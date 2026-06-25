@@ -13,24 +13,29 @@ export function useCommunityStories(viewerId: string | undefined, authorIds: str
 
   const authorKey = useMemo(() => [...new Set(authorIds.filter(Boolean))].sort().join(","), [authorIds]);
 
-  const refresh = useCallback(() => setRevision((r) => r + 1), []);
+  const refresh = useCallback(() => {
+    setLoading(true);
+    setRevision((r) => r + 1);
+  }, []);
 
   useEffect(() => {
     if (!viewerId || !authorKey) {
       setStoriesByAuthor(new Map());
+      setLoading(false);
       return;
     }
     let cancelled = false;
-    setLoading(true);
     const ids = authorKey.split(",").filter(Boolean);
     void fetchActiveStoriesForAuthors(ids).then((res) => {
       if (cancelled) return;
       setLoading(false);
-      const map = new Map<string, CommunityStoryRow>();
-      for (const row of res.data ?? []) {
-        map.set(row.author_id, row);
-      }
-      setStoriesByAuthor(map);
+      setStoriesByAuthor((prev) => {
+        const next = new Map(prev);
+        for (const row of res.data ?? []) {
+          next.set(row.author_id, row);
+        }
+        return next;
+      });
     });
     return () => {
       cancelled = true;

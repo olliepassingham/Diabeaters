@@ -72,6 +72,7 @@ import {
   COMMUNITY_FEED_STALE_MS,
   getCommunityFeedNextPageParam,
 } from "@/lib/community-feed-cache";
+import { APP_SCROLL_MAIN_ID } from "@/lib/app-scroll";
 
 function mapPostRowsInInfiniteData(
   old: InfiniteData<CommunityPostRow[]> | undefined,
@@ -297,12 +298,13 @@ export function FeedPostList(props: {
   useEffect(() => {
     const el = loadMoreSentinelRef.current;
     if (!el || !feedQuery.hasNextPage || loadingPosts) return;
+    const scrollRoot = document.getElementById(APP_SCROLL_MAIN_ID);
     const obs = new IntersectionObserver(
       (entries) => {
         if (!entries[0]?.isIntersecting || feedQuery.isFetchingNextPage) return;
         void feedQuery.fetchNextPage();
       },
-      { rootMargin: "240px" },
+      { root: scrollRoot, rootMargin: "240px" },
     );
     obs.observe(el);
     return () => obs.disconnect();

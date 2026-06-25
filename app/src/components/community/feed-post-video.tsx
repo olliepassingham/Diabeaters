@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, Volume2, VolumeX } from "lucide-react";
+import { APP_SCROLL_MAIN_ID } from "@/lib/app-scroll";
+import { claimActiveFeedVideo, releaseActiveFeedVideo } from "@/lib/feed-video-playback";
 import { getPostVideoSignedUrl } from "@/lib/community/posts-supabase";
 import { cn } from "@/lib/utils";
 
@@ -7,6 +9,8 @@ type Props = {
   path: string;
   className?: string;
 };
+
+const PLAY_THRESHOLD = 0.6;
 
 export function FeedPostVideo({ path, className }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -33,26 +37,38 @@ export function FeedPostVideo({ path, className }: Props) {
 
   useEffect(() => {
     const el = containerRef.current;
-    if (!el || !src) return;
+    const video = videoRef.current;
+    if (!el || !src || !video) return;
+
+    const scrollRoot = document.getElementById(APP_SCROLL_MAIN_ID);
 
     const observer = new IntersectionObserver(
       (entries) => {
         const entry = entries[0];
-        const video = videoRef.current;
-        if (!video || !entry) return;
-        if (entry.isIntersecting && entry.intersectionRatio >= 0.55) {
-          void video.play().catch(() => {
+        if (!entry || !videoRef.current) return;
+        const v = videoRef.current;
+        if (entry.isIntersecting && entry.intersectionRatio >= PLAY_THRESHOLD) {
+          claimActiveFeedVideo(v);
+          void v.play().catch(() => {
             /* autoplay blocked */
           });
         } else {
-          video.pause();
+          v.pause();
+          releaseActiveFeedVideo(v);
         }
       },
-      { threshold: [0, 0.55, 0.85] },
+      {
+        root: scrollRoot,
+        threshold: [0, PLAY_THRESHOLD, 1],
+        rootMargin: "0px 0px -8% 0px",
+      },
     );
 
     observer.observe(el);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      releaseActiveFeedVideo(video);
+    };
   }, [src]);
 
   useEffect(() => {
@@ -106,8 +122,7 @@ export function FeedPostVideo({ path, className }: Props) {
           muted={muted}
           loop
           playsInline
-          autoPlay
-          preload="auto"
+          preload="metadata"
           className="aspect-[4/5] max-h-[min(85vw,32rem)] w-full object-cover"
           onPlay={() => setPlaying(true)}
           onPause={() => setPlaying(false)}

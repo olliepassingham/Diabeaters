@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useSearch } from "wouter";
+import { useQueryClient } from "@tanstack/react-query";
 import { Bookmark, MessageCircle, Search as SearchIcon } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { FeedFollowSuggestionsStrip } from "@/components/community/feed-follow-suggestions-strip";
@@ -51,7 +52,8 @@ import {
   dismissFeedSuggestions,
   isFeedSuggestionsDismissed,
 } from "@/lib/community/feed-suggestions-dismiss";
-import { buildMainFeedScopeKey, MAIN_FEED_PAGE_SIZE } from "@/lib/community-feed-cache";
+import { buildMainFeedScopeKey, COMMUNITY_FEED_QUERY_ROOT, MAIN_FEED_PAGE_SIZE } from "@/lib/community-feed-cache";
+import { getAppScrollMain, setAppScrollTop } from "@/lib/app-scroll";
 import { CommunityPushPromptDialog } from "@/components/community-push-prompt-dialog";
 import { useCommunityPushPromptAfterOnboarding } from "@/hooks/use-community-push-prompt-after-onboarding";
 
@@ -100,25 +102,30 @@ export default function CommunityHomePage() {
   const { toast } = useToast();
   const [pathname, setLocation] = useLocation();
   const search = useSearch();
+  const queryClient = useQueryClient();
   const [feedTab, setFeedTab] = useState<FeedTab>(() => readStoredFeedTab());
   /** `null` = all topics. */
   const [topicFilter, setTopicFilter] = useState<CommunityTopicId | null>(null);
   const [feedSearch, setFeedSearch] = useState("");
 
-  const [feedListKey, setFeedListKey] = useState(0);
+  const [feedListRevision, setFeedListRevision] = useState(0);
   const [composerPanelOpen, setComposerPanelOpen] = useState(initialFeedComposerOpen);
   const isMobile = useIsMobile();
   const feedComposer = useFeedComposer({
     closeSheetOnPost: isMobile,
-    onPosted: () => setFeedListKey((k) => k + 1),
+    onPosted: () => {
+      void queryClient.invalidateQueries({ queryKey: [COMMUNITY_FEED_QUERY_ROOT] });
+      setFeedListRevision((k) => k + 1);
+    },
   });
   const orderedTopics = feedComposer.formBodyProps.orderedTopics;
 
   const [peopleOpen, setPeopleOpen] = useState(false);
   const [suggested, setSuggested] = useState<FollowSuggestion[]>([]);
   const [suggestedLoading, setSuggestedLoading] = useState(false);
+  const [suggestionsFetched, setSuggestionsFetched] = useState(false);
   const [followBusyIds, setFollowBusyIds] = useState<Record<string, boolean>>({});
-  /** Current user’s followees — refreshed when Find people opens so search results show Following vs Follow. */
+  /** Current user’s followees — loaded on feed mount for suggestion strip + Find people. */
   const [followeeIds, setFolloweeIds] = useState<Set<string>>(() => new Set());
   const [followeesLoading, setFolloweesLoading] = useState(false);
   const [savedOnly, setSavedOnly] = useState(false);
@@ -153,28 +160,27 @@ export default function CommunityHomePage() {
     setSuggestionsDismissed(isFeedSuggestionsDismissed(user.id));
   }, [user?.id]);
 
-  // Preserve scroll position across Everyone / Following toggles.
+  // Preserve scroll position across Everyone / Following toggles (app main scroll container).
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    const scrollEl = getAppScrollMain();
+    if (!scrollEl) return;
     const onScroll = () => {
-      const y = window.scrollY ?? 0;
+      const y = scrollEl.scrollTop;
       setScrollByTab((prev) => (prev[feedTab] === y ? prev : { ...prev, [feedTab]: y }));
     };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    scrollEl.addEventListener("scroll", onScroll, { passive: true });
+    return () => scrollEl.removeEventListener("scroll", onScroll);
   }, [feedTab]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
     const y = scrollByTab[feedTab] ?? 0;
-    // Defer to next frame so layout is settled (prevents "jump then jump again" on mobile).
-    window.requestAnimationFrame(() => window.scrollTo({ top: y, left: 0, behavior: "auto" }));
+    window.requestAnimationFrame(() => setAppScrollTop(y, "auto"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [feedTab]);
 
   const feedCacheScope = useMemo(
-    () => buildMainFeedScopeKey({ feedTab, topicFilter, savedOnly, feedSearch, feedListKey }),
-    [feedTab, topicFilter, savedOnly, feedSearch, feedListKey],
+    () => buildMainFeedScopeKey({ feedTab, topicFilter, savedOnly, feedSearch }),
+    [feedTab, topicFilter, savedOnly, feedSearch],
   );
 
   const hasFeedHandle = feedComposer.hasFeedHandle;
@@ -388,13 +394,9 @@ export default function CommunityHomePage() {
   }, [search, setLocation, pathname]);
 
   useEffect(() => {
-    if (!peopleOpen) {
-      setFolloweeIds(new Set());
-      setFolloweesLoading(false);
-      return;
-    }
     if (!user?.id) {
       setFolloweeIds(new Set());
+      setFolloweesLoading(false);
       return;
     }
     let cancelled = false;
@@ -411,6 +413,18 @@ export default function CommunityHomePage() {
     return () => {
       cancelled = true;
     };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!peopleOpen || !user?.id) return;
+    let cancelled = false;
+    void listFolloweeIdsForCurrentUser().then((res) => {
+      if (cancelled || res.error) return;
+      setFolloweeIds(new Set(res.ids));
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [peopleOpen, user?.id]);
 
   const loadSuggestedPeople = useCallback(async () => {
@@ -420,17 +434,18 @@ export default function CommunityHomePage() {
     if (!res.error) setSuggested(res.data);
     else setSuggested([]);
     setSuggestedLoading(false);
+    setSuggestionsFetched(true);
   }, [user?.id]);
 
   const refreshSuggestedForFindPeople = useCallback(() => {
-    if (!user?.id || suggestedLoading || suggested.length > 0) return;
+    if (!user?.id || suggestedLoading) return;
+    if (suggested.length > 0) return;
     void loadSuggestedPeople();
   }, [user?.id, suggestedLoading, suggested.length, loadSuggestedPeople]);
 
-  // Discovery — deferred until idle so the feed load is not competing on weak WiFi.
+  // Discovery — deferred until idle; fetch once so the strip does not flash repeatedly.
   useEffect(() => {
-    if (!user?.id) return;
-    if (suggestedLoading || suggested.length > 0) return;
+    if (!user?.id || suggestionsFetched) return;
     if (savedOnly || feedSearch.trim()) return;
 
     let cancelled = false;
@@ -453,7 +468,7 @@ export default function CommunityHomePage() {
       if (idleId) window.cancelIdleCallback(idleId);
       if (timeoutId) window.clearTimeout(timeoutId);
     };
-  }, [user?.id, savedOnly, feedSearch, suggestedLoading, suggested.length, loadSuggestedPeople]);
+  }, [user?.id, savedOnly, feedSearch, suggestionsFetched, loadSuggestedPeople]);
 
   async function handleFollow(id: string) {
     if (!user?.id) {
@@ -920,10 +935,10 @@ export default function CommunityHomePage() {
         ) : null}
       </div>
 
-      {user && !savedOnly && !feedSearch.trim() && !suggestionsDismissed ? (
+      {user && !savedOnly && !feedSearch.trim() && !suggestionsDismissed && (suggestedLoading || suggested.length > 0) ? (
         <FeedFollowSuggestionsStrip
           suggestions={suggested}
-          loading={suggestedLoading}
+          loading={suggestedLoading && suggested.length === 0}
           followeeIds={followeeIds}
           followBusyIds={followBusyIds}
           onFollow={(id) => void handleFollow(id)}
@@ -938,7 +953,6 @@ export default function CommunityHomePage() {
 
       <div className="-mx-4 min-w-0 md:-mx-6">
       <FeedPostList
-        key={feedListKey}
         viewerId={user?.id}
         scopeKey={feedCacheScope}
         searchQuery={feedSearch}
@@ -950,7 +964,7 @@ export default function CommunityHomePage() {
         followingAuthorIds={followingAuthorIds}
         searchMatchedAuthorIds={searchMatchedAuthorIds}
         savedOnly={savedOnly}
-        feedListRevision={feedListKey}
+        feedListRevision={feedListRevision}
         onOpenFindPeople={() => setPeopleOpen(true)}
         onSwitchToEveryone={() => {
           setFeedTab("everyone");

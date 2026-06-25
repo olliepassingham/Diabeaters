@@ -217,22 +217,25 @@ function FindPeoplePanelBody({
             ) : null}
             {peopleResults.length > 0 ? (
               <ul className="space-y-2">
-                {peopleResults.map((p) => (
-                  <FindPeoplePersonRow
-                    key={p.id}
-                    person={p}
-                    isSelf={Boolean(userId && p.id === userId)}
-                    alreadyFollowing={Boolean(userId && followeeIds.has(p.id))}
-                    busy={Boolean(followBusyIds[p.id])}
-                    waitFollowees={Boolean(userId && followeesLoading)}
-                    hasUser={Boolean(userId)}
-                    onFollow={() => onFollow(p.id)}
-                    storyRing={alreadyFollowing ? ringState(p.id) : "none"}
-                    onStoryClick={
-                      alreadyFollowing && onStoryClick ? () => onStoryClick(p.id, p.name) : undefined
-                    }
-                  />
-                ))}
+                {peopleResults.map((p) => {
+                  const isFollowing = Boolean(userId && followeeIds.has(p.id));
+                  return (
+                    <FindPeoplePersonRow
+                      key={p.id}
+                      person={p}
+                      isSelf={Boolean(userId && p.id === userId)}
+                      alreadyFollowing={isFollowing}
+                      busy={Boolean(followBusyIds[p.id])}
+                      waitFollowees={Boolean(userId && followeesLoading)}
+                      hasUser={Boolean(userId)}
+                      onFollow={() => onFollow(p.id)}
+                      storyRing={isFollowing ? ringState(p.id) : "none"}
+                      onStoryClick={
+                        isFollowing && onStoryClick ? () => onStoryClick(p.id, p.name) : undefined
+                      }
+                    />
+                  );
+                })}
               </ul>
             ) : null}
           </div>
@@ -260,29 +263,32 @@ function FindPeoplePanelBody({
               </p>
             ) : (
               <ul className="space-y-2">
-                {suggested.map((p) => (
-                  <FindPeoplePersonRow
-                    key={p.id}
-                    person={{
-                      id: p.id,
-                      name: p.name,
-                      avatar_url: p.avatar_url,
-                      handle: p.handle,
-                      reasonLabel: p.reasonLabel,
-                    }}
-                    showReason
-                    isSelf={Boolean(userId && p.id === userId)}
-                    alreadyFollowing={Boolean(userId && followeeIds.has(p.id))}
-                    busy={Boolean(followBusyIds[p.id])}
-                    waitFollowees={Boolean(userId && followeesLoading)}
-                    hasUser={Boolean(userId)}
-                    onFollow={() => onFollow(p.id)}
-                    storyRing={alreadyFollowing ? ringState(p.id) : "none"}
-                    onStoryClick={
-                      alreadyFollowing && onStoryClick ? () => onStoryClick(p.id, p.name) : undefined
-                    }
-                  />
-                ))}
+                {suggested.map((p) => {
+                  const isFollowing = Boolean(userId && followeeIds.has(p.id));
+                  return (
+                    <FindPeoplePersonRow
+                      key={p.id}
+                      person={{
+                        id: p.id,
+                        name: p.name,
+                        avatar_url: p.avatar_url,
+                        handle: p.handle,
+                        reasonLabel: p.reasonLabel,
+                      }}
+                      showReason
+                      isSelf={Boolean(userId && p.id === userId)}
+                      alreadyFollowing={isFollowing}
+                      busy={Boolean(followBusyIds[p.id])}
+                      waitFollowees={Boolean(userId && followeesLoading)}
+                      hasUser={Boolean(userId)}
+                      onFollow={() => onFollow(p.id)}
+                      storyRing={isFollowing ? ringState(p.id) : "none"}
+                      onStoryClick={
+                        isFollowing && onStoryClick ? () => onStoryClick(p.id, p.name) : undefined
+                      }
+                    />
+                  );
+                })}
               </ul>
             )}
           </div>
@@ -332,7 +338,7 @@ export function FindPeoplePanel({
     return [...ids];
   }, [peopleResults, suggested]);
 
-  const { ringState, storiesByAuthor } = useCommunityStories(userId, visibleAuthorIds);
+  const { ringState, storiesByAuthor } = useCommunityStories(userId, open ? visibleAuthorIds : []);
 
   useEffect(() => {
     if (!open) {
