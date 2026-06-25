@@ -156,22 +156,23 @@ export function AppointmentsWidget(props: DashboardWidgetLayoutProps) {
             </div>
           </Link>
           <p className="text-small text-muted-foreground uppercase tracking-wide mt-1 pl-0 sm:pl-7">
-            Upcoming visits
+            {appointments.length > 0 ? "Upcoming visits" : null}
           </p>
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-3 p-4 pt-0 md:px-6 md:pb-6">
         {appointments.length === 0 ? (
           <HomeCardEmpty
+            compact
             icon={Calendar}
             title="No upcoming appointments"
-            description="Add clinic visits to see them here and on your calendar."
+            description="Add clinic visits to see them on your calendar."
           >
-            <Link href="/appointments" className="w-full max-w-xs">
+            <Link href="/appointments" className="w-full">
               <Button
                 variant="secondary"
                 size="sm"
-                className="w-full min-h-10 gap-1.5 font-medium shadow-sm border border-border/80"
+                className="w-full min-h-9 gap-1.5 text-xs font-medium shadow-sm border border-border/80"
                 data-testid="button-add-appointment-widget"
               >
                 <Plus className="h-3.5 w-3.5 shrink-0" aria-hidden />

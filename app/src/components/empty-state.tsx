@@ -9,12 +9,41 @@ type EmptyStateProps = {
   icon?: LucideIcon;
   className?: string;
   children?: ReactNode;
+  /** Shorter inline layout for dashboard widget empty slots. */
+  compact?: boolean;
 };
 
 /**
  * Illustration-free empty state: soft card, display title, optional actions.
  */
-export function EmptyState({ title, description, icon: Icon, className, children }: EmptyStateProps) {
+export function EmptyState({ title, description, icon: Icon, className, children, compact }: EmptyStateProps) {
+  if (compact) {
+    return (
+      <div
+        className={cn(
+          "animate-soft-in rounded-xl border border-dashed border-border/55 bg-muted/20 px-3 py-2.5 text-left",
+          className,
+        )}
+        role="status"
+      >
+        <div className="flex items-start gap-2.5">
+          {Icon ? (
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/[0.08] ring-1 ring-primary/[0.12]">
+              <Icon className="h-4 w-4 text-primary" aria-hidden />
+            </div>
+          ) : null}
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium leading-snug text-foreground">{title}</p>
+            {description ? (
+              <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{description}</p>
+            ) : null}
+          </div>
+        </div>
+        {children ? <div className="mt-2.5 flex flex-wrap gap-2">{children}</div> : null}
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(

@@ -12,7 +12,7 @@ export function WidgetCard({
     <Card
       variant={variant}
       className={cn(
-        "pressable card-interactive dashboard-card-hover h-full flex flex-col overflow-hidden rounded-2xl border border-border/55 shadow-sm ring-1 ring-border/20 dark:border-border/45",
+        "pressable card-interactive dashboard-card-hover flex flex-col overflow-hidden rounded-2xl border border-border/55 shadow-sm ring-1 ring-border/20 dark:border-border/45",
         variant === "glass-muted" && "ring-0",
         className,
       )}

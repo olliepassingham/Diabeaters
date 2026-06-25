@@ -1731,6 +1731,7 @@ export default function CarerViewPage() {
               <CardContent>
                 {hypoLogs.length === 0 ? (
                   <CarerCardEmpty
+                    compact
                     icon={Heart}
                     title="No hypos shared yet"
                     description="When they log a hypo and share alerts with you, it will appear here."
@@ -1818,6 +1819,7 @@ export default function CarerViewPage() {
               <CardContent>
                 {supplies.length === 0 ? (
                   <CarerCardEmpty
+                    compact
                     icon={Package}
                     title="No supplies shared yet"
                     description="They can enable supply sharing in their supporter link settings."
@@ -1883,6 +1885,7 @@ export default function CarerViewPage() {
               <CardContent className="space-y-3">
                 {scenarioLines.length === 0 ? (
                   <CarerCardEmpty
+                    compact
                     icon={Plane}
                     title="No situations shared"
                     description="Travel, sick day, or bedtime flags will show here when shared."
@@ -1930,6 +1933,7 @@ export default function CarerViewPage() {
                 <CardContent className="space-y-3">
                   {carerActivityWeek.countLast7Days === 0 ? (
                     <CarerCardEmpty
+                      compact
                       icon={History}
                       title="Quiet week"
                       description="No shared activity in the last 7 days."
@@ -1969,6 +1973,7 @@ export default function CarerViewPage() {
               <CardContent>
                 {upcomingAppointments.length === 0 ? (
                   <CarerCardEmpty
+                    compact
                     icon={Calendar}
                     title="No upcoming appointments"
                     description="Shared clinic visits will appear here when scheduled."

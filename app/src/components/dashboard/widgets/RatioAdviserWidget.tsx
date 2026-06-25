@@ -20,6 +20,7 @@ import { WidgetCard } from "./WidgetCard";
 import type { DashboardWidgetLayoutProps } from "./types";
 import { isCompactLayout } from "./types";
 import { cn } from "@/lib/utils";
+import { HomeCardEmpty } from "@/components/home/home-ui";
 function getScenarioFactor(scenarioState: ScenarioState): { factor: number; label: string; icon: typeof Pill } | null {
   if (scenarioState.sickDayActive) {
     const severity = scenarioState.sickDaySeverity || "moderate";
@@ -162,7 +163,7 @@ export function RatioAdviserWidget(props: DashboardWidgetLayoutProps) {
           </div>
         </Link>
         <p className="text-[0.65rem] leading-snug text-muted-foreground mt-0.5">
-          Tap a meal row for quick meal planner · title opens ratio setup
+          {hasRatios ? "Tap a meal row for quick meal planner · title opens ratio setup" : null}
         </p>
       </CardHeader>
       <CardContent className="flex flex-col gap-2 p-3 pt-0 md:px-4 md:pb-3">
@@ -237,10 +238,12 @@ export function RatioAdviserWidget(props: DashboardWidgetLayoutProps) {
             })}
           </div>
         ) : (
-          <div className="space-y-0.5 py-1 text-center">
-            <p className="text-sm text-muted-foreground">No ratios set yet.</p>
-            <p className="text-[0.65rem] leading-snug text-muted-foreground">Set breakfast, lunch, and dinner in one place.</p>
-          </div>
+          <HomeCardEmpty
+            compact
+            icon={Syringe}
+            title="No ratios set yet"
+            description="Set breakfast, lunch, and dinner in one place."
+          />
         )}
 
         {!hasRatios && (
@@ -265,7 +268,7 @@ export function RatioAdviserWidget(props: DashboardWidgetLayoutProps) {
           </div>
         )}
 
-        {!compact && (
+        {hasRatios && !compact && (
           <div className="flex items-start gap-1.5 rounded-md bg-muted/40 px-2 py-1 text-[0.65rem] leading-snug text-muted-foreground">
             <AlertCircle className="mt-px h-3 w-3 shrink-0 opacity-80" aria-hidden />
             <span>Not medical advice — follow your care team.</span>

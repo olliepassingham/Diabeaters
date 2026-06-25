@@ -10,6 +10,7 @@ import type { DashboardWidgetLayoutProps } from "./types";
 import { isCompactLayout } from "./types";
 import { useSupporterSession } from "@/hooks/use-supporter-session";
 import { emergencyDetailsEditHref } from "@/lib/emergency-details-edit-href";
+import { HomeCardEmpty } from "@/components/home/home-ui";
 
 export function HelpNowInfoWidget(props: DashboardWidgetLayoutProps) {
   const compact = isCompactLayout(props);
@@ -31,7 +32,9 @@ export function HelpNowInfoWidget(props: DashboardWidgetLayoutProps) {
             <CardTitle className="text-h3 text-foreground">Emergency information</CardTitle>
           </div>
         </Link>
-        <p className="text-small text-muted-foreground uppercase tracking-wide mt-1">Urgent help</p>
+        <p className="text-small text-muted-foreground uppercase tracking-wide mt-1">
+          {primaryContact ? "Urgent help" : null}
+        </p>
       </CardHeader>
       <CardContent className="flex flex-col gap-3 p-4 pt-0 md:px-6 md:pb-6">
         {primaryContact ? (
@@ -54,7 +57,12 @@ export function HelpNowInfoWidget(props: DashboardWidgetLayoutProps) {
             </div>
           </div>
         ) : (
-          <p className="text-body text-muted-foreground text-center py-1">No emergency contacts set up yet.</p>
+          <HomeCardEmpty
+            compact
+            icon={User}
+            title="No emergency contacts yet"
+            description="Add a contact so supporters know who to call."
+          />
         )}
 
         <div className={cn("grid gap-2", compact ? "grid-cols-1" : "grid-cols-2")}>

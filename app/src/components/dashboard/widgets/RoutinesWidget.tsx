@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Repeat, ArrowRight, Clock, Star, Utensils, Coffee, Sun, Moon, Cookie } from "lucide-react";
+import { Repeat, ArrowRight, Clock, Star, Utensils, Coffee, Sun, Moon, Cookie, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link } from "wouter";
 import { storage, Routine, RoutineMealType } from "@/lib/storage";
@@ -9,6 +9,7 @@ import { formatDistanceToNow } from "date-fns";
 import { WidgetCard } from "./WidgetCard";
 import type { DashboardWidgetLayoutProps } from "./types";
 import { isCompactLayout } from "./types";
+import { HomeCardEmpty } from "@/components/home/home-ui";
 
 function getMealIcon(type: RoutineMealType) {
   switch (type) {
@@ -90,7 +91,9 @@ export function RoutinesWidget(props: DashboardWidgetLayoutProps) {
             )}
           </div>
         </Link>
-        <p className="text-small text-muted-foreground uppercase tracking-wide mt-1">Saved meals</p>
+        <p className="text-small text-muted-foreground uppercase tracking-wide mt-1">
+          {hasRoutines ? "Saved meals" : null}
+        </p>
       </CardHeader>
       <CardContent className="flex flex-col gap-3 p-4 pt-0 md:px-6 md:pb-6">
         {hasRoutines ? (
@@ -141,23 +144,39 @@ export function RoutinesWidget(props: DashboardWidgetLayoutProps) {
             )}
           </div>
         ) : (
-          <div className="text-center py-2 space-y-1">
-            <p className="text-body text-muted-foreground">No routines saved yet.</p>
-            <p className="text-small text-muted-foreground">Save regular meals under Tools → Routines for quick reference.</p>
-          </div>
+          <HomeCardEmpty
+            compact
+            icon={Repeat}
+            title="No routines saved yet"
+            description="Save regular meals under Tools → Routines."
+          >
+            <Link href="/routines" className="w-full">
+              <Button
+                variant="secondary"
+                size="sm"
+                className="w-full min-h-9 gap-1.5 text-xs font-medium shadow-sm border border-border/80"
+                data-testid="button-view-routines"
+              >
+                <Plus className="h-3.5 w-3.5" aria-hidden />
+                Create a routine
+              </Button>
+            </Link>
+          </HomeCardEmpty>
         )}
 
-        <Link href="/routines" className="mt-auto">
+        {hasRoutines && (
+        <Link href="/routines">
           <Button
             variant="secondary"
             size="sm"
             className="w-full min-h-10 gap-1.5 font-medium shadow-sm border border-border/80"
             data-testid="button-view-routines"
           >
-            {hasRoutines ? "View all routines" : "Create a routine"}
+            View all routines
             <ArrowRight className="h-3.5 w-3.5" aria-hidden />
           </Button>
         </Link>
+        )}
       </CardContent>
     </WidgetCard>
   );

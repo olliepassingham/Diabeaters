@@ -216,14 +216,16 @@ export function HomeCardEmpty({
   description,
   icon,
   children,
+  compact,
 }: {
   title: string;
   description?: string;
   icon?: LucideIcon;
   children?: ReactNode;
+  compact?: boolean;
 }) {
   return (
-    <EmptyState title={title} description={description} icon={icon} className="py-6">
+    <EmptyState title={title} description={description} icon={icon} compact={compact} className={compact ? undefined : "py-6"}>
       {children}
     </EmptyState>
   );

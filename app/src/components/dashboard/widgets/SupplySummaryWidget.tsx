@@ -1,7 +1,8 @@
 import { useMemo, useState, useEffect } from "react";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Package, AlertTriangle, Syringe, Activity, Plug, Cylinder } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Package, AlertTriangle, Syringe, Activity, Plug, Cylinder, Plus } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import { getUnitsPerPen, storage, Supply } from "@/lib/storage";
@@ -132,16 +133,29 @@ export function SupplySummaryWidget(props: DashboardWidgetLayoutProps) {
           )}
         </div>
         <p className="text-small text-muted-foreground uppercase tracking-wide mt-0.5">
-          Stock &amp; estimated run-out · tap an item to open it
+          {supplies.length > 0 ? "Stock & estimated run-out · tap an item to open it" : null}
         </p>
       </CardHeader>
       <CardContent className="flex flex-col gap-2.5 p-4 pt-0 md:px-6 md:pb-5">
         {supplies.length === 0 ? (
           <HomeCardEmpty
+            compact
             icon={Package}
             title="No supplies tracked yet"
-            description="Add items in Supply Tracker to see stock and runway here."
-          />
+            description="Add items in Supply Tracker to see stock and runway."
+          >
+            <Link href="/supplies" className="w-full">
+              <Button
+                variant="secondary"
+                size="sm"
+                className="w-full min-h-9 gap-1.5 text-xs font-medium shadow-sm border border-border/80"
+                data-testid="button-add-supplies-widget"
+              >
+                <Plus className="h-3.5 w-3.5" aria-hidden />
+                Add supplies
+              </Button>
+            </Link>
+          </HomeCardEmpty>
         ) : minDays !== null ? (
           <div
             className={cn(

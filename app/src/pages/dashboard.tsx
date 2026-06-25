@@ -78,6 +78,7 @@ import {
   shouldShowHeroGlanceLine,
   type HealthStatus,
 } from "@/lib/dashboard-health-status";
+import { cn } from "@/lib/utils";
 
 const VERIFIED_WELCOME_PENDING_KEY = "diabeater_verified_welcome_pending";
 const VERIFIED_WELCOME_DISMISSED_AT_KEY = "diabeater_verified_welcome_dismissed_at";
@@ -1046,7 +1047,7 @@ export default function Dashboard() {
       />
 
       <section className="animate-stagger space-y-3 sm:space-y-4 pt-2" data-testid="dashboard-widgets">
-        <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2">
+        <div className="grid grid-cols-1 items-start gap-4 sm:gap-6 md:grid-cols-2">
           {widgetsToRender.map((w) => {
             const Comp = w.Component;
             if (!Comp) return null;
@@ -1054,7 +1055,10 @@ export default function Dashboard() {
               <div
                 key={w.id}
                 data-testid={`widget-container-${w.type}`}
-                className={isMobile || w.size === "full" ? "md:col-span-2" : undefined}
+                className={cn(
+                  "w-full self-start",
+                  (isMobile || w.size === "full") && "md:col-span-2",
+                )}
               >
                 <Comp layoutSize={isMobile ? "full" : w.size} />
               </div>

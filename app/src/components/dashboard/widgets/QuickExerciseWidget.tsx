@@ -194,7 +194,9 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
             <CardTitle className="text-h3 text-foreground">Quick exercise</CardTitle>
           </div>
         </Link>
-        <p className="text-small text-muted-foreground uppercase tracking-wide mt-1">Start a saved workout</p>
+        <p className="text-small text-muted-foreground uppercase tracking-wide mt-1">
+          {exercises.length > 0 || activeSession ? "Start a saved workout" : null}
+        </p>
       </CardHeader>
       <CardContent className="flex flex-col gap-3 p-4 pt-0 md:px-6 md:pb-6">
         {travelActiveTripHint ? (
@@ -277,32 +279,40 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
           </>
         ) : (
           <HomeCardEmpty
+            compact
             icon={Dumbbell}
             title="No saved exercises yet"
-            description="Save workouts under Tools → Routines (Exercise) for quick access here."
-          />
+            description="Save workouts under Tools → Routines (Exercise)."
+          >
+            <Link href="/routines?section=exercise" className="w-full">
+              <Button
+                variant="secondary"
+                size="sm"
+                className="w-full min-h-9 gap-1.5 text-xs font-medium shadow-sm border border-border/80"
+                data-testid="button-exercise-action"
+              >
+                <Plus className="h-3.5 w-3.5" aria-hidden />
+                Add exercises
+              </Button>
+            </Link>
+          </HomeCardEmpty>
         )}
 
-        <Link href={plannerCtaHref} className="mt-auto">
+        {(exercises.length > 0 || activeSession) && (
+        <Link href={plannerCtaHref}>
           <Button
             variant="secondary"
             size="sm"
             className="w-full min-h-10 gap-1.5 font-medium shadow-sm border border-border/80"
             data-testid="button-exercise-action"
           >
-            {exercises.length > 0 || activeSession ? (
-              <>
-                {plannerCtaLabel}
-                <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-              </>
-            ) : (
-              <>
-                <Plus className="h-3.5 w-3.5" aria-hidden />
-                Add exercises
-              </>
-            )}
+            <>
+              {plannerCtaLabel}
+              <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+            </>
           </Button>
         </Link>
+        )}
       </CardContent>
     </WidgetCard>
   );
