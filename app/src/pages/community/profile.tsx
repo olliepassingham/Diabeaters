@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useRoute } from "wouter";
-import { ChevronRight, Grid3X3, LayoutList, MessageCircle, Plus, UserCheck, UserPlus } from "lucide-react";
+import { ChevronRight, Grid3X3, LayoutList, MessageCircle, MoreHorizontal, Plus, UserCheck, UserPlus } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11,7 +11,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   ProfileAvatarTile,
   ProfileBioPreview,
@@ -19,12 +24,13 @@ import {
   ProfileFollowStats,
   ProfileHandle,
   ProfileHeroCard,
-  ProfileHeroRow,
   ProfileMetaRow,
   ProfileMutedCard,
   ProfileSectionHeading,
   ProfileSupportedPersonBadge,
+  ProfileInlineActionRow,
 } from "@/components/profile/profile-ui";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -32,7 +38,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { PageBackButton, PageShell } from "@/components/layout";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { FeedPostList } from "@/components/community/feed-post-list";
 import { ProfilePostMediaGrid } from "@/components/community/profile-post-media-grid";
@@ -329,8 +335,8 @@ export default function CommunityProfilePage() {
 
   if (!isSupabaseConfigured()) {
     return (
-      <PageShell variant="standard" className="max-w-lg mx-auto space-y-4">
-        <PageHeader leading={<PageBackButton />} title="Profile" />
+      <PageShell variant="standard" className="max-w-lg mx-auto space-y-3">
+        <PageBackButton />
         <p className="text-sm text-muted-foreground">Connect Supabase to view public profiles.</p>
       </PageShell>
     );
@@ -338,8 +344,8 @@ export default function CommunityProfilePage() {
 
   if (!userId) {
     return (
-      <PageShell variant="standard" className="max-w-lg mx-auto space-y-4">
-        <PageHeader leading={<PageBackButton />} title="Profile" />
+      <PageShell variant="standard" className="max-w-lg mx-auto space-y-3">
+        <PageBackButton />
         <p className="text-sm text-muted-foreground">Invalid link.</p>
       </PageShell>
     );
@@ -354,51 +360,16 @@ export default function CommunityProfilePage() {
       : null;
 
   return (
-    <PageShell variant="standard" className="max-w-lg mx-auto space-y-5 pb-4">
-      <PageHeader
-        leading={<PageBackButton />}
-        title="Profile"
-        actions={
-          isSelf ? (
-            <Button variant="outline" size="sm" className="rounded-full" asChild>
-              <Link href="/account#profile">Edit</Link>
-            </Button>
-          ) : !isSelf && user && profile ? (
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant={followingThem ? "secondary" : "default"}
-                disabled={followBusy || blockStatus.iBlockedThem || blockStatus.theyBlockedMe}
-                onClick={() => void toggleFollow()}
-                className="gap-1.5 rounded-full"
-              >
-                {followingThem ? (
-                  <UserCheck className="h-4 w-4 shrink-0" aria-hidden />
-                ) : (
-                  <UserPlus className="h-4 w-4 shrink-0" aria-hidden />
-                )}
-                {followingThem ? "Following" : "Follow"}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={blockStatus.iBlockedThem || blockStatus.theyBlockedMe}
-                onClick={() => void openMessages()}
-                className="gap-1.5 rounded-full"
-              >
-                <MessageCircle className="h-4 w-4 shrink-0" aria-hidden />
-                Message
-              </Button>
-            </div>
-          ) : !isSelf && !user && profile && !loading && !authLoading ? (
-            <Button variant="outline" size="sm" className="rounded-full" asChild>
-              <Link href={loginNextHref}>Sign in</Link>
-            </Button>
-          ) : null
-        }
-      />
+    <PageShell variant="standard" className="max-w-lg mx-auto space-y-3 pb-4">
+      <div className="flex items-center justify-between gap-2">
+        <PageBackButton />
+        {isSelf && profile ? (
+          <Button variant="ghost" size="sm" className="h-8 rounded-full px-3 text-xs" asChild>
+            <Link href="/account#profile">Edit</Link>
+          </Button>
+        ) : null}
+      </div>
+      <h1 className="sr-only">{profile ? displayName : "Profile"}</h1>
 
       {loading || authLoading ? (
         <ProfileMutedCard>
@@ -409,11 +380,11 @@ export default function CommunityProfilePage() {
           <p className="text-sm text-muted-foreground">{loadError ?? "Profile not found."}</p>
         </ProfileMutedCard>
       ) : (
-        <ProfileHeroCard testId="public-profile-hero">
-          <div className="flex flex-col gap-3">
-            <ProfileHeroRow
-              avatar={
-                storyRing !== "none" && activeStory && canViewStory ? (
+        <ProfileHeroCard testId="public-profile-hero" compact flat>
+          <div className="space-y-2">
+            <div className="flex items-start gap-3">
+              <div className="shrink-0">
+                {storyRing !== "none" && activeStory && canViewStory ? (
                   <StoryAvatarRing
                     state={storyRing}
                     onClick={() => setStoryViewerOpen(true)}
@@ -439,72 +410,117 @@ export default function CommunityProfilePage() {
                     alt={displayName}
                     size="md"
                   />
-                )
-              }
-            >
-              <ProfileDisplayName compact name={displayName} />
-              <ProfileMetaRow>
-                {profile.public_handle ? <ProfileHandle handle={profile.public_handle} /> : null}
-                <ProfileStreakBadges streaks={profile.streaks ?? profile.achievements ?? []} size="sm" />
-                {isSelf && !profile.is_public ? (
-                  <span className="inline-flex rounded-full border border-amber-500/35 bg-amber-500/[0.08] px-2 py-0.5 text-[11px] font-medium text-amber-950 dark:text-amber-100">
-                    Hidden from others
-                  </span>
-                ) : null}
-              </ProfileMetaRow>
-              <ProfileFollowStats
-                followers={counts.followers}
-                following={counts.following}
-                onFollowersClick={() => void openList("followers")}
-                onFollowingClick={() => void openList("following")}
-              />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-1">
+                  <ProfileDisplayName size="sm" name={displayName} />
+                  {!isSelf && user ? (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0 rounded-full text-muted-foreground"
+                          aria-label="Profile options"
+                        >
+                          <MoreHorizontal className="h-4 w-4" aria-hidden />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-40">
+                        {blockStatus.iBlockedThem ? (
+                          <DropdownMenuItem onSelect={() => void handleUnblock()}>Unblock</DropdownMenuItem>
+                        ) : (
+                          <DropdownMenuItem onSelect={() => setBlockConfirmOpen(true)}>Block</DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem onSelect={() => setReportOpen(true)}>Report</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  ) : null}
+                </div>
+                <ProfileMetaRow>
+                  {profile.public_handle ? <ProfileHandle handle={profile.public_handle} /> : null}
+                  <ProfileStreakBadges streaks={profile.streaks ?? profile.achievements ?? []} size="sm" />
+                  {isSelf && !profile.is_public ? (
+                    <span className="inline-flex rounded-full border border-amber-500/35 bg-amber-500/[0.08] px-2 py-0.5 text-[11px] font-medium text-amber-950 dark:text-amber-100">
+                      Hidden from others
+                    </span>
+                  ) : null}
+                </ProfileMetaRow>
+                <ProfileFollowStats
+                  followers={counts.followers}
+                  following={counts.following}
+                  onFollowersClick={() => void openList("followers")}
+                  onFollowingClick={() => void openList("following")}
+                />
+              </div>
+            </div>
+
+            {profileBio || livingWithLine ? (
               <ProfileBioPreview
-                compact
+                relaxed
                 bio={profileBio}
                 livingWithLine={livingWithLine}
                 emptyLabel={isBeatieProfile ? BEATIE_FEED_BOT_DEFAULT_BIO : "No bio yet."}
               />
-              {profile.supported_person ? (
-                <ProfileSupportedPersonBadge person={profile.supported_person} />
-              ) : null}
-              {isSelf && storyRing === "none" && user ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="mt-1 w-fit gap-1.5 rounded-full"
-                  onClick={() => setStoryCreateOpen(true)}
-                >
-                  <Plus className="h-3.5 w-3.5" aria-hidden />
-                  Add story
-                </Button>
-              ) : null}
-            </ProfileHeroRow>
+            ) : null}
 
-            {!isSelf && !user ? (
-              <p className="rounded-xl border border-border/50 bg-background/40 px-3 py-2 text-xs text-muted-foreground dark:bg-background/25 sm:text-sm">
-                <Link href={loginNextHref} className="font-medium text-primary underline-offset-4 hover:underline">
-                  Sign in
-                </Link>{" "}
-                to follow or message this person.
-              </p>
+            {profile.supported_person ? (
+              <ProfileSupportedPersonBadge person={profile.supported_person} subtle className="w-fit" />
+            ) : null}
+
+            {isSelf && storyRing === "none" && user ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 w-fit gap-1.5 rounded-full text-xs"
+                onClick={() => setStoryCreateOpen(true)}
+              >
+                <Plus className="h-3.5 w-3.5" aria-hidden />
+                Add story
+              </Button>
             ) : null}
 
             {!isSelf && user ? (
-              <div className="flex flex-wrap gap-2 border-t border-border/40 pt-4">
-                {blockStatus.iBlockedThem ? (
-                  <Button type="button" size="sm" variant="outline" className="rounded-full" onClick={() => void handleUnblock()}>
-                    Unblock
-                  </Button>
-                ) : (
-                  <Button type="button" size="sm" variant="ghost" className="rounded-full" onClick={() => setBlockConfirmOpen(true)}>
-                    Block
-                  </Button>
-                )}
-                <Button type="button" size="sm" variant="ghost" className="rounded-full" onClick={() => setReportOpen(true)}>
-                  Report
+              <ProfileInlineActionRow>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={followingThem ? "secondary" : "default"}
+                  disabled={followBusy || blockStatus.iBlockedThem || blockStatus.theyBlockedMe}
+                  onClick={() => void toggleFollow()}
+                  className="gap-1.5 text-xs"
+                >
+                  {followingThem ? (
+                    <UserCheck className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  ) : (
+                    <UserPlus className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  )}
+                  {followingThem ? "Following" : "Follow"}
                 </Button>
-              </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={blockStatus.iBlockedThem || blockStatus.theyBlockedMe}
+                  onClick={() => void openMessages()}
+                  className="gap-1.5 text-xs"
+                >
+                  <MessageCircle className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  Message
+                </Button>
+              </ProfileInlineActionRow>
+            ) : null}
+
+            {!isSelf && !user ? (
+              <p className="text-xs text-muted-foreground sm:text-sm">
+                <Link href={loginNextHref} className="font-medium text-primary underline-offset-4 hover:underline">
+                  Sign in
+                </Link>{" "}
+                to follow or message.
+              </p>
             ) : null}
           </div>
         </ProfileHeroCard>
@@ -522,11 +538,11 @@ export default function CommunityProfilePage() {
             </p>
           </ProfileMutedCard>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4 pt-1">
             <div className="flex flex-wrap items-end justify-between gap-2">
               <ProfileSectionHeading
                 title={isSelf ? "Your posts" : "Posts"}
-                subtitle={isSelf ? "What you've shared on the Feed" : `Posts from ${displayName}`}
+                subtitle={isSelf ? "What you've shared on the Feed" : undefined}
               />
               <div className="inline-flex rounded-full border border-border/50 bg-muted/30 p-0.5" role="tablist" aria-label="Posts view">
                 <button

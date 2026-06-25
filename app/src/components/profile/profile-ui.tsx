@@ -14,14 +14,38 @@ export function ProfileHeroCard({
   children,
   className,
   testId,
+  relaxed,
+  compact,
+  flat,
 }: {
   children: ReactNode;
   className?: string;
   testId?: string;
+  relaxed?: boolean;
+  /** Tighter card padding for dense public profile layouts. */
+  compact?: boolean;
+  /** Subtle surface for community public profiles. */
+  flat?: boolean;
 }) {
   return (
-    <Card variant="glass-strong" className={cn(profileHeroCardClass, className)} data-testid={testId}>
-      <CardContent className="relative p-4 sm:p-5">{children}</CardContent>
+    <Card
+      variant="glass-strong"
+      className={cn(
+        flat
+          ? "animate-soft-in overflow-hidden border border-border/45 bg-card/35 shadow-sm ring-0 dark:bg-card/25"
+          : profileHeroCardClass,
+        className,
+      )}
+      data-testid={testId}
+    >
+      <CardContent
+        className={cn(
+          "relative",
+          compact ? "p-3 sm:p-3.5" : relaxed ? "p-5 sm:p-6" : "p-4 sm:p-5",
+        )}
+      >
+        {children}
+      </CardContent>
     </Card>
   );
 }
@@ -154,11 +178,35 @@ export function ProfileAvatarTile({
 }
 
 /** Avatar left, identity column right — use on all breakpoints to save vertical space. */
-export function ProfileHeroRow({ avatar, children }: { avatar: ReactNode; children: ReactNode }) {
+export function ProfileHeroRow({
+  avatar,
+  children,
+  relaxed,
+  balanced,
+}: {
+  avatar: ReactNode;
+  children: ReactNode;
+  /** More breathing room for public profile pages. */
+  relaxed?: boolean;
+  /** Middle ground: compact card without feeling cramped. */
+  balanced?: boolean;
+}) {
   return (
-    <div className="flex items-start gap-3 sm:gap-3.5">
+    <div
+      className={cn(
+        "flex items-start",
+        relaxed ? "gap-4" : balanced ? "gap-3" : "gap-3 sm:gap-3.5",
+      )}
+    >
       <div className="shrink-0">{avatar}</div>
-      <div className="min-w-0 flex-1 flex flex-col gap-1 sm:gap-1.5">{children}</div>
+      <div
+        className={cn(
+          "min-w-0 flex-1 flex flex-col",
+          relaxed ? "gap-2 sm:gap-2.5" : balanced ? "gap-1.5 sm:gap-2" : "gap-1 sm:gap-1.5",
+        )}
+      >
+        {children}
+      </div>
     </div>
   );
 }
@@ -177,15 +225,22 @@ export function ProfileDisplayName({
   href,
   testId,
   compact,
+  size = "default",
 }: {
   name: string;
   href?: string;
   testId?: string;
   compact?: boolean;
+  /** `sm` for dense public profile headers. */
+  size?: "default" | "sm";
 }) {
   const className = cn(
     "truncate font-display font-semibold tracking-tight text-foreground",
-    compact ? "text-lg leading-tight sm:text-xl" : "text-2xl sm:text-[1.65rem]",
+    size === "sm"
+      ? "text-base leading-tight sm:text-lg"
+      : compact
+        ? "text-lg leading-tight sm:text-xl"
+        : "text-2xl sm:text-[1.65rem]",
   );
   if (href) {
     return (
@@ -322,27 +377,36 @@ export function ProfileBioPreview({
   livingWithLine,
   emptyLabel = "No bio yet.",
   compact,
+  relaxed,
 }: {
   bio?: string | null;
   livingWithLine?: string | null;
   emptyLabel?: string;
   compact?: boolean;
+  /** Public profile: readable bio without aggressive clamping. */
+  relaxed?: boolean;
 }) {
   const trimmed = bio?.trim();
+  const useRelaxed = relaxed && !compact;
   return (
     <div className="min-w-0">
       <p
         className={cn(
-          "leading-snug",
-          compact ? "text-xs sm:text-sm" : "text-sm",
+          useRelaxed ? "text-xs sm:text-sm leading-snug" : compact ? "text-xs sm:text-sm leading-snug" : "text-sm leading-snug",
           trimmed ? "whitespace-pre-wrap text-foreground/90" : "italic text-muted-foreground",
-          compact && trimmed && "line-clamp-2",
+          compact && !useRelaxed && trimmed && "line-clamp-2",
+          useRelaxed && trimmed && "line-clamp-3",
         )}
       >
         {trimmed || emptyLabel}
       </p>
       {livingWithLine ? (
-        <p className={cn("text-muted-foreground truncate", compact ? "text-[11px] mt-0.5" : "text-xs mt-1")}>
+        <p
+          className={cn(
+            "text-muted-foreground truncate",
+            useRelaxed ? "text-xs mt-1.5" : compact ? "text-[11px] mt-0.5" : "text-xs mt-1",
+          )}
+        >
           {livingWithLine}
         </p>
       ) : null}
@@ -350,7 +414,15 @@ export function ProfileBioPreview({
   );
 }
 
-export function ProfileSupportedPersonBadge({ person }: { person: PublicProfileSupportedPerson }) {
+export function ProfileSupportedPersonBadge({
+  person,
+  className,
+  subtle,
+}: {
+  person: PublicProfileSupportedPerson;
+  className?: string;
+  subtle?: boolean;
+}) {
   const handle = person.public_handle.replace(/^@/, "");
   const name = person.full_name?.trim();
   const label = name || `@${handle}`;
@@ -358,10 +430,19 @@ export function ProfileSupportedPersonBadge({ person }: { person: PublicProfileS
   return (
     <Link
       href={`/community/profile/${encodeURIComponent(person.patient_id)}`}
-      className="inline-flex max-w-full items-center gap-2 rounded-full border border-primary/20 bg-primary/[0.06] px-3 py-1.5 text-xs text-foreground transition-colors hover:border-primary/30 hover:bg-primary/[0.1]"
+      className={cn(
+        "inline-flex max-w-full items-center gap-1.5 rounded-full border text-foreground transition-colors",
+        subtle
+          ? "border-border/50 bg-muted/25 px-2.5 py-1 text-[11px] hover:bg-muted/40"
+          : "border-primary/20 bg-primary/[0.06] px-3 py-1.5 text-xs hover:border-primary/30 hover:bg-primary/[0.1]",
+        className,
+      )}
       data-testid="profile-supported-person-badge"
     >
-      <HeartHandshake className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
+      <HeartHandshake
+        className={cn("shrink-0 text-primary", subtle ? "h-3 w-3" : "h-3.5 w-3.5")}
+        aria-hidden
+      />
       <span className="min-w-0 truncate">
         Supports <span className="font-medium">{label}</span>
         {name && handle ? <span className="text-muted-foreground"> · @{handle}</span> : null}
@@ -370,9 +451,24 @@ export function ProfileSupportedPersonBadge({ person }: { person: PublicProfileS
   );
 }
 
-export function ProfileActionGrid({ children }: { children: ReactNode }) {
+export function ProfileInlineActionRow({ children }: { children: ReactNode }) {
   return (
-    <div className="grid w-full grid-cols-2 gap-2 border-t border-border/40 pt-3 [&_a]:w-full [&_button]:w-full [&_a]:min-h-10 [&_button]:min-h-10 [&_a]:rounded-xl [&_button]:rounded-xl">
+    <div className="flex gap-2 [&_a]:h-9 [&_a]:flex-1 [&_a]:rounded-full [&_button]:h-9 [&_button]:flex-1 [&_button]:rounded-full">
+      {children}
+    </div>
+  );
+}
+
+export function ProfileActionGrid({ children, compact }: { children: ReactNode; compact?: boolean }) {
+  return (
+    <div
+      className={cn(
+        "grid w-full grid-cols-2 gap-2 [&_a]:w-full [&_button]:w-full",
+        compact
+          ? "gap-1.5 pt-0.5 [&_a]:min-h-9 [&_button]:min-h-9 [&_a]:rounded-lg [&_button]:rounded-lg"
+          : "border-t border-border/40 pt-3 [&_a]:min-h-10 [&_button]:min-h-10 [&_a]:rounded-xl [&_button]:rounded-xl",
+      )}
+    >
       {children}
     </div>
   );
