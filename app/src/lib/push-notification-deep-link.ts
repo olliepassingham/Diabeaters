@@ -1,11 +1,7 @@
 import type { PushNotificationSchema } from "@capacitor/push-notifications";
 
-import { setPendingHypoCheckInForLog } from "@/lib/hypo-check-ins";
-import {
-  getPathForInAppNotification,
-  isHypoLogDeepLink,
-  requestOpenHypoLogScreen,
-} from "@/lib/in-app-notifications-nav";
+import { getPathForInAppNotification } from "@/lib/in-app-notifications-nav";
+import { DIABEATER_OPEN_HYPO_DIALOG_EVENT, isHypoLogDeepLink } from "@/lib/hypo-check-in-events";
 import {
   isNotificationBellDeepLink,
   requestOpenNotificationBell,
@@ -84,7 +80,10 @@ export function applyPushDeepLinkPath(path: string, navigateTo: (path: string) =
     return;
   }
   if (isHypoLogDeepLink(path)) {
-    requestOpenHypoLogScreen(navigateTo);
+    navigateTo(path.trim());
+    window.requestAnimationFrame(() => {
+      window.dispatchEvent(new Event(DIABEATER_OPEN_HYPO_DIALOG_EVENT));
+    });
     return;
   }
   navigateTo(path.trim());
@@ -103,7 +102,9 @@ export function handlePushDeepLinkFromNotification(notification: PushNotificatio
   const path = getPathFromPushNotification(notification);
   if (!path) return;
   if (data.kind === "hypo_check_in" && typeof data.check_in_id === "string" && data.check_in_id.trim()) {
-    setPendingHypoCheckInForLog(data.check_in_id);
+    void import("./hypo-check-ins").then(({ setPendingHypoCheckInForLog }) => {
+      setPendingHypoCheckInForLog(data.check_in_id as string);
+    });
   }
   storePendingPushDeepLink(path);
   if (navigationReady && navigate) {

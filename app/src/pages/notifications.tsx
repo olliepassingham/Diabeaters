@@ -28,7 +28,7 @@ import {
   type InAppNotificationsChangedDetail,
   notifyInAppNotificationsChanged,
 } from "@/lib/in-app-notifications-events";
-import { navigateForInAppNotification } from "@/lib/in-app-notifications-nav";
+import { navigateForInAppNotification } from "@/lib/hypo-check-in-nav";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { getProfilesByIds } from "@/lib/profile";
 import { resolveProfileImageUrlResult } from "@/lib/storage-profile";

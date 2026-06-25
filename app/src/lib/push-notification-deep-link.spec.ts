@@ -9,7 +9,7 @@ import {
   isSafeInAppPath,
   storePendingPushDeepLink,
 } from "./push-notification-deep-link";
-import { HYPO_LOG_DEEP_LINK } from "./in-app-notifications-nav";
+import { HYPO_LOG_DEEP_LINK } from "@/lib/hypo-check-in-events";
 import { NOTIFICATION_BELL_DEEP_LINK } from "./notification-inbox-deep-link";
 
 const OPEN_NOTIFICATION_BELL_EVENT = "diabeaters:open-notification-bell";

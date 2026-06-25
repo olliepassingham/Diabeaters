@@ -29,7 +29,8 @@ import {
   markAllInAppNotificationsRead,
   markInAppNotificationRead,
 } from "@/lib/in-app-notifications-supabase";
-import { getPathForInAppNotification, navigateForInAppNotification } from "@/lib/in-app-notifications-nav";
+import { getPathForInAppNotification } from "@/lib/in-app-notifications-nav";
+import { navigateForInAppNotification } from "@/lib/hypo-check-in-nav";
 import { consumePendingOpenNotificationBell } from "@/lib/notification-inbox-deep-link";
 import type { InAppNotificationRow } from "@/lib/carer-notify-types";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";

@@ -5,7 +5,6 @@ import { isIosDeviceForCapacitorPush } from "@/lib/ios-user-agent";
 import { ensureNativeLocalNotificationPermission } from "@/lib/native-local-notifications";
 import { clearNativeAppBadge, scheduleNativeAppBadgeSync } from "@/lib/native-app-badge";
 import { presentAudiblePushNotificationFromRemote } from "@/lib/push-notification-present";
-import { handlePushDeepLinkFromNotification } from "@/lib/push-notification-deep-link";
 import {
   getNativePushPlatform,
   isCapacitorNativeShell,
@@ -275,7 +274,9 @@ function bindPushDeepLinkListeners(): void {
     writePushDiag({ state: "push_action_performed", platform: currentPushPlatform() ?? "ios" });
     void clearNativeAppBadge();
     scheduleNativeAppBadgeSync(0);
-    handlePushDeepLinkFromNotification(action.notification);
+    void import("./push-notification-deep-link").then(({ handlePushDeepLinkFromNotification }) => {
+      handlePushDeepLinkFromNotification(action.notification);
+    });
   }).then((h) => {
     deepLinkHandles.push(h);
   });
