@@ -12,6 +12,7 @@ import {
   setPrimaryAppRole,
 } from "@/lib/carer-session";
 import { finalizeCommunityMemberSession } from "@/lib/community-member-session";
+import { getCommunityMemberLandingPath } from "@/lib/community-landing";
 import { useAuth } from "@/lib/auth-context";
 import { isUserVerified } from "@/lib/auth";
 import { reconcileWrongWelcomePathForSignedInUser } from "@/lib/welcome-path-reconcile";

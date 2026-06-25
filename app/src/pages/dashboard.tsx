@@ -64,6 +64,7 @@ import { useProfile } from "@/lib/profile";
 import { getSupabase } from "@/lib/supabase";
 import { repairSickDayCloudIfLocalInactive } from "@/lib/scenarios-supabase";
 import { insertHypoLog } from "@/lib/hypo-logs-supabase";
+import { setPendingHypoCheckInForLog } from "@/lib/hypo-check-ins";
 import { invokeNotifyCarersOnHypo } from "@/lib/invoke-notify-carers-hypo";
 import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
 import { PageHeader, PageShell } from "@/components/layout";
@@ -331,6 +332,11 @@ function HeroCard({
   const glucoseStep = bgUnitsLabel === "mg/dL" ? "1" : "0.1";
   const glucosePlaceholder = bgUnitsLabel === "mg/dL" ? "e.g., 58" : "e.g., 3.2";
 
+  const handleHypoDialogOpenChange = (open: boolean) => {
+    setHypoDialogOpen(open);
+    if (!open) setPendingHypoCheckInForLog(null);
+  };
+
   useEffect(() => {
     if (!hypoDialogOpen) return;
     setHypoHistory(storage.getHypoTreatments());
@@ -364,7 +370,7 @@ function HeroCard({
         userId: user?.id,
         toast,
         onAfterLocalSave: () => {
-          setHypoDialogOpen(false);
+          handleHypoDialogOpenChange(false);
           setHypoGlucose("");
           setHypoTreatment("");
           setHypoNotes("");
@@ -538,7 +544,7 @@ function HeroCard({
         </CardContent>
       </Card>
 
-      <Dialog open={hypoDialogOpen} onOpenChange={setHypoDialogOpen}>
+      <Dialog open={hypoDialogOpen} onOpenChange={handleHypoDialogOpenChange}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-1">
@@ -647,7 +653,7 @@ function HeroCard({
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setHypoDialogOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => handleHypoDialogOpenChange(false)}>Cancel</Button>
             <Button onClick={handleLogHypo} className="bg-green-600 dark:bg-green-700 gap-2" data-testid="button-dashboard-confirm-hypo">
               <CheckCircle2 className="h-4 w-4" />
               Log Treatment

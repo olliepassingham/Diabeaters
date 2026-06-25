@@ -83,8 +83,7 @@ function InAppToastContent(props: {
 }
 
 export function NotificationBell() {
-  try {
-    const { toast } = useToast();
+  const { toast } = useToast();
     const { user } = useAuth();
     const configured = isSupabaseConfigured();
 
@@ -587,7 +586,4 @@ export function NotificationBell() {
         </AlertDialog>
       </>
     );
-  } catch {
-    return null;
-  }
 }

@@ -53,7 +53,7 @@ import {
   isFeedSuggestionsDismissed,
 } from "@/lib/community/feed-suggestions-dismiss";
 import { buildMainFeedScopeKey, COMMUNITY_FEED_QUERY_ROOT, MAIN_FEED_PAGE_SIZE } from "@/lib/community-feed-cache";
-import { getAppScrollMain, setAppScrollTop } from "@/lib/app-scroll";
+import { getAppScrollMain, getAppScrollTop, setAppScrollTop } from "@/lib/app-scroll";
 import { CommunityPushPromptDialog } from "@/components/community-push-prompt-dialog";
 import { useCommunityPushPromptAfterOnboarding } from "@/hooks/use-community-push-prompt-after-onboarding";
 
@@ -647,11 +647,8 @@ export default function CommunityHomePage() {
         <Tabs
           value={feedTab}
           onValueChange={(v) => {
-            // Save current tab scroll before switching.
-            if (typeof window !== "undefined") {
-              const y = window.scrollY ?? 0;
-              setScrollByTab((prev) => ({ ...prev, [feedTab]: y }));
-            }
+            // Sync scroll from app main container (not window — mobile shell scrolls #app-scroll-main).
+            setScrollByTab((prev) => ({ ...prev, [feedTab]: getAppScrollTop() }));
             setFeedTab(v as FeedTab);
           }}
           className="w-full"

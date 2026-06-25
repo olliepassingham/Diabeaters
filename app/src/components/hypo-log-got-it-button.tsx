@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ThumbsUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -26,6 +26,10 @@ export function HypoLogGotItButton({
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(acknowledged);
+
+  useEffect(() => {
+    if (acknowledged) setDone(true);
+  }, [acknowledged]);
 
   if (done) {
     return (
