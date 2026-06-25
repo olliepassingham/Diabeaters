@@ -997,7 +997,7 @@ export default function Dashboard() {
           </Alert>
         )}
 
-        {!isCommunityDash && user ? (
+        {!isCommunityDash ? (
           <PendingHypoCheckInBanner />
         ) : null}
 
