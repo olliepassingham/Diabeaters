@@ -1,7 +1,9 @@
 import type { PushNotificationSchema } from "@capacitor/push-notifications";
 
+import { carerNameFromCheckInNotification, checkInIdFromNotificationData } from "@/lib/hypo-check-ins";
 import { getPathForInAppNotification } from "@/lib/in-app-notifications-nav";
 import { DIABEATER_OPEN_HYPO_DIALOG_EVENT, isHypoLogDeepLink } from "@/lib/hypo-check-in-events";
+import { requestOpenHypoCheckInRespondSheet } from "@/lib/hypo-check-in-respond-deep-link";
 import {
   isNotificationBellDeepLink,
   requestOpenNotificationBell,
@@ -101,11 +103,17 @@ export function handlePushDeepLinkFromNotification(notification: PushNotificatio
   const data = notificationDataRecord(notification);
   const path = getPathFromPushNotification(notification);
   if (!path) return;
-  if (data.kind === "hypo_check_in" && typeof data.check_in_id === "string" && data.check_in_id.trim()) {
-    void import("./hypo-check-ins").then(({ setPendingHypoCheckInForLog }) => {
-      setPendingHypoCheckInForLog(data.check_in_id as string);
-    });
+
+  if (data.kind === "hypo_check_in") {
+    const checkInId = checkInIdFromNotificationData(data);
+    if (checkInId) {
+      requestOpenHypoCheckInRespondSheet({
+        checkInId,
+        carerName: carerNameFromCheckInNotification(data),
+      });
+    }
   }
+
   storePendingPushDeepLink(path);
   if (navigationReady && navigate) {
     const pending = consumePendingPushDeepLink();

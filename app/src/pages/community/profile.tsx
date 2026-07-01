@@ -45,6 +45,7 @@ import { ProfilePostMediaGrid } from "@/components/community/profile-post-media-
 import { StoryAvatarRing } from "@/components/community/story-avatar-ring";
 import { StoryCreateSheet } from "@/components/community/story-create-sheet";
 import { StoryViewerDialog } from "@/components/community/story-viewer-dialog";
+import { StoryViewersSummary } from "@/components/community/story-viewers-sheet";
 import { ProfileStreakBadges } from "@/components/achievements/achievements-panel";
 import { useResolvedProfileImageUrl } from "@/hooks/use-resolved-profile-image-url";
 import { useCommunityStories } from "@/hooks/use-community-stories";
@@ -483,6 +484,10 @@ export default function CommunityProfilePage() {
               </Button>
             ) : null}
 
+            {isSelf && activeStory && userId ? (
+              <StoryViewersSummary storyId={activeStory.id} authorId={userId} variant="inline" />
+            ) : null}
+
             {!isSelf && user ? (
               <ProfileInlineActionRow>
                 <Button
@@ -664,6 +669,7 @@ export default function CommunityProfilePage() {
       <StoryViewerDialog
         open={storyViewerOpen}
         onOpenChange={setStoryViewerOpen}
+        viewerId={user?.id}
         entries={
           activeStory && userId && canViewStory
             ? [

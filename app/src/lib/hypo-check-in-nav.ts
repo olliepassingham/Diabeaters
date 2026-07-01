@@ -1,17 +1,22 @@
 import type { InAppNotificationRow } from "@/lib/carer-notify-types";
-import { checkInIdFromNotificationData, setPendingHypoCheckInForLog } from "@/lib/hypo-check-ins";
+import {
+  carerNameFromCheckInNotification,
+  checkInIdFromNotificationData,
+  setPendingHypoCheckInForLog,
+} from "@/lib/hypo-check-ins";
 import { getPathForInAppNotification } from "@/lib/in-app-notifications-nav";
 import {
   DIABEATER_OPEN_HYPO_DIALOG_EVENT,
   HYPO_LOG_DEEP_LINK,
   isHypoLogDeepLink,
 } from "@/lib/hypo-check-in-events";
+import { requestOpenHypoCheckInRespondSheet } from "@/lib/hypo-check-in-respond-deep-link";
 import {
   isNotificationBellDeepLink,
   requestOpenNotificationBell,
 } from "@/lib/notification-inbox-deep-link";
 
-/** Navigate home and open the hypo log dialog (used by check-in alerts). */
+/** Navigate home and open the hypo log dialog (used when logging a hypo from a check-in). */
 export function requestOpenHypoLogScreen(
   navigate: (path: string) => void,
   options?: { checkInId?: string | null },
@@ -45,7 +50,21 @@ export function navigateForInAppNotification(
   const kind = typeof data.kind === "string" ? data.kind : "";
 
   if (kind === "hypo_check_in") {
-    requestOpenHypoLogScreen(navigate, { checkInId: checkInIdFromNotificationData(data) });
+    const checkInId = checkInIdFromNotificationData(data);
+    navigate("/");
+    if (checkInId) {
+      const openSheet = () => {
+        requestOpenHypoCheckInRespondSheet({
+          checkInId,
+          carerName: carerNameFromCheckInNotification(data),
+        });
+      };
+      if (typeof window !== "undefined" && window.location.pathname === "/") {
+        openSheet();
+      } else {
+        window.requestAnimationFrame(openSheet);
+      }
+    }
     return;
   }
 

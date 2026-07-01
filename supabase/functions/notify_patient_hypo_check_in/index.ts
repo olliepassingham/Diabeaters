@@ -131,7 +131,7 @@ Deno.serve(async (req: Request) => {
       carer_id: carerId,
       carer_name: carerLabel,
       patient_user_id: patientId,
-      deep_link: "/?hypo_log=1",
+      deep_link: "/",
     };
 
     let pushDelivered = 0;

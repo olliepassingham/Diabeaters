@@ -1,25 +1,22 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { CheckCircle2, Droplet, HeartHandshake } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import {
   respondHypoCheckIn,
   setPendingHypoCheckInForLog,
-  consumePendingHypoCheckInForLog,
   type HypoCheckInResponse,
 } from "@/lib/hypo-check-ins";
-import {
-  DIABEATER_HYPO_CLOUD_LOGGED_EVENT,
-  DIABEATER_OPEN_HYPO_DIALOG_EVENT,
-  type HypoCloudLoggedDetail,
-} from "@/lib/storage";
+import { DIABEATER_OPEN_HYPO_DIALOG_EVENT } from "@/lib/hypo-check-in-events";
 import { hapticLight } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 
 export type HypoCheckInResponseActionsProps = {
   checkInId: string;
   carerName?: string;
+  /** @deprecated Use `layout` instead. */
   compact?: boolean;
+  layout?: "inline" | "sheet";
   className?: string;
   onResponded?: () => void;
 };
@@ -28,46 +25,14 @@ export function HypoCheckInResponseActions({
   checkInId,
   carerName = "Your supporter",
   compact = false,
+  layout,
   className,
   onResponded,
 }: HypoCheckInResponseActionsProps) {
+  const resolvedLayout = layout ?? (compact ? "inline" : "inline");
   const { toast } = useToast();
   const [busy, setBusy] = useState<HypoCheckInResponse | "log" | null>(null);
   const [done, setDone] = useState(false);
-
-  useEffect(() => {
-    const onHypoLogged = (event: Event) => {
-      const pendingId = consumePendingHypoCheckInForLog();
-      if (!pendingId || pendingId !== checkInId) return;
-      const detail = (event as CustomEvent<HypoCloudLoggedDetail>).detail;
-      const hypoLogId = detail?.hypoLogId?.trim();
-      if (!hypoLogId) return;
-      void (async () => {
-        setBusy("hypo_logged");
-        const res = await respondHypoCheckIn({
-          checkInId,
-          response: "hypo_logged",
-          hypoLogId,
-        });
-        setBusy(null);
-        if (res.error) {
-          toast({
-            title: "Could not update check-in",
-            description: res.error.message,
-            variant: "destructive",
-          });
-          return;
-        }
-        void hapticLight();
-        setDone(true);
-        onResponded?.();
-        toast({ title: "Reply sent", description: `${carerName} will see that you logged a hypo.` });
-      })();
-    };
-
-    window.addEventListener(DIABEATER_HYPO_CLOUD_LOGGED_EVENT, onHypoLogged);
-    return () => window.removeEventListener(DIABEATER_HYPO_CLOUD_LOGGED_EVENT, onHypoLogged);
-  }, [carerName, checkInId, onResponded, toast]);
 
   const respond = async (response: HypoCheckInResponse) => {
     setBusy(response);
@@ -107,12 +72,21 @@ export function HypoCheckInResponseActions({
   }
 
   return (
-    <div className={cn("flex flex-col gap-2", compact ? "" : "sm:flex-row sm:flex-wrap", className)}>
+    <div
+      className={cn(
+        resolvedLayout === "sheet" ? "flex flex-col gap-2.5" : "flex flex-col gap-2 sm:flex-row sm:flex-wrap",
+        className,
+      )}
+    >
       <Button
         type="button"
-        size="sm"
+        size={resolvedLayout === "sheet" ? "lg" : "sm"}
         variant="secondary"
-        className="h-8 rounded-full px-3 text-xs"
+        className={cn(
+          resolvedLayout === "sheet"
+            ? "h-12 w-full rounded-xl text-base font-medium"
+            : "h-8 rounded-full px-3 text-xs",
+        )}
         disabled={busy != null}
         onClick={(e) => {
           e.stopPropagation();
@@ -124,9 +98,13 @@ export function HypoCheckInResponseActions({
       </Button>
       <Button
         type="button"
-        size="sm"
+        size={resolvedLayout === "sheet" ? "lg" : "sm"}
         variant="outline"
-        className="h-8 rounded-full px-3 text-xs"
+        className={cn(
+          resolvedLayout === "sheet"
+            ? "h-12 w-full rounded-xl text-base font-medium"
+            : "h-8 rounded-full px-3 text-xs",
+        )}
         disabled={busy != null}
         onClick={(e) => {
           e.stopPropagation();
@@ -138,8 +116,12 @@ export function HypoCheckInResponseActions({
       </Button>
       <Button
         type="button"
-        size="sm"
-        className="h-8 rounded-full px-3 text-xs"
+        size={resolvedLayout === "sheet" ? "lg" : "sm"}
+        className={cn(
+          resolvedLayout === "sheet"
+            ? "h-12 w-full rounded-xl text-base font-medium"
+            : "h-8 rounded-full px-3 text-xs",
+        )}
         disabled={busy != null}
         onClick={(e) => {
           e.stopPropagation();
@@ -147,7 +129,7 @@ export function HypoCheckInResponseActions({
         }}
         data-testid={`hypo-check-in-log-${checkInId}`}
       >
-        <Droplet className="mr-1 h-3.5 w-3.5" aria-hidden />
+        <Droplet className={cn("h-4 w-4", resolvedLayout === "sheet" ? "mr-2" : "mr-1 h-3.5 w-3.5")} aria-hidden />
         {busy === "log" ? "Opening…" : "Log hypo"}
       </Button>
     </div>

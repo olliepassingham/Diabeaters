@@ -114,6 +114,7 @@ import { AppointmentReminderPoller } from "@/components/appointment-reminder-pol
 import { BedtimeReminderPoller } from "@/components/bedtime-reminder-poller";
 import { PumpChangeReminderPoller } from "@/components/pump-change-reminder-poller";
 import { BedtimeReminderPromptDialog } from "@/components/bedtime-reminder-prompt-dialog";
+import { HypoCheckInRespondHost } from "@/components/hypo-check-in-respond-host";
 import { cancelAllBedtimeReminders, rescheduleBedtimeReminders } from "@/lib/bedtime-reminders";
 import { useBedtimeReminderPromptAfterOnboarding } from "@/hooks/use-bedtime-reminder-prompt-after-onboarding";
 import { SupplyLowNotifyPoller } from "@/components/supply-low-notify-poller";
@@ -1419,6 +1420,7 @@ function AuthenticatedShell() {
           variant="onboarding"
         />
       ) : null}
+      {!suppressClinicalPollers ? <HypoCheckInRespondHost /> : null}
     </div>
       )}
     </AskAnythingProvider>

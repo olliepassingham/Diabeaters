@@ -88,6 +88,23 @@ export function consumePendingHypoCheckInForLog(): string | null {
   return id;
 }
 
+/** After a cloud hypo log, complete a pending supporter check-in if one was linked. */
+export async function completePendingHypoCheckInAfterLog(
+  hypoLogId: string,
+): Promise<{ completed: boolean; error: Error | null }> {
+  const checkInId = consumePendingHypoCheckInForLog();
+  const id = hypoLogId?.trim();
+  if (!checkInId || !id) return { completed: false, error: null };
+
+  const res = await respondHypoCheckIn({
+    checkInId,
+    response: "hypo_logged",
+    hypoLogId: id,
+  });
+  if (res.error) return { completed: false, error: res.error };
+  return { completed: true, error: null };
+}
+
 export function isActivePendingHypoCheckIn(row: { status: string; created_at: string }): boolean {
   if (row.status !== "pending") return false;
   const created = new Date(row.created_at).getTime();

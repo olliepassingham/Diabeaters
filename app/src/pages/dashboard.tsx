@@ -64,7 +64,6 @@ import { useProfile } from "@/lib/profile";
 import { getSupabase } from "@/lib/supabase";
 import { repairSickDayCloudIfLocalInactive } from "@/lib/scenarios-supabase";
 import { insertHypoLog } from "@/lib/hypo-logs-supabase";
-import { setPendingHypoCheckInForLog } from "@/lib/hypo-check-ins";
 import { invokeNotifyCarersOnHypo } from "@/lib/invoke-notify-carers-hypo";
 import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
 import { PageHeader, PageShell } from "@/components/layout";
@@ -334,7 +333,6 @@ function HeroCard({
 
   const handleHypoDialogOpenChange = (open: boolean) => {
     setHypoDialogOpen(open);
-    if (!open) setPendingHypoCheckInForLog(null);
   };
 
   useEffect(() => {

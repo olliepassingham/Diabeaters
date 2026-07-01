@@ -13,9 +13,6 @@ export function getPathForInAppNotification(row: InAppNotificationRow): string |
   const kind = typeof data.kind === "string" ? data.kind : "";
   const target = typeof data.deep_link === "string" ? data.deep_link.trim() : "";
   if (target && !isNotificationBellDeepLink(target)) {
-    if (kind === "hypo_check_in" && (target === "/" || target === "/dashboard")) {
-      return HYPO_LOG_DEEP_LINK;
-    }
     if (kind === "hypo_logged_self" && (target === "/" || target === "/dashboard")) {
       return "/tools/hypo-history";
     }
@@ -27,7 +24,7 @@ export function getPathForInAppNotification(row: InAppNotificationRow): string |
   if (kind === "supplies_low") return "/supplies";
   if (kind === "hypo_logged_self") return "/tools/hypo-history";
   if (kind === "hypo_acknowledged") return "/tools/hypo-history";
-  if (kind === "hypo_check_in") return HYPO_LOG_DEEP_LINK;
+  if (kind === "hypo_check_in") return "/";
   if (kind === "hypo_check_in_response") return "/carer-view";
   if (kind === "hypo_logged" || kind === "scenario_started" || kind === "alcohol_night_mode" || kind === "appointment_reminder_support") {
     return "/carer-view";

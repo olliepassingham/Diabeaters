@@ -74,11 +74,16 @@ describe("getPathForInAppNotification", () => {
       "/tools/hypo-history",
     );
     expect(getPathForInAppNotification(row({ id: "1", user_id: "u", data: { kind: "hypo_check_in" } }))).toBe(
-      "/?hypo_log=1",
+      "/",
     );
     expect(
       getPathForInAppNotification(
         row({ id: "1", user_id: "u", data: { kind: "hypo_check_in", deep_link: "/" } }),
+      ),
+    ).toBe("/");
+    expect(
+      getPathForInAppNotification(
+        row({ id: "1", user_id: "u", data: { kind: "hypo_check_in", deep_link: "/?hypo_log=1" } }),
       ),
     ).toBe("/?hypo_log=1");
     expect(

@@ -2,8 +2,16 @@ import { useRef, useState } from "react";
 import { ImagePlus, Loader2, Video, X } from "lucide-react";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { StoryOverlayEditor } from "@/components/community/story-overlay-editor";
 import { useToast } from "@/hooks/use-toast";
-import { insertCommunityStory, MAX_STORY_BYTES } from "@/lib/community/stories-supabase";
+import {
+  insertCommunityStory,
+  MAX_STORY_BYTES,
+  MAX_STORY_CAPTION_LENGTH,
+  type StoryOverlay,
+} from "@/lib/community/stories-supabase";
 
 type Props = {
   open: boolean;
@@ -16,28 +24,36 @@ export function StoryCreateSheet({ open, onOpenChange, onPosted }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [caption, setCaption] = useState("");
+  const [overlays, setOverlays] = useState<StoryOverlay[]>([]);
   const [busy, setBusy] = useState(false);
 
   function reset() {
     setFile(null);
     if (preview) URL.revokeObjectURL(preview);
     setPreview(null);
+    setCaption("");
+    setOverlays([]);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   function onPick(files: FileList | null) {
     const f = files?.[0];
     if (!f) return;
-    reset();
+    if (preview) URL.revokeObjectURL(preview);
     setFile(f);
     setPreview(URL.createObjectURL(f));
+    setOverlays([]);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   async function handlePost() {
     if (!file || busy) return;
     setBusy(true);
-    const res = await insertCommunityStory(file);
+    const res = await insertCommunityStory(file, {
+      caption: caption.trim() || undefined,
+      overlays,
+    });
     setBusy(false);
     if (res.error) {
       toast({ title: "Story failed", description: res.error.message, variant: "destructive" });
@@ -71,22 +87,39 @@ export function StoryCreateSheet({ open, onOpenChange, onPosted }: Props) {
           onChange={(e) => onPick(e.target.files)}
         />
         {preview && file ? (
-          <div className="relative overflow-hidden rounded-xl border border-border/50 bg-black">
-            {file.type.startsWith("video/") ? (
-              <video src={preview} className="max-h-64 w-full object-contain" controls playsInline />
-            ) : (
-              <img src={preview} alt="" className="max-h-64 w-full object-contain" />
-            )}
+          <div className="space-y-3">
+            <StoryOverlayEditor overlays={overlays} onChange={setOverlays}>
+              {file.type.startsWith("video/") ? (
+                <video src={preview} className="max-h-64 w-full object-contain" controls playsInline />
+              ) : (
+                <img src={preview} alt="" className="max-h-64 w-full object-contain" />
+              )}
+            </StoryOverlayEditor>
             <Button
               type="button"
               variant="secondary"
-              size="icon"
-              className="absolute right-2 top-2 h-8 w-8 rounded-full"
+              size="sm"
+              className="gap-1.5"
               onClick={reset}
-              aria-label="Remove"
             >
               <X className="h-4 w-4" />
+              Change media
             </Button>
+            <div className="space-y-1.5">
+              <Label htmlFor="story-caption">Caption (optional)</Label>
+              <Textarea
+                id="story-caption"
+                value={caption}
+                onChange={(e) => setCaption(e.target.value)}
+                maxLength={MAX_STORY_CAPTION_LENGTH}
+                placeholder="Add context or a question for friends…"
+                rows={2}
+                className="min-h-[4.5rem] resize-none"
+              />
+              <p className="text-right text-[11px] text-muted-foreground">
+                {caption.length}/{MAX_STORY_CAPTION_LENGTH}
+              </p>
+            </div>
           </div>
         ) : (
           <div className="flex flex-wrap gap-2">

@@ -335,6 +335,9 @@ export type HypoCloudLoggedDetail = { hypoLogId: string };
 
 export function notifyHypoCloudLogged(detail: HypoCloudLoggedDetail): void {
   if (typeof window === "undefined") return;
+  void import("./hypo-check-ins").then(({ completePendingHypoCheckInAfterLog }) => {
+    void completePendingHypoCheckInAfterLog(detail.hypoLogId);
+  });
   window.dispatchEvent(new CustomEvent(DIABEATER_HYPO_CLOUD_LOGGED_EVENT, { detail }));
 }
 

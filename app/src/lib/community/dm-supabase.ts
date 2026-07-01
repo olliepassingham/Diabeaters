@@ -660,6 +660,38 @@ export async function sendFeedPostToDmThread(
   return { data: { threadId: threadRes.data }, error: null };
 }
 
+/** Absolute URL when running in the browser so the link opens from notifications / copy-paste. */
+export function buildShareStoryMessageBody(storyId: string): string {
+  const path = `/community?story=${storyId}`;
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return `Replied to your story:\n${window.location.origin}${path}`;
+  }
+  return `Replied to your story:\n${path}`;
+}
+
+/**
+ * Open or create a 1:1 thread and send a story reply (optional note above the link).
+ */
+export async function sendStoryReplyToDmThread(
+  otherUserId: string,
+  storyId: string,
+  optionalNote?: string,
+): Promise<{ data: { threadId: string } | null; error: Error | null }> {
+  const threadRes = await getOrCreateDmThread(otherUserId);
+  if (threadRes.error || !threadRes.data) {
+    return { data: null, error: threadRes.error ?? new Error("Could not open chat") };
+  }
+  const linkBlock = buildShareStoryMessageBody(storyId);
+  const note = optionalNote?.trim();
+  const body = note ? `${note}\n\n${linkBlock}` : linkBlock;
+  if (body.length > 8000) {
+    return { data: null, error: new Error("Message is too long (max 8000 characters).") };
+  }
+  const msgRes = await insertDmMessage(threadRes.data, body);
+  if (msgRes.error) return { data: null, error: msgRes.error };
+  return { data: { threadId: threadRes.data }, error: null };
+}
+
 export { mapMessage as mapDmMessageRow };
 
 export async function enrichDmMessages(messages: DmMessageRow[]): Promise<DmMessageRow[]> {

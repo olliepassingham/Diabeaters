@@ -35,6 +35,7 @@ import {
   type FeedCursor,
   type CommunityStoryRow,
   type FollowSuggestion,
+  fetchStoryById,
 } from "@/lib/community";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -357,6 +358,24 @@ export default function CommunityHomePage() {
   );
 
   useEffect(() => {
+    const raw = search.startsWith("?") ? search.slice(1) : search;
+    const params = new URLSearchParams(raw);
+    const storyId = params.get("story");
+    if (!storyId?.trim() || !user?.id) return;
+    let cancelled = false;
+    void fetchStoryById(storyId.trim()).then((res) => {
+      if (cancelled || !res.data) return;
+      openStory(res.data.author_id, res.data);
+      params.delete("story");
+      const next = params.toString();
+      setLocation(next ? `${pathname}?${next}` : pathname, { replace: true });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [search, user?.id, openStory, pathname, setLocation]);
+
+  useEffect(() => {
     const q = feedSearch.trim();
     if (q.length < 2) {
       setSearchMatchedAuthorIds(null);
@@ -616,6 +635,7 @@ export default function CommunityHomePage() {
       <StoryViewerDialog
         open={storyViewerOpen}
         onOpenChange={setStoryViewerOpen}
+        viewerId={user?.id}
         entries={storyViewerEntriesOverride ?? storyViewerQueue}
         initialIndex={storyViewerInitialIndex}
         onViewed={() => refreshStories()}

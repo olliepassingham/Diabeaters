@@ -97,13 +97,13 @@ describe("push-notification-deep-link", () => {
     expect(hypoOpened).toBe(true);
   });
 
-  it("resolves hypo check-in push data to hypo log deep link", () => {
+  it("resolves hypo check-in push data to home", () => {
     expect(
       getPathForPushNotificationData({
         kind: "hypo_check_in",
         check_in_id: "abc-123",
         deep_link: "/",
       }),
-    ).toBe(HYPO_LOG_DEEP_LINK);
+    ).toBe("/");
   });
 });

@@ -106,7 +106,7 @@ export function NotificationBell() {
       [rows],
     );
     const { hasAcked, refresh: refreshHypoAcks } = useHypoAcknowledgementIndex(hypoIdsForAck, user?.id);
-    const { isPending: isCheckInPending, refresh: refreshCheckIns } = usePendingHypoCheckInIds(user?.id);
+    const { isPending: isCheckInPending } = usePendingHypoCheckInIds(user?.id);
 
     const sortedRows = useMemo(() => {
       return [...rows].sort((a, b) => Number(a.read) - Number(b.read));
@@ -508,7 +508,6 @@ export function NotificationBell() {
                             <HypoCheckInNotificationFooter
                               row={n}
                               responded={!isCheckInPending(checkInId)}
-                              onResponded={() => void refreshCheckIns()}
                             />
                           ) : undefined
                         }

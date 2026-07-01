@@ -79,7 +79,7 @@ export default function NotificationsPage() {
     [rows],
   );
   const { hasAcked, refresh: refreshHypoAcks } = useHypoAcknowledgementIndex(hypoIdsForAck, user?.id);
-  const { isPending: isCheckInPending, refresh: refreshCheckIns } = usePendingHypoCheckInIds(user?.id);
+  const { isPending: isCheckInPending } = usePendingHypoCheckInIds(user?.id);
 
   const refresh = useCallback(async () => {
     if (!configured) {
@@ -314,7 +314,6 @@ export default function NotificationsPage() {
                         <HypoCheckInNotificationFooter
                           row={r}
                           responded={!isCheckInPending(checkInId)}
-                          onResponded={() => void refreshCheckIns()}
                         />
                       ) : undefined
                     }
