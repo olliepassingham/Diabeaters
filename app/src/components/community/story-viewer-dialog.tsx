@@ -12,14 +12,17 @@ import { useToast } from "@/hooks/use-toast";
 import { sendStoryReplyToDmThread, submitContentReport } from "@/lib/community";
 import {
   fetchActiveStoryForAuthor,
+  fetchStoryReactionProfiles,
   fetchStoryReactionSummary,
   getStoryMediaSignedUrl,
   markStoryViewed,
   setStoryReaction,
+  storyReactionEmoji,
   STORY_REACTION_OPTIONS,
   totalStoryReactions,
   type CommunityStoryRow,
   type StoryReactionKind,
+  type StoryReactionProfile,
   type StoryReactionSummary,
 } from "@/lib/community/stories-supabase";
 import { cn } from "@/lib/utils";
@@ -119,6 +122,7 @@ export function StoryViewerDialog({
   const [replyOpen, setReplyOpen] = useState(false);
   const [replyDraft, setReplyDraft] = useState("");
   const [replyBusy, setReplyBusy] = useState(false);
+  const [reactionProfiles, setReactionProfiles] = useState<StoryReactionProfile[]>([]);
 
   const current = queue[index];
   const isLast = index >= queue.length - 1;
@@ -210,6 +214,36 @@ export function StoryViewerDialog({
     };
   }, [open, resolvedStory?.id]);
 
+  const refreshReactionProfiles = useCallback(async () => {
+    if (!resolvedStory || !isOwnStory) {
+      setReactionProfiles([]);
+      return;
+    }
+    const res = await fetchStoryReactionProfiles(resolvedStory.id);
+    if (!res.error) {
+      setReactionProfiles(res.data);
+      setReactions((prev) => {
+        const base: StoryReactionSummary = { heart: 0, support: 0, celebrate: 0, my_reaction: prev?.my_reaction ?? null };
+        for (const row of res.data) {
+          if (row.reaction_kind === "heart") base.heart += 1;
+          else if (row.reaction_kind === "support") base.support += 1;
+          else if (row.reaction_kind === "celebrate") base.celebrate += 1;
+        }
+        return base;
+      });
+    }
+  }, [resolvedStory, isOwnStory]);
+
+  useEffect(() => {
+    if (!open || !resolvedStory || !isOwnStory) {
+      setReactionProfiles([]);
+      return;
+    }
+    void refreshReactionProfiles();
+    const id = window.setInterval(() => void refreshReactionProfiles(), 12_000);
+    return () => window.clearInterval(id);
+  }, [open, resolvedStory?.id, isOwnStory, refreshReactionProfiles]);
+
   const advance = useCallback(() => {
     if (replyOpen) return;
     if (index < queue.length - 1) {
@@ -261,6 +295,7 @@ export function StoryViewerDialog({
   async function openViewers() {
     if (!resolvedStory || !isOwnStory || !viewerId) return;
     void refreshViewCount();
+    void refreshReactionProfiles();
     setViewersOpen(true);
   }
 
@@ -442,20 +477,36 @@ export function StoryViewerDialog({
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm font-medium leading-tight text-white">
-                        {viewCount === 0
-                          ? "No viewers yet"
-                          : viewCount === 1
-                            ? "1 viewer"
-                            : `${viewCount} viewers`}
+                        {viewCount === 0 && reactionTotal === 0
+                          ? "No activity yet"
+                          : [
+                              viewCount > 0 ? `${viewCount} viewer${viewCount === 1 ? "" : "s"}` : null,
+                              reactionTotal > 0
+                                ? `${reactionTotal} reaction${reactionTotal === 1 ? "" : "s"}`
+                                : null,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
                       </span>
-                      <span className="block text-xs leading-tight text-white/55">Tap to see who watched</span>
+                      <span className="block text-xs leading-tight text-white/55">Tap for views and reactions</span>
                     </span>
                     <ChevronRight className="h-4 w-4 shrink-0 text-white/45" aria-hidden />
                   </button>
-                  {reactionTotal > 0 ? (
-                    <p className="text-xs text-white/50">
-                      {reactionTotal} {reactionTotal === 1 ? "reaction" : "reactions"}
-                    </p>
+                  {reactionProfiles.length > 0 ? (
+                    <div className="flex max-w-full flex-wrap justify-center gap-1.5 px-2">
+                      {reactionProfiles.slice(0, 6).map((r) => (
+                        <span
+                          key={r.user_id}
+                          className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/35 px-2 py-1 text-xs text-white/90 backdrop-blur-sm"
+                        >
+                          <span aria-hidden>{storyReactionEmoji(r.reaction_kind)}</span>
+                          <span className="max-w-[5rem] truncate">{r.name.split(" ")[0]}</span>
+                        </span>
+                      ))}
+                      {reactionProfiles.length > 6 ? (
+                        <span className="text-xs text-white/50">+{reactionProfiles.length - 6} more</span>
+                      ) : null}
+                    </div>
                   ) : null}
                 </div>
               ) : canInteract ? (

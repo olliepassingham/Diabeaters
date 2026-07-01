@@ -637,6 +637,53 @@ export function parseSharedFeedPostMessage(body: string): { note: string | null;
   return null;
 }
 
+const STORY_PATH =
+  /\/community\?story=([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i;
+
+function storyIdFromShareLine(line: string): string | null {
+  const m = line.match(STORY_PATH);
+  if (m?.[1]) return m[1];
+  try {
+    const url = new URL(line.trim());
+    const id = url.searchParams.get("story");
+    return id?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Inverse of {@link buildShareStoryMessageBody} + optional note from {@link sendStoryReplyToDmThread}.
+ */
+export function parseSharedStoryMessage(body: string): { note: string | null; storyId: string } | null {
+  const trimmed = body.trim();
+  if (!trimmed) return null;
+
+  const withNoteSep = "\n\nReplied to your story:\n";
+  let note: string | null = null;
+  let linkTail: string;
+
+  const sepIdx = trimmed.indexOf(withNoteSep);
+  if (sepIdx !== -1) {
+    note = trimmed.slice(0, sepIdx).trim() || null;
+    linkTail = trimmed.slice(sepIdx + withNoteSep.length);
+  } else if (trimmed.startsWith("Replied to your story:\n")) {
+    linkTail = trimmed.slice("Replied to your story:\n".length);
+  } else {
+    return null;
+  }
+
+  const lines = linkTail
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+  for (const line of lines) {
+    const storyId = storyIdFromShareLine(line);
+    if (storyId) return { note, storyId };
+  }
+  return null;
+}
+
 /**
  * Open or create a 1:1 thread and send a feed post link (optional note above the link).
  */

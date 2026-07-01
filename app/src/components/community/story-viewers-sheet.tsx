@@ -6,29 +6,45 @@ import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { fetchStoryViewerProfiles, type StoryViewerProfile } from "@/lib/community/stories-supabase";
+import {
+  fetchStoryReactionProfiles,
+  fetchStoryReactionSummary,
+  fetchStoryViewerProfiles,
+  storyReactionEmoji,
+  totalStoryReactions,
+  type StoryReactionProfile,
+  type StoryViewerProfile,
+} from "@/lib/community/stories-supabase";
 import { cn } from "@/lib/utils";
 
 export function useStoryViewerCount(storyId: string | undefined, authorId: string | undefined) {
   const [count, setCount] = useState(0);
+  const [reactionCount, setReactionCount] = useState(0);
   const [loading, setLoading] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!storyId || !authorId) {
       setCount(0);
+      setReactionCount(0);
       return;
     }
     setLoading(true);
-    const res = await fetchStoryViewerProfiles(storyId, { excludeUserId: authorId });
+    const [viewersRes, reactionsRes] = await Promise.all([
+      fetchStoryViewerProfiles(storyId, { excludeUserId: authorId }),
+      fetchStoryReactionSummary(storyId),
+    ]);
     setLoading(false);
-    if (!res.error) setCount(res.data.length);
+    if (!viewersRes.error) setCount(viewersRes.data.length);
+    if (!reactionsRes.error && reactionsRes.data) {
+      setReactionCount(totalStoryReactions(reactionsRes.data));
+    }
   }, [storyId, authorId]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
-  return { count, loading, refresh };
+  return { count, reactionCount, loading, refresh };
 }
 
 type StoryViewersSheetProps = {
@@ -42,65 +58,107 @@ export function StoryViewersSheet({ open, onOpenChange, storyId, authorId }: Sto
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [viewers, setViewers] = useState<StoryViewerProfile[]>([]);
+  const [reactions, setReactions] = useState<StoryReactionProfile[]>([]);
 
   useEffect(() => {
     if (!open) {
       setViewers([]);
+      setReactions([]);
       return;
     }
     let cancelled = false;
     setLoading(true);
-    void fetchStoryViewerProfiles(storyId, { excludeUserId: authorId }).then((res) => {
+    void Promise.all([
+      fetchStoryViewerProfiles(storyId, { excludeUserId: authorId }),
+      fetchStoryReactionProfiles(storyId),
+    ]).then(([viewersRes, reactionsRes]) => {
       if (cancelled) return;
       setLoading(false);
-      if (res.error) {
-        toast({ title: "Could not load viewers", description: res.error.message, variant: "destructive" });
+      if (viewersRes.error || reactionsRes.error) {
+        toast({
+          title: "Could not load story activity",
+          description: viewersRes.error?.message ?? reactionsRes.error?.message,
+          variant: "destructive",
+        });
         return;
       }
-      setViewers(res.data);
+      setViewers(viewersRes.data);
+      setReactions(reactionsRes.data);
     });
     return () => {
       cancelled = true;
     };
   }, [open, storyId, authorId, toast]);
 
-  const title =
-    viewers.length === 1 ? "1 person viewed your story" : `${viewers.length} people viewed your story`;
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[70dvh] overflow-hidden sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>{loading ? "Story viewers" : viewers.length === 0 ? "Story viewers" : title}</DialogTitle>
+          <DialogTitle>Story activity</DialogTitle>
         </DialogHeader>
-        <div className="max-h-[50dvh] overflow-y-auto">
+        <div className="max-h-[50dvh] space-y-5 overflow-y-auto">
           {loading ? (
             <p className="py-6 text-center text-sm text-muted-foreground">Loading…</p>
-          ) : viewers.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              No views yet. Friends who follow you will see your story on the feed.
-            </p>
           ) : (
-            <ul className="space-y-1">
-              {viewers.map((v) => (
-                <li key={v.viewer_id}>
-                  <Link
-                    href={`/community/profile/${encodeURIComponent(v.viewer_id)}`}
-                    onClick={() => onOpenChange(false)}
-                    className="flex items-center gap-3 rounded-lg px-1 py-2 transition-colors hover:bg-muted/60"
-                  >
-                    <CommunityAuthorAvatar displayName={v.name} avatarPath={v.avatar_url} size="sm" />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{v.name}</p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {v.public_handle ? `@${v.public_handle} · ` : ""}
-                        {formatDistanceToNow(new Date(v.viewed_at), { addSuffix: true })}
-                      </p>
-                    </div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            <>
+              <section className="space-y-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Reactions</h3>
+                {reactions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No reactions yet.</p>
+                ) : (
+                  <ul className="space-y-1">
+                    {reactions.map((r) => (
+                      <li key={r.user_id}>
+                        <Link
+                          href={`/community/profile/${encodeURIComponent(r.user_id)}`}
+                          onClick={() => onOpenChange(false)}
+                          className="flex items-center gap-3 rounded-lg px-1 py-2 transition-colors hover:bg-muted/60"
+                        >
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-lg">
+                            {storyReactionEmoji(r.reaction_kind)}
+                          </span>
+                          <CommunityAuthorAvatar displayName={r.name} avatarPath={r.avatar_url} size="sm" />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium">{r.name}</p>
+                            <p className="truncate text-xs text-muted-foreground">
+                              {formatDistanceToNow(new Date(r.created_at), { addSuffix: true })}
+                            </p>
+                          </div>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+
+              <section className="space-y-2 border-t border-border/40 pt-4">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Viewers</h3>
+                {viewers.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No views yet.</p>
+                ) : (
+                  <ul className="space-y-1">
+                    {viewers.map((v) => (
+                      <li key={v.viewer_id}>
+                        <Link
+                          href={`/community/profile/${encodeURIComponent(v.viewer_id)}`}
+                          onClick={() => onOpenChange(false)}
+                          className="flex items-center gap-3 rounded-lg px-1 py-2 transition-colors hover:bg-muted/60"
+                        >
+                          <CommunityAuthorAvatar displayName={v.name} avatarPath={v.avatar_url} size="sm" />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium">{v.name}</p>
+                            <p className="truncate text-xs text-muted-foreground">
+                              {v.public_handle ? `@${v.public_handle} · ` : ""}
+                              {formatDistanceToNow(new Date(v.viewed_at), { addSuffix: true })}
+                            </p>
+                          </div>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            </>
           )}
         </div>
       </DialogContent>
@@ -124,7 +182,7 @@ export function StoryViewersSummary({
   onOpen,
 }: StoryViewersSummaryProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
-  const { count, loading, refresh } = useStoryViewerCount(storyId, authorId);
+  const { count, reactionCount, loading, refresh } = useStoryViewerCount(storyId, authorId);
 
   function openSheet() {
     onOpen?.();
@@ -132,7 +190,12 @@ export function StoryViewersSummary({
     setSheetOpen(true);
   }
 
-  const label = loading ? "…" : count === 1 ? "1 view" : `${count} views`;
+  const activityParts = [
+    !loading && count > 0 ? (count === 1 ? "1 view" : `${count} views`) : null,
+    !loading && reactionCount > 0
+      ? `${reactionCount} ${reactionCount === 1 ? "reaction" : "reactions"}`
+      : null,
+  ].filter(Boolean);
 
   return (
     <>
@@ -146,7 +209,7 @@ export function StoryViewersSummary({
           )}
         >
           <Eye className="h-3 w-3" aria-hidden />
-          {label}
+          {loading ? "…" : activityParts.length > 0 ? activityParts.join(" · ") : "No activity"}
         </button>
       ) : variant === "inline" ? (
         <button
@@ -157,13 +220,17 @@ export function StoryViewersSummary({
             className,
           )}
         >
-          {loading ? "Loading views…" : count === 0 ? "No views yet" : `${count} ${count === 1 ? "person" : "people"} viewed · See who`}
+          {loading
+            ? "Loading activity…"
+            : activityParts.length === 0
+              ? "No activity yet"
+              : `${activityParts.join(" · ")} · See details`}
         </button>
       ) : (
         <Button type="button" variant="outline" size="sm" className={cn("gap-1.5", className)} onClick={openSheet}>
           <Eye className="h-4 w-4" />
-          {loading ? "Loading…" : count === 0 ? "No views yet" : label}
-          {!loading && count > 0 ? " · See who" : ""}
+          {loading ? "Loading…" : activityParts.length === 0 ? "No activity yet" : activityParts.join(" · ")}
+          {!loading && (count > 0 || reactionCount > 0) ? " · See details" : ""}
         </Button>
       )}
 

@@ -3,6 +3,7 @@ import { useRoute } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Heart, ImagePlus, Check, CheckCheck, Send } from "lucide-react";
 import { DmSharedPostPreview } from "@/components/community/dm-shared-post-preview";
+import { DmSharedStoryPreview } from "@/components/community/dm-shared-story-preview";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,6 +20,7 @@ import {
 import {
   insertDmMessage,
   parseSharedFeedPostMessage,
+  parseSharedStoryMessage,
   toggleDmMessageLike,
   type DmMessageRow,
 } from "@/lib/community";
@@ -153,12 +155,14 @@ function DmMessageBubble({
   showReadLabel: boolean;
   onToggleLike: (m: DmMessageRow) => void;
 }) {
-  const shared = parseSharedFeedPostMessage(m.body);
+  const sharedPost = parseSharedFeedPostMessage(m.body);
+  const sharedStory = !sharedPost ? parseSharedStoryMessage(m.body) : null;
+  const isShared = Boolean(sharedPost || sharedStory);
   const likeCount = m.like_count ?? 0;
   const likedByMe = m.liked_by_me ?? false;
   const showImage = Boolean(m.image_signed_url);
-  const hasText = !shared && Boolean(m.body.trim());
-  const isImageOnly = showImage && !hasText && !shared;
+  const hasText = !isShared && Boolean(m.body.trim());
+  const isImageOnly = showImage && !hasText && !isShared;
   const timeLabel = format(new Date(m.created_at), "HH:mm");
   const doubleTapLike = useDoubleTap(() => onToggleLike(m));
 
@@ -178,7 +182,7 @@ function DmMessageBubble({
                 "rounded-[1.25rem] bg-card text-foreground ring-1 ring-border/40",
                 groupedWithPrevious ? "rounded-tl-[0.45rem]" : "rounded-bl-[0.45rem]",
               ),
-          shared && "max-w-[min(92%,22rem)] p-2.5",
+          isShared && "max-w-[min(92%,22rem)] p-2.5",
         ),
   );
 
@@ -214,15 +218,22 @@ function DmMessageBubble({
             }
           : {})}
       >
-        {shared ? (
+        {sharedPost ? (
           <>
-            {shared.note ? <div className="mb-2 whitespace-pre-wrap px-0.5">{shared.note}</div> : null}
-            <DmSharedPostPreview postId={shared.postId} />
+            {sharedPost.note ? <div className="mb-2 whitespace-pre-wrap px-0.5">{sharedPost.note}</div> : null}
+            <DmSharedPostPreview postId={sharedPost.postId} />
+          </>
+        ) : null}
+
+        {sharedStory ? (
+          <>
+            {sharedStory.note ? <div className="mb-2 whitespace-pre-wrap px-0.5">{sharedStory.note}</div> : null}
+            <DmSharedStoryPreview storyId={sharedStory.storyId} />
           </>
         ) : null}
 
         {showImage ? (
-          <div className={cn(!isImageOnly && (shared || hasText) && "mt-2", isImageOnly && "p-0")}>
+          <div className={cn(!isImageOnly && (isShared || hasText) && "mt-2", isImageOnly && "p-0")}>
             <DmMessageImage
               src={m.image_signed_url!}
               className={isImageOnly ? "rounded-none" : "rounded-xl"}
@@ -235,7 +246,7 @@ function DmMessageBubble({
 
         {hasText ? <div className={cn("whitespace-pre-wrap", showImage && "mt-2")}>{m.body}</div> : null}
 
-        {!shared && !showImage && m.image_storage_path && !m.image_signed_url ? (
+        {!isShared && !showImage && m.image_storage_path && !m.image_signed_url ? (
           <span className="text-xs opacity-70">Could not load image</span>
         ) : null}
 

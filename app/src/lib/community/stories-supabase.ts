@@ -64,6 +64,19 @@ export const STORY_REACTION_OPTIONS: { kind: StoryReactionKind; emoji: string; l
   { kind: "celebrate", emoji: "🙌", label: "Celebrate" },
 ];
 
+export function storyReactionEmoji(kind: StoryReactionKind): string {
+  return STORY_REACTION_OPTIONS.find((o) => o.kind === kind)?.emoji ?? "❤️";
+}
+
+export type StoryReactionProfile = {
+  user_id: string;
+  reaction_kind: StoryReactionKind;
+  created_at: string;
+  name: string;
+  avatar_url: string | null;
+  public_handle: string | null;
+};
+
 function clamp01(n: number): number {
   return Math.min(1, Math.max(0, n));
 }
@@ -336,6 +349,42 @@ export async function fetchStoryReactionSummary(storyId: string): Promise<{
   }
 
   return { data: summary, error: null };
+}
+
+export async function fetchStoryReactionProfiles(storyId: string): Promise<{
+  data: StoryReactionProfile[];
+  error: Error | null;
+}> {
+  const supabase = getSupabase();
+  if (!supabase) return { data: [], error: new Error("Supabase not configured") };
+
+  const { data, error } = await supabase
+    .from("community_story_reactions")
+    .select("user_id, reaction_kind, created_at")
+    .eq("story_id", storyId)
+    .order("created_at", { ascending: false });
+
+  if (error) return { data: [], error: new Error(error.message) };
+
+  const rows = (data ?? []) as { user_id: string; reaction_kind: string; created_at: string }[];
+  if (rows.length === 0) return { data: [], error: null };
+
+  const profilesRes = await getProfilesByIds(rows.map((r) => r.user_id));
+  return {
+    data: rows.map((r) => {
+      const kind = String(r.reaction_kind) as StoryReactionKind;
+      const p = profilesRes.get(r.user_id);
+      return {
+        user_id: r.user_id,
+        reaction_kind: kind === "support" || kind === "celebrate" ? kind : "heart",
+        created_at: String(r.created_at),
+        name: p?.full_name?.trim() || "Member",
+        avatar_url: p?.avatar_url ?? null,
+        public_handle: p?.public_handle ?? null,
+      };
+    }),
+    error: null,
+  };
 }
 
 export async function setStoryReaction(
