@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Moon, Utensils, Syringe, Activity, Wine, CheckCircle2, AlertCircle, AlertTriangle, Sparkles, Plane, Thermometer, ChevronDown, ChevronUp, TrendingDown, TrendingUp, Minus } from "lucide-react";
+import { Moon, Utensils, Activity, Wine, AlertTriangle, Sparkles, Plane, Thermometer, ChevronDown, ChevronUp, TrendingDown, TrendingUp, Minus } from "lucide-react";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 import { BedtimeReminderPromptDialog } from "@/components/bedtime-reminder-prompt-dialog";
@@ -23,41 +23,23 @@ import { useToast } from "@/hooks/use-toast";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
-import { BedtimeCorrectionPanel } from "@/components/scenarios/bedtime-correction-panel";
+import { BedtimeResultView } from "@/components/scenarios/bedtime-result-view";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
-import { computeSimpleCorrectionDose } from "@/lib/correction-dose";
+import { calculateBedtimeCorrectionDose, type BedtimeCorrectionSuggestion } from "@/lib/bedtime-correction-dose";
 import { upsertScenario } from "@/lib/scenarios-supabase";
 import {
   buildBedtimePersonalizedCopy,
   formatBedtimeBgDisplay,
   hoursSinceSelectPhrase,
+  isBedtimeBgWellAboveTarget,
   resolveBedtimeReadinessLevel,
   BEDTIME_OVERNIGHT_TREND_STORAGE_KEY,
   type OvernightUsualTrend,
 } from "@/lib/bedtime-readiness";
-import {
-  getMdiBedtimePostExerciseLine,
-  getPumpBedtimePostExerciseLine,
-  inferPostExerciseLoadTier,
-} from "@/lib/post-exercise-nudge";
 
 type ReadinessLevel = "steady" | "monitor" | "alert";
 
 type BedtimeBgTrend = "rising" | "steady" | "falling" | "not_sure";
-
-interface CorrectionSuggestion {
-  fullDose: number;
-  suggestedDose: number;
-  currentBg: number;
-  targetBg: number;
-  correctionFactor: number;
-  bgUnits: string;
-  hasIOB: boolean;
-  iobWarning: string;
-  exerciseWarning: string;
-  alcoholWarning: string;
-  sickDayWarning: string;
-}
 
 interface ReadinessResult {
   level: ReadinessLevel;
@@ -70,7 +52,7 @@ interface ReadinessResult {
   messageBullets: string[];
   tips: string[];
   factors: { label: string; status: "good" | "caution" | "concern"; note: string; detail?: string }[];
-  correction: CorrectionSuggestion | null;
+  correction: BedtimeCorrectionSuggestion | null;
   /** True when BG is above target but no correction dose could be calculated (e.g. missing ISF). */
   correctionUnavailable: boolean;
   bgAboveTarget: boolean;
@@ -175,10 +157,8 @@ export default function Bedtime() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [bedtimeLogs, setBedtimeLogs] = useState<BedtimeLog[]>([]);
-  const [detailsOpen, setDetailsOpen] = useState(false);
   const [quickCheckOpen, setQuickCheckOpen] = useState(true);
   const [extrasOpen, setExtrasOpen] = useState(false);
-  const [tipsOpen, setTipsOpen] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
   const { data: linkedPatient } = useLinkedPatient();
@@ -219,75 +199,6 @@ export default function Bedtime() {
       return { low: userSettings.targetBgLow, high: userSettings.targetBgHigh };
     }
     return bgUnits === "mmol/L" ? { low: 5.0, high: 8.0 } : { low: 90, high: 144 };
-  };
-
-  const calculateCorrectionDose = (bgMmol: number, targetHighMmol: number, insulinHours: number): CorrectionSuggestion | null => {
-    const correctionFactor = userSettings?.correctionFactor;
-    if (!correctionFactor || correctionFactor <= 0) return null;
-
-    const bgInUserUnits = bgUnits === "mg/dL" ? Math.round(bgMmol * 18) : Math.round(bgMmol * 10) / 10;
-    const targetInUserUnits = bgUnits === "mg/dL" ? Math.round(targetHighMmol * 18) : Math.round(targetHighMmol * 10) / 10;
-
-    const simple = computeSimpleCorrectionDose({
-      currentBg: bgInUserUnits,
-      targetBg: targetInUserUnits,
-      correctionFactor,
-      bgUnits,
-    });
-    if (simple.status !== "dose") return null;
-
-    const fullDose = simple.fullDoseRounded;
-
-    const hasIOB = insulinHours < 4;
-    let iobReduction = 0;
-    if (insulinHours < 1) iobReduction = 0.6;
-    else if (insulinHours < 2) iobReduction = 0.4;
-    else if (insulinHours < 3) iobReduction = 0.2;
-    else if (insulinHours < 4) iobReduction = 0.1;
-
-    const bedtimeReduction = 0.5;
-    const effectiveDose = fullDose * bedtimeReduction * (1 - iobReduction);
-    const suggestedDose = Math.round(effectiveDose);
-
-    if (suggestedDose <= 0) return null;
-
-    let iobWarning = "";
-    if (insulinHours < 1) {
-      iobWarning = "You have significant active insulin from less than 1 hour ago. This may bring you down on its own.";
-    } else if (insulinHours < 2) {
-      iobWarning = "You still have active insulin from your recent dose. It may bring you down further.";
-    } else if (insulinHours < 4) {
-      iobWarning = "Some insulin is still active from earlier. A smaller correction accounts for this.";
-    }
-
-    let exerciseWarning = "";
-    if (exercisedToday) {
-      exerciseWarning = "Exercise increases your sensitivity to insulin, especially overnight. Be extra cautious with any correction.";
-    }
-
-    let alcoholWarning = "";
-    if (hadAlcohol) {
-      alcoholWarning = "Alcohol can cause delayed lows. Correcting at bedtime after drinking carries extra risk.";
-    }
-
-    let sickDayWarning = "";
-    if (scenarioState.sickDayActive) {
-      sickDayWarning = "You're in sick day mode. Illness can make blood glucose harder to predict. Consider a smaller correction or consult your diabetes team.";
-    }
-
-    return {
-      fullDose,
-      suggestedDose,
-      currentBg: bgInUserUnits,
-      targetBg: targetInUserUnits,
-      correctionFactor,
-      bgUnits,
-      hasIOB,
-      iobWarning,
-      exerciseWarning,
-      alcoholWarning,
-      sickDayWarning,
-    };
   };
 
   const persistBedtimeCheck = (level: ReadinessLevel, correctionDose: number | null) => {
@@ -729,7 +640,18 @@ export default function Bedtime() {
       tips.push("Consider a temporary basal at 80–90% overnight after exercise if your team uses that approach");
     }
 
-    const correction = calculateCorrectionDose(bgMmol, targetHighMmol, insulinHoursForIOB);
+    const correction = calculateBedtimeCorrectionDose({
+      bgMmol,
+      targetHighMmol,
+      correctionFactor: userSettings?.correctionFactor ?? 0,
+      bgUnits,
+      insulinHours: insulinHoursForIOB,
+      bgTrend,
+      wellAboveTarget: isBedtimeBgWellAboveTarget(bgMmol, targetHighMmol),
+      exercisedToday,
+      hadAlcohol,
+      sickDayActive: scenarioState.sickDayActive,
+    });
     const correctionUnavailable = bgMmol > targetHighMmol && correction == null;
     const bgAboveTarget = bgMmol > targetHighMmol;
     const messageBullets = personalized.messageBullets;
@@ -756,9 +678,7 @@ export default function Bedtime() {
       // ignore
     }
     persistBedtimeCheck(level, correction?.suggestedDose ?? null);
-    setDetailsOpen(false);
     setQuickCheckOpen(false);
-    setTipsOpen(false);
 
     // Bring the verdict/status card into view after calculating.
     try {
@@ -799,50 +719,7 @@ export default function Bedtime() {
     });
   };
 
-  const getLevelColors = (level: ReadinessLevel) => {
-    switch (level) {
-      case "steady":
-        return {
-          heroSurface: "border-primary/30 bg-gradient-to-b from-primary/10 via-card to-card",
-          title: "text-foreground",
-          chip: "bg-emerald-500/15 text-emerald-900 dark:text-emerald-100",
-        };
-      case "monitor":
-        return {
-          heroSurface: "border-amber-500/35 bg-gradient-to-b from-amber-500/10 via-card to-card",
-          title: "text-foreground",
-          chip: "bg-amber-500/15 text-amber-900 dark:text-amber-100",
-        };
-      case "alert":
-        return {
-          heroSurface: "border-red-500/35 bg-gradient-to-b from-red-500/12 via-card to-card",
-          title: "text-foreground",
-          chip: "bg-red-500/15 text-red-800 dark:text-red-100",
-        };
-    }
-  };
-
-  const getStatusIcon = (status: "good" | "caution" | "concern") => {
-    switch (status) {
-      case "good":
-        return <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />;
-      case "caution":
-        return <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />;
-      case "concern":
-        return <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />;
-    }
-  };
-
   const canCalculate = currentBg && !isNaN(parseFloat(currentBg));
-
-  const verdictLabel = (level: ReadinessLevel, aboveTarget?: boolean) =>
-    level === "steady"
-      ? "Ready"
-      : level === "monitor"
-        ? aboveTarget
-          ? "Plan"
-          : "Caution"
-        : "Needs attention";
 
   const getRecentLogs = () => {
     const fourteenDaysAgo = new Date();
@@ -945,260 +822,15 @@ export default function Bedtime() {
         </div>
       )}
 
-      {result && (() => {
-        const colors = getLevelColors(result.level);
-        return (
-          <div className="space-y-3" data-testid="card-bedtime-result-hero">
-            <div className={cn("overflow-hidden rounded-2xl border shadow-sm", colors.heroSurface)}>
-              <div className="relative px-5 pb-4 pt-5 text-center">
-                <Badge
-                  variant="secondary"
-                  className={cn("absolute right-3 top-3 rounded-full font-medium", colors.chip)}
-                >
-                  {verdictLabel(result.level, result.bgAboveTarget)}
-                </Badge>
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-primary/90">Tonight&apos;s check</p>
-                <p
-                  className={cn("mt-1 font-display text-5xl font-bold tracking-tight", colors.title)}
-                  data-testid="text-bedtime-verdict"
-                >
-                  {verdictLabel(result.level, result.bgAboveTarget)}
-                </p>
-                <p className="mt-2 text-sm text-muted-foreground">{result.headline}</p>
-                <div className="mt-3 flex flex-wrap justify-center gap-2">
-                  <Badge variant="secondary" className="rounded-lg px-2.5 py-1 font-semibold tabular-nums">
-                    {result.bgGlance.display}
-                  </Badge>
-                  <Badge variant="outline" className="rounded-lg border-border/60 px-2.5 py-1 text-xs">
-                    {result.bgGlance.trendLabel}
-                  </Badge>
-                  <Badge variant="outline" className="rounded-lg border-border/60 px-2.5 py-1 text-xs">
-                    {result.bgGlance.rangeLabel}
-                  </Badge>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-border/60 bg-card/40 px-4 py-4">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">What to do</p>
-              <ol className="mt-2.5 space-y-2" aria-label="Bedtime guidance">
-                {result.guidance.map((line, i) => (
-                  <li key={line} className="flex gap-2.5 text-sm leading-relaxed text-foreground/90">
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-semibold text-muted-foreground" aria-hidden>
-                      {i + 1}
-                    </span>
-                    <span className="min-w-0 pt-0.5">{line}</span>
-                  </li>
-                ))}
-              </ol>
-            </div>
-
-            {result.snack ? (
-              <div className="rounded-2xl border border-amber-500/30 bg-amber-500/[0.08] px-4 py-3">
-                <p className="text-sm font-medium text-foreground">Optional snack</p>
-                <p className="mt-0.5 text-sm text-foreground/90">
-                  <span className="font-semibold tabular-nums">{result.snack.grams}g</span> fast carbs
-                  <span className="text-muted-foreground"> — {result.snack.reason}</span>
-                </p>
-              </div>
-            ) : null}
-          </div>
-        );
-      })()}
-
-      {result?.correction ? (
-        <BedtimeCorrectionPanel
-          correction={result.correction}
+      {result ? (
+        <BedtimeResultView
+          result={result}
           isPumpUser={isPumpUser}
           hoursUntilSleep={hoursUntilSleep}
+          exercisedToday={exercisedToday}
+          hadAlcohol={hadAlcohol}
+          lastExerciseLabel={lastExerciseLabel}
         />
-      ) : null}
-
-      {result?.correctionUnavailable ? (
-        <Card className="rounded-2xl border-amber-500/30 bg-amber-500/[0.06]" data-testid="card-correction-unavailable">
-          <CardContent className="space-y-2 px-4 py-4 text-sm text-foreground/90">
-            <p className="font-medium text-foreground">Above target — correction not calculated</p>
-            <p className="text-muted-foreground">
-              Add your correction factor under Settings → Ratios so we can suggest a cautious bedtime dose, or follow
-              your usual team plan if you correct before sleep.
-            </p>
-            <Button variant="link" size="sm" className="h-auto px-0" asChild>
-              <Link href="/settings/ratios">Open ratios settings</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {result ? (
-        <div
-          className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-none"
-          data-testid="card-bedtime-save-prompt"
-        >
-          <div className="px-4 py-4 sm:px-5">
-            <div className="flex items-start gap-3">
-              <CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
-              <div className="min-w-0">
-                <p className="font-semibold text-foreground">Check logged</p>
-                <p className="mt-0.5 text-sm text-muted-foreground">
-                  Counted for your bedtime streak, activity history, and linked supporters.
-                </p>
-              </div>
-            </div>
-            <div className="mt-3 flex justify-center">
-              <Button variant="link" size="sm" className="h-auto px-0 text-muted-foreground" asChild>
-                <Link href="/tools/hypo-help">Hypo help</Link>
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {result ? (
-        <div className="space-y-3" data-testid="card-bedtime-result">
-          {isPumpUser && (result.level === "monitor" || result.level === "alert") ? (
-            <Collapsible className="overflow-hidden rounded-xl border border-border/60 bg-card" data-testid="card-pump-overnight">
-              <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium hover:bg-muted/20">
-                <span className="flex items-center gap-2">
-                  <Syringe className="h-4 w-4 text-indigo-600 dark:text-indigo-400" aria-hidden />
-                  Pump overnight tips
-                </span>
-                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
-              </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-2 border-t border-border/50 px-4 pb-4 pt-3 text-sm text-foreground/90">
-                {exercisedToday ? (
-                  <p data-testid="text-pump-post-exercise">
-                    {(() => {
-                      const last = storage.getLastExerciseSummary();
-                      const tier =
-                        last && storage.didExerciseRecently(24) ? inferPostExerciseLoadTier(last) : "moderate";
-                      const suffix = lastExerciseLabel ? ` (${lastExerciseLabel})` : "";
-                      return getPumpBedtimePostExerciseLine(tier, suffix);
-                    })()}
-                  </p>
-                ) : null}
-                {hadAlcohol ? (
-                  <p>Alcohol can cause delayed lows. Consider reducing basal by 10–20% overnight and setting an alarm.</p>
-                ) : null}
-                <p>If your BG is trending down, a small temporary basal reduction (80–90%) may help prevent an overnight low.</p>
-              </CollapsibleContent>
-            </Collapsible>
-          ) : null}
-
-          {!isPumpUser && (result.level === "monitor" || result.level === "alert") && exercisedToday ? (
-            <Collapsible
-              className="overflow-hidden rounded-xl border border-border/60 bg-card"
-              data-testid="card-mdi-post-exercise"
-            >
-              <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium hover:bg-muted/20">
-                <span className="flex items-center gap-2">
-                  <Syringe className="h-4 w-4 text-indigo-600 dark:text-indigo-400" aria-hidden />
-                  After exercise (MDI)
-                </span>
-                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
-              </CollapsibleTrigger>
-              <CollapsibleContent className="border-t border-border/50 px-4 pb-4 pt-3 text-sm text-foreground/90">
-                {(() => {
-                  const last = storage.getLastExerciseSummary();
-                  const tier = last && storage.didExerciseRecently(24) ? inferPostExerciseLoadTier(last) : "moderate";
-                  return getMdiBedtimePostExerciseLine(tier);
-                })()}
-              </CollapsibleContent>
-            </Collapsible>
-          ) : null}
-
-          {result.tips.length > 0 ? (
-            <Collapsible open={tipsOpen} onOpenChange={setTipsOpen}>
-              <div data-testid="container-bedtime-tips">
-                <CollapsibleTrigger asChild>
-                  <button
-                    type="button"
-                    className="flex w-full items-center justify-between gap-3 rounded-xl border border-border/60 bg-card px-4 py-3 text-left hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    aria-label={tipsOpen ? "Hide tips for tonight" : "Show tips for tonight"}
-                    data-testid="button-toggle-bedtime-tips"
-                  >
-                    <span className="flex items-center gap-2 text-sm font-medium">
-                      <Sparkles className="h-4 w-4 text-muted-foreground" aria-hidden />
-                      Tips for tonight
-                      <span className="text-xs font-normal text-muted-foreground">({result.tips.length})</span>
-                    </span>
-                    {tipsOpen ? (
-                      <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                    ) : (
-                      <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                    )}
-                  </button>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <ul className="mt-2 space-y-2">
-                    {result.tips.map((tip, i) => (
-                      <li
-                        key={i}
-                        className="rounded-xl border border-border/50 bg-muted/20 px-3 py-2.5 text-sm leading-relaxed"
-                        data-testid={`text-tip-${i}`}
-                      >
-                        {tip}
-                      </li>
-                    ))}
-                  </ul>
-                </CollapsibleContent>
-              </div>
-            </Collapsible>
-          ) : null}
-        </div>
-      ) : null}
-
-      {result ? (
-        <div className="-mt-1">
-          <Button
-            type="button"
-            variant="outline"
-            className="h-11 w-full justify-between rounded-xl border-border/60 bg-card/80"
-            onClick={() => setDetailsOpen((v) => !v)}
-            data-testid="button-open-details-top"
-          >
-            <span>{detailsOpen ? "Hide factor breakdown" : "Why we said this"}</span>
-            {detailsOpen ? <ChevronUp className="h-4 w-4" aria-hidden /> : <ChevronDown className="h-4 w-4" aria-hidden />}
-          </Button>
-        </div>
-      ) : null}
-
-      {result ? (
-        <Collapsible open={detailsOpen} onOpenChange={setDetailsOpen}>
-          <CollapsibleContent>
-            <Card className="rounded-2xl border-border/60 shadow-sm" data-testid="card-bedtime-factors">
-              <CardContent className="space-y-4 p-5 md:p-6">
-                <h3 className="font-semibold text-foreground">Why we said this</h3>
-                <div className="grid gap-3 sm:grid-cols-2" data-testid="container-bedtime-factors">
-                  {result.factors.map((factor, i) => (
-                    <div
-                      key={i}
-                      className="flex items-start gap-3 rounded-xl border border-border/50 bg-card/80 px-3 py-3 shadow-sm"
-                      data-testid={`card-factor-${i}`}
-                    >
-                      <div className="mt-0.5 shrink-0">{getStatusIcon(factor.status)}</div>
-                      <div className="min-w-0 space-y-1">
-                        <p className="text-sm font-medium text-foreground" data-testid={`text-factor-label-${i}`}>
-                          {factor.label}
-                        </p>
-                        <p className="text-sm leading-relaxed text-foreground/90" data-testid={`text-factor-note-${i}`}>
-                          {factor.note}
-                        </p>
-                        {factor.detail ? (
-                          <p
-                            className="text-xs leading-relaxed text-muted-foreground"
-                            data-testid={`text-factor-detail-${i}`}
-                          >
-                            {factor.detail}
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </CollapsibleContent>
-        </Collapsible>
       ) : null}
 
       <Collapsible open={quickCheckOpen} onOpenChange={setQuickCheckOpen}>
