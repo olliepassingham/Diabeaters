@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useCommunityStories } from "@/hooks/use-community-stories";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { type FollowSuggestion } from "@/lib/community";
-import type { CommunityStoryRow, StoryRingState } from "@/lib/community/stories-supabase";
+import { pickStoryToOpen, type CommunityStoryRow, type StoryRingState } from "@/lib/community/stories-supabase";
 import { searchProfilesByHandlePrefix } from "@/lib/profile";
 
 type FindPeoplePerson = {
@@ -433,7 +433,7 @@ export function FindPeoplePanel({
     ringState,
     onStoryClick: onStoryClick
       ? (authorId: string, displayName: string) =>
-          onStoryClick(authorId, storiesByAuthor.get(authorId), displayName)
+          onStoryClick(authorId, pickStoryToOpen(storiesByAuthor.get(authorId) ?? []) ?? undefined, displayName)
       : undefined,
   };
 

@@ -4,7 +4,8 @@ import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { StoryAvatarRing } from "@/components/community/story-avatar-ring";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
-  storyRingStateForRow,
+  pickStoryToOpen,
+  storyRingStateForStories,
   type CommunityStoryRow,
 } from "@/lib/community/stories-supabase";
 import { cn } from "@/lib/utils";
@@ -18,7 +19,7 @@ export type FeedStoryStripPerson = {
 type Props = {
   self: FeedStoryStripPerson | null;
   people: FeedStoryStripPerson[];
-  storiesByAuthor: Map<string, CommunityStoryRow>;
+  storiesByAuthor: Map<string, CommunityStoryRow[]>;
   loading?: boolean;
   onOpenStory: (authorId: string, story?: CommunityStoryRow) => void;
   onAddStory: () => void;
@@ -42,31 +43,47 @@ const NAME_CLASS = "w-full truncate text-center text-[9px] leading-none text-mut
 
 function SelfStoryCell({
   self,
-  selfStory,
+  selfStories,
   onOpenStory,
   onAddStory,
 }: {
   self: FeedStoryStripPerson;
-  selfStory?: CommunityStoryRow;
+  selfStories: CommunityStoryRow[];
   onOpenStory: (authorId: string, story?: CommunityStoryRow) => void;
   onAddStory: () => void;
 }) {
+  const hasStories = selfStories.length > 0;
+  const storyToOpen = pickStoryToOpen(selfStories);
+
   return (
     <div className={cn("flex shrink-0 flex-col items-center gap-0.5", ITEM_WIDTH)}>
-      {selfStory ? (
-        <StoryAvatarRing
-          state={storyRingStateForRow(selfStory)}
-          label={selfStory.viewed_by_me ? "Rewatch your story" : "Your story"}
-          onClick={() => onOpenStory(self.id, selfStory)}
-          compact
-        >
-          <CommunityAuthorAvatar
-            displayName={self.name}
-            avatarPath={self.avatar_url}
-            size="sm"
-            className={AVATAR_CLASS}
-          />
-        </StoryAvatarRing>
+      {hasStories && storyToOpen ? (
+        <div className="relative">
+          <StoryAvatarRing
+            state={storyRingStateForStories(selfStories)}
+            label={selfStories.every((s) => s.viewed_by_me) ? "Rewatch your stories" : "Your stories"}
+            onClick={() => onOpenStory(self.id, storyToOpen)}
+            compact
+          >
+            <CommunityAuthorAvatar
+              displayName={self.name}
+              avatarPath={self.avatar_url}
+              size="sm"
+              className={AVATAR_CLASS}
+            />
+          </StoryAvatarRing>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddStory();
+            }}
+            className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-primary text-primary-foreground ring-2 ring-background outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            aria-label="Add another story"
+          >
+            <Plus className="h-2 w-2" strokeWidth={3} />
+          </button>
+        </div>
       ) : (
         <button
           type="button"
@@ -157,21 +174,22 @@ export function FeedStoriesComposerHeader({
   className,
 }: Props) {
   const storyEntries = useMemo(() => {
-    const out: { person: FeedStoryStripPerson; story: CommunityStoryRow }[] = [];
+    const out: { person: FeedStoryStripPerson; stories: CommunityStoryRow[]; story: CommunityStoryRow }[] = [];
     for (const person of people) {
-      const story = storiesByAuthor.get(person.id);
-      if (story) out.push({ person, story });
+      const stories = storiesByAuthor.get(person.id) ?? [];
+      const story = pickStoryToOpen(stories);
+      if (story) out.push({ person, stories, story });
     }
     out.sort((a, b) => {
-      if (a.story.viewed_by_me !== b.story.viewed_by_me) {
-        return a.story.viewed_by_me ? 1 : -1;
-      }
+      const aUnseen = a.stories.some((s) => !s.viewed_by_me);
+      const bUnseen = b.stories.some((s) => !s.viewed_by_me);
+      if (aUnseen !== bUnseen) return aUnseen ? -1 : 1;
       return a.person.name.localeCompare(b.person.name);
     });
     return out;
   }, [people, storiesByAuthor]);
 
-  const selfStory = self ? storiesByAuthor.get(self.id) : undefined;
+  const selfStories = self ? storiesByAuthor.get(self.id) ?? [] : [];
   const showStoriesRow = Boolean(self) || loading || storyEntries.length > 0;
   const hideComposerAvatar = showStoriesRow && Boolean(self);
 
@@ -216,7 +234,7 @@ export function FeedStoriesComposerHeader({
           {self ? (
             <SelfStoryCell
               self={self}
-              selfStory={selfStory}
+              selfStories={selfStories}
               onOpenStory={onOpenStory}
               onAddStory={onAddStory}
             />
@@ -226,10 +244,10 @@ export function FeedStoriesComposerHeader({
             ? Array.from({ length: 3 }).map((_, i) => (
                 <div key={i} className="h-9 w-9 shrink-0 animate-pulse rounded-full bg-muted/25" />
               ))
-            : storyEntries.map(({ person, story }) => (
+            : storyEntries.map(({ person, stories, story }) => (
                 <div key={person.id} className={cn("flex shrink-0 flex-col items-center gap-0.5", ITEM_WIDTH)}>
                   <StoryAvatarRing
-                    state={storyRingStateForRow(story)}
+                    state={storyRingStateForStories(stories)}
                     onClick={() => onOpenStory(person.id, story)}
                     label={`Watch ${person.name}'s story`}
                     compact

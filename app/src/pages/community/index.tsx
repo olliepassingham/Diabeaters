@@ -37,6 +37,7 @@ import {
   type FollowSuggestion,
   fetchStoryById,
 } from "@/lib/community";
+import { pickStoryToOpen } from "@/lib/community/stories-supabase";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { isSupabaseConfigured } from "@/lib/supabase";
@@ -332,7 +333,9 @@ export default function CommunityHomePage() {
       const isFollowee = storyFolloweeIds.includes(authorId);
       if (!isSelf && !isFollowee) return;
 
-      const queueIdx = storyViewerQueue.findIndex((e) => e.authorId === authorId);
+      const queueIdx = story
+        ? storyViewerQueue.findIndex((e) => e.story?.id === story.id)
+        : storyViewerQueue.findIndex((e) => e.authorId === authorId);
       if (queueIdx >= 0) {
         setStoryViewerEntriesOverride(null);
         setStoryViewerInitialIndex(queueIdx);
@@ -345,7 +348,7 @@ export default function CommunityHomePage() {
         setStoryViewerEntriesOverride([
           {
             authorId,
-            story: story ?? storiesByAuthor.get(authorId) ?? null,
+            story: story ?? pickStoryToOpen(storiesByAuthor.get(authorId) ?? []) ?? null,
             authorDisplayName: displayName ?? person?.name ?? undefined,
             authorAvatarUrl,
           },

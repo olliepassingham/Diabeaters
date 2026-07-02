@@ -49,6 +49,7 @@ import { StoryViewersSummary } from "@/components/community/story-viewers-sheet"
 import { ProfileStreakBadges } from "@/components/achievements/achievements-panel";
 import { useResolvedProfileImageUrl } from "@/hooks/use-resolved-profile-image-url";
 import { useCommunityStories } from "@/hooks/use-community-stories";
+import { latestStoryForAuthor } from "@/lib/community/stories-supabase";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { getPrimaryAppRole } from "@/lib/carer-session";
@@ -145,7 +146,8 @@ export default function CommunityProfilePage() {
     user?.id,
     profileStoryAuthorIds,
   );
-  const activeStory = userId ? storiesByAuthor.get(userId) : undefined;
+  const authorStories = userId ? storiesByAuthor.get(userId) ?? [] : [];
+  const latestStory = latestStoryForAuthor(authorStories);
   const storyRing = profileRingState(userId ?? "");
 
   const isSelf = Boolean(user?.id && userId && user.id === userId);
@@ -385,16 +387,16 @@ export default function CommunityProfilePage() {
           <div className="space-y-2">
             <div className="flex items-start gap-3">
               <div className="shrink-0">
-                {storyRing !== "none" && activeStory && canViewStory ? (
+                {storyRing !== "none" && authorStories.length > 0 && canViewStory ? (
                   <StoryAvatarRing
                     state={storyRing}
                     onClick={() => setStoryViewerOpen(true)}
                     label={
                       isSelf
-                        ? activeStory.viewed_by_me
-                          ? "Rewatch your story"
-                          : "Your story"
-                        : `Watch ${displayName}'s story`
+                        ? authorStories.every((s) => s.viewed_by_me)
+                          ? "Rewatch your stories"
+                          : "Your stories"
+                        : `Watch ${displayName}'s stories`
                     }
                   >
                     <ProfileAvatarTile
@@ -471,7 +473,7 @@ export default function CommunityProfilePage() {
               <ProfileSupportedPersonBadge person={profile.supported_person} subtle className="w-fit" />
             ) : null}
 
-            {isSelf && storyRing === "none" && user ? (
+            {isSelf && user ? (
               <Button
                 type="button"
                 variant="outline"
@@ -484,8 +486,8 @@ export default function CommunityProfilePage() {
               </Button>
             ) : null}
 
-            {isSelf && activeStory && userId ? (
-              <StoryViewersSummary storyId={activeStory.id} authorId={userId} variant="inline" />
+            {isSelf && latestStory && userId ? (
+              <StoryViewersSummary storyId={latestStory.id} authorId={userId} variant="inline" />
             ) : null}
 
             {!isSelf && user ? (
@@ -671,15 +673,13 @@ export default function CommunityProfilePage() {
         onOpenChange={setStoryViewerOpen}
         viewerId={user?.id}
         entries={
-          activeStory && userId && canViewStory
-            ? [
-                {
-                  authorId: userId,
-                  story: activeStory,
-                  authorDisplayName: displayName,
-                  authorAvatarUrl: profile?.avatar_url ?? null,
-                },
-              ]
+          authorStories.length > 0 && userId && canViewStory
+            ? authorStories.map((story) => ({
+                authorId: userId,
+                story,
+                authorDisplayName: displayName,
+                authorAvatarUrl: profile?.avatar_url ?? null,
+              }))
             : []
         }
         initialIndex={0}

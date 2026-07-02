@@ -274,13 +274,7 @@ export async function fetchActiveStoriesForAuthors(authorIds: string[]): Promise
   if (error) return { data: [], error: new Error(error.message) };
 
   const rows = (data ?? []) as Record<string, unknown>[];
-  const latestByAuthor = new Map<string, Record<string, unknown>>();
-  for (const row of rows) {
-    const aid = String(row.author_id);
-    if (!latestByAuthor.has(aid)) latestByAuthor.set(aid, row);
-  }
-
-  const storyIds = [...latestByAuthor.values()].map((r) => String(r.id));
+  const storyIds = rows.map((r) => String(r.id));
   const viewedIds = new Set<string>();
   if (viewerId && storyIds.length > 0) {
     const { data: views } = await supabase
@@ -293,7 +287,7 @@ export async function fetchActiveStoriesForAuthors(authorIds: string[]): Promise
     }
   }
 
-  const out = [...latestByAuthor.values()].map((r) => mapStory(r, viewedIds.has(String(r.id))));
+  const out = rows.map((r) => mapStory(r, viewedIds.has(String(r.id))));
   return { data: out, error: null };
 }
 
@@ -491,16 +485,6 @@ export async function insertCommunityStory(
   const uid = sessionData.session?.user?.id;
   if (!uid) return { data: null, error: new Error("Not signed in") };
 
-  const now = new Date().toISOString();
-  const { data: existing } = await supabase
-    .from("community_stories")
-    .select("id, media_path")
-    .eq("author_id", uid)
-    .gt("expires_at", now);
-
-  const oldPaths = (existing ?? []).map((r) => String((r as { media_path: string }).media_path)).filter(Boolean);
-  const oldIds = (existing ?? []).map((r) => String((r as { id: string }).id));
-
   const storyId = crypto.randomUUID();
   const ext = extFromStoryFile(file);
   const mediaKind = mediaKindFromFile(file);
@@ -513,11 +497,6 @@ export async function insertCommunityStory(
     contentType: file.type || undefined,
   });
   if (upErr) return { data: null, error: new Error(upErr.message) };
-
-  if (oldIds.length > 0) {
-    await supabase.from("community_stories").delete().in("id", oldIds);
-    await deleteStoryMediaPaths(supabase, oldPaths);
-  }
 
   const { data, error } = await supabase
     .from("community_stories")
@@ -542,6 +521,30 @@ export async function insertCommunityStory(
 }
 
 export type StoryRingState = "none" | "unseen" | "seen";
+
+export function sortStoriesChronologically(stories: CommunityStoryRow[]): CommunityStoryRow[] {
+  return [...stories].sort(
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+  );
+}
+
+export function storyRingStateForStories(stories: CommunityStoryRow[] | null | undefined): StoryRingState {
+  if (!stories || stories.length === 0) return "none";
+  if (stories.some((s) => !s.viewed_by_me)) return "unseen";
+  return "seen";
+}
+
+/** First unviewed story, or the oldest when all are viewed. */
+export function pickStoryToOpen(stories: CommunityStoryRow[] | null | undefined): CommunityStoryRow | null {
+  if (!stories || stories.length === 0) return null;
+  const sorted = sortStoriesChronologically(stories);
+  return sorted.find((s) => !s.viewed_by_me) ?? sorted[0];
+}
+
+export function latestStoryForAuthor(stories: CommunityStoryRow[] | null | undefined): CommunityStoryRow | null {
+  if (!stories || stories.length === 0) return null;
+  return sortStoriesChronologically(stories)[stories.length - 1];
+}
 
 export function storyRingStateForRow(story: CommunityStoryRow | null | undefined): StoryRingState {
   if (!story) return "none";

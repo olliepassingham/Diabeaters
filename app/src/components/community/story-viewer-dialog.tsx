@@ -54,37 +54,39 @@ type Props = {
 export function buildStoryViewerQueue(
   self: { id: string; name: string; avatar_url: string | null } | null,
   people: { id: string; name: string; avatar_url: string | null }[],
-  storiesByAuthor: Map<string, CommunityStoryRow>,
+  storiesByAuthor: Map<string, CommunityStoryRow[]>,
 ): StoryViewerEntry[] {
   const out: StoryViewerEntry[] = [];
-  if (self) {
-    const story = storiesByAuthor.get(self.id);
-    if (story) {
-      out.push({
-        authorId: self.id,
-        story,
-        authorDisplayName: self.name,
-        authorAvatarUrl: self.avatar_url,
-      });
+
+  const appendAuthorStories = (
+    authorId: string,
+    authorDisplayName: string,
+    authorAvatarUrl: string | null,
+  ) => {
+    for (const story of storiesByAuthor.get(authorId) ?? []) {
+      out.push({ authorId, story, authorDisplayName, authorAvatarUrl });
     }
+  };
+
+  if (self && (storiesByAuthor.get(self.id)?.length ?? 0) > 0) {
+    appendAuthorStories(self.id, self.name, self.avatar_url);
   }
+
   const others = people
-    .map((person) => ({ person, story: storiesByAuthor.get(person.id) }))
-    .filter((x): x is { person: (typeof people)[0]; story: CommunityStoryRow } => Boolean(x.story))
+    .filter((person) => (storiesByAuthor.get(person.id)?.length ?? 0) > 0)
     .sort((a, b) => {
-      if (a.story.viewed_by_me !== b.story.viewed_by_me) {
-        return a.story.viewed_by_me ? 1 : -1;
-      }
-      return a.person.name.localeCompare(b.person.name);
+      const aStories = storiesByAuthor.get(a.id) ?? [];
+      const bStories = storiesByAuthor.get(b.id) ?? [];
+      const aUnseen = aStories.some((s) => !s.viewed_by_me);
+      const bUnseen = bStories.some((s) => !s.viewed_by_me);
+      if (aUnseen !== bUnseen) return aUnseen ? -1 : 1;
+      return a.name.localeCompare(b.name);
     });
-  for (const { person, story } of others) {
-    out.push({
-      authorId: person.id,
-      story,
-      authorDisplayName: person.name,
-      authorAvatarUrl: person.avatar_url,
-    });
+
+  for (const person of others) {
+    appendAuthorStories(person.id, person.name, person.avatar_url);
   }
+
   return out;
 }
 

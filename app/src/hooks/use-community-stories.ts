@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   fetchActiveStoriesForAuthors,
-  storyRingStateForRow,
+  sortStoriesChronologically,
+  storyRingStateForStories,
   type CommunityStoryRow,
   type StoryRingState,
 } from "@/lib/community/stories-supabase";
 
 export function useCommunityStories(viewerId: string | undefined, authorIds: string[]) {
-  const [storiesByAuthor, setStoriesByAuthor] = useState<Map<string, CommunityStoryRow>>(new Map());
+  const [storiesByAuthor, setStoriesByAuthor] = useState<Map<string, CommunityStoryRow[]>>(new Map());
   const [loading, setLoading] = useState(false);
   const [revision, setRevision] = useState(0);
 
@@ -31,8 +32,17 @@ export function useCommunityStories(viewerId: string | undefined, authorIds: str
       setLoading(false);
       setStoriesByAuthor((prev) => {
         const next = new Map(prev);
+        for (const id of ids) {
+          next.set(id, []);
+        }
         for (const row of res.data ?? []) {
-          next.set(row.author_id, row);
+          const list = next.get(row.author_id) ?? [];
+          list.push(row);
+          next.set(row.author_id, list);
+        }
+        for (const id of ids) {
+          const list = next.get(id);
+          if (list) next.set(id, sortStoriesChronologically(list));
         }
         return next;
       });
@@ -43,7 +53,7 @@ export function useCommunityStories(viewerId: string | undefined, authorIds: str
   }, [viewerId, authorKey, revision]);
 
   const ringState = useCallback(
-    (authorId: string): StoryRingState => storyRingStateForRow(storiesByAuthor.get(authorId)),
+    (authorId: string): StoryRingState => storyRingStateForStories(storiesByAuthor.get(authorId)),
     [storiesByAuthor],
   );
 
