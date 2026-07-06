@@ -27,6 +27,7 @@ import {
   updateProfile,
   useProfile,
 } from "@/lib/profile";
+import { mergeCloudAchievements } from "@/lib/user-achievements";
 import { getPrimaryAppRole } from "@/lib/carer-session";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { useAuth } from "@/lib/auth-context";
@@ -297,6 +298,7 @@ export function AccountCommunityProfileFields({
       return;
     }
     void refresh();
+    void mergeCloudAchievements(profile.id, { showToasts: true });
     toast({ title: "Removed", description: "This is no longer shown on your public profile." });
   }
 
@@ -390,6 +392,9 @@ export function AccountCommunityProfileFields({
     }
     if (nameVal) applyDisplayNameToLocalProfile(nameVal);
     void refresh();
+    if (profile.id) {
+      void mergeCloudAchievements(profile.id, { showToasts: true });
+    }
     const completeAfterSave = isPublicCommunityProfileComplete({
       full_name: nameVal,
       public_handle: normalizedHandle,
@@ -621,7 +626,7 @@ export function AccountCommunityProfileFields({
             <div className="space-y-2 border-t border-border/40 pt-3">
               <FieldLabelWithInfo
                 htmlFor={onsetId}
-                info="Optional. Shown on your community card when set. You can change or remove it anytime."
+                info="Optional. Shown on your community card. May unlock Community veteran or Newest journey in Achievements."
               >
                 Living with diabetes since{" "}
                 <span className="text-muted-foreground font-normal">(optional)</span>

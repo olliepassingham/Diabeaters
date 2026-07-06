@@ -37,6 +37,7 @@ export function AccountPublicProfileTab({
   publicHandle,
   bioPreview,
   livingWithLine,
+  diabetesOnsetDate,
   isPublic,
   followers,
   following,
@@ -52,6 +53,7 @@ export function AccountPublicProfileTab({
   publicHandle: string;
   bioPreview: string;
   livingWithLine: string | null;
+  diabetesOnsetDate?: string | null;
   isPublic: boolean;
   followers: number;
   following: number;
@@ -169,7 +171,7 @@ export function AccountPublicProfileTab({
         </div>
       </ProfileHeroCard>
 
-      {!supporterMode ? <AccountPublicAchievementsSummary /> : null}
+      {!supporterMode ? <AccountPublicAchievementsSummary onsetDate={diabetesOnsetDate} /> : null}
 
       <div className="space-y-3">
         <div className="flex flex-wrap items-end justify-between gap-2">

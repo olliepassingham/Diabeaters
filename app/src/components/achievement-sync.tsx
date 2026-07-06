@@ -13,7 +13,7 @@ import { mergeCloudAchievements, syncAchievementsFromActivity, syncPublicStreakC
 function runAchievementSync(userId: string | null, showToasts: boolean): void {
   syncAchievementsFromActivity({ showToasts, userId });
   if (userId) {
-    void mergeCloudAchievements(userId);
+    void mergeCloudAchievements(userId, { showToasts });
     void syncPublicStreakCountsToProfile(userId);
   }
 }

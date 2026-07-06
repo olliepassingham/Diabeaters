@@ -141,8 +141,11 @@ export function togglePinnedAchievement(id: AchievementId): AchievementId[] {
   return loadPinnedAchievementIds();
 }
 
-export function buildPublicStreakSnapshot(kinds: ProfileStreakKind[]): Record<string, number> {
-  const counts = computeAllProfileStreakDays();
+export function buildPublicStreakSnapshot(
+  kinds: ProfileStreakKind[],
+  onsetDate?: string | null,
+): Record<string, number> {
+  const counts = computeAllProfileStreakDays(collectAllActivityEvents(), new Date(), onsetDate);
   const snapshot: Record<string, number> = {};
   for (const kind of kinds) {
     const days = counts[kind];
@@ -157,11 +160,12 @@ export async function syncPinnedStreaksToProfile(
 ): Promise<{ error: Error | null }> {
   const pinned = kinds ?? loadPinnedStreakKinds();
   savePinnedStreakKinds(pinned);
-  const { updateProfile } = await import("./profile");
+  const { getProfile, updateProfile } = await import("./profile");
+  const { profile } = await getProfile(userId);
   const { error } = await updateProfile({
     id: userId,
     pinned_achievement_ids: pinned,
-    public_streak_counts: buildPublicStreakSnapshot(pinned),
+    public_streak_counts: buildPublicStreakSnapshot(pinned, profile?.diabetes_onset_date ?? null),
   });
   return { error };
 }
@@ -178,10 +182,11 @@ export async function syncPinnedAchievementsToProfile(
 export async function syncPublicStreakCountsToProfile(userId: string): Promise<void> {
   const pinned = loadPinnedStreakKinds();
   if (pinned.length === 0) return;
-  const { updateProfile } = await import("./profile");
+  const { getProfile, updateProfile } = await import("./profile");
+  const { profile } = await getProfile(userId);
   await updateProfile({
     id: userId,
-    public_streak_counts: buildPublicStreakSnapshot(pinned),
+    public_streak_counts: buildPublicStreakSnapshot(pinned, profile?.diabetes_onset_date ?? null),
   });
 }
 
@@ -282,16 +287,29 @@ export async function pushAchievementsToCloud(
 }
 
 /** Merge cloud achievements into local storage (keeps earliest earnedAt per id). */
-export async function mergeCloudAchievements(userId: string): Promise<void> {
+export async function mergeCloudAchievements(
+  userId: string,
+  options?: { showToasts?: boolean },
+): Promise<void> {
   await loadPinnedStreaksFromProfile(userId);
 
+  const localBefore = new Set(loadEarnedAchievements().map((row) => row.id));
   const cloud = await fetchCloudAchievements(userId);
+  const communityIds = new Set(
+    ACHIEVEMENT_DEFINITIONS.filter((def) => def.communityAward).map((def) => def.id),
+  );
+  const cloudIds = new Set(cloud.map((row) => row.id));
+
+  const local = loadEarnedAchievements().filter(
+    (row) => !communityIds.has(row.id) || cloudIds.has(row.id),
+  );
   if (cloud.length === 0) {
+    if (local.length !== loadEarnedAchievements().length) {
+      saveEarnedAchievementsLocal(local);
+    }
     await syncPublicStreakCountsToProfile(userId);
     return;
   }
-
-  const local = loadEarnedAchievements();
   const byId = new Map<string, EarnedAchievement>();
   for (const row of [...local, ...cloud]) {
     const prev = byId.get(row.id);
@@ -300,6 +318,15 @@ export async function mergeCloudAchievements(userId: string): Promise<void> {
 
   const merged = [...byId.values()].sort((a, b) => a.earnedAt.localeCompare(b.earnedAt));
   saveEarnedAchievementsLocal(merged);
+
+  const newlyFromCloud = merged.filter((row) => !localBefore.has(row.id));
+  if (newlyFromCloud.length > 0 && options?.showToasts && typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent("diabeater:achievement-unlocked", {
+        detail: { ids: newlyFromCloud.map((row) => row.id) },
+      }),
+    );
+  }
 
   const missingOnCloud = merged.filter((row) => !cloud.some((c) => c.id === row.id));
   if (missingOnCloud.length > 0) {
@@ -387,7 +414,7 @@ export function publicAchievementsFromPinnedIds(pinnedIds: string[] | null | und
   return publicStreaksFromProfile(pinnedIds, null);
 }
 
-export function localPublicProfileStreaks(): PublicProfileStreak[] {
+export function localPublicProfileStreaks(onsetDate?: string | null): PublicProfileStreak[] {
   const pinned = loadPinnedStreakKinds();
-  return publicStreaksFromProfile(pinned, buildPublicStreakSnapshot(pinned));
+  return publicStreaksFromProfile(pinned, buildPublicStreakSnapshot(pinned, onsetDate));
 }

@@ -8,11 +8,13 @@ import {
   ACHIEVEMENT_DEFINITIONS,
   computeProfileStreakDays,
   getAchievementDefinition,
+  profileStreakBadgeLabel,
   profileStreakKindIcon,
   profileStreakTooltip,
   type AchievementId,
   type ProfileStreakKind,
 } from "@/lib/achievements";
+import { computeTenureDaysSinceOnset, formatTenureBadgeLabel } from "@/lib/diabetes-tenure";
 import {
   loadEarnedAchievements,
   loadPinnedStreakKinds,
@@ -55,14 +57,20 @@ function usePinnedStreakKindsState(): ProfileStreakKind[] {
 }
 
 /** Account → Public profile: pinned live streak badges with a link to the full Tools page. */
-export function AccountPublicAchievementsSummary({ className }: { className?: string }) {
-  const [streaks, setStreaks] = useState<PublicProfileStreak[]>(() => localPublicProfileStreaks());
+export function AccountPublicAchievementsSummary({
+  className,
+  onsetDate,
+}: {
+  className?: string;
+  onsetDate?: string | null;
+}) {
+  const [streaks, setStreaks] = useState<PublicProfileStreak[]>(() => localPublicProfileStreaks(onsetDate));
 
   useEffect(() => {
-    const refresh = () => setStreaks(localPublicProfileStreaks());
+    const refresh = () => setStreaks(localPublicProfileStreaks(onsetDate));
     window.addEventListener(USER_ACHIEVEMENTS_CHANGED_EVENT, refresh);
     return () => window.removeEventListener(USER_ACHIEVEMENTS_CHANGED_EVENT, refresh);
-  }, []);
+  }, [onsetDate]);
 
   return (
     <ProfileMutedCard testId="account-public-achievements" className={className}>
@@ -94,10 +102,12 @@ export function AchievementsPanel({
   showProfileToggles = false,
   className,
   userId,
+  onsetDate,
 }: {
   showProfileToggles?: boolean;
   className?: string;
   userId?: string;
+  onsetDate?: string | null;
 }) {
   const earned = useEarnedAchievementsState();
   const pinned = usePinnedStreakKindsState();
@@ -107,8 +117,12 @@ export function AchievementsPanel({
   const rows = ACHIEVEMENT_DEFINITIONS.map((def) => ({
     def,
     earned: earnedIds.has(def.id),
-    streakDays: computeProfileStreakDays(def.streakKind),
+    streakDays: computeProfileStreakDays(def.streakKind, undefined, undefined, onsetDate),
     pinned: pinned.includes(def.streakKind),
+    livingLine:
+      def.communityAward && onsetDate
+        ? formatTenureBadgeLabel(computeTenureDaysSinceOnset(onsetDate))
+        : null,
   }));
 
   const unlockedCount = earned.length;
@@ -139,14 +153,17 @@ export function AchievementsPanel({
             <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">On your profile</p>
             <ProfileStreakBadges
               streaks={pinned
-                .map((kind) => ({ kind, days: computeProfileStreakDays(kind) }))
+                .map((kind) => ({
+                  kind,
+                  days: computeProfileStreakDays(kind, undefined, undefined, onsetDate),
+                }))
                 .filter((row) => row.days > 0)}
             />
           </div>
         ) : null}
 
         <ul className="list-none space-y-2.5" aria-label="Achievements">
-          {rows.map(({ def, earned: isEarned, streakDays, pinned: isPinned }) => {
+          {rows.map(({ def, earned: isEarned, streakDays, pinned: isPinned, livingLine }) => {
             const Icon = def.icon;
             const canPin = showProfileToggles && isEarned;
             const pinDisabled = !isPinned && pinned.length >= MAX_PINNED_ACHIEVEMENTS;
@@ -173,7 +190,12 @@ export function AchievementsPanel({
                 <div className="min-w-0 flex-1 space-y-0.5 pr-8">
                   <p className="text-sm font-semibold text-foreground">{def.title}</p>
                   <p className="text-xs leading-relaxed text-muted-foreground">{def.description}</p>
-                  {isEarned && streakDays > 0 ? (
+                  {isEarned && def.communityAward && livingLine ? (
+                    <p className="text-[11px] font-medium text-emerald-800/80 dark:text-emerald-200/80">
+                      {livingLine}
+                    </p>
+                  ) : null}
+                  {isEarned && !def.communityAward && streakDays > 0 ? (
                     <p className="text-[11px] font-medium text-emerald-800/80 dark:text-emerald-200/80">
                       Current streak: {streakDays} {streakDays === 1 ? "day" : "days"}
                     </p>
@@ -256,7 +278,7 @@ export function ProfileStreakBadges({
                 compact ? "text-xs" : "text-sm",
               )}
             >
-              {streak.days}
+              {profileStreakBadgeLabel(streak.kind, streak.days)}
             </span>
           </span>
         );

@@ -680,6 +680,7 @@ export default function Account() {
               publicHandle={publicHandle}
               bioPreview={bioPreview}
               livingWithLine={livingWithLine}
+              diabetesOnsetDate={profile?.diabetes_onset_date ?? null}
               isPublic={isPublicProfile}
               followers={publicCounts?.followers ?? 0}
               following={publicCounts?.following ?? 0}
