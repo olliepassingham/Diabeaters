@@ -7,6 +7,37 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { cn } from "@/lib/utils";
 
+/** Shared surface for home dashboard cards (hero, setup, widgets). */
+export const homeDashboardCardClass =
+  "dashboard-card-hover animate-soft-in overflow-hidden rounded-2xl border border-primary/18 bg-gradient-to-br from-primary-light/80 via-primary-light/45 to-primary/[0.08] shadow-md ring-1 ring-primary/10 dark:border-primary/24 dark:from-primary-light/30 dark:via-primary-light/15 dark:to-primary/[0.08] dark:ring-primary/18";
+
+/** Warm setup / onboarding card tint. */
+export const homeSetupCardClass =
+  "dashboard-card-hover animate-soft-in overflow-hidden rounded-2xl border border-amber-400/50 bg-gradient-to-br from-amber-50/95 via-amber-100/55 to-primary-light/65 shadow-sm ring-1 ring-amber-400/20 dark:border-amber-500/35 dark:from-amber-950/40 dark:via-amber-950/20 dark:to-primary-light/12";
+
+/** Compact metadata pill used for dates, counts, and setup progress. */
+export function HomeMetaBadge({
+  children,
+  className,
+  testId,
+}: {
+  children: ReactNode;
+  className?: string;
+  testId?: string;
+}) {
+  return (
+    <span
+      className={cn(
+        "chip shrink-0 border-primary/20 bg-primary-light/50 text-[11px] font-semibold tabular-nums text-foreground dark:bg-primary-light/20",
+        className,
+      )}
+      data-testid={testId}
+    >
+      {children}
+    </span>
+  );
+}
+
 export type HomeGlanceType = "ok" | "info" | "warning";
 
 export function HomeSectionHeading({
@@ -104,8 +135,8 @@ export function HomeQuickActions({
         const isPrimary = action.variant === "primary";
         const gridClass = isPrimary ? "col-span-2 sm:col-span-1" : undefined;
         const btnClass = cn(
-          "min-h-11 w-full rounded-2xl shadow-none",
-          isPrimary && "font-semibold tracking-tight",
+          "min-h-11 w-full rounded-2xl",
+          isPrimary && "font-semibold tracking-tight shadow-sm",
           action.className,
         );
         const content = (
@@ -154,8 +185,8 @@ export function HomeQuickActions({
 }
 
 const urgentCardClass =
-  "dashboard-card-hover animate-soft-in border border-border/60 shadow-sm overflow-hidden";
-const mutedCardClass = "animate-soft-in border-0 shadow-sm";
+  "dashboard-card-hover animate-soft-in border border-primary/15 shadow-sm overflow-hidden";
+const mutedCardClass = "animate-soft-in border border-border/50 shadow-sm bg-muted/25 dark:bg-muted/15";
 
 export function HomeUrgentCard({
   children,

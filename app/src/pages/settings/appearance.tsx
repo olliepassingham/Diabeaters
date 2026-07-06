@@ -39,7 +39,7 @@ const THEME_BOXES: {
   },
   {
     value: "system",
-    label: "Auto",
+    label: "Auto (day/night)",
     testId: "button-theme-auto",
     previewClass: "bg-gradient-to-br from-[rgb(247_248_250)] to-[rgb(18_18_18)]",
     icon: Monitor,
@@ -59,7 +59,10 @@ export function SettingsAppearanceRoute() {
     >
       <SettingsPanel id="appearance-theme" className="scroll-mt-28" data-testid="tab-appearance">
         <SettingsPanelBody className="space-y-4">
-          <SettingsSectionHeader title="Theme mode" description="Light or dark. Auto switches by time (dark 7pm–7am)." />
+          <SettingsSectionHeader
+            title="Theme mode"
+            description="Light or dark all day, or Auto (day/night) — dark from 7pm to 7am."
+          />
           <RadioGroup
             value={themeMode}
             onValueChange={(v) => setThemeMode(v as ThemeMode)}

@@ -6,10 +6,20 @@ export const THEME_COLOR_STORAGE_KEY = "diabeaters_theme_color";
 /** Opt-in soft page background tint derived from primary theme. */
 export const BACKGROUND_TINT_STORAGE_KEY = "diabeaters_bg_tint";
 
-// Light mode canvas base before primary tint is applied.
-// Keep this slightly darker than the tinted panels so the UI isn't "white on white".
-const LIGHT_BG_BASE = "228 235 247";
-const DARK_BG_BASE = "18 18 18";
+// Light mode canvas neutrals — tinted at runtime from the user's chosen primary (see applyBackgroundTintToDocument).
+const LIGHT_CANVAS_NEUTRAL = "208 214 220";
+const LIGHT_MUTED_NEUTRAL = "190 198 206";
+const LIGHT_CARD_NEUTRAL = "224 230 236";
+const LIGHT_BORDER_NEUTRAL = "165 174 184";
+
+/** RGB canvas tokens overridden at runtime when background tint is on (light mode only). */
+const LIGHT_TINT_PROPS = [
+  "--app-background",
+  "--color-bg-muted",
+  "--color-bg-card",
+  "--color-bg-popover",
+  "--color-border",
+] as const;
 
 /** Mix space-separated RGB triples: `result = t * a + (1-t) * b`. */
 function mixRgbTriples(a: string, b: string, t: number): string {
@@ -19,6 +29,81 @@ function mixRgbTriples(a: string, b: string, t: number): string {
   const g = Math.round(pa[1]! * t + pb[1]! * (1 - t));
   const bl = Math.round(pa[2]! * t + pb[2]! * (1 - t));
   return `${r} ${g} ${bl}`;
+}
+
+function parseRgbTriple(triple: string): [number, number, number] {
+  const parts = triple.trim().split(/\s+/).map(Number);
+  return [parts[0]!, parts[1]!, parts[2]!];
+}
+
+function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
+  r /= 255;
+  g /= 255;
+  b /= 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  let h = 0;
+  let s = 0;
+  const l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r:
+        h = (g - b) / d + (g < b ? 6 : 0);
+        break;
+      case g:
+        h = (b - r) / d + 2;
+        break;
+      default:
+        h = (r - g) / d + 4;
+    }
+    h /= 6;
+  }
+  return [h * 360, s * 100, l * 100];
+}
+
+function hslToRgb(h: number, s: number, l: number): [number, number, number] {
+  h /= 360;
+  s /= 100;
+  l /= 100;
+  if (s === 0) {
+    const v = Math.round(l * 255);
+    return [v, v, v];
+  }
+  const hue2rgb = (p: number, q: number, t: number) => {
+    let tt = t;
+    if (tt < 0) tt += 1;
+    if (tt > 1) tt -= 1;
+    if (tt < 1 / 6) return p + (q - p) * 6 * tt;
+    if (tt < 1 / 2) return q;
+    if (tt < 2 / 3) return p + (q - p) * (2 / 3 - tt) * 6;
+    return p;
+  };
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  return [
+    Math.round(hue2rgb(p, q, h + 1 / 3) * 255),
+    Math.round(hue2rgb(p, q, h) * 255),
+    Math.round(hue2rgb(p, q, h - 1 / 3) * 255),
+  ];
+}
+
+function formatRgbTriple(rgb: [number, number, number]): string {
+  return `${rgb[0]} ${rgb[1]} ${rgb[2]}`;
+}
+
+/** Light-mode fills: less saturation so buttons don't shout on pastel canvases. */
+function softenLightPrimaryRgb(triple: string): string {
+  const [r, g, b] = parseRgbTriple(triple);
+  const [h, s, l] = rgbToHsl(r, g, b);
+  return formatRgbTriple(hslToRgb(h, Math.min(s * 0.62, 52), Math.min(Math.max(l, 36), 46)));
+}
+
+function softenLightBorderRgb(triple: string): string {
+  const [r, g, b] = parseRgbTriple(triple);
+  const [h, s, l] = rgbToHsl(r, g, b);
+  return formatRgbTriple(hslToRgb(h, Math.min(s * 0.55, 46), Math.min(Math.max(l, 42), 54)));
 }
 
 export type AppPrimaryTheme =
@@ -288,19 +373,24 @@ export function applyPrimaryThemeToDocument(id: AppPrimaryTheme, mode: "light" |
   if (typeof document === "undefined") return;
   const pack = mode === "dark" ? DARK[id] : LIGHT[id];
   const root = document.documentElement;
-  root.style.setProperty("--color-primary", pack.colorPrimary);
+  if (mode === "light") {
+    root.style.setProperty("--color-primary", softenLightPrimaryRgb(pack.colorPrimary));
+    root.style.setProperty("--color-primary-border", softenLightBorderRgb(pack.colorPrimaryBorder));
+  } else {
+    root.style.setProperty("--color-primary", pack.colorPrimary);
+    root.style.setProperty("--color-primary-border", pack.colorPrimaryBorder);
+  }
   root.style.setProperty("--color-primary-foreground", pack.colorPrimaryForeground);
   root.style.setProperty("--color-primary-light", pack.colorPrimaryLight);
   root.style.setProperty("--color-primary-dark", pack.colorPrimaryDark);
-  root.style.setProperty("--color-primary-border", pack.colorPrimaryBorder);
   root.style.setProperty("--ring", pack.ring);
   root.style.setProperty("--sidebar-primary", pack.sidebarPrimary);
   root.style.setProperty("--sidebar-ring", pack.sidebarRing);
 }
 
 /**
- * When enabled, sets `--app-background` to a subtle blend of `--color-primary-light` and the
- * default page base (must stay as space-separated `R G B` for Tailwind `rgb(var(...) / α)`).
+ * Blend the page canvas and surfaces with the active primary theme (light mode only).
+ * Dark mode always uses `theme.css` tokens — no runtime overrides.
  */
 export function applyBackgroundTintToDocument(
   enabled: boolean,
@@ -309,17 +399,24 @@ export function applyBackgroundTintToDocument(
 ): void {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
-  // Do not override light mode styling imperatively.
-  // Light/dark palettes and tinted surfaces are defined in CSS (`theme.css`/`index.css`) and
-  // should remain the single source of truth.
-  void enabled;
-  void mode;
-  void primary;
-  root.style.removeProperty("--app-background");
-  root.style.removeProperty("--surface-glass-bg");
-  root.style.removeProperty("--surface-glass-bg-strong");
-  root.style.removeProperty("--surface-glass-chrome-bg");
-  root.style.removeProperty("--surface-glass-muted-bg");
+
+  // Clear any prior runtime tint (including legacy HSL vars that must not hold RGB triples).
+  for (const prop of LIGHT_TINT_PROPS) root.style.removeProperty(prop);
+  for (const prop of ["--secondary", "--accent", "--sidebar", "--sidebar-accent", "--sidebar-border"] as const) {
+    root.style.removeProperty(prop);
+  }
+
+  if (!enabled || mode !== "light") return;
+
+  const pack = LIGHT[primary];
+  const tint = pack.colorPrimaryLight;
+  const borderTint = pack.colorPrimaryBorder;
+
+  root.style.setProperty("--app-background", mixRgbTriples(tint, LIGHT_CANVAS_NEUTRAL, 0.32));
+  root.style.setProperty("--color-bg-muted", mixRgbTriples(tint, LIGHT_MUTED_NEUTRAL, 0.36));
+  root.style.setProperty("--color-bg-card", mixRgbTriples(tint, LIGHT_CARD_NEUTRAL, 0.3));
+  root.style.setProperty("--color-bg-popover", mixRgbTriples(tint, LIGHT_CARD_NEUTRAL, 0.28));
+  root.style.setProperty("--color-border", mixRgbTriples(borderTint, LIGHT_BORDER_NEUTRAL, 0.16));
 }
 
 /**

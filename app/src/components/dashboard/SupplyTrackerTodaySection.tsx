@@ -159,7 +159,7 @@ export function SupplyTrackerTodaySection({ healthStatus }: { healthStatus: Heal
         ? "border-red-400/80 bg-red-50/90 dark:bg-red-950/30 dark:border-red-800/60"
         : worst === "low"
           ? "border-amber-400/80 bg-amber-50/80 dark:bg-amber-950/25 dark:border-amber-800/50"
-          : "border-border/80 bg-primary-light/40 dark:bg-primary-light/10";
+          : "border-primary/30 bg-gradient-to-br from-primary-light/85 via-primary-light/50 to-primary/[0.1] dark:from-primary-light/22 dark:via-primary-light/12 dark:to-primary/[0.06]";
 
   const supplyTopContent = () => {
     if (supplies.length === 0) {
@@ -270,7 +270,7 @@ export function SupplyTrackerEntryCard() {
         ? "border-red-400/80 bg-red-50/90 dark:bg-red-950/30 dark:border-red-800/60"
         : worst === "low"
           ? "border-amber-400/80 bg-amber-50/80 dark:bg-amber-950/25 dark:border-amber-800/50"
-          : "border-border/80 bg-primary-light/40 dark:bg-primary-light/10";
+          : "border-primary/30 bg-gradient-to-br from-primary-light/85 via-primary-light/50 to-primary/[0.1] dark:from-primary-light/22 dark:via-primary-light/12 dark:to-primary/[0.06]";
 
   const statusLabel =
     supplies.length === 0
@@ -504,7 +504,7 @@ export function TodayAtAGlanceCard(props: {
 
   return (
     <Card
-      className="dashboard-card-hover border-border/70 shadow-sm hover:shadow-md dark:border-border/50 rounded-xl overflow-hidden"
+      className="dashboard-card-hover border-primary/25 shadow-sm hover:shadow-md dark:border-border/50 rounded-xl overflow-hidden bg-gradient-to-br from-primary-light/70 via-primary-light/35 to-transparent dark:from-primary-light/15 dark:via-transparent"
       data-testid="dashboard-today-card"
     >
       <CardContent className="space-y-0 px-3 py-2.5 md:px-3.5 md:py-3" data-testid="dashboard-today-inline">
@@ -548,8 +548,8 @@ export function TodayAtAGlanceCard(props: {
             </div>
           </div>
           <Badge
-            variant={status.type === "warning" ? "destructive" : status.type === "info" ? "secondary" : "outline"}
-            className="max-w-[46%] shrink-0 truncate border-border/80 bg-muted/40 text-[11px] font-medium text-foreground dark:bg-muted/25"
+            variant="outline"
+            className="chip max-w-[46%] shrink-0 truncate border-primary/25 bg-primary-light/60 text-[11px] font-semibold text-foreground dark:bg-primary-light/20"
           >
             {new Date().toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
           </Badge>

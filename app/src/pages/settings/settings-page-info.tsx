@@ -7,7 +7,7 @@ export function SettingsHubInfoDialog() {
         <p>Your units, insulin habits, supply pack sizes, and backup.</p>
       </InfoSection>
       <InfoSection title="Appearance">
-        <p>Light, dark, or Auto (matches your device), plus primary accent colour.</p>
+        <p>Light, dark, or Auto (day/night), plus primary accent colour.</p>
       </InfoSection>
       <InfoSection title="Notifications">
         <p>
@@ -29,7 +29,7 @@ export function SettingsAppearanceInfoDialog() {
     <PageInfoDialog title="About appearance" description="Theme and accent colour for this device">
       <InfoSection title="Theme mode">
         <p>
-          Choose light, dark, or Auto. Auto uses dark between 7pm and 7am so evening use is easier on your eyes.
+          Choose light, dark, or Auto (day/night). Auto uses dark between 7pm and 7am so evening use is easier on your eyes.
         </p>
       </InfoSection>
       <InfoSection title="Primary colour">

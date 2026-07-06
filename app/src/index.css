@@ -41,6 +41,37 @@
     overscroll-behavior-x: none;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    background-color: rgb(var(--app-background));
+  }
+
+  /*
+   * App shell wallpaper — light mode only; dark mode stays a flat canvas.
+   */
+  .app-canvas {
+    color: rgb(var(--color-text));
+    background-color: rgb(var(--app-background));
+  }
+
+  :root:not(.dark) .app-canvas {
+    background-image:
+      radial-gradient(ellipse 125% 88% at 50% -18%, rgb(var(--color-primary) / 0.16), transparent 58%),
+      radial-gradient(ellipse 72% 58% at -8% 42%, rgb(var(--color-primary) / 0.1), transparent 54%),
+      radial-gradient(ellipse 62% 52% at 108% 72%, rgb(var(--color-primary) / 0.05), transparent 52%),
+      linear-gradient(
+        180deg,
+        rgb(var(--color-bg-muted) / 0.92) 0%,
+        rgb(var(--app-background) / 0.98) 40%,
+        rgb(var(--app-background)) 100%
+      );
+    background-attachment: fixed;
+  }
+
+  .dark .app-canvas {
+    background-image: none;
+  }
+
+  #app-scroll-main {
+    background: transparent;
   }
 
   /*
@@ -147,13 +178,54 @@
     box-shadow: var(--shadow-sm);
   }
 
+  .dashboard-card-hover {
+    transition:
+      box-shadow var(--app-motion-duration) var(--app-motion-ease),
+      border-color var(--app-motion-duration) var(--app-motion-ease),
+      background-color var(--app-motion-duration) var(--app-motion-ease);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .dashboard-card-hover:hover {
+      box-shadow: var(--shadow-md);
+    }
+  }
+
+  /* Home dashboard — extra lift on the today cluster (light mode only). */
+  :root:not(.dark) .dashboard-home-canvas {
+    position: relative;
+    isolation: isolate;
+    border-radius: 1.25rem;
+    padding: 0.125rem 0;
+  }
+
+  :root:not(.dark) .dashboard-home-canvas::before {
+    content: "";
+    position: absolute;
+    inset: -0.35rem -0.5rem;
+    z-index: -1;
+    border-radius: 1.35rem;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 100% 75% at 50% -5%, rgb(var(--color-primary) / 0.12), transparent 65%),
+      linear-gradient(180deg, rgb(var(--color-primary-light) / 0.38) 0%, rgb(var(--color-primary-light) / 0.08) 100%);
+    border: 1px solid rgb(var(--color-primary-border) / 0.1);
+  }
+
   /* Home Ask Beatie — soft halo on wrapper so button shadow does not hide it */
   .coach-entry-glow {
+    box-shadow:
+      0 0 0 1px rgb(var(--color-primary) / 0.18),
+      0 0 14px 2px rgb(var(--color-primary) / 0.2),
+      0 6px 18px -6px rgb(var(--color-primary) / 0.22);
+    transition: box-shadow var(--app-motion-duration) var(--app-motion-ease);
+  }
+
+  .dark .coach-entry-glow {
     box-shadow:
       0 0 0 1px rgb(var(--color-primary) / 0.28),
       0 0 20px 4px rgb(var(--color-primary) / 0.35),
       0 8px 24px -6px rgb(var(--color-primary) / 0.4);
-    transition: box-shadow var(--app-motion-duration) var(--app-motion-ease);
   }
 
   .dark .coach-entry-glow {
@@ -250,6 +322,12 @@
     text-overflow: ellipsis;
   }
 
+  :root:not(.dark) .chip {
+    background:
+      linear-gradient(180deg, rgb(var(--color-primary-light) / 0.42) 0%, rgb(var(--color-primary-light) / 0.18) 100%),
+      rgb(var(--color-bg-card) / 0.72);
+  }
+
   .dark .chip {
     background:
       linear-gradient(180deg, rgb(var(--color-primary) / 0.18) 0%, rgb(var(--color-primary) / 0.06) 100%),
@@ -302,6 +380,12 @@
     box-shadow: var(--surface-glass-shadow);
   }
 
+  :root:not(.dark) .surface-glass {
+    background:
+      linear-gradient(180deg, rgb(var(--color-primary) / 0.14) 0%, rgb(var(--color-primary) / 0.06) 100%),
+      var(--surface-glass-bg);
+  }
+
   .surface-glass-strong {
     background:
       linear-gradient(180deg, rgb(var(--color-primary) / 0.045) 0%, rgb(var(--color-primary) / 0.022) 100%),
@@ -310,6 +394,12 @@
     backdrop-filter: blur(var(--surface-glass-blur));
     border: 1px solid var(--surface-glass-border);
     box-shadow: var(--surface-glass-shadow);
+  }
+
+  :root:not(.dark) .surface-glass-strong {
+    background:
+      linear-gradient(135deg, rgb(var(--color-primary) / 0.18) 0%, rgb(var(--color-primary) / 0.09) 52%, rgb(var(--color-primary-dark) / 0.05) 100%),
+      var(--surface-glass-bg-strong);
   }
 
   .surface-glass-muted {
@@ -322,12 +412,24 @@
     box-shadow: var(--surface-glass-shadow);
   }
 
+  :root:not(.dark) .surface-glass-muted {
+    background:
+      linear-gradient(180deg, rgb(var(--color-primary) / 0.1) 0%, rgb(var(--color-primary) / 0.04) 100%),
+      var(--surface-glass-muted-bg);
+  }
+
   .surface-chrome {
     background:
       linear-gradient(180deg, rgb(var(--color-primary) / 0.022) 0%, transparent 100%),
       var(--surface-glass-chrome-bg);
     -webkit-backdrop-filter: blur(var(--surface-glass-chrome-blur));
     backdrop-filter: blur(var(--surface-glass-chrome-blur));
+  }
+
+  :root:not(.dark) .surface-chrome {
+    background:
+      linear-gradient(180deg, rgb(var(--color-primary) / 0.1) 0%, rgb(var(--color-primary) / 0.04) 100%),
+      var(--surface-glass-chrome-bg);
   }
 
   .dark .surface-glass {

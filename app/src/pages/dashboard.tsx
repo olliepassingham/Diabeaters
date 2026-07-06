@@ -72,7 +72,7 @@ import { SupplyTrackerTodaySection } from "@/components/dashboard/SupplyTrackerT
 import { isAiCoachEnabled, isCommunityEnabled } from "@/lib/flags";
 import { useOffline } from "@/hooks/use-offline";
 import { DashboardQuickActions } from "@/components/home/dashboard-quick-actions";
-import { HomePrimaryStatusPill } from "@/components/home/home-ui";
+import { HomeMetaBadge, HomePrimaryStatusPill, homeDashboardCardClass, homeSetupCardClass } from "@/components/home/home-ui";
 import { useAskAnything } from "@/components/ai-coach/ask-anything-context";
 import {
   getHealthStatus,
@@ -412,7 +412,7 @@ function HeroCard({
     <>
       <Card
         variant="glass-strong"
-        className="dashboard-card-hover animate-soft-in overflow-hidden border border-primary/15 bg-gradient-to-br from-primary/[0.06] via-transparent to-transparent shadow-md ring-1 ring-border/25 hover:shadow-lg hover:ring-primary/10 dark:border-primary/18 dark:from-primary/[0.09] dark:via-transparent dark:to-transparent dark:ring-border/35"
+        className={cn(homeDashboardCardClass, "hover:shadow-lg hover:ring-primary/20")}
         data-testid="card-hero"
       >
         <CardContent className="p-4 md:p-6 space-y-3 md:space-y-5">
@@ -507,13 +507,12 @@ function HeroCard({
               <Button
                 variant="destructive"
                 size="sm"
-                className={[
+                className={cn(
                   "min-h-11 w-full min-w-0 rounded-2xl px-3 text-sm",
-                  "bg-gradient-to-r from-red-600 to-red-500 dark:from-red-700 dark:to-red-600",
-                  "shadow-sm shadow-red-600/10 ring-1 ring-red-500/25 hover:shadow-md hover:ring-red-500/35 active:translate-y-[0.5px]",
-                  "transition-all",
-                  isUrgent ? "glow-pulse-critical" : "",
-                ].join(" ")}
+                  "bg-gradient-to-r from-red-500 to-red-600 dark:from-red-700 dark:to-red-600",
+                  "shadow-sm shadow-red-600/10 ring-1 ring-red-500/20 hover:shadow-md",
+                  isUrgent && "glow-pulse-critical",
+                )}
                 data-testid="button-help-now"
               >
                 <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/15">
@@ -524,12 +523,11 @@ function HeroCard({
             </Link>
             <Button
               size="sm"
-              className={[
+              className={cn(
                 "min-h-11 min-w-0 flex-1 rounded-2xl px-3 text-sm text-white",
-                "bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-700 dark:to-green-700",
-                "shadow-sm shadow-emerald-600/10 ring-1 ring-emerald-500/25 hover:shadow-md hover:ring-emerald-500/35 active:translate-y-[0.5px]",
-                "transition-all",
-              ].join(" ")}
+                "bg-gradient-to-r from-emerald-500 to-green-600 dark:from-emerald-700 dark:to-green-700",
+                "shadow-sm shadow-emerald-600/10 ring-1 ring-emerald-500/20 hover:shadow-md",
+              )}
               onClick={handleTreatedHypoClick}
               data-testid="button-dashboard-treated-hypo"
             >
@@ -777,34 +775,36 @@ function SoftSettingsNudge({
 
 function SetupPromptCard({ completion }: { completion: { percentage: number; completed: number; total: number } }) {
   return (
-    <Card className="dashboard-card-hover rounded-xl border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/30 glow-warning shadow-sm hover:shadow-md transition-shadow duration-200" data-testid="card-setup-prompt">
-      <CardContent className="space-y-3 p-3 md:p-4">
+    <Card className={cn(homeSetupCardClass, "glow-warning hover:shadow-md")} data-testid="card-setup-prompt">
+      <CardContent className="space-y-3 p-4">
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-amber-600" />
-            <h3 className="font-display text-h3 font-semibold tracking-tight">Finish your setup</h3>
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-700 ring-1 ring-amber-500/25 dark:text-amber-300">
+              <AlertCircle className="h-4 w-4" aria-hidden />
+            </div>
+            <h3 className="font-display text-base font-semibold tracking-tight">Finish your setup</h3>
           </div>
-          <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">
+          <HomeMetaBadge className="border-amber-400/35 bg-amber-100/80 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200" testId="badge-setup-progress">
             {completion.completed}/{completion.total}
-          </Badge>
+          </HomeMetaBadge>
         </div>
-        
+
         <div>
-          <div className="flex justify-between text-sm mb-2">
+          <div className="mb-2 flex justify-between text-sm">
             <span className="text-muted-foreground">Setup progress</span>
-            <span className="font-medium">{completion.percentage}%</span>
+            <span className="font-medium tabular-nums">{completion.percentage}%</span>
           </div>
           <Progress value={completion.percentage} className="h-2" />
         </div>
 
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm leading-relaxed text-muted-foreground">
           Add the basics in Settings to unlock the full app and more tailored suggestions.
         </p>
-        
+
         <Link href="/settings">
-          <Button className="w-full gradient-primary border-primary-border" data-testid="button-complete-setup">
+          <Button className="w-full gradient-primary border-primary-border shadow-sm" data-testid="button-complete-setup">
             Open Settings
-            <ArrowRight className="h-4 w-4 ml-2" />
+            <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </Link>
       </CardContent>
@@ -969,7 +969,7 @@ export default function Dashboard() {
         }
       />
       {/* Today: high-signal cluster (reads as one section) */}
-      <section className="space-y-4 sm:space-y-5" data-testid="dashboard-today">
+      <section className="dashboard-home-canvas space-y-4 sm:space-y-5" data-testid="dashboard-today">
         {showVerifiedWelcome && (
           <Alert
             className="animate-fade-in-up border-emerald-500/40 bg-emerald-500/5 dark:bg-emerald-950/20 dark:border-emerald-500/30"

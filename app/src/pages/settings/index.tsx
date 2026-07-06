@@ -2101,7 +2101,7 @@ export default function Settings() {
           <SettingsHubNavLink
             href="/settings/appearance"
             label="Theme & colour"
-            description="Light, dark, Auto, and accent colour"
+            description="Light, dark, Auto (day/night), and accent colour"
             icon={Palette}
           />
         </SettingsHubGroup>

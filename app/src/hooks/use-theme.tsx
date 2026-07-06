@@ -32,7 +32,7 @@ import { hapticLight } from "@/lib/haptics";
 import { syncNativeStatusBar } from "@/lib/native-chrome";
 
 interface ThemeContextType {
-  /** Resolved light/dark UI (follows system when theme mode is system). */
+  /** Resolved light/dark UI (Auto uses a day/night schedule when theme mode is system). */
   theme: "light" | "dark";
   effectiveTheme: "light" | "dark";
   themeMode: ThemeMode;

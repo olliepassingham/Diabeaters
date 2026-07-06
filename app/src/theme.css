@@ -1,39 +1,37 @@
   :root {
-    /* Light mode: near-white canvas, whisper of cool grey */
-    --app-background: 247 249 253;
+    /* Light mode: neutral canvas — runtime tint from chosen primary (applyBackgroundTintToDocument) */
+    --app-background: 208 214 220;
     --app-foreground: 28 27 35;
 
     --color-bg: var(--app-background);
-    /* Neutral backing; the "tint" comes from the frosted surface fills */
-    --color-bg-card: 252 252 254;
-    --color-bg-muted: 240 243 250;
-    --color-bg-popover: 253 253 255;
+    --color-bg-card: 224 230 236;
+    --color-bg-muted: 190 198 206;
+    --color-bg-popover: 228 232 238;
     --color-text: var(--app-foreground);
     --color-text-muted: 64 70 86;
-    --color-border: 210 218 236;
-    --color-input: 206 214 232;
+    --color-border: 165 174 184;
+    --color-input: 158 168 178;
 
-    /* Frosted glass surfaces (used by .surface-* in index.css); fills get a light primary wash in index.css */
+    /* Frosted glass surfaces — fill uses --color-primary-light (updates with accent choice) */
     --surface-card-blur: 14px;
     --surface-glass-blur: 12px;
     --surface-glass-chrome-blur: 12px;
-    /* Light mode boxes: primary-tinted fills so it's not "white on white" */
-    --surface-glass-bg: rgb(var(--color-primary-light) / 0.28);
-    --surface-glass-bg-strong: rgb(var(--color-primary-light) / 0.36);
-    --surface-glass-chrome-bg: rgb(var(--color-primary-light) / 0.24);
-    --surface-glass-border: rgb(var(--color-border) / 0.62);
+    --surface-glass-bg: rgb(var(--color-primary-light) / 0.78);
+    --surface-glass-bg-strong: rgb(var(--color-primary-light) / 0.9);
+    --surface-glass-chrome-bg: rgb(var(--color-primary-light) / 0.68);
+    --surface-glass-border: rgb(var(--color-primary-border) / 0.32);
     --surface-glass-shadow: var(--shadow-sm);
-    --surface-glass-muted-bg: rgb(var(--color-primary-light) / 0.14);
+    --surface-glass-muted-bg: rgb(var(--color-primary-light) / 0.52);
 
-    /* Soft teal primary — calm, clinical-trustworthy */
-    --color-primary: 20 130 118;
+    /* Default primary (blue) until applyPrimaryThemeToDocument runs */
+    --color-primary: 59 130 246;
     --color-primary-foreground: 255 255 255;
-    --color-primary-light: 232 252 248;
-    --color-primary-dark: 12 102 92;
-    --color-primary-border: 26 140 128;
+    --color-primary-light: 239 246 255;
+    --color-primary-dark: 29 78 216;
+    --color-primary-border: 37 99 235;
     --primary: var(--color-primary);
 
-    --ring: 173 55% 42%;
+    --ring: 221 83% 53%;
 
     --button-outline: rgba(45, 35, 65, 0.08);
     --badge-outline: rgba(45, 35, 65, 0.04);
@@ -41,20 +39,19 @@
     --elevate-1: rgba(80, 50, 120, 0.04);
     --elevate-2: rgba(80, 50, 120, 0.08);
 
-    --sidebar: 250 35% 97%;
+    --sidebar: 228 232 238;
     --sidebar-foreground: 260 25% 18%;
-    --sidebar-border: 250 25% 90%;
-    --sidebar-primary: 173 55% 38%;
+    --sidebar-border: 210 218 228;
+    --sidebar-primary: 221 83% 53%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 250 40% 94%;
+    --sidebar-accent: 236 240 246;
     --sidebar-accent-foreground: 260 20% 22%;
-    --sidebar-ring: 173 55% 42%;
+    --sidebar-ring: 221 83% 53%;
 
-    --secondary: 250 30% 95%;
+    --secondary: 236 240 246;
     --secondary-foreground: 260 20% 22%;
-    /* Peach-lavender accent wash (HSL for hsl() in Tailwind) */
-    --accent: 280 35% 96%;
-    --accent-foreground: 173 45% 22%;
+    --accent: 242 246 252;
+    --accent-foreground: 221 45% 22%;
     --destructive: 0 72% 48%;
     --destructive-foreground: 0 72% 98%;
     --warning-text: 28 55% 32%;
