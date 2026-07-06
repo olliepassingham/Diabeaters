@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { isPublicCommunityProfileComplete, needsCommunityProfileSetup } from "@/lib/profile";
+import { canEngageWithCommunityFeed, isPublicCommunityProfileComplete, needsCommunityProfileSetup } from "@/lib/profile";
 import {
   clearSupporterProfilePromptState,
   dismissSupporterProfilePrompt,
@@ -34,6 +34,25 @@ describe("isPublicCommunityProfileComplete", () => {
       }),
     ).toBe(false);
     expect(needsCommunityProfileSetup(null)).toBe(true);
+  });
+});
+
+describe("canEngageWithCommunityFeed", () => {
+  it("matches complete public profile rules", () => {
+    expect(
+      canEngageWithCommunityFeed({
+        is_public: true,
+        full_name: "Sam",
+        public_handle: "sam_s",
+      }),
+    ).toBe(true);
+    expect(
+      canEngageWithCommunityFeed({
+        is_public: true,
+        full_name: "Sam",
+        public_handle: null,
+      }),
+    ).toBe(false);
   });
 });
 

@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { COMMUNITY_FEED_ENGAGE_REQUIRED_MESSAGE } from "@/lib/profile";
 import {
   castPollVote,
   fetchPollVoteState,
@@ -24,12 +25,14 @@ export function FeedPollCard({
   question,
   options,
   viewerId,
+  canEngageWithFeed = true,
   className,
 }: {
   postId: string;
   question: string;
   options: string[];
   viewerId: string | undefined;
+  canEngageWithFeed?: boolean;
   className?: string;
 }) {
   const { toast } = useToast();
@@ -62,10 +65,19 @@ export function FeedPollCard({
   const total = useMemo(() => counts.reduce((a, b) => a + b, 0), [counts]);
   const hasVoted = myIdx !== null;
   const revealTallies = hasVoted;
+  const mayEngage = Boolean(viewerId && canEngageWithFeed);
 
   async function onPick(i: number) {
     if (!viewerId) {
       toast({ title: "Sign in to vote", description: "Log in to cast your vote on this poll.", variant: "destructive" });
+      return;
+    }
+    if (!canEngageWithFeed) {
+      toast({
+        title: "Choose a @handle first",
+        description: COMMUNITY_FEED_ENGAGE_REQUIRED_MESSAGE,
+        variant: "destructive",
+      });
       return;
     }
     if (voting) return;
@@ -143,7 +155,7 @@ export function FeedPollCard({
                 <li key={i}>
                   <button
                     type="button"
-                    disabled={!viewerId || voting}
+                    disabled={!mayEngage || voting}
                     aria-pressed={isMine}
                     aria-label={`Vote for ${label}${revealTallies ? `, ${pct}%` : ""}`}
                     onClick={() => void onPick(i)}

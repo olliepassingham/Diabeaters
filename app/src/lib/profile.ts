@@ -304,6 +304,16 @@ export function needsCommunityProfileSetup(
   return !isPublicCommunityProfileComplete(profile);
 }
 
+/** Whether the signed-in user may post, like, comment, or vote on the community feed. */
+export function canEngageWithCommunityFeed(
+  profile: Pick<ProfileRow, "full_name" | "public_handle" | "is_public"> | null | undefined,
+): boolean {
+  return isPublicCommunityProfileComplete(profile);
+}
+
+export const COMMUNITY_FEED_ENGAGE_REQUIRED_MESSAGE =
+  "Choose a display name and @handle on your public profile before posting, liking, or commenting.";
+
 function mapPublicProfileSupportedPersonRow(
   row: Record<string, unknown> | null | undefined,
 ): PublicProfileSupportedPerson | null {

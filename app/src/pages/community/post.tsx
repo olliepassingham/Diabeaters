@@ -35,6 +35,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useCommunityTopicOrder } from "@/hooks/use-community-topic-order";
 import { usePostEditImages } from "@/hooks/use-post-edit-images";
 import { useAuth } from "@/lib/auth-context";
+import { canEngageWithCommunityFeed, COMMUNITY_FEED_ENGAGE_REQUIRED_MESSAGE, useProfile } from "@/lib/profile";
 import {
   DEFAULT_COMMUNITY_TOPIC,
   deleteCommunityComment,
@@ -66,6 +67,7 @@ export default function CommunityPostPage() {
   const [, params] = useRoute("/community/post/:postId");
   const postId = params?.postId ?? null;
   const { user } = useAuth();
+  const { profile, loading: profileLoading } = useProfile();
   const orderedTopics = useCommunityTopicOrder();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -180,8 +182,18 @@ export default function CommunityPostPage() {
     return { name: "", avatar_url: null, public_handle: null, loading: true };
   }
 
+  const canEngageWithFeed = !profileLoading && canEngageWithCommunityFeed(profile);
+
   async function handleToggleLike(pid: string, currentlyLiked: boolean) {
     if (!user || !post || pid !== post.id) return;
+    if (!canEngageWithFeed) {
+      toast({
+        title: "Choose a @handle first",
+        description: COMMUNITY_FEED_ENGAGE_REQUIRED_MESSAGE,
+        variant: "destructive",
+      });
+      return;
+    }
     setPost({
       ...post,
       liked_by_me: !currentlyLiked,
@@ -200,6 +212,14 @@ export default function CommunityPostPage() {
 
   async function handleToggleInterest(pid: string, currentlyInterested: boolean) {
     if (!user || !post || pid !== post.id || post.post_kind !== "event") return;
+    if (!canEngageWithFeed) {
+      toast({
+        title: "Choose a @handle first",
+        description: COMMUNITY_FEED_ENGAGE_REQUIRED_MESSAGE,
+        variant: "destructive",
+      });
+      return;
+    }
     setPost({
       ...post,
       interested_by_me: !currentlyInterested,
@@ -228,6 +248,14 @@ export default function CommunityPostPage() {
 
   async function submitComment() {
     if (!postId || !post) return;
+    if (!canEngageWithFeed) {
+      toast({
+        title: "Choose a @handle first",
+        description: COMMUNITY_FEED_ENGAGE_REQUIRED_MESSAGE,
+        variant: "destructive",
+      });
+      return;
+    }
     const text = commentDraft.trim();
     if (!text) return;
     const res = await insertCommunityComment(postId, text);
@@ -419,6 +447,7 @@ export default function CommunityPostPage() {
       <FeedPostCard
         post={post}
         viewerId={user?.id}
+        canEngageWithFeed={canEngageWithFeed}
         authorDisplayName={m.name}
         authorLoading={Boolean(m.loading)}
         authorPublicHandle={m.public_handle}

@@ -69,11 +69,13 @@ import {
   unblockUser,
 } from "@/lib/community";
 import {
+  canEngageWithCommunityFeed,
   formatLivingWithDiabetesLine,
   getProfile,
   getPublicCommunityProfile,
   getPublicProfileSupportedPerson,
   getProfilesByIds,
+  useProfile,
   type PublicCommunityProfile,
 } from "@/lib/profile";
 import {
@@ -107,6 +109,8 @@ export default function CommunityProfilePage() {
   const [, params] = useRoute("/community/profile/:userId");
   const userId = params?.userId ?? null;
   const { user, loading: authLoading } = useAuth();
+  const { profile: viewerProfile, loading: viewerProfileLoading } = useProfile();
+  const canEngageWithFeed = !viewerProfileLoading && canEngageWithCommunityFeed(viewerProfile);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
@@ -576,6 +580,7 @@ export default function CommunityProfilePage() {
             ) : (
               <FeedPostList
                 viewerId={user.id}
+                canEngageWithFeed={canEngageWithFeed}
                 scopeKey={`profile:${userId}`}
                 pageSize={20}
                 showRefreshButton={false}

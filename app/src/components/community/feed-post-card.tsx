@@ -94,6 +94,8 @@ export type CommentAuthorMeta = FeedAuthorMeta;
 type FeedPostCardProps = {
   post: CommunityPostRow;
   viewerId: string | undefined;
+  /** When false, like/comment/vote controls are disabled (read-only feed). */
+  canEngageWithFeed?: boolean;
   authorDisplayName: string;
   authorLoading?: boolean;
   /** Shown under the display name when set (community public handle). */
@@ -137,6 +139,7 @@ type FeedPostCardProps = {
 export function FeedPostCard({
   post,
   viewerId,
+  canEngageWithFeed = true,
   authorDisplayName,
   authorLoading,
   authorPublicHandle,
@@ -169,6 +172,7 @@ export function FeedPostCard({
 }: FeedPostCardProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const mayEngage = Boolean(viewerId && canEngageWithFeed);
   const canReportPost = viewerId && viewerId !== post.author_id;
   const onLikersLoadedRef = useRef(onLikersLoaded);
   onLikersLoadedRef.current = onLikersLoaded;
@@ -451,7 +455,7 @@ export function FeedPostCard({
           variant="ghost"
           size="sm"
           className="h-11 w-11 p-0 text-foreground hover:text-foreground"
-          disabled={!viewerId}
+          disabled={!mayEngage}
           aria-pressed={post.liked_by_me}
           aria-label={post.liked_by_me ? "Unlike" : "Like"}
           onClick={onLike}
@@ -632,7 +636,7 @@ export function FeedPostCard({
               imageAltTexts={post.image_alt_texts}
               interestedCount={post.interested_count}
               interestedByMe={post.interested_by_me}
-              viewerCanReact={Boolean(viewerId)}
+              viewerCanReact={mayEngage}
               onInterested={onEventInterest}
               onShowInterested={() => setInterestedOpen(true)}
             />
@@ -643,6 +647,7 @@ export function FeedPostCard({
               question={pollExtra.question}
               options={pollExtra.options}
               viewerId={viewerId}
+              canEngageWithFeed={canEngageWithFeed}
             />
           ) : null}
           {previewLink ? <FeedLinkPreview href={previewLink} className="mt-1" /> : null}
@@ -688,7 +693,7 @@ export function FeedPostCard({
               imageAltTexts={post.image_alt_texts}
               interestedCount={post.interested_count}
               interestedByMe={post.interested_by_me}
-              viewerCanReact={Boolean(viewerId)}
+              viewerCanReact={mayEngage}
               onInterested={onEventInterest}
               onShowInterested={() => setInterestedOpen(true)}
             />
@@ -699,6 +704,7 @@ export function FeedPostCard({
               question={pollExtra.question}
               options={pollExtra.options}
               viewerId={viewerId}
+              canEngageWithFeed={canEngageWithFeed}
             />
           ) : null}
           {previewLink ? <FeedLinkPreview href={previewLink} /> : null}
@@ -779,11 +785,18 @@ export function FeedPostCard({
                 rows={1}
                 maxLength={4000}
                 hideHint
-                placeholder="Add a comment…"
+                placeholder={mayEngage ? "Add a comment…" : "Set up your @handle to comment"}
+                disabled={!mayEngage}
                 className="min-h-8 resize-none border-0 bg-transparent px-0 py-1.5 text-base shadow-none focus-visible:ring-0"
               />
             </div>
-            <Button type="button" size="sm" className="h-8 shrink-0 rounded-full px-3 text-xs" onClick={onSubmitComment}>
+            <Button
+              type="button"
+              size="sm"
+              className="h-8 shrink-0 rounded-full px-3 text-xs"
+              disabled={!mayEngage}
+              onClick={onSubmitComment}
+            >
               Post
             </Button>
           </div>

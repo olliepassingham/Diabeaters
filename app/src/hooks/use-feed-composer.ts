@@ -16,7 +16,7 @@ import {
   type CommunityTopicId,
 } from "@/lib/community";
 import { defaultEventStartsAtLocal } from "@/lib/community/event-display";
-import { useProfile } from "@/lib/profile";
+import { canEngageWithCommunityFeed, COMMUNITY_FEED_ENGAGE_REQUIRED_MESSAGE, useProfile } from "@/lib/profile";
 
 export type UseFeedComposerOptions = {
   /** Called after a successful post (e.g. refresh feed list). */
@@ -67,7 +67,8 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
   const videoInputRef = useRef<HTMLInputElement>(null);
 
   const hasFeedHandle = Boolean(profile?.public_handle?.trim());
-  const canComposeToFeed = Boolean(user?.id) && !profileLoading && hasFeedHandle;
+  const canComposeToFeed =
+    Boolean(user?.id) && !profileLoading && canEngageWithCommunityFeed(profile);
 
   const pillPreview = composer.trim() ? composer.trim() : "Share something…";
   const avatarDisplayName = (profile?.full_name ?? user?.email ?? "You").trim() || "You";
@@ -269,7 +270,7 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
     if (!canComposeToFeed) {
       toast({
         title: "Choose a @handle to post",
-        description: "Set your public handle in Feed profile settings — it powers mentions and your profile link.",
+        description: COMMUNITY_FEED_ENGAGE_REQUIRED_MESSAGE,
         variant: "destructive",
       });
       return;

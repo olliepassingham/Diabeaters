@@ -43,7 +43,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getProfilesByIds, searchPublicProfilesForFeedQuery, useProfile } from "@/lib/profile";
+import { getProfilesByIds, searchPublicProfilesForFeedQuery, useProfile, canEngageWithCommunityFeed } from "@/lib/profile";
 import { CommunityProfileReminderCard } from "@/components/community-profile-reminder-card";
 import { CommunityProfileSetupPrompt } from "@/components/community-profile-setup-prompt";
 import {
@@ -187,6 +187,7 @@ export default function CommunityHomePage() {
 
   const hasFeedHandle = feedComposer.hasFeedHandle;
   const canComposeToFeed = feedComposer.canComposeToFeed;
+  const canEngageWithFeed = !profileLoading && canEngageWithCommunityFeed(profile);
 
   // Deep-link support: /community?saved=1
   useEffect(() => {
@@ -986,6 +987,7 @@ export default function CommunityHomePage() {
       <div className="-mx-4 min-w-0 md:-mx-6">
       <FeedPostList
         viewerId={user?.id}
+        canEngageWithFeed={canEngageWithFeed}
         scopeKey={feedCacheScope}
         searchQuery={feedSearch}
         pageSize={PAGE_SIZE}

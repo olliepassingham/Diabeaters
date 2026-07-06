@@ -5,7 +5,7 @@
  */
 import { logEdgeInvokeFailure } from "@/lib/dev-log";
 import { getSupabase } from "@/lib/supabase";
-import { getProfilesByIds } from "@/lib/profile";
+import { canEngageWithCommunityFeed, COMMUNITY_FEED_ENGAGE_REQUIRED_MESSAGE, getProfilesByIds } from "@/lib/profile";
 import { listFolloweeIdsForCurrentUser } from "./follows-supabase";
 import {
   isCommunityContentNoteId,
@@ -337,6 +337,9 @@ export async function togglePostLike(
   const uid = sessionData.session?.user?.id;
   if (!uid) return { error: new Error("Not signed in") };
 
+  const gate = await assertProfileCanEngageCommunityFeed(supabase, uid);
+  if (!gate.ok) return { error: gate.error };
+
   if (currentlyLiked) {
     const { error } = await supabase
       .from("community_post_reactions")
@@ -373,6 +376,9 @@ export async function toggleEventInterest(
   const { data: sessionData } = await supabase.auth.getSession();
   const uid = sessionData.session?.user?.id;
   if (!uid) return { error: new Error("Not signed in") };
+
+  const gate = await assertProfileCanEngageCommunityFeed(supabase, uid);
+  if (!gate.ok) return { error: gate.error };
 
   if (currentlyInterested) {
     const { error } = await supabase
@@ -700,6 +706,22 @@ function normalizeMentionsForInsert(
 
 type SupabaseNonNull = NonNullable<ReturnType<typeof getSupabase>>;
 
+async function assertProfileCanEngageCommunityFeed(
+  supabase: SupabaseNonNull,
+  uid: string,
+): Promise<{ ok: true } | { ok: false; error: Error }> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("full_name, public_handle, is_public")
+    .eq("id", uid)
+    .maybeSingle();
+  if (error) return { ok: false, error: new Error(error.message) };
+  if (!canEngageWithCommunityFeed(data)) {
+    return { ok: false, error: new Error(COMMUNITY_FEED_ENGAGE_REQUIRED_MESSAGE) };
+  }
+  return { ok: true };
+}
+
 async function insertCommunityPostRowWithOptionalImageUploads(params: {
   supabase: SupabaseNonNull;
   uid: string;
@@ -882,22 +904,8 @@ export async function insertFeedPost(
   const uid = sessionData.session?.user?.id;
   if (!uid) return { data: null, error: new Error("Not signed in") };
 
-  const { data: handleRow, error: handleErr } = await supabase
-    .from("profiles")
-    .select("public_handle")
-    .eq("id", uid)
-    .maybeSingle();
-  if (handleErr) return { data: null, error: new Error(handleErr.message) };
-  const publicHandle =
-    typeof (handleRow as { public_handle?: unknown } | null)?.public_handle === "string"
-      ? String((handleRow as { public_handle: string }).public_handle).trim()
-      : "";
-  if (!publicHandle) {
-    return {
-      data: null,
-      error: new Error("Set a public @handle in Feed profile settings before posting."),
-    };
-  }
+  const gate = await assertProfileCanEngageCommunityFeed(supabase, uid);
+  if (!gate.ok) return { data: null, error: gate.error };
 
   const { mentioned_user_ids, mention_map } = normalizeMentionsForInsert(uid, input.mentions);
 
@@ -1036,6 +1044,9 @@ export async function insertCommunityComment(postId: string, body: string): Prom
   const { data: sessionData } = await supabase.auth.getSession();
   const uid = sessionData.session?.user?.id;
   if (!uid) return { data: null, error: new Error("Not signed in") };
+
+  const gate = await assertProfileCanEngageCommunityFeed(supabase, uid);
+  if (!gate.ok) return { data: null, error: gate.error };
 
   const trimmed = body.trim();
   if (!trimmed) return { data: null, error: new Error("Comment cannot be empty") };
@@ -1329,6 +1340,9 @@ export async function castPollVote(postId: string, optionIndex: number): Promise
   const { data: sessionData } = await supabase.auth.getSession();
   const uid = sessionData.session?.user?.id;
   if (!uid) return { error: new Error("Not signed in") };
+
+  const gate = await assertProfileCanEngageCommunityFeed(supabase, uid);
+  if (!gate.ok) return { error: gate.error };
 
   const { error } = await supabase.from("community_poll_votes").upsert(
     { post_id: postId, user_id: uid, option_index: optionIndex },

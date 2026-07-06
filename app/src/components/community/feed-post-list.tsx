@@ -74,6 +74,7 @@ import {
   getCommunityFeedNextPageParam,
 } from "@/lib/community-feed-cache";
 import { APP_SCROLL_MAIN_ID } from "@/lib/app-scroll";
+import { COMMUNITY_FEED_ENGAGE_REQUIRED_MESSAGE } from "@/lib/profile";
 
 function mapPostRowsInInfiniteData(
   old: InfiniteData<CommunityPostRow[]> | undefined,
@@ -125,6 +126,8 @@ export function FeedPostList(props: {
   savedOnly?: boolean;
   /** Bump when parent remount key changes (realtime channel id). */
   feedListRevision?: number;
+  /** When false, viewer can read but not like, comment, or vote. */
+  canEngageWithFeed?: boolean;
   /** Clear search field (main feed). */
   onClearSearch?: () => void;
   /** Switch to Everyone tab with a topic (onboarding). */
@@ -468,9 +471,23 @@ export function FeedPostList(props: {
     if (nextOpen) await ensureCommentsLoaded(postId);
   }
 
+  const canEngageWithFeed = props.canEngageWithFeed !== false;
+
+  function showEngageBlockedToast() {
+    toast({
+      title: "Choose a @handle first",
+      description: COMMUNITY_FEED_ENGAGE_REQUIRED_MESSAGE,
+      variant: "destructive",
+    });
+  }
+
   async function onSubmitComment(postId: string) {
     if (!props.viewerId) {
       toast({ title: "Sign in to reply", description: "Log in to write a comment.", variant: "destructive" });
+      return;
+    }
+    if (!canEngageWithFeed) {
+      showEngageBlockedToast();
       return;
     }
     const draft = (commentDrafts[postId] ?? "").trim();
@@ -521,6 +538,10 @@ export function FeedPostList(props: {
 
   async function onLike(postId: string) {
     if (!props.viewerId) return;
+    if (!canEngageWithFeed) {
+      showEngageBlockedToast();
+      return;
+    }
     const cur = postsRef.current.find((p) => p.id === postId);
     if (!cur) return;
     const res = await togglePostLike(postId, cur.liked_by_me);
@@ -538,6 +559,10 @@ export function FeedPostList(props: {
 
   async function onEventInterest(postId: string) {
     if (!props.viewerId) return;
+    if (!canEngageWithFeed) {
+      showEngageBlockedToast();
+      return;
+    }
     const cur = postsRef.current.find((p) => p.id === postId);
     if (!cur || cur.post_kind !== "event") return;
     const res = await toggleEventInterest(postId, cur.interested_by_me);
@@ -818,6 +843,7 @@ export function FeedPostList(props: {
                 post={post}
                 mediaPriority={index < 3}
                 viewerId={props.viewerId}
+                canEngageWithFeed={canEngageWithFeed}
                 authorDisplayName={authorDisplayName}
                 authorLoading={Boolean(m.loading)}
                 authorPublicHandle={m.public_handle}

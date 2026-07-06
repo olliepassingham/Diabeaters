@@ -26,6 +26,7 @@ import {
   ProfileSectionHeading,
 } from "@/components/profile/profile-ui";
 import { fetchCommunityPostsByAuthorPage } from "@/lib/community";
+import { canEngageWithCommunityFeed, useProfile } from "@/lib/profile";
 import { sharePublicProfile } from "@/lib/share-public-profile";
 import { useToast } from "@/hooks/use-toast";
 
@@ -64,6 +65,8 @@ export function AccountPublicProfileTab({
   supporterMode?: boolean;
 }) {
   const { toast } = useToast();
+  const { profile: viewerProfile, loading: viewerProfileLoading } = useProfile();
+  const canEngageWithFeed = !viewerProfileLoading && canEngageWithCommunityFeed(viewerProfile);
   const publicProfileHref = `/community/profile/${encodeURIComponent(userId)}`;
   const [postsView, setPostsView] = useState<ProfilePostsView>(() => readStoredProfilePostsView());
 
@@ -201,6 +204,7 @@ export function AccountPublicProfileTab({
         ) : (
           <FeedPostList
             viewerId={userId}
+            canEngageWithFeed={canEngageWithFeed}
             scopeKey={`account-public:${userId}`}
             pageSize={20}
             showRefreshButton
