@@ -39,19 +39,20 @@
     --elevate-1: rgba(80, 50, 120, 0.04);
     --elevate-2: rgba(80, 50, 120, 0.08);
 
-    --sidebar: 228 232 238;
+    --sidebar: 250 35% 97%;
     --sidebar-foreground: 260 25% 18%;
-    --sidebar-border: 210 218 228;
+    --sidebar-border: 250 25% 90%;
     --sidebar-primary: 221 83% 53%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 236 240 246;
+    --sidebar-accent: 250 40% 94%;
     --sidebar-accent-foreground: 260 20% 22%;
     --sidebar-ring: 221 83% 53%;
 
-    --secondary: 236 240 246;
+    --secondary: 250 30% 95%;
     --secondary-foreground: 260 20% 22%;
-    --accent: 242 246 252;
-    --accent-foreground: 221 45% 22%;
+    /* HSL triple for hsl() in Tailwind — used for menu/select highlights */
+    --accent: 250 40% 94%;
+    --accent-foreground: 260 20% 22%;
     --destructive: 0 72% 48%;
     --destructive-foreground: 0 72% 98%;
     --warning-text: 28 55% 32%;

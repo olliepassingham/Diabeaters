@@ -445,7 +445,7 @@ export function RoutinesContent() {
                 Save a Routine
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg !grid-rows-[auto_1fr_auto] max-h-[80vh]">
+            <DialogContent className="max-w-lg !grid-rows-[auto_1fr_auto] max-h-[min(80vh,42rem)] gap-5">
               <DialogHeader>
                 <DialogTitle>{editingRoutine ? "Edit Routine" : "Save a New Routine"}</DialogTitle>
                 <DialogDescription>
@@ -601,7 +601,7 @@ export function RoutinesContent() {
                   />
                 </div>
               </div>
-              <DialogFooter className="border-t pt-4">
+              <DialogFooter className="gap-2 border-t border-border/40 pt-4 sm:gap-0">
                 <DialogClose asChild>
                   <Button variant="outline" data-testid="button-cancel-routine">Cancel</Button>
                 </DialogClose>
@@ -868,7 +868,7 @@ export function RoutinesContent() {
                 Add Exercise Routine
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg !grid-rows-[auto_1fr_auto] max-h-[80vh]">
+            <DialogContent className="max-w-lg !grid-rows-[auto_1fr_auto] max-h-[min(80vh,42rem)] gap-5">
               <DialogHeader>
                 <DialogTitle>{editingExercise ? "Edit Exercise Routine" : "Add Exercise Routine"}</DialogTitle>
                 <DialogDescription>
@@ -943,7 +943,7 @@ export function RoutinesContent() {
                   />
                 </div>
               </div>
-              <DialogFooter className="border-t pt-4">
+              <DialogFooter className="gap-2 border-t border-border/40 pt-4 sm:gap-0">
                 <DialogClose asChild>
                   <Button variant="outline" data-testid="button-cancel-exercise">Cancel</Button>
                 </DialogClose>
