@@ -3,6 +3,7 @@ import {
   computeExerciseHypoSuggestion,
   hypoRangeThreshold,
   isBgBelowHypoThreshold,
+  needsImmediateExerciseBgTreatment,
   resolveExerciseBgForHypo,
 } from "./exercise-hypo-auto";
 import type { ActiveExerciseSession, UserSettings } from "./storage";
@@ -38,9 +39,9 @@ describe("exercise-hypo-auto", () => {
     expect(hypoRangeThreshold(undefined, "mg/dL")).toBe(70);
   });
 
-  it("computeExerciseHypoSuggestion returns null in range", () => {
+  it("computeExerciseHypoSuggestion returns null when BG is comfortably in range", () => {
     const settings: UserSettings = { targetBgLow: 4, targetBgHigh: 7 };
-    expect(computeExerciseHypoSuggestion(5, settings, "mmol/L", { dateOfBirth: "1990-01-01" })).toBeNull();
+    expect(computeExerciseHypoSuggestion(7, settings, "mmol/L", { dateOfBirth: "1990-01-01" })).toBeNull();
   });
 
   it("computeExerciseHypoSuggestion returns carbs when below range (adult)", () => {
@@ -49,5 +50,47 @@ describe("exercise-hypo-auto", () => {
     expect(r).not.toBeNull();
     expect(r!.carbsGrams).toBeGreaterThanOrEqual(10);
     expect(r!.approximate).toBe(false);
+    expect(r!.clinicalHypo).toBe(true);
+  });
+
+  it("needsImmediateExerciseBgTreatment for exercise-low falling BG", () => {
+    const settings: UserSettings = { targetBgLow: 4, targetBgHigh: 7 };
+    expect(
+      needsImmediateExerciseBgTreatment(5, settings, "mmol/L", {
+        trend: "falling",
+        exerciseLowThreshold: 5.6,
+      }),
+    ).toBe(true);
+    expect(
+      needsImmediateExerciseBgTreatment(5.6, settings, "mmol/L", {
+        trend: "flat",
+        exerciseLowThreshold: 5.6,
+      }),
+    ).toBe(false);
+  });
+
+  it("computeExerciseHypoSuggestion returns carbs for 5.0 mmol/L falling during exercise", () => {
+    const settings: UserSettings = { targetBgLow: 4, targetBgHigh: 7 };
+    const r = computeExerciseHypoSuggestion(5, settings, "mmol/L", { dateOfBirth: "1990-01-01" }, {
+      trend: "falling",
+      phase: "active",
+      exerciseLowThreshold: 5.6,
+      carbsIfLow: 20,
+    });
+    expect(r).not.toBeNull();
+    expect(r!.carbsGrams).toBeGreaterThanOrEqual(15);
+    expect(r!.clinicalHypo).toBe(false);
+  });
+
+  it("computeExerciseHypoSuggestion returns carbs for recovery 6.0 falling", () => {
+    const settings: UserSettings = { targetBgLow: 4, targetBgHigh: 7 };
+    const r = computeExerciseHypoSuggestion(6, settings, "mmol/L", { dateOfBirth: "1990-01-01" }, {
+      trend: "falling",
+      phase: "recovery",
+      exerciseLowThreshold: 5.6,
+      carbsIfLow: 20,
+    });
+    expect(r).not.toBeNull();
+    expect(r!.carbsGrams).toBeGreaterThanOrEqual(15);
   });
 });

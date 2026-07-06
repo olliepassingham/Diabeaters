@@ -5,6 +5,7 @@
 
 import { formatCarbsForScenario, formatFastCarbsForScenario } from "@/lib/carb-source-preferences";
 import type { ExercisePlanResult } from "@/lib/exercise-plan";
+import { exerciseApproachLowCeiling } from "@/lib/exercise-hypo-auto";
 import type { ExerciseBgTrend, ExerciseIntensity, PreRapidInsulin2h, UserProfile } from "@/lib/storage";
 
 export type ExerciseReadinessVerdict = "ready" | "caution" | "not_recommended";
@@ -22,9 +23,9 @@ function parseNumericMaybe(value: string | null | undefined): number | null {
 }
 
 /** Upper band where “in range” BG + falling still warrants extra caution (matches recovery logic). */
-function exerciseApproachLowCeiling(bgUnits: string, lowThreshold: number): number {
-  const approachMargin = bgUnits === "mmol/L" ? 0.9 : 16;
-  return lowThreshold + approachMargin;
+function exerciseApproachLowCeilingForUnits(bgUnits: string, lowThreshold: number): number {
+  const units = bgUnits === "mg/dL" ? "mg/dL" : "mmol/L";
+  return exerciseApproachLowCeiling(lowThreshold, units);
 }
 
 /** Matches {@link ExercisePlanResult.pre.targetBg} lower bound — tip-of-the-day “snack first” band. */
@@ -124,7 +125,10 @@ function baseVerdict(input: ExerciseReadinessInput): ExerciseReadinessResult {
     return {
       verdict: "not_recommended",
       title: "Not recommended (low BG)",
-      detail: "Treat first, then re-check in 10–15 minutes.",
+      detail:
+        grams > 0
+          ? `Treat now with about ${grams}g fast carbs, then re-check in 10–15 minutes.`
+          : "Treat first, then re-check in 10–15 minutes.",
     };
   }
 
@@ -232,7 +236,7 @@ function refineWithExerciseTypeAndTrend(
     if (phase === "active") {
       const lowThreshold = parseNumericMaybe(input.exercisePlanResult?.pre.lowThreshold ?? null);
       const approachCeiling =
-        lowThreshold != null ? exerciseApproachLowCeiling(input.bgUnits, lowThreshold) : null;
+        lowThreshold != null ? exerciseApproachLowCeilingForUnits(input.bgUnits, lowThreshold) : null;
 
       if (trend === "falling") {
         if (approachCeiling != null && bg < approachCeiling) {
@@ -332,17 +336,20 @@ export function getRecoveryReadinessVerdict(input: ExerciseReadinessInput): Exer
       title: "Not recommended (low BG)",
       detail:
         grams > 0
-          ? "Low after exercise — treat first, then re-check per your hypo plan."
+          ? `Low after exercise — treat now with about ${grams}g fast carbs, then re-check per your hypo plan.`
           : "Low after exercise — treat per your hypo plan, then re-check.",
     };
   }
 
   if (trend === "falling" && bg < approachLowCeiling) {
+    const grams = exercisePlanResult.pre.carbsIfLow;
     return {
       verdict: "not_recommended",
       title: "Not recommended (low + falling)",
       detail:
-        "BG is borderline low and dropping — treat per your hypo plan if your team uses these bands; delayed lows after activity are common.",
+        grams > 0
+          ? `BG is borderline low and dropping — treat now with about ${grams}g fast carbs, then re-check. Delayed lows after activity are common.`
+          : "BG is borderline low and dropping — treat per your hypo plan if your team uses these bands; delayed lows after activity are common.",
     };
   }
 
@@ -514,23 +521,24 @@ export type ExerciseFuelPlanLine = {
   text: string;
 };
 
-/** Pre/recovery low BG: show Take now with carb favourites even when verdict is not_recommended. */
+/** Pre/active/recovery low or falling BG: show Take now with carb favourites. */
 function resolveTreatFirstFuelGrams(
   plan: ExercisePlanResult,
   phase: "pre" | "active" | "recovery",
   bg: number | null | undefined,
   bgUnits: string,
+  trend?: ExerciseBgTrend | null,
 ): number | null {
-  if (phase !== "pre" && phase !== "recovery") return null;
   const lowThreshold = parseNumericMaybe(plan.pre.lowThreshold);
   if (bg == null || lowThreshold == null) return null;
   const grams = plan.pre.carbsIfLow;
   if (grams <= 0) return null;
+  const units = bgUnits === "mg/dL" ? "mg/dL" : "mmol/L";
+  const approachCeiling = exerciseApproachLowCeiling(lowThreshold, units);
+
   if (bg < lowThreshold) return grams;
-  if (phase === "recovery") {
-    const approachMargin = bgUnits === "mmol/L" ? 0.9 : 16;
-    if (bg < lowThreshold + approachMargin) return grams;
-  }
+  if (trend === "falling" && bg < approachCeiling) return grams;
+  if (phase === "recovery" && bg < approachCeiling) return grams;
   return null;
 }
 
@@ -573,12 +581,19 @@ export function getExerciseFuelPlanLines(
     currentBg?: number | null;
     bgUnits?: string;
     intensity?: ExerciseIntensity;
+    trend?: ExerciseBgTrend | null;
   },
 ): ExerciseFuelPlanLine[] {
   const phase = options?.phase ?? "pre";
   const bgUnits = options?.bgUnits ?? "mmol/L";
 
-  const treatFirstGrams = resolveTreatFirstFuelGrams(plan, phase, options?.currentBg, bgUnits);
+  const treatFirstGrams = resolveTreatFirstFuelGrams(
+    plan,
+    phase,
+    options?.currentBg,
+    bgUnits,
+    options?.trend,
+  );
   if (verdict === "not_recommended") {
     if (treatFirstGrams != null) {
       return [
@@ -637,6 +652,15 @@ export function getExerciseFuelPlanLines(
   }
 
   if (phase === "active") {
+    if (treatFirstGrams != null) {
+      return [
+        {
+          id: "on_hand",
+          label: "Take now",
+          text: formatFastCarbsForScenario(treatFirstGrams, profile, "exercise_on_hand"),
+        },
+      ];
+    }
     const carry = computeActiveWorkoutFuelCarry({
       plan,
       exerciseType: options?.exerciseType ?? "",
@@ -684,6 +708,7 @@ export function getExerciseCarbPlanHintLine(
     currentBg?: number | null;
     bgUnits?: string;
     intensity?: ExerciseIntensity;
+    trend?: ExerciseBgTrend | null;
   },
 ): string | null {
   const lines = getExerciseFuelPlanLines(plan, verdict, options?.profile, {
@@ -692,6 +717,7 @@ export function getExerciseCarbPlanHintLine(
     currentBg: options?.currentBg,
     bgUnits: options?.bgUnits,
     intensity: options?.intensity,
+    trend: options?.trend,
   });
   if (lines.length === 0) return null;
   return `${lines.map((l) => `${l.label}: ${l.text}`).join(" · ")}.`;

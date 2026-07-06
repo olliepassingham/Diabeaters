@@ -12,6 +12,7 @@ import { isCompactLayout } from "./types";
 import { cn } from "@/lib/utils";
 import { HomeCardEmpty } from "@/components/home/home-ui";
 import { computeExerciseHypoSuggestion, resolveExerciseBgForHypo } from "@/lib/exercise-hypo-auto";
+import { calculateExercisePlan } from "@/lib/exercise-plan";
 import { ExerciseHypoTreatmentHint, ExerciseWorkoutProgressBar } from "@/components/exercise-active-session-extras";
 
 const EXERCISE_ICONS: Record<ExerciseType, typeof Dumbbell> = {
@@ -90,7 +91,27 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
     const settings = storage.getSettings();
     const profile = storage.getProfile();
     const u = (profile?.bgUnits === "mg/dL" ? "mg/dL" : "mmol/L") as "mmol/L" | "mg/dL";
-    return computeExerciseHypoSuggestion(bg, settings, u, profile ?? {});
+    const plan = calculateExercisePlan({
+      exerciseType: activeSession.exerciseType,
+      durationMinutes: activeSession.durationMinutes,
+      intensity: activeSession.intensity,
+      minutesUntilStart: 0,
+      bgUnits: u,
+      currentBg: bg,
+    });
+    const trend =
+      activeSession.phase === "pre"
+        ? activeSession.preTrend
+        : activeSession.phase === "active"
+          ? activeSession.midTrend ?? activeSession.preTrend
+          : activeSession.recoveryTrend ?? activeSession.midTrend;
+    const lowThreshold = parseFloat(plan.pre.lowThreshold);
+    return computeExerciseHypoSuggestion(bg, settings, u, profile ?? {}, {
+      trend,
+      phase: activeSession.phase,
+      exerciseLowThreshold: Number.isFinite(lowThreshold) ? lowThreshold : undefined,
+      carbsIfLow: plan.pre.carbsIfLow,
+    });
   }, [activeSession]);
 
   const handleQuickStart = (exercise: ExerciseRoutine) => {

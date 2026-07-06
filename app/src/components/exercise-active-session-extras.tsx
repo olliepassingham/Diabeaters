@@ -169,22 +169,25 @@ export function ExerciseHypoTreatmentHint(props: {
           <Droplet className="h-3.5 w-3.5" aria-hidden />
         </span>
         <div className="min-w-0 space-y-0.5">
-          <p className="text-xs font-semibold text-foreground">Reading looks low</p>
+          <p className="text-xs font-semibold text-foreground">
+            {suggestion.clinicalHypo ? "Reading looks low" : "Treat now"}
+          </p>
           <p className="text-[11px] leading-snug text-muted-foreground">
             {suggestion.approximate ? (
               <>
-                Try about <strong className="font-semibold text-foreground">{suggestion.carbsGrams}g</strong> fast
-                carbs, then recheck. Use your care team&apos;s hypo plan if it differs.
+                Take about <strong className="font-semibold text-foreground">{suggestion.carbsGrams}g</strong> fast
+                carbs now, then recheck. Use your care team&apos;s hypo plan if it differs.
               </>
             ) : suggestion.primaryTreatmentLine ? (
               <>
-                About <strong className="font-semibold text-foreground">{suggestion.carbsGrams}g</strong> fast carbs (
-                {suggestion.primaryTreatmentLine}). Recheck soon.
+                Take about <strong className="font-semibold text-foreground">{suggestion.carbsGrams}g</strong> fast carbs
+                now ({suggestion.primaryTreatmentLine}). Recheck in 10–15 minutes.
               </>
             ) : (
               <>
-                About <strong className="font-semibold text-foreground">{suggestion.carbsGrams}g</strong> fast carbs
-                (~{suggestion.glucoseTablets} glucose tablets or ~{suggestion.juiceMl}ml juice). Recheck soon.
+                Take about <strong className="font-semibold text-foreground">{suggestion.carbsGrams}g</strong> fast carbs
+                now (~{suggestion.glucoseTablets} glucose tablets or ~{suggestion.juiceMl}ml juice). Recheck in 10–15
+                minutes.
               </>
             )}
           </p>

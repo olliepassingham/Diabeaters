@@ -239,6 +239,48 @@ describe("getExerciseFuelPlanLines active phase", () => {
     expect(lines.find((l) => l.id === "during")?.text).toContain("30g");
   });
 
+  it("shows Take now during active when BG is falling in approach band", () => {
+    const strengthPlan = calculateExercisePlan({
+      exerciseType: "strength",
+      durationMinutes: 45,
+      intensity: "moderate",
+      minutesUntilStart: 0,
+      bgUnits: "mmol/L",
+      currentBg: 5.6,
+    });
+    const lines = getExerciseFuelPlanLines(strengthPlan, "caution", null, {
+      phase: "active",
+      exerciseType: "strength",
+      intensity: "moderate",
+      currentBg: 5.6,
+      bgUnits: "mmol/L",
+      trend: "falling",
+    });
+    expect(lines.find((l) => l.id === "on_hand")?.label).toBe("Take now");
+    expect(lines.find((l) => l.id === "on_hand")?.text).toContain("15");
+  });
+
+  it("shows Take now during active when BG is below exercise low threshold", () => {
+    const strengthPlan = calculateExercisePlan({
+      exerciseType: "strength",
+      durationMinutes: 45,
+      intensity: "moderate",
+      minutesUntilStart: 0,
+      bgUnits: "mmol/L",
+      currentBg: 5,
+    });
+    const lines = getExerciseFuelPlanLines(strengthPlan, "not_recommended", null, {
+      phase: "active",
+      exerciseType: "strength",
+      intensity: "moderate",
+      currentBg: 5,
+      bgUnits: "mmol/L",
+      trend: "falling",
+    });
+    expect(lines.find((l) => l.id === "on_hand")?.label).toBe("Take now");
+    expect(lines.find((l) => l.id === "on_hand")?.text).toContain("15");
+  });
+
   it("adds interval dose line for cardio longer than 30 min", () => {
     const cardioPlan = calculateExercisePlan({
       exerciseType: "cardio",
@@ -271,6 +313,26 @@ describe("getExerciseFuelPlanLines recovery phase", () => {
     expect(lines[0]?.label).toBe("Have ready");
     expect(lines[0]?.text).toContain("35g");
     expect(lines[0]?.text.toLowerCase()).not.toContain("delayed low");
+  });
+
+  it("shows Take now when recovery BG is borderline and falling", () => {
+    const strengthPlan = calculateExercisePlan({
+      exerciseType: "strength",
+      durationMinutes: 45,
+      intensity: "moderate",
+      minutesUntilStart: 0,
+      bgUnits: "mmol/L",
+      currentBg: 6,
+    });
+    const lines = getExerciseFuelPlanLines(strengthPlan, "not_recommended", null, {
+      phase: "recovery",
+      exerciseType: "strength",
+      currentBg: 6,
+      bgUnits: "mmol/L",
+      trend: "falling",
+    });
+    expect(lines.find((l) => l.id === "on_hand")?.label).toBe("Take now");
+    expect(lines.find((l) => l.id === "on_hand")?.text).toContain("15");
   });
 });
 

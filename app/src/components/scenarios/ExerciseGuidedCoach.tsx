@@ -465,8 +465,14 @@ export function ExerciseGuidedCoach() {
     const bg = resolveExerciseBgForHypo(activeSession, bgInput);
     if (bg == null) return null;
     const settings = storage.getSettings();
-    return computeExerciseHypoSuggestion(bg, settings, bgUnits, profile);
-  }, [activeSession, bgInput, bgUnits, profile.dateOfBirth, profile.bgUnits]);
+    const lowThreshold = exercisePlan ? parseFloat(exercisePlan.pre.lowThreshold) : undefined;
+    return computeExerciseHypoSuggestion(bg, settings, bgUnits, profile, {
+      trend: trendForReadiness,
+      phase: activeSession.phase,
+      exerciseLowThreshold: Number.isFinite(lowThreshold) ? lowThreshold : undefined,
+      carbsIfLow: exercisePlan?.pre.carbsIfLow,
+    });
+  }, [activeSession, bgInput, bgUnits, profile.dateOfBirth, profile.bgUnits, exercisePlan, trendForReadiness]);
 
   // ----- Mutators -----
   const update = (updates: Parameters<typeof storage.updateActiveExercise>[0]) => {

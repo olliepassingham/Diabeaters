@@ -564,8 +564,11 @@ export function AppStatusStrip() {
       phase: "active",
       exerciseType: ex.exerciseType,
       intensity: ex.intensity,
+      currentBg: readiness.bg,
+      bgUnits,
+      trend: trendForReadiness,
     });
-  }, [ex?.exerciseType, ex?.intensity, ex?.phase, exercisePlan, readiness?.bg, readiness?.verdict, stripProfile]);
+  }, [bgUnits, ex?.exerciseType, ex?.intensity, ex?.phase, exercisePlan, readiness?.bg, readiness?.verdict, stripProfile, trendForReadiness]);
 
   const recoveryFuelPlanLines = useMemo(() => {
     if (ex?.phase !== "recovery" || !exercisePlan || !readiness?.verdict) return [];
@@ -573,8 +576,11 @@ export function AppStatusStrip() {
     return getExerciseFuelPlanLines(exercisePlan, readiness.verdict.verdict, stripProfile, {
       phase: "recovery",
       exerciseType: ex.exerciseType,
+      currentBg: readiness.bg,
+      bgUnits,
+      trend: trendForReadiness,
     });
-  }, [ex?.exerciseType, ex?.phase, exercisePlan, readiness?.bg, readiness?.verdict, stripProfile]);
+  }, [bgUnits, ex?.exerciseType, ex?.phase, exercisePlan, readiness?.bg, readiness?.verdict, stripProfile, trendForReadiness]);
 
   const recoveryInsulinLine = useMemo(() => {
     if (!exercisePlan || ex?.phase !== "recovery") return null;
@@ -637,8 +643,14 @@ export function AppStatusStrip() {
     const u = (bgUnits === "mmol/L" ? "mmol/L" : "mg/dL") as "mmol/L" | "mg/dL";
     const bg = resolveExerciseBgForHypo(ex, exerciseBgInput);
     if (bg == null) return null;
-    return computeExerciseHypoSuggestion(bg, storage.getSettings(), u, storage.getProfile() ?? {});
-  }, [ex, exerciseBgInput, bgUnits]);
+    const lowThreshold = exercisePlan ? parseFloat(exercisePlan.pre.lowThreshold) : undefined;
+    return computeExerciseHypoSuggestion(bg, storage.getSettings(), u, storage.getProfile() ?? {}, {
+      trend: trendForReadiness,
+      phase: ex.phase,
+      exerciseLowThreshold: Number.isFinite(lowThreshold) ? lowThreshold : undefined,
+      carbsIfLow: exercisePlan?.pre.carbsIfLow,
+    });
+  }, [ex, exerciseBgInput, bgUnits, exercisePlan, trendForReadiness]);
 
   const onExerciseBgInputChange = (value: string) => {
     setExerciseBgInput(value);

@@ -52,7 +52,7 @@ import { Input } from "@/components/ui/input";
 import { BgTrendThreeButtons } from "@/components/bg-trend-three-buttons";
 import { useToast } from "@/hooks/use-toast";
 import { ExerciseFuelPlanSummary, ExerciseHypoTreatmentHint, ExerciseWorkoutProgressBar } from "@/components/exercise-active-session-extras";
-import { computeExerciseHypoSuggestion } from "@/lib/exercise-hypo-auto";
+import { computeExerciseHypoSuggestion, resolveExerciseBgForHypo } from "@/lib/exercise-hypo-auto";
 
 const EXERCISE_LABELS: Record<ExerciseType, string> = {
   cardio: "Cardio", strength: "Strength", hiit: "HIIT",
@@ -641,6 +641,7 @@ export function ActiveExerciseBanner() {
             currentBg: bg,
             bgUnits,
             intensity: session.intensity,
+            trend: trend ?? null,
           })
         : [];
     return { readinessResult, fuelPlanLines, exercisePlanResult: planResult };
@@ -841,23 +842,21 @@ export function ActiveExerciseBanner() {
     if (!session) return null;
     const settings = storage.getSettings();
     const profile = storage.getProfile();
-    let bg: number | null = null;
-    if (session.phase === "pre") {
-      const draft = preDraftBg.trim().replace(",", ".");
-      if (draft !== "") {
-        const n = parseFloat(draft);
-        if (Number.isFinite(n)) bg = n;
-      }
-      if (bg == null) bg = session.preBg ?? null;
-    } else if (session.phase === "active") {
-      bg = session.midBg ?? session.preBg ?? null;
-    } else {
-      bg = session.recoveryBg ?? session.midBg ?? session.preBg ?? null;
-    }
+    const draft = session.phase === "pre" ? preDraftBg : undefined;
+    const bg = resolveExerciseBgForHypo(session, draft);
     if (bg == null) return null;
     const units = (profile?.bgUnits === "mg/dL" ? "mg/dL" : "mmol/L") as "mmol/L" | "mg/dL";
-    return computeExerciseHypoSuggestion(bg, settings, units, profile ?? {});
-  }, [session, preDraftBg]);
+    const planResult = computeBannerExercisePlan(session, units);
+    const trend = trendForPlannerFromActiveSession(session);
+    const effectiveTrend =
+      session.phase === "pre" && preDraftTrend !== "not_sure" ? preDraftTrend : trend;
+    return computeExerciseHypoSuggestion(bg, settings, units, profile ?? {}, {
+      trend: effectiveTrend,
+      phase: session.phase,
+      exerciseLowThreshold: planResult ? parseFloat(planResult.pre.lowThreshold) : undefined,
+      carbsIfLow: planResult?.pre.carbsIfLow,
+    });
+  }, [session, preDraftBg, preDraftTrend]);
 
   const activeEffectiveBg = session?.phase === "active" ? session.midBg ?? session.preBg : null;
   const activeEffectiveTrend =
