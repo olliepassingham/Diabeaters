@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useRoute } from "wouter";
-import { ChevronRight, Grid3X3, LayoutList, MessageCircle, MoreHorizontal, Plus, UserCheck, UserPlus } from "lucide-react";
+import { ChevronRight, MessageCircle, MoreHorizontal, Plus, UserCheck, UserPlus } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -76,7 +76,12 @@ import {
   getProfilesByIds,
   type PublicCommunityProfile,
 } from "@/lib/profile";
-import { cn } from "@/lib/utils";
+import {
+  ProfilePostsViewTabs,
+  persistProfilePostsView,
+  readStoredProfilePostsView,
+  type ProfilePostsView,
+} from "@/components/profile/profile-posts-view-tabs";
 import {
   BEATIE_FEED_AVATAR_FALLBACK_SRC,
   BEATIE_FEED_BOT_DEFAULT_BIO,
@@ -97,20 +102,6 @@ function profileInitials(name: string): string {
 }
 
 type ListKind = "followers" | "following";
-type ProfilePostsView = "list" | "photos";
-
-const PROFILE_POSTS_VIEW_KEY = "diabeater.community.profile_posts_view";
-
-function readStoredProfilePostsView(): ProfilePostsView {
-  if (typeof window === "undefined") return "list";
-  try {
-    const raw = window.localStorage.getItem(PROFILE_POSTS_VIEW_KEY);
-    if (raw === "photos" || raw === "list") return raw;
-  } catch {
-    /* ignore */
-  }
-  return "list";
-}
 
 export default function CommunityProfilePage() {
   const [, params] = useRoute("/community/profile/:userId");
@@ -566,48 +557,13 @@ export default function CommunityProfilePage() {
                 title={isSelf ? "Your posts" : "Posts"}
                 subtitle={isSelf ? "What you've shared on the Feed" : undefined}
               />
-              <div className="inline-flex rounded-full border border-border/50 bg-muted/30 p-0.5" role="tablist" aria-label="Posts view">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={postsView === "list"}
-                  className={cn(
-                    "inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors",
-                    postsView === "list" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground",
-                  )}
-                  onClick={() => {
-                    setPostsView("list");
-                    try {
-                      window.localStorage.setItem(PROFILE_POSTS_VIEW_KEY, "list");
-                    } catch {
-                      /* ignore */
-                    }
-                  }}
-                >
-                  <LayoutList className="h-3.5 w-3.5" aria-hidden />
-                  All
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={postsView === "photos"}
-                  className={cn(
-                    "inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors",
-                    postsView === "photos" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground",
-                  )}
-                  onClick={() => {
-                    setPostsView("photos");
-                    try {
-                      window.localStorage.setItem(PROFILE_POSTS_VIEW_KEY, "photos");
-                    } catch {
-                      /* ignore */
-                    }
-                  }}
-                >
-                  <Grid3X3 className="h-3.5 w-3.5" aria-hidden />
-                  Photos
-                </button>
-              </div>
+              <ProfilePostsViewTabs
+                value={postsView}
+                onChange={(view) => {
+                  setPostsView(view);
+                  persistProfilePostsView(view);
+                }}
+              />
             </div>
             {postsView === "photos" ? (
               <ProfilePostMediaGrid

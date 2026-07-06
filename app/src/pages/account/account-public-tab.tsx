@@ -1,8 +1,16 @@
+import { useState } from "react";
 import { Pencil, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FeedPostList } from "@/components/community/feed-post-list";
+import { ProfilePostMediaGrid } from "@/components/community/profile-post-media-grid";
 import { AccountPublicAchievementsSummary } from "@/components/achievements/achievements-panel";
+import {
+  ProfilePostsViewTabs,
+  persistProfilePostsView,
+  readStoredProfilePostsView,
+  type ProfilePostsView,
+} from "@/components/profile/profile-posts-view-tabs";
 import {
   ProfileActionGrid,
   ProfileAvatarTile,
@@ -55,6 +63,7 @@ export function AccountPublicProfileTab({
 }) {
   const { toast } = useToast();
   const publicProfileHref = `/community/profile/${encodeURIComponent(userId)}`;
+  const [postsView, setPostsView] = useState<ProfilePostsView>(() => readStoredProfilePostsView());
 
   async function handleShareProfile() {
     const result = await sharePublicProfile({
@@ -163,13 +172,30 @@ export function AccountPublicProfileTab({
       {!supporterMode ? <AccountPublicAchievementsSummary /> : null}
 
       <div className="space-y-3">
-        <ProfileSectionHeading title="Your posts" subtitle="What others see when they visit your profile" />
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <ProfileSectionHeading title="Your posts" subtitle="What others see when they visit your profile" />
+          {isPublic ? (
+            <ProfilePostsViewTabs
+              value={postsView}
+              onChange={(view) => {
+                setPostsView(view);
+                persistProfilePostsView(view);
+              }}
+            />
+          ) : null}
+        </div>
         {!isPublic ? (
           <ProfileMutedCard>
             <p className="text-sm text-muted-foreground">
               Posts stay private until you turn on your public profile. You can still draft from the Feed composer.
             </p>
           </ProfileMutedCard>
+        ) : postsView === "photos" ? (
+          <ProfilePostMediaGrid
+            authorId={userId}
+            emptyTitle="No photos yet"
+            emptyDescription="Posts with photos or videos will show up here."
+          />
         ) : (
           <FeedPostList
             viewerId={userId}
