@@ -47,6 +47,7 @@ import { StoryCreateSheet } from "@/components/community/story-create-sheet";
 import { StoryViewerDialog } from "@/components/community/story-viewer-dialog";
 import { StoryViewersSummary } from "@/components/community/story-viewers-sheet";
 import { ProfileStreakBadges } from "@/components/achievements/achievements-panel";
+import { fetchPublicProfileStreaks, USER_ACHIEVEMENTS_CHANGED_EVENT } from "@/lib/user-achievements";
 import { useResolvedProfileImageUrl } from "@/hooks/use-resolved-profile-image-url";
 import { useCommunityStories } from "@/hooks/use-community-stories";
 import { latestStoryForAuthor } from "@/lib/community/stories-supabase";
@@ -178,6 +179,11 @@ export default function CommunityProfilePage() {
           setProfile(null);
           setLoadError("Could not load profile.");
         } else {
+          const streaks = await fetchPublicProfileStreaks(
+            userId,
+            full.pinned_achievement_ids,
+            full.public_streak_counts,
+          );
           setProfile({
             id: full.id,
             full_name: full.full_name,
@@ -186,6 +192,8 @@ export default function CommunityProfilePage() {
             public_handle: full.public_handle,
             is_public: full.is_public,
             diabetes_onset_date: full.diabetes_onset_date ?? null,
+            streaks,
+            achievements: streaks,
             supported_person: supportedRes.data,
           });
         }
@@ -220,6 +228,13 @@ export default function CommunityProfilePage() {
     if (authLoading) return;
     void loadProfile();
   }, [loadProfile, authLoading]);
+
+  useEffect(() => {
+    if (authLoading || !userId || user?.id !== userId) return;
+    const refresh = () => void loadProfile();
+    window.addEventListener(USER_ACHIEVEMENTS_CHANGED_EVENT, refresh);
+    return () => window.removeEventListener(USER_ACHIEVEMENTS_CHANGED_EVENT, refresh);
+  }, [authLoading, userId, user?.id, loadProfile]);
 
   useEffect(() => {
     if (authLoading || !userId) return;
