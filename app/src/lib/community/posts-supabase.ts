@@ -19,6 +19,10 @@ import {
   type CommunityPostKind,
 } from "./post-kinds";
 import { buildMentionsForPost } from "./post-mentions";
+import {
+  getPostMediaSignedUrl,
+  getPostMediaSignedUrls,
+} from "./post-media-signed-urls";
 import type { CommunityPostAuthorPreview, CommunityPostCommentRow, CommunityPostRow } from "./types";
 import {
   DEFAULT_COMMUNITY_TOPIC,
@@ -456,31 +460,14 @@ function validateVideoFile(file: File | null | undefined): Error | null {
   return null;
 }
 
-/** Signed URL for a private bucket video (short TTL; refresh on feed load). */
+/** Signed URL for a private bucket video (cached; batch-friendly). */
 export async function getPostVideoSignedUrl(path: string): Promise<string | null> {
-  const supabase = getSupabase();
-  const trimmed = String(path ?? "").trim();
-  if (!supabase || !trimmed) return null;
-  const { data, error } = await supabase.storage
-    .from(COMMUNITY_POST_IMAGES_BUCKET)
-    .createSignedUrl(trimmed, 3600);
-  return !error && data?.signedUrl ? data.signedUrl : null;
+  return getPostMediaSignedUrl(path);
 }
 
-/** Signed URLs for displaying private bucket images (short TTL; refresh on feed load). */
+/** Signed URLs for displaying private bucket images (cached; batch-friendly). */
 export async function getPostImageSignedUrls(paths: string[]): Promise<(string | null)[]> {
-  const supabase = getSupabase();
-  if (!supabase || paths.length === 0) return paths.map(() => null);
-  return Promise.all(
-    paths.map(async (raw) => {
-      const path = String(raw ?? "").trim();
-      if (!path) return null;
-      const { data, error } = await supabase.storage
-        .from(COMMUNITY_POST_IMAGES_BUCKET)
-        .createSignedUrl(path, 3600);
-      return !error && data?.signedUrl ? data.signedUrl : null;
-    }),
-  );
+  return getPostMediaSignedUrls(paths);
 }
 
 export async function fetchCommunityPostsPage(
@@ -783,7 +770,7 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
       const { error: upErr } = await supabase.storage
         .from(COMMUNITY_POST_IMAGES_BUCKET)
         .upload(pendingVideoPath, videoFile, {
-          cacheControl: "3600",
+          cacheControl: "604800",
           upsert: false,
           contentType: videoFile.type || undefined,
         });
@@ -796,7 +783,7 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
       const { error: upErr } = await supabase.storage
         .from(COMMUNITY_POST_IMAGES_BUCKET)
         .upload(path, files[i]!, {
-          cacheControl: "3600",
+          cacheControl: "604800",
           upsert: false,
           contentType: files[i]!.type || undefined,
         });

@@ -52,6 +52,7 @@ import {
   togglePostSave,
   updateCommunityPost,
   shouldUseFeedServerSearch,
+  prefetchPostMediaSignedUrls,
   type CommunityPostCommentRow,
   type CommunityPostRow,
   type CommunityTopicId,
@@ -435,6 +436,16 @@ export function FeedPostList(props: {
     });
   }, [posts, props.searchQuery, props.savedOnly, authorMeta, useServerSearch]);
 
+  useEffect(() => {
+    if (displayPosts.length === 0) return;
+    const paths: string[] = [];
+    for (const post of displayPosts.slice(0, 20)) {
+      paths.push(...post.image_urls);
+      if (post.video_url) paths.push(post.video_url);
+    }
+    prefetchPostMediaSignedUrls(paths, { preloadImages: 6 });
+  }, [displayPosts]);
+
   async function ensureCommentsLoaded(postId: string) {
     if (commentsByPost[postId]) return;
     setLoadingComments((m) => ({ ...m, [postId]: true }));
@@ -798,13 +809,14 @@ export function FeedPostList(props: {
         />
       ) : (
         <div className="flex flex-col">
-          {displayPosts.map((post) => {
+          {displayPosts.map((post, index) => {
             const m = metaFor(post.author_id);
             const authorDisplayName = displayAuthorName(m, post.author_id, beatieFeedBotUserId);
             return (
               <FeedPostCard
                 key={post.id}
                 post={post}
+                mediaPriority={index < 3}
                 viewerId={props.viewerId}
                 authorDisplayName={authorDisplayName}
                 authorLoading={Boolean(m.loading)}

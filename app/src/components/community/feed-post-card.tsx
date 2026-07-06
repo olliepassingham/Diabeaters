@@ -130,6 +130,8 @@ type FeedPostCardProps = {
   beatieFeedBotUserId?: string | null;
   onAskBeatie?: () => void;
   askBeatieBusy?: boolean;
+  /** Prioritize loading images/video in the first visible feed posts. */
+  mediaPriority?: boolean;
 };
 
 export function FeedPostCard({
@@ -163,6 +165,7 @@ export function FeedPostCard({
   beatieFeedBotUserId,
   onAskBeatie,
   askBeatieBusy,
+  mediaPriority = false,
 }: FeedPostCardProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -602,10 +605,17 @@ export function FeedPostCard({
         </DropdownMenu>
       </div>
 
-      {hasFeedVideo && post.video_url ? <FeedPostVideo path={post.video_url} /> : null}
+      {hasFeedVideo && post.video_url ? (
+        <FeedPostVideo path={post.video_url} priority={mediaPriority} />
+      ) : null}
 
       {hasFeedImages ? (
-        <CommunityPostImageGrid paths={post.image_urls} altTexts={post.image_alt_texts} variant="feed" />
+        <CommunityPostImageGrid
+          paths={post.image_urls}
+          altTexts={post.image_alt_texts}
+          variant="feed"
+          priority={mediaPriority}
+        />
       ) : null}
 
       {!isMediaFirst ? (

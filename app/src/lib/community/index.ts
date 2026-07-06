@@ -39,6 +39,7 @@ export {
 } from "./post-kinds";
 export * from "./feed-search-mode";
 export * from "./posts-supabase";
+export { getCachedPostMediaSignedUrl, prefetchPostMediaSignedUrls } from "./post-media-signed-urls";
 export * from "./dm-supabase";
 export { DM_INBOX_CHANGED, notifyDmInboxChanged } from "./dm-inbox-events";
 export * from "./follows-supabase";
