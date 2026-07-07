@@ -15,6 +15,7 @@ import {
   type CgmPreferences,
 } from "@/lib/cgm/preferences";
 import { connectHealthPlatformCgm, getHealthPlatformAccessStatus } from "@/lib/cgm/registry";
+import { probeHealthNativeBridge, type HealthNativeProbe } from "@/lib/cgm/health-native-probe";
 import { isCapacitorNativeShell } from "@/lib/native-platform";
 import { cn } from "@/lib/utils";
 import {
@@ -71,18 +72,27 @@ function getCgmStatus({
   healthAvailable,
   healthReason,
   accessGranted,
+  nativeProbe,
 }: {
   isNative: boolean;
   prefs: CgmPreferences;
   healthAvailable: boolean | null;
   healthReason: string | null;
   accessGranted: boolean | null;
+  nativeProbe: HealthNativeProbe | null;
 }): { label: string; detail: string; tone: StatusTone } {
   if (!isNative) {
     return {
       label: "Phone app required",
       detail: "Open Diabeaters on iPhone or Android to connect.",
       tone: "muted",
+    };
+  }
+  if (nativeProbe?.status === "plugin_missing") {
+    return {
+      label: "App update required",
+      detail: "Install the latest Diabeaters iPhone build with Apple Health support.",
+      tone: "amber",
     };
   }
   if (!prefs.prefillEnabled) {
@@ -132,34 +142,50 @@ export function SettingsCgmRoute() {
   const [healthAvailable, setHealthAvailable] = useState<boolean | null>(null);
   const [healthReason, setHealthReason] = useState<string | null>(null);
   const [accessGranted, setAccessGranted] = useState<boolean | null>(null);
+  const [nativeProbe, setNativeProbe] = useState<HealthNativeProbe | null>(null);
   const [connecting, setConnecting] = useState(false);
 
   const isNative = isCapacitorNativeShell();
   const healthLabel = healthPlatformCgmAdapter.label;
+  const needsAppUpdate = nativeProbe?.status === "plugin_missing";
 
-  const refreshAvailability = useCallback(async () => {
-    const status = await healthPlatformCgmAdapter.isAvailable();
-    setHealthAvailable(status.available);
-    setHealthReason(status.reason ?? null);
-  }, []);
+  const runDiagnostics = useCallback(async () => {
+    const probe = await probeHealthNativeBridge();
+    setNativeProbe(probe);
 
-  const refreshAccess = useCallback(async () => {
     if (!isCapacitorNativeShell()) {
+      setHealthAvailable(false);
       setAccessGranted(false);
       return;
     }
+
+    if (probe.status === "plugin_missing") {
+      setHealthAvailable(false);
+      setHealthReason(probe.message);
+      setAccessGranted(false);
+      return;
+    }
+
+    if (probe.status === "health_unavailable") {
+      setHealthAvailable(false);
+      setHealthReason(probe.reason ?? null);
+      setAccessGranted(false);
+      return;
+    }
+
+    setHealthAvailable(true);
+    setHealthReason(null);
     const access = await getHealthPlatformAccessStatus();
     setAccessGranted(access.granted);
   }, []);
 
   useEffect(() => {
-    void refreshAvailability();
-    void refreshAccess();
-  }, [refreshAvailability, refreshAccess]);
+    void runDiagnostics();
+  }, [runDiagnostics]);
 
   const status = useMemo(
-    () => getCgmStatus({ isNative, prefs, healthAvailable, healthReason, accessGranted }),
-    [isNative, prefs, healthAvailable, healthReason, accessGranted],
+    () => getCgmStatus({ isNative, prefs, healthAvailable, healthReason, accessGranted, nativeProbe }),
+    [isNative, prefs, healthAvailable, healthReason, accessGranted, nativeProbe],
   );
 
   function updatePrefs(next: CgmPreferences) {
@@ -171,14 +197,13 @@ export function SettingsCgmRoute() {
     setConnecting(true);
     try {
       const res = await connectHealthPlatformCgm();
-      await refreshAccess();
+      await runDiagnostics();
       if (!res.ok) {
         toast({ title: "Could not connect", description: res.error, variant: "destructive" });
         return;
       }
       setPrefs(readCgmPreferences());
       toast({ title: "Connected", description: `${healthLabel} can now prefill blood glucose.` });
-      void refreshAvailability();
     } finally {
       setConnecting(false);
     }
@@ -224,6 +249,21 @@ export function SettingsCgmRoute() {
           />
         </SettingsPanelBody>
       </SettingsPanel>
+
+      {needsAppUpdate ? (
+        <SettingsPanel>
+          <SettingsPanelBody className="space-y-2">
+            <p className="text-sm font-medium text-amber-900 dark:text-amber-100">Update the Diabeaters app</p>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              {nativeProbe?.status === "plugin_missing"
+                ? nativeProbe.message
+                : "Apple Health support is not in this app build."}{" "}
+              CGM prefill needs a new iPhone build from TestFlight or the App Store. Diabeaters will only appear under
+              Health → Sources after that build is installed and you tap Connect.
+            </p>
+          </SettingsPanelBody>
+        </SettingsPanel>
+      ) : null}
 
       {!isNative ? (
         <SettingsPanel>
@@ -290,7 +330,7 @@ export function SettingsCgmRoute() {
               <Button
                 type="button"
                 className="h-10 w-full gap-2 rounded-xl"
-                disabled={connecting || !prefs.prefillEnabled || accessGranted === true}
+                disabled={connecting || !prefs.prefillEnabled || accessGranted === true || needsAppUpdate}
                 onClick={() => void handleConnectHealth()}
                 data-testid="button-cgm-connect-health"
               >
@@ -300,7 +340,8 @@ export function SettingsCgmRoute() {
               {connecting ? (
                 <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
                   Approve <span className="font-medium text-foreground">Blood Glucose</span> in the {healthLabel} sheet.
-                  If nothing appears, open Settings → Health → Data Access &amp; Devices → Diabeaters.
+                  Diabeaters appears in Health → Sources only after permission is granted. If nothing appears, install the
+                  latest app update, then try again.
                 </p>
               ) : null}
             </SettingsPanelBody>

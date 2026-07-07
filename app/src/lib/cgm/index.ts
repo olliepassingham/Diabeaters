@@ -27,5 +27,6 @@ export { fetchLatestCgmReading, connectHealthPlatformCgm, listCgmAdapters, getCg
 export { getBgPrefill, bgPrefillFromReading, type BgPrefillResult } from "./prefill";
 export { assessReadingStaleness, formatAgeMinutes } from "./staleness";
 export { mgDlToMmol, mmolToMgDl, convertGlucoseValue } from "./units";
+export { probeHealthNativeBridge, type HealthNativeProbe } from "./health-native-probe";
 export { healthPlatformCgmAdapter } from "./adapters/health-platform";
 export { HEALTH_PLUGIN_EVALUATION } from "./health-plugin-evaluation";

@@ -4,6 +4,8 @@ import { isCapacitorNativeShell } from "@/lib/native-platform";
 import { Capacitor } from "@capacitor/core";
 import { mgDlToMmol } from "@/lib/cgm/units";
 import { assessReadingStaleness } from "@/lib/cgm/staleness";
+import { withTimeout } from "@/lib/cgm/async-timeout";
+import { probeHealthNativeBridge } from "@/lib/cgm/health-native-probe";
 import { CGM_PREFILL_STALE_AGE_MINUTES } from "@/lib/cgm/v1-scope";
 
 type HealthSample = {
@@ -23,22 +25,6 @@ const HEALTH_REQUEST_TIMEOUT_MS = 30_000;
 
 function isBloodGlucoseAuthorized(status: { readAuthorized?: string[] }): boolean {
   return status.readAuthorized?.includes("bloodGlucose") ?? false;
-}
-
-function withTimeout<T>(promise: Promise<T>, ms: number, timeoutMessage: string): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = window.setTimeout(() => reject(new Error(timeoutMessage)), ms);
-    promise.then(
-      (value) => {
-        window.clearTimeout(timer);
-        resolve(value);
-      },
-      (error: unknown) => {
-        window.clearTimeout(timer);
-        reject(error);
-      },
-    );
-  });
 }
 
 async function loadHealthPlugin(): Promise<typeof import("@capgo/capacitor-health").Health | null> {
@@ -104,6 +90,14 @@ export const healthPlatformCgmAdapter: CgmAdapter = {
   },
 
   async requestAccess(): Promise<CgmAccessResult> {
+    const probe = await probeHealthNativeBridge();
+    if (probe.status === "plugin_missing") {
+      return { granted: false, error: probe.message };
+    }
+    if (probe.status === "health_unavailable") {
+      return { granted: false, error: probe.reason ?? "Apple Health is not available on this device." };
+    }
+
     const Health = await loadHealthPlugin();
     if (!Health) return { granted: false, error: "Health plugin unavailable." };
     const label = platformHealthLabel();
