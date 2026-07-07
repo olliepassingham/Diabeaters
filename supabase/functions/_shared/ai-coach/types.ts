@@ -22,7 +22,9 @@ export type AuditCategory =
   | "llm_disabled"
   | "llm_error"
   | "post_filter_refused"
-  | "invalid_request";
+  | "invalid_request"
+  | "feed_scheduled_post"
+  | "feed_scheduled_skipped";
 
 export type PostFilterStatus = "pass" | "rewritten" | "refused" | "n/a";
 

@@ -42,7 +42,8 @@
     "preflight": "npm run web:build && (npm run test:e2e || echo 'e2e skipped') && npm run icons:validate",
     "supabase:deploy-notify-functions": "npx supabase functions deploy notify_carers_on_hypo --project-ref ffgcivxvbtdlmfnttwjm --no-verify-jwt && npx supabase functions deploy notify_scenario_started --project-ref ffgcivxvbtdlmfnttwjm --no-verify-jwt && npx supabase functions deploy notify_alcohol_night_mode --project-ref ffgcivxvbtdlmfnttwjm --no-verify-jwt && npx supabase functions deploy notify_supply_low --project-ref ffgcivxvbtdlmfnttwjm --no-verify-jwt && npx supabase functions deploy notify_supply_low_cron --project-ref ffgcivxvbtdlmfnttwjm --no-verify-jwt && npx supabase functions deploy notify_supporter_appointment_reminders --project-ref ffgcivxvbtdlmfnttwjm --no-verify-jwt && npx supabase functions deploy notify_dm_push --project-ref ffgcivxvbtdlmfnttwjm --no-verify-jwt && npx supabase functions deploy notify_feed_push --project-ref ffgcivxvbtdlmfnttwjm --no-verify-jwt && npx supabase functions deploy notify_patient_hypo_acknowledged --project-ref ffgcivxvbtdlmfnttwjm --no-verify-jwt && npx supabase functions deploy notify_patient_hypo_check_in --project-ref ffgcivxvbtdlmfnttwjm --no-verify-jwt && npx supabase functions deploy notify_carer_hypo_check_in_response --project-ref ffgcivxvbtdlmfnttwjm --no-verify-jwt && npx supabase functions deploy notify_push_test --project-ref ffgcivxvbtdlmfnttwjm --no-verify-jwt",
     "supabase:deploy-ai-coach": "npx supabase functions deploy ai_coach",
-    "supabase:deploy-ai-feed-reply": "npx supabase functions deploy ai_feed_reply"
+    "supabase:deploy-ai-feed-reply": "npx supabase functions deploy ai_feed_reply",
+    "supabase:deploy-beatie-feed-post-cron": "npx supabase functions deploy beatie_feed_post_cron --no-verify-jwt"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.4",

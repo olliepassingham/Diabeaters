@@ -216,6 +216,8 @@ export function FeedPostCard({
   const [interestedError, setInterestedError] = useState<string | null>(null);
   const [interestedTruncated, setInterestedTruncated] = useState(false);
 
+  const isBeatiePost = Boolean(beatieFeedBotUserId && post.author_id === beatieFeedBotUserId);
+
   const previewLink = useMemo(() => getFirstWhitelistedFeedLink(post.body), [post.body]);
 
   const pollExtra = useMemo(
@@ -550,12 +552,22 @@ export function FeedPostCard({
             </div>
           ) : (
             <div className="space-y-0.5">
-              <Link
-                href={`/community/profile/${post.author_id}`}
-                className="block truncate text-sm font-semibold leading-tight text-foreground hover:underline underline-offset-2"
-              >
-                {authorDisplayName}
-              </Link>
+              <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                <Link
+                  href={`/community/profile/${post.author_id}`}
+                  className="truncate text-sm font-semibold leading-tight text-foreground hover:underline underline-offset-2"
+                >
+                  {authorDisplayName}
+                </Link>
+                {isBeatiePost ? (
+                  <Badge
+                    variant="outline"
+                    className="border-primary/35 bg-transparent px-1 py-0 text-[9px] font-medium leading-none text-primary"
+                  >
+                    AI guide
+                  </Badge>
+                ) : null}
+              </div>
               <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
                 <span
                   className="inline-flex max-w-full items-center rounded-full bg-muted/55 px-1.5 py-0.5 text-[10px] font-medium leading-tight text-muted-foreground ring-1 ring-border/40"
@@ -732,7 +744,7 @@ export function FeedPostCard({
             </div>
           ) : (
             <div className="space-y-2">
-              {isAuthor && onAskBeatie ? (
+              {isAuthor && onAskBeatie && !isBeatiePost ? (
                 <Button
                   type="button"
                   variant="outline"

@@ -5,6 +5,7 @@
 #   supabase functions deploy notify_scenario_started --no-verify-jwt
 #   supabase functions deploy notify_supply_low --no-verify-jwt
 #   supabase functions deploy notify_supply_low_cron --no-verify-jwt
+#   supabase functions deploy beatie_feed_post_cron --no-verify-jwt
 #   supabase functions deploy notify_dm_push --no-verify-jwt
 #   supabase functions deploy notify_feed_push --no-verify-jwt
 #   supabase functions deploy notify_push_test --no-verify-jwt
@@ -32,6 +33,9 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.notify_supply_low_cron]
+verify_jwt = false
+
+[functions.beatie_feed_post_cron]
 verify_jwt = false
 
 [functions.notify_dm_push]

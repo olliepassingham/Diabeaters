@@ -46,6 +46,7 @@ jobs:
           supabase functions deploy notify_alcohol_night_mode --project-ref "$REF" --no-verify-jwt
           supabase functions deploy notify_supply_low --project-ref "$REF" --no-verify-jwt
           supabase functions deploy notify_supply_low_cron --project-ref "$REF" --no-verify-jwt
+          supabase functions deploy beatie_feed_post_cron --project-ref "$REF" --no-verify-jwt
           supabase functions deploy notify_supporter_appointment_reminders --project-ref "$REF" --no-verify-jwt
           supabase functions deploy notify_dm_push --project-ref "$REF" --no-verify-jwt
           supabase functions deploy notify_feed_push --project-ref "$REF" --no-verify-jwt
