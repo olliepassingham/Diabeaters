@@ -33,7 +33,8 @@ export function getPathForInAppNotification(row: InAppNotificationRow): string |
     kind === "feed_post_like" ||
     kind === "feed_post_comment" ||
     kind === "feed_post_mention" ||
-    kind === "feed_comment_mention"
+    kind === "feed_comment_mention" ||
+    kind === "feed_comment_like"
   ) {
     const postId = typeof data.post_id === "string" ? data.post_id : "";
     return postId ? `/community/post/${postId}` : "/community";

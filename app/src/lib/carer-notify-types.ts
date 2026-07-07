@@ -15,7 +15,7 @@ export type HypoNotificationPayload = {
 
 /** Feed like/comment/mention rows inserted by DB triggers (community migrations). */
 export type FeedInAppNotificationPayload = {
-  kind: "feed_post_like" | "feed_post_comment" | "feed_post_mention" | "feed_comment_mention";
+  kind: "feed_post_like" | "feed_post_comment" | "feed_post_mention" | "feed_comment_mention" | "feed_comment_like";
   post_id: string;
   actor_user_id?: string;
   comment_id?: string;

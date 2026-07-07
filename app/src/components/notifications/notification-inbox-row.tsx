@@ -35,7 +35,7 @@ import {
 import { cn } from "@/lib/utils";
 
 function iconForKind(kind: string): LucideIcon {
-  if (kind === "feed_post_like") return Heart;
+  if (kind === "feed_post_like" || kind === "feed_comment_like") return Heart;
   if (kind === "feed_post_comment" || kind === "feed_comment_mention") return MessageCircle;
   if (kind === "feed_post_mention") return AtSign;
   if (kind === "hypo_logged" || kind === "hypo_logged_self") return Droplet;

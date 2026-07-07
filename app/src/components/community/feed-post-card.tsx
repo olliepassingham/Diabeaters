@@ -116,6 +116,7 @@ type FeedPostCardProps = {
   onSubmitComment: () => void;
   onReportPost: () => void;
   onReportComment: (commentId: string) => void;
+  onLikeComment: (commentId: string, currentlyLiked: boolean) => void;
   commentMeta: (authorId: string) => CommentAuthorMeta;
   isAuthor: boolean;
   onMenuEdit: () => void;
@@ -158,6 +159,7 @@ export function FeedPostCard({
   onSubmitComment,
   onReportPost,
   onReportComment,
+  onLikeComment,
   commentMeta,
   isAuthor,
   onMenuEdit,
@@ -765,6 +767,10 @@ export function FeedPostCard({
                       meta={commentMeta(c.author_id)}
                       beatieFeedBotUserId={beatieFeedBotUserId}
                       viewerId={viewerId}
+                      likeCount={c.like_count}
+                      likedByMe={c.liked_by_me}
+                      canLike={mayEngage && Boolean(viewerId && viewerId !== c.author_id)}
+                      onLike={() => onLikeComment(c.id, c.liked_by_me)}
                       onReport={() => onReportComment(c.id)}
                       onDelete={() => setPendingDeleteCommentId(c.id)}
                     />

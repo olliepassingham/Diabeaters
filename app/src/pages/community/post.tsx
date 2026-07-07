@@ -45,6 +45,7 @@ import {
   insertCommunityComment,
   submitContentReport,
   togglePostLike,
+  toggleCommentLike,
   toggleEventInterest,
   togglePostSave,
   updateCommunityPost,
@@ -243,6 +244,35 @@ export default function CommunityPostPage() {
     if (res.error) {
       setPost({ ...post, saved_by_me: currentlySaved });
       toast({ title: "Could not update bookmark", description: res.error.message, variant: "destructive" });
+    }
+  }
+
+  async function handleLikeComment(commentId: string, currentlyLiked: boolean) {
+    if (!user || !post) return;
+    if (!canEngageWithFeed) {
+      toast({
+        title: "Choose a @handle first",
+        description: COMMUNITY_FEED_ENGAGE_REQUIRED_MESSAGE,
+        variant: "destructive",
+      });
+      return;
+    }
+    const prev = comments;
+    setComments((list) =>
+      list.map((c) =>
+        c.id === commentId
+          ? {
+              ...c,
+              liked_by_me: !currentlyLiked,
+              like_count: Math.max(0, c.like_count + (currentlyLiked ? -1 : 1)),
+            }
+          : c,
+      ),
+    );
+    const res = await toggleCommentLike(commentId, currentlyLiked);
+    if (res.error) {
+      setComments(prev);
+      toast({ title: "Could not update like", description: res.error.message, variant: "destructive" });
     }
   }
 
@@ -472,6 +502,7 @@ export default function CommunityPostPage() {
         onSubmitComment={() => void submitComment()}
         onReportPost={() => openReport("post", post.id)}
         onReportComment={(cid) => openReport("comment", cid)}
+        onLikeComment={(commentId, currentlyLiked) => void handleLikeComment(commentId, currentlyLiked)}
         commentMeta={metaFor}
         isAuthor={Boolean(user?.id && user.id === post.author_id)}
         onMenuEdit={() => {

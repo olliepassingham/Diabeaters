@@ -48,6 +48,7 @@ import {
   searchCommunityPostsPage,
   submitContentReport,
   togglePostLike,
+  toggleCommentLike,
   toggleEventInterest,
   togglePostSave,
   updateCommunityPost,
@@ -536,6 +537,30 @@ export function FeedPostList(props: {
     }
   }
 
+  async function onLikeComment(postId: string, commentId: string, currentlyLiked: boolean) {
+    if (!props.viewerId) return;
+    if (!canEngageWithFeed) {
+      showEngageBlockedToast();
+      return;
+    }
+    const prev = commentsByPost[postId] ?? [];
+    const next = prev.map((c) =>
+      c.id === commentId
+        ? {
+            ...c,
+            liked_by_me: !currentlyLiked,
+            like_count: Math.max(0, c.like_count + (currentlyLiked ? -1 : 1)),
+          }
+        : c,
+    );
+    setCommentsByPost((m) => ({ ...m, [postId]: next }));
+    const res = await toggleCommentLike(commentId, currentlyLiked);
+    if (res.error) {
+      setCommentsByPost((m) => ({ ...m, [postId]: prev }));
+      toast({ title: "Could not update like", description: res.error.message, variant: "destructive" });
+    }
+  }
+
   async function onLike(postId: string) {
     if (!props.viewerId) return;
     if (!canEngageWithFeed) {
@@ -870,6 +895,9 @@ export function FeedPostList(props: {
                 onSubmitComment={() => void onSubmitComment(post.id)}
                 onReportPost={() => openReport("post", post.id)}
                 onReportComment={(commentId) => openReport("comment", commentId)}
+                onLikeComment={(commentId, currentlyLiked) =>
+                  void onLikeComment(post.id, commentId, currentlyLiked)
+                }
                 commentMeta={metaFor}
                 isAuthor={Boolean(props.viewerId && props.viewerId === post.author_id)}
                 onMenuEdit={() => openEditPost(post.id)}

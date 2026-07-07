@@ -366,6 +366,38 @@ export async function togglePostLike(
   return { error: null };
 }
 
+export async function toggleCommentLike(
+  commentId: string,
+  currentlyLiked: boolean,
+): Promise<{ error: Error | null }> {
+  const supabase = getSupabase();
+  if (!supabase) return { error: new Error("Supabase not configured") };
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData.session?.user?.id;
+  if (!uid) return { error: new Error("Not signed in") };
+
+  const gate = await assertProfileCanEngageCommunityFeed(supabase, uid);
+  if (!gate.ok) return { error: gate.error };
+
+  if (currentlyLiked) {
+    const { error } = await supabase
+      .from("community_comment_reactions")
+      .delete()
+      .eq("comment_id", commentId)
+      .eq("user_id", uid);
+    if (error) return { error: new Error(error.message) };
+    return { error: null };
+  }
+
+  const { error } = await supabase.from("community_comment_reactions").insert({
+    comment_id: commentId,
+    user_id: uid,
+  });
+  if (error) return { error: new Error(error.message) };
+  return { error: null };
+}
+
 export async function toggleEventInterest(
   postId: string,
   currentlyInterested: boolean,
@@ -413,8 +445,51 @@ function mapComment(r: Record<string, unknown>): CommunityPostCommentRow {
     mention_map: parseMentionMap(r.mention_map),
     mentioned_user_ids: parseMentionedUserIds(r.mentioned_user_ids),
     is_reported: Boolean(r.is_reported),
+    like_count: typeof r.like_count === "number" ? r.like_count : Number(r.like_count ?? 0) || 0,
+    liked_by_me: false,
     created_at: String(r.created_at ?? ""),
   };
+}
+
+async function enrichCommentsWithLikes(
+  comments: CommunityPostCommentRow[],
+): Promise<CommunityPostCommentRow[]> {
+  if (comments.length === 0) return [];
+  const supabase = getSupabase();
+  if (!supabase) return comments;
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData.session?.user?.id ?? null;
+  const ids = comments.map((c) => c.id);
+
+  const { data, error } = await supabase
+    .from("community_comment_reactions")
+    .select("comment_id, user_id")
+    .in("comment_id", ids);
+
+  if (error) {
+    if (import.meta.env.DEV) console.warn("[feed] comment likes fetch", error.message);
+    return comments;
+  }
+
+  const countMap = new Map<string, number>();
+  const myLikes = new Set<string>();
+  for (const row of data ?? []) {
+    const rec = row as { comment_id: string; user_id: string };
+    const cid = String(rec.comment_id);
+    countMap.set(cid, (countMap.get(cid) ?? 0) + 1);
+    if (uid && String(rec.user_id) === uid) myLikes.add(cid);
+  }
+
+  return comments.map((c) => {
+    const fromReactions = countMap.get(c.id);
+    const like_count = fromReactions != null ? fromReactions : c.like_count;
+    return {
+      ...c,
+      like_count,
+      liked_by_me: myLikes.has(c.id),
+    };
+  });
 }
 
 function extFromFile(f: File): string {
@@ -1028,8 +1103,10 @@ export async function fetchCommentsForPost(
   const { data, error } = await q;
 
   if (error) return { data: null, error: new Error(error.message) };
+  const mapped = (data ?? []).map((r) => mapComment(r as Record<string, unknown>));
+  const enriched = await enrichCommentsWithLikes(mapped);
   return {
-    data: (data ?? []).map((r) => mapComment(r as Record<string, unknown>)),
+    data: enriched,
     error: null,
   };
 }

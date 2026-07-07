@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Flag, Trash2 } from "lucide-react";
+import { Flag, Heart, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -21,6 +21,10 @@ export type FeedCommentItemProps = {
   meta: FeedAuthorMeta;
   beatieFeedBotUserId?: string | null;
   viewerId?: string;
+  likeCount?: number;
+  likedByMe?: boolean;
+  canLike?: boolean;
+  onLike?: () => void;
   onReport?: () => void;
   onDelete?: () => void;
 };
@@ -34,6 +38,10 @@ export function FeedCommentItem({
   meta,
   beatieFeedBotUserId,
   viewerId,
+  likeCount = 0,
+  likedByMe = false,
+  canLike = false,
+  onLike,
   onReport,
   onDelete,
 }: FeedCommentItemProps) {
@@ -41,6 +49,7 @@ export function FeedCommentItem({
   const displayName = displayAuthorName(meta, authorId, beatieFeedBotUserId);
   const canReport = Boolean(viewerId && viewerId !== authorId && onReport);
   const canDelete = Boolean(viewerId && viewerId === authorId && onDelete);
+  const showLikeRow = canLike || likeCount > 0;
 
   return (
     <li
@@ -118,6 +127,30 @@ export function FeedCommentItem({
         <p className="text-[13px] leading-snug text-foreground/90 whitespace-pre-wrap">
           {renderBodyWithMentions(body, mentionMap ?? {})}
         </p>
+        {showLikeRow ? (
+          <div className="flex items-center gap-1 pt-0.5">
+            {canLike ? (
+              <button
+                type="button"
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full px-1 py-0.5 text-[11px] transition-colors",
+                  likedByMe ? "text-primary" : "text-muted-foreground hover:text-foreground",
+                )}
+                aria-pressed={likedByMe}
+                aria-label={likedByMe ? "Unlike comment" : "Like comment"}
+                onClick={onLike}
+              >
+                <Heart className={cn("h-3.5 w-3.5", likedByMe && "fill-current")} />
+                {likeCount > 0 ? <span>{likeCount}</span> : null}
+              </button>
+            ) : likeCount > 0 ? (
+              <span className="inline-flex items-center gap-1 px-1 text-[11px] text-muted-foreground">
+                <Heart className="h-3.5 w-3.5" />
+                {likeCount}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </li>
   );

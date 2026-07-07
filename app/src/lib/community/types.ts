@@ -52,6 +52,8 @@ export type CommunityPostCommentRow = {
   mention_map: Record<string, string>;
   mentioned_user_ids: string[];
   is_reported: boolean;
+  like_count: number;
+  liked_by_me: boolean;
   created_at: string;
 };
 

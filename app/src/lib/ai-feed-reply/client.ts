@@ -26,6 +26,8 @@ function mapComment(row: Record<string, unknown>): CommunityPostCommentRow | nul
     is_reported,
     mention_map: {},
     mentioned_user_ids: [],
+    like_count: 0,
+    liked_by_me: false,
   };
 }
 

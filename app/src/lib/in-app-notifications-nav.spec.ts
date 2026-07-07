@@ -114,6 +114,9 @@ describe("getPathForInAppNotification", () => {
       getPathForInAppNotification(row({ id: "1", user_id: "u", data: { kind: "feed_post_mention", post_id: "p3" } })),
     ).toBe("/community/post/p3");
     expect(
+      getPathForInAppNotification(row({ id: "1", user_id: "u", data: { kind: "feed_comment_like", post_id: "p4" } })),
+    ).toBe("/community/post/p4");
+    expect(
       getPathForInAppNotification(row({ id: "1", user_id: "u", data: { kind: "feed_post_like" } })),
     ).toBe("/community");
   });
