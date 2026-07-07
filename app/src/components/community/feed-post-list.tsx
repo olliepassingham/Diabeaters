@@ -554,7 +554,7 @@ export function FeedPostList(props: {
         : c,
     );
     setCommentsByPost((m) => ({ ...m, [postId]: next }));
-    const res = await toggleCommentLike(commentId, currentlyLiked);
+    const res = await toggleCommentLike(commentId, currentlyLiked, postId);
     if (res.error) {
       setCommentsByPost((m) => ({ ...m, [postId]: prev }));
       toast({ title: "Could not update like", description: res.error.message, variant: "destructive" });

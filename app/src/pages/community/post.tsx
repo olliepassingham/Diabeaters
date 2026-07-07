@@ -269,7 +269,7 @@ export default function CommunityPostPage() {
           : c,
       ),
     );
-    const res = await toggleCommentLike(commentId, currentlyLiked);
+    const res = await toggleCommentLike(commentId, currentlyLiked, post.id);
     if (res.error) {
       setComments(prev);
       toast({ title: "Could not update like", description: res.error.message, variant: "destructive" });

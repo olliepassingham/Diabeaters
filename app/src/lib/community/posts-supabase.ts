@@ -369,6 +369,7 @@ export async function togglePostLike(
 export async function toggleCommentLike(
   commentId: string,
   currentlyLiked: boolean,
+  postId: string,
 ): Promise<{ error: Error | null }> {
   const supabase = getSupabase();
   if (!supabase) return { error: new Error("Supabase not configured") };
@@ -395,6 +396,15 @@ export async function toggleCommentLike(
     user_id: uid,
   });
   if (error) return { error: new Error(error.message) };
+
+  void supabase.functions
+    .invoke("notify_feed_push", {
+      body: { kind: "feed_comment_like", post_id: postId, comment_id: commentId },
+    })
+    .then(({ error: fnErr }) => {
+      if (fnErr) logEdgeInvokeFailure("notify_feed_push comment like", fnErr.message);
+    });
+
   return { error: null };
 }
 

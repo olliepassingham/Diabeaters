@@ -3,6 +3,7 @@
  *
  * Covers events that already create in-app notifications via DB triggers:
  * - like/comment on your post (community_feed_notifications.sql)
+ * - like on your comment (community_comment_likes.sql)
  * - mentions on posts (community_posts_poll_event_mentions.sql)
  * - new follower (inapp_notifications_insert_follow_trigger.sql)
  *
@@ -25,6 +26,7 @@ const corsHeaders: Record<string, string> = {
 type Body =
   | { kind: "feed_post_like"; post_id: string }
   | { kind: "feed_post_comment"; post_id: string; comment_id: string }
+  | { kind: "feed_comment_like"; post_id: string; comment_id: string }
   | { kind: "feed_post_mention"; post_id: string; mentioned_user_id: string }
   | { kind: "feed_comment_mention"; post_id: string; comment_id: string; mentioned_user_id: string }
   | { kind: "new_follower"; followee_id: string };
@@ -175,6 +177,42 @@ Deno.serve(async (req: Request) => {
       bodyText = `${actor}: ${preview || "commented on your post."}`;
       deepLink = `/community/post/${postId}`;
       payload = { kind: "feed_post_comment", post_id: postId, actor_user_id: callerId, comment_id: commentId, deep_link: deepLink };
+    } else if (body.kind === "feed_comment_like") {
+      const postId = body.post_id?.trim() ?? "";
+      const commentId = body.comment_id?.trim() ?? "";
+      if (!isUuid(postId) || !isUuid(commentId)) {
+        return new Response(JSON.stringify({ success: false, error: "invalid_ids" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const { data: c } = await admin
+        .from("community_post_comments")
+        .select("author_id, body")
+        .eq("id", commentId)
+        .eq("post_id", postId)
+        .maybeSingle();
+      const authorId = c ? String((c as any).author_id) : "";
+      if (!isUuid(authorId) || authorId === callerId) {
+        return new Response(JSON.stringify({ success: true, delivered_push: 0 }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const raw = typeof (c as any)?.body === "string" ? String((c as any).body).trim() : "";
+      let preview = raw.slice(0, 80);
+      if (raw.length > 80) preview += "…";
+      recipientId = authorId;
+      title = "New like on your comment";
+      bodyText = preview ? `${actor} liked your comment: ${preview}` : `${actor} liked your comment.`;
+      deepLink = `/community/post/${postId}`;
+      payload = {
+        kind: "feed_comment_like",
+        post_id: postId,
+        comment_id: commentId,
+        actor_user_id: callerId,
+        deep_link: deepLink,
+      };
     } else if (body.kind === "feed_post_mention") {
       const postId = body.post_id?.trim() ?? "";
       const mentionedUserId = body.mentioned_user_id?.trim() ?? "";
