@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { buildCoachHref } from "@/lib/ai-coach/links";
 import { Link, useLocation, useRoute } from "wouter";
 import { ChevronRight, MessageCircle, MoreHorizontal, Plus, UserCheck, UserPlus } from "lucide-react";
 import {
@@ -291,6 +292,10 @@ export default function CommunityProfilePage() {
 
   async function openMessages() {
     if (!userId || !user?.id || isSelf) return;
+    if (isBeatieProfile) {
+      setLocation(buildCoachHref({ from: "beatie_profile" }));
+      return;
+    }
     const { data, error } = await getOrCreateDmThread(userId);
     if (error) {
       const msg = error.message.toLowerCase().includes("dm_not_allowed") || error.message.includes("blocked")
