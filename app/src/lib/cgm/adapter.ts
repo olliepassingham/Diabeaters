@@ -15,6 +15,8 @@ export type CgmAdapter = {
   isAvailable(): Promise<CgmAvailability>;
   /** Request OS or service permissions. */
   requestAccess(): Promise<CgmAccessResult>;
+  /** Check permissions without prompting (when supported). */
+  checkAccess(): Promise<CgmAccessResult>;
   /** Latest non-stale (per adapter rules) reading in the user's units. */
   getLatestReading(userUnits: BgUnits): Promise<GlucoseReading | null>;
 };

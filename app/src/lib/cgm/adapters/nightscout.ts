@@ -38,6 +38,10 @@ export const nightscoutCgmAdapter: CgmAdapter = {
   },
 
   async requestAccess(): Promise<CgmAccessResult> {
+    return this.checkAccess();
+  },
+
+  async checkAccess(): Promise<CgmAccessResult> {
     const prefs = readCgmPreferences();
     if (!prefs.nightscoutUrl?.trim() || !prefs.nightscoutToken?.trim()) {
       return { granted: false, error: "Nightscout URL and API token required." };

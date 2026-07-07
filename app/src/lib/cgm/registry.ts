@@ -48,6 +48,10 @@ export async function fetchLatestCgmReading(userUnits: BgUnits): Promise<Glucose
   return best;
 }
 
+export async function getHealthPlatformAccessStatus(): Promise<CgmAccessResult> {
+  return healthPlatformCgmAdapter.checkAccess();
+}
+
 export async function connectHealthPlatformCgm(): Promise<{ ok: boolean; error?: string }> {
   const availability = await healthPlatformCgmAdapter.isAvailable();
   if (!availability.available) {

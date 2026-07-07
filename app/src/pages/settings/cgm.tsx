@@ -14,7 +14,7 @@ import {
   writeCgmPreferences,
   type CgmPreferences,
 } from "@/lib/cgm/preferences";
-import { connectHealthPlatformCgm } from "@/lib/cgm/registry";
+import { connectHealthPlatformCgm, getHealthPlatformAccessStatus } from "@/lib/cgm/registry";
 import { isCapacitorNativeShell } from "@/lib/native-platform";
 import { cn } from "@/lib/utils";
 import {
@@ -70,11 +70,13 @@ function getCgmStatus({
   prefs,
   healthAvailable,
   healthReason,
+  accessGranted,
 }: {
   isNative: boolean;
   prefs: CgmPreferences;
   healthAvailable: boolean | null;
   healthReason: string | null;
+  accessGranted: boolean | null;
 }): { label: string; detail: string; tone: StatusTone } {
   if (!isNative) {
     return {
@@ -90,13 +92,6 @@ function getCgmStatus({
       tone: "muted",
     };
   }
-  if (!prefs.healthPlatformEnabled) {
-    return {
-      label: "Almost ready",
-      detail: "Enable your health app source, then connect.",
-      tone: "amber",
-    };
-  }
   if (healthAvailable === false) {
     return {
       label: "Unavailable",
@@ -104,10 +99,24 @@ function getCgmStatus({
       tone: "amber",
     };
   }
+  if (accessGranted === true) {
+    return {
+      label: "Connected",
+      detail: "Driving and exercise can suggest a recent reading.",
+      tone: "green",
+    };
+  }
+  if (!prefs.healthPlatformEnabled) {
+    return {
+      label: "Almost ready",
+      detail: "Enable your health app source, then connect.",
+      tone: "amber",
+    };
+  }
   return {
-    label: "Ready",
-    detail: "Driving and exercise can suggest a recent reading.",
-    tone: "green",
+    label: "Needs permission",
+    detail: "Tap Connect and allow blood glucose read access.",
+    tone: "amber",
   };
 }
 
@@ -122,6 +131,7 @@ export function SettingsCgmRoute() {
   const [prefs, setPrefs] = useState<CgmPreferences>(() => readCgmPreferences());
   const [healthAvailable, setHealthAvailable] = useState<boolean | null>(null);
   const [healthReason, setHealthReason] = useState<string | null>(null);
+  const [accessGranted, setAccessGranted] = useState<boolean | null>(null);
   const [connecting, setConnecting] = useState(false);
 
   const isNative = isCapacitorNativeShell();
@@ -133,13 +143,23 @@ export function SettingsCgmRoute() {
     setHealthReason(status.reason ?? null);
   }, []);
 
+  const refreshAccess = useCallback(async () => {
+    if (!isCapacitorNativeShell()) {
+      setAccessGranted(false);
+      return;
+    }
+    const access = await getHealthPlatformAccessStatus();
+    setAccessGranted(access.granted);
+  }, []);
+
   useEffect(() => {
     void refreshAvailability();
-  }, [refreshAvailability]);
+    void refreshAccess();
+  }, [refreshAvailability, refreshAccess]);
 
   const status = useMemo(
-    () => getCgmStatus({ isNative, prefs, healthAvailable, healthReason }),
-    [isNative, prefs, healthAvailable, healthReason],
+    () => getCgmStatus({ isNative, prefs, healthAvailable, healthReason, accessGranted }),
+    [isNative, prefs, healthAvailable, healthReason, accessGranted],
   );
 
   function updatePrefs(next: CgmPreferences) {
@@ -151,6 +171,7 @@ export function SettingsCgmRoute() {
     setConnecting(true);
     try {
       const res = await connectHealthPlatformCgm();
+      await refreshAccess();
       if (!res.ok) {
         toast({ title: "Could not connect", description: res.error, variant: "destructive" });
         return;
@@ -162,6 +183,12 @@ export function SettingsCgmRoute() {
       setConnecting(false);
     }
   }
+
+  const connectButtonLabel = accessGranted
+    ? `Connected to ${healthLabel}`
+    : connecting
+      ? "Waiting for permission…"
+      : `Connect ${healthLabel}`;
 
   const StatusIcon =
     status.tone === "green" ? CheckCircle2 : status.tone === "amber" ? Sparkles : isNative ? Activity : Smartphone;
@@ -263,13 +290,19 @@ export function SettingsCgmRoute() {
               <Button
                 type="button"
                 className="h-10 w-full gap-2 rounded-xl"
-                disabled={connecting || !prefs.prefillEnabled}
+                disabled={connecting || !prefs.prefillEnabled || accessGranted === true}
                 onClick={() => void handleConnectHealth()}
                 data-testid="button-cgm-connect-health"
               >
                 <Activity className="h-4 w-4" aria-hidden />
-                {connecting ? "Connecting…" : `Connect ${healthLabel}`}
+                {connectButtonLabel}
               </Button>
+              {connecting ? (
+                <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
+                  Approve <span className="font-medium text-foreground">Blood Glucose</span> in the {healthLabel} sheet.
+                  If nothing appears, open Settings → Health → Data Access &amp; Devices → Diabeaters.
+                </p>
+              ) : null}
             </SettingsPanelBody>
           </SettingsPanel>
         </div>
