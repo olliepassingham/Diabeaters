@@ -43,6 +43,7 @@ export default defineConfig(({ mode }) => {
         "react",
         "react-dom",
         "date-fns",
+        "@capgo/capacitor-health",
         "@radix-ui/react-accordion",
         "@radix-ui/react-collapsible",
         "@radix-ui/react-tabs",

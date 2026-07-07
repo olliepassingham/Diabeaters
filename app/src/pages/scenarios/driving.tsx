@@ -16,11 +16,9 @@ import { storage, type UserProfile, DIABEATER_PROFILE_CHANGED_EVENT } from "@/li
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { canShowDrivingReadiness } from "@/lib/user-age";
 import { normalizeBgUnits } from "@/lib/alcohol-night-tool";
-import {
-  getDrivingBgPrefill,
-  formatDrivingTargetRange,
-  getRecentHypoForDriving,
-} from "@/lib/driving-prefill";
+import { formatDrivingTargetRange, getRecentHypoForDriving } from "@/lib/driving-prefill";
+import { useBgPrefill } from "@/hooks/use-bg-prefill";
+import { CgmPrefillButton } from "@/components/cgm-prefill-button";
 import {
   buildDrivingReadinessOutcome,
   type DrivingReadinessOutcome,
@@ -126,7 +124,7 @@ export default function DrivingScenarioPage() {
   const isPumpUser = isPumpDeliveryMethod(profile?.insulinDeliveryMethod);
   const targetRangeLine = formatDrivingTargetRange(settings, bgUnits);
   const recentHypoLogged = getRecentHypoForDriving(4);
-  const bgPrefill = useMemo(() => getDrivingBgPrefill(), []);
+  const { prefill: bgPrefill, loading: bgPrefillLoading, refresh: refreshBgPrefill } = useBgPrefill();
 
   const progressPct = phase === "form" ? ((wizardStep + 1) / FORM_WIZARD_STEPS) * 100 : 100;
 
@@ -353,18 +351,15 @@ export default function DrivingScenarioPage() {
                         data-testid="input-driving-bg"
                       />
                     </div>
-                    {bgPrefill && !bgInput.trim() ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-9"
-                        onClick={() => setBgInput(bgPrefill.value)}
-                        data-testid="button-driving-use-prefill"
-                      >
-                        Use recent ({bgPrefill.value} {bgUnits})
-                      </Button>
-                    ) : null}
+                    <CgmPrefillButton
+                      prefill={bgPrefill}
+                      loading={bgPrefillLoading}
+                      bgUnits={bgUnits}
+                      currentValue={bgInput}
+                      onApply={setBgInput}
+                      onRefresh={refreshBgPrefill}
+                      testId="button-driving-use-prefill"
+                    />
                     <BgTrendThreeButtons
                       label="Trend (if you know it)"
                       value={bgTrend}

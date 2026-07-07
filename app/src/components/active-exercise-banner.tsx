@@ -41,6 +41,9 @@ import {
 } from "@/lib/exercise-planner-href";
 import { cancelExerciseReminders, scheduleExerciseActiveReminders } from "@/lib/exercise-reminders";
 import { cn } from "@/lib/utils";
+import { CgmPrefillButton } from "@/components/cgm-prefill-button";
+import { useBgPrefill } from "@/hooks/use-bg-prefill";
+import type { BgPrefillResult } from "@/lib/cgm/prefill";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -300,6 +303,9 @@ function ExerciseReadingPrompt({
   saveTestId,
   skipTestId,
   skipLabel = "Skip",
+  bgPrefill,
+  bgPrefillLoading,
+  onRefreshBgPrefill,
 }: {
   bgUnits: string;
   title: string;
@@ -309,6 +315,9 @@ function ExerciseReadingPrompt({
   saveTestId?: string;
   skipTestId?: string;
   skipLabel?: string;
+  bgPrefill?: BgPrefillResult | null;
+  bgPrefillLoading?: boolean;
+  onRefreshBgPrefill?: () => void;
 }) {
   const { toast } = useToast();
   const [raw, setRaw] = useState("");
@@ -344,6 +353,15 @@ function ExerciseReadingPrompt({
               className="h-9 text-sm"
               placeholder="e.g. 6.2"
               data-testid="input-exercise-reading-bg"
+            />
+            <CgmPrefillButton
+              prefill={bgPrefill ?? null}
+              loading={bgPrefillLoading}
+              bgUnits={bgUnits}
+              currentValue={raw}
+              onApply={setRaw}
+              onRefresh={onRefreshBgPrefill}
+              testId="button-exercise-cgm-prefill"
             />
           </div>
           <BgTrendThreeButtons
@@ -589,6 +607,7 @@ function getTypeConfig(type: ExerciseType): ExerciseTypeConfig {
 
 export function ActiveExerciseBanner() {
   const { toast } = useToast();
+  const { prefill: bgPrefill, loading: bgPrefillLoading, refresh: refreshBgPrefill } = useBgPrefill();
   const [session, setSession] = useState<ActiveExerciseSession | null>(null);
   const [expanded, setExpanded] = useState(true);
   const [preDraftBg, setPreDraftBg] = useState("");
@@ -1077,6 +1096,9 @@ export function ActiveExerciseBanner() {
                             saveTestId="button-save-mid-reading"
                             skipTestId="button-skip-mid-reading"
                             skipLabel="Not now"
+                            bgPrefill={bgPrefill}
+                            bgPrefillLoading={bgPrefillLoading}
+                            onRefreshBgPrefill={refreshBgPrefill}
                           />
                           <div className="flex gap-2 flex-wrap">
                             <Button
@@ -1306,6 +1328,9 @@ export function ActiveExerciseBanner() {
               saveTestId="button-save-mid-reading-dialog"
               skipTestId="button-skip-mid-reading-dialog"
               skipLabel="Cancel"
+              bgPrefill={bgPrefill}
+              bgPrefillLoading={bgPrefillLoading}
+              onRefreshBgPrefill={refreshBgPrefill}
             />
           </DialogContent>
         </Dialog>
@@ -1326,6 +1351,9 @@ export function ActiveExerciseBanner() {
               onSkip={handleSkipRecoveryReading}
               saveTestId="button-save-recovery-reading"
               skipTestId="button-skip-recovery-reading"
+              bgPrefill={bgPrefill}
+              bgPrefillLoading={bgPrefillLoading}
+              onRefreshBgPrefill={refreshBgPrefill}
             />
           </DialogContent>
         </Dialog>

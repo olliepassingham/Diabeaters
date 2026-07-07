@@ -55,7 +55,11 @@
     <string>Allow Diabeaters to access your photo library so you can attach images to community posts and direct messages, and update your profile photo.</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
     <string>Allow Diabeaters to save images to your photo library when you export or download them from the app.</string>
-	<key>UIBackgroundModes</key>
+    <key>NSHealthShareUsageDescription</key>
+    <string>Diabeaters can read blood glucose from Apple Health to prefill BG fields in tools. Confirm readings on your CGM before treating.</string>
+    <key>NSHealthUpdateUsageDescription</key>
+    <string>Diabeaters does not write health data in v1.</string>
+    <key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
 	</array>

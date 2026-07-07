@@ -4,4 +4,5 @@
     <string name="title_activity_main">Diabeaters</string>
     <string name="package_name">com.passingtime.diabeaters</string>
     <string name="custom_url_scheme">com.passingtime.diabeaters</string>
+    <string name="health_connect_privacy_policy_url">https://diabeaters.vercel.app/privacy</string>
 </resources>

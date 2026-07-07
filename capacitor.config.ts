@@ -51,6 +51,7 @@ const config: CapacitorConfig = {
       "@capacitor/local-notifications",
       "@capacitor/push-notifications",
       "@capacitor/status-bar",
+      "@capgo/capacitor-health",
     ],
   },
 };

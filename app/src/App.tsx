@@ -929,6 +929,11 @@ function InnerRouter() {
           <SettingsPage />
         </Suspense>
       </Route>
+      <Route path="/settings/cgm">
+        <Suspense fallback={<RouteFallback />}>
+          <SettingsPage />
+        </Suspense>
+      </Route>
       <Route path="/settings/appearance">
         <Suspense fallback={<RouteFallback />}>
           <SettingsPage />

@@ -81,6 +81,7 @@ import { SettingsNotificationsRoute } from "./notifications";
 import { SettingsAboutRoute } from "./about";
 import { SettingsFeedbackRoute } from "./feedback";
 import { SettingsRatiosRoute } from "./ratios";
+import { SettingsCgmRoute } from "./cgm";
 import { SettingsDataBackupSection, SettingsHubGroup, SettingsHubNavLink, SettingsSectionHeader, SettingsSetupBanner, SettingsStickySaveBar, SETTINGS_STICKY_SAVE_SCROLL_CLASS } from "./shared";
 import { buildRatiosPageSnapshot, buildUsagePageSnapshot } from "@/lib/settings-page-snapshots";
 import { cn } from "@/lib/utils";
@@ -2086,6 +2087,17 @@ export default function Settings() {
           </SettingsHubGroup>
         )}
 
+        {!inSupporterSession && (
+          <SettingsHubGroup title="Health data">
+            <SettingsHubNavLink
+              href="/settings/cgm"
+              label="CGM prefill"
+              description="Recent BG from Apple Health or Health Connect"
+              icon={Activity}
+            />
+          </SettingsHubGroup>
+        )}
+
         {!inSupporterSession && !isCommunityAccount && (
           <SettingsHubGroup title="Family & sharing">
             <SettingsHubNavLink
@@ -2150,6 +2162,10 @@ export default function Settings() {
 
   if (pathOnly === "/settings/appearance") {
     return <SettingsAppearanceRoute />;
+  }
+
+  if (pathOnly === "/settings/cgm") {
+    return <SettingsCgmRoute />;
   }
 
   if (pathOnly === "/settings/notifications") {

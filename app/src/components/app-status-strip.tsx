@@ -53,6 +53,8 @@ import {
   type ExerciseReadinessResult,
 } from "@/lib/exercise-readiness";
 import { cancelExerciseReminders, scheduleExerciseActiveReminders } from "@/lib/exercise-reminders";
+import { CgmPrefillButton } from "@/components/cgm-prefill-button";
+import { useBgPrefill } from "@/hooks/use-bg-prefill";
 import { syncSickDayDeactivatedToCloud } from "@/lib/scenarios-supabase";
 import { cancelSickDayMedReminder } from "@/lib/sick-day-med-reminders";
 import {
@@ -227,6 +229,7 @@ function postExerciseTipPresentation(text: string, index: number): { Icon: Lucid
  */
 export function AppStatusStrip() {
   const { toast } = useToast();
+  const { prefill: bgPrefill, loading: bgPrefillLoading, refresh: refreshBgPrefill } = useBgPrefill();
   const online = useOnline();
   const [sc, setSc] = useState<ScenarioState>(() => storage.getScenarioState());
   const [ex, setEx] = useState<ActiveExerciseSession | null>(() => storage.getActiveExercise());
@@ -994,6 +997,15 @@ export function AppStatusStrip() {
                       ))}
                     </div>
                   </div>
+                  <CgmPrefillButton
+                    prefill={bgPrefill}
+                    loading={bgPrefillLoading}
+                    bgUnits={bgUnits}
+                    currentValue={exerciseBgInput}
+                    onApply={setExerciseBgInput}
+                    onRefresh={refreshBgPrefill}
+                    testId="button-exercise-cgm-prefill"
+                  />
                 </div>
               ) : (
                 <div className="space-y-1">
@@ -1026,6 +1038,15 @@ export function AppStatusStrip() {
                       ))}
                     </div>
                   </div>
+                  <CgmPrefillButton
+                    prefill={bgPrefill}
+                    loading={bgPrefillLoading}
+                    bgUnits={bgUnits}
+                    currentValue={exerciseBgInput}
+                    onApply={setExerciseBgInput}
+                    onRefresh={refreshBgPrefill}
+                    testId="button-exercise-cgm-prefill"
+                  />
                 </div>
               )}
 

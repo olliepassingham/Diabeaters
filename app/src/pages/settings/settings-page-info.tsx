@@ -129,6 +129,44 @@ export function SettingsAboutInfoDialog() {
   );
 }
 
+export function SettingsCgmInfoDialog() {
+  return (
+    <PageInfoDialog title="About CGM prefill" description="Optional blood glucose suggestions from your phone health app">
+      <InfoSection title="How it works">
+        <p>
+          Diabeaters reads the latest blood glucose sample your CGM app has shared with Apple Health or Health Connect.
+          When you open a tool like Driving or Exercise, you can tap to fill in a recent value — you can always edit or
+          ignore it.
+        </p>
+      </InfoSection>
+      <InfoSection title="Setup">
+        <p>
+          In your Dexcom or Libre app, enable sharing blood glucose to Apple Health (or Health Connect on Android). Then
+          turn on prefill here and tap Connect to grant read permission.
+        </p>
+      </InfoSection>
+      <InfoSection title="Delays & freshness">
+        <p>
+          Prefilled values may be delayed — Dexcom often writes to Apple Health about three hours late. Diabeaters shows
+          how old each reading is. Readings over three hours old are not offered.
+        </p>
+      </InfoSection>
+      <InfoSection title="Privacy (v1)">
+        <p>
+          CGM streams are never uploaded to Diabeaters servers. Readings are fetched on your phone when you open a tool
+          or tap prefill, used locally, and not stored in Supabase.
+        </p>
+      </InfoSection>
+      <InfoSection title="Safety">
+        <p>
+          Diabeaters is not a medical device. CGM prefill is a convenience only — always confirm on your CGM receiver or
+          meter before treating.
+        </p>
+      </InfoSection>
+    </PageInfoDialog>
+  );
+}
+
 export function SettingsFeedbackInfoDialog() {
   return (
     <PageInfoDialog title="About feedback" description="How we use your suggestions and bug reports">
