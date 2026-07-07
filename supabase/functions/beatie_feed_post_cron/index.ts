@@ -97,12 +97,20 @@ Deno.serve(async (req: Request) => {
     const botId = (Deno.env.get("BEATIE_FEED_BOT_USER_ID") ?? "").trim();
 
     if (!supabaseUrl || !serviceKey) {
+      console.error("[beatie_feed_post_cron] server_misconfigured");
       return jsonResponse(500, { success: false, error: "server_misconfigured" });
     }
     if (!authorizeCron(req, serviceKey)) {
+      const authHeader = (req.headers.get("Authorization") ?? "").trim();
+      const apikeyHeader = (req.headers.get("apikey") ?? "").trim();
+      const cronSecretEnv = (Deno.env.get("BEATIE_FEED_POST_CRON_SECRET") ?? "").trim();
+      console.warn(
+        `[beatie_feed_post_cron] unauthorized (auth_len=${authHeader.length} apikey_len=${apikeyHeader.length} cron_secret_configured=${cronSecretEnv.length >= 16})`,
+      );
       return jsonResponse(401, { success: false, error: "unauthorized" });
     }
     if (!botId || !UUID_RE.test(botId)) {
+      console.error("[beatie_feed_post_cron] beatie_bot_not_configured");
       return jsonResponse(500, {
         success: false,
         error: "beatie_bot_not_configured",
@@ -113,6 +121,8 @@ Deno.serve(async (req: Request) => {
     const admin = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
+
+    console.log("[beatie_feed_post_cron] authorized; checking recent posts");
 
     const maxPerDay = Number.parseInt(Deno.env.get("BEATIE_FEED_POST_CRON_MAX_PER_DAY") ?? "1", 10);
     const maxSafe = Number.isFinite(maxPerDay) && maxPerDay > 0 ? maxPerDay : 1;

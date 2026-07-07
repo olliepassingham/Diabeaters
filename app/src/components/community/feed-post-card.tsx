@@ -56,6 +56,8 @@ import { FieldLabelWithInfo } from "@/components/ui/field-label-with-info";
 import { useToast } from "@/hooks/use-toast";
 import { getProfileIdByPublicHandle, getProfilesByIds, normalizePublicHandleInput } from "@/lib/profile";
 import { cn } from "@/lib/utils";
+import { BEATIE_FEED_AVATAR_FALLBACK_SRC } from "@/lib/ai-feed-reply/config";
+import { AI_ASSISTANT_NAME } from "@/lib/ai-coach/persona";
 import { type FeedAuthorMeta } from "@/lib/community/feed-author-meta";
 import {
   communityTopicLabel,
@@ -217,6 +219,8 @@ export function FeedPostCard({
   const [interestedTruncated, setInterestedTruncated] = useState(false);
 
   const isBeatiePost = Boolean(beatieFeedBotUserId && post.author_id === beatieFeedBotUserId);
+  const showBeatieAvatar =
+    isBeatiePost || authorDisplayName.trim() === AI_ASSISTANT_NAME;
 
   const previewLink = useMemo(() => getFirstWhitelistedFeedLink(post.body), [post.body]);
 
@@ -543,6 +547,7 @@ export function FeedPostCard({
           profileHref={`/community/profile/${post.author_id}`}
           size="sm"
           className="!h-9 !w-9 ring-1 ring-border/30"
+          fallbackSrc={showBeatieAvatar ? BEATIE_FEED_AVATAR_FALLBACK_SRC : undefined}
         />
         <div className="min-w-0 flex-1">
           {authorLoading ? (
