@@ -1,7 +1,9 @@
 import { useId, useMemo } from "react";
 import { chartYDomain, type CgmChartPoint } from "@/lib/cgm/cgm-chart";
+import { CGM_CHART_OVERLAY_COLORS, type CgmChartOverlay } from "@/lib/cgm/cgm-chart-overlays";
 import type { BgUnits } from "@/lib/cgm/types";
 import { formatTargetBgInput } from "@/lib/hypo-context";
+import { computeGlucoseRangeStatus, glucoseRangeChartStroke, type GlucoseRangeStatus } from "@/lib/live-glucose-range";
 import { cn } from "@/lib/utils";
 
 type CgmGlucoseChartProps = {
@@ -9,6 +11,7 @@ type CgmGlucoseChartProps = {
   units: BgUnits;
   targetLow?: number;
   targetHigh?: number;
+  overlays?: CgmChartOverlay[];
   className?: string;
 };
 
@@ -27,7 +30,14 @@ function scaleY(value: number, min: number, max: number, innerHeight: number): n
   return PAD.top + innerHeight * (1 - ratio);
 }
 
-export function CgmGlucoseChart({ points, units, targetLow, targetHigh, className }: CgmGlucoseChartProps) {
+function scaleXByTime(timeMs: number, startMs: number, endMs: number, innerWidth: number): number {
+  if (endMs <= startMs) return PAD.left + innerWidth / 2;
+  const ratio = (timeMs - startMs) / (endMs - startMs);
+  const clamped = Math.max(0, Math.min(1, ratio));
+  return PAD.left + clamped * innerWidth;
+}
+
+export function CgmGlucoseChart({ points, units, targetLow, targetHigh, overlays = [], className }: CgmGlucoseChartProps) {
   const gradientId = useId().replace(/:/g, "");
   const [yMin, yMax] = useMemo(() => chartYDomain(points, units), [points, units]);
   const innerWidth = WIDTH - PAD.left - PAD.right;
@@ -56,6 +66,17 @@ export function CgmGlucoseChart({ points, units, targetLow, targetHigh, classNam
   }, [points]);
 
   const refLines = [targetLow, targetHigh].filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+  const hasTargetBand =
+    typeof targetLow === "number" && typeof targetHigh === "number" && targetHigh > targetLow;
+
+  const pointStatuses = useMemo(() => {
+    if (!hasTargetBand) return points.map(() => "in_range" as GlucoseRangeStatus);
+    return points.map((p) => computeGlucoseRangeStatus(p.value, targetLow!, targetHigh!));
+  }, [points, hasTargetBand, targetLow, targetHigh]);
+
+  const latestStatus = pointStatuses[pointStatuses.length - 1] ?? "in_range";
+  const chartStartMs = points[0]?.timeMs ?? 0;
+  const chartEndMs = points[points.length - 1]?.timeMs ?? chartStartMs;
 
   return (
     <div className={cn("w-full", className)} data-testid="cgm-glucose-chart">
@@ -71,6 +92,37 @@ export function CgmGlucoseChart({ points, units, targetLow, targetHigh, classNam
             <stop offset="100%" stopColor="hsl(var(--chart-2))" stopOpacity="0.02" />
           </linearGradient>
         </defs>
+
+        {overlays.map((overlay) => {
+          const x1 = scaleXByTime(overlay.startMs, chartStartMs, chartEndMs, innerWidth);
+          const x2 = scaleXByTime(overlay.endMs, chartStartMs, chartEndMs, innerWidth);
+          const width = Math.max(2, x2 - x1);
+          const colors = CGM_CHART_OVERLAY_COLORS[overlay.kind];
+          return (
+            <rect
+              key={overlay.id}
+              x={x1}
+              y={PAD.top}
+              width={width}
+              height={innerHeight}
+              fill={colors.fill}
+              fillOpacity={colors.opacity}
+              data-overlay-kind={overlay.kind}
+            />
+          );
+        })}
+
+        {hasTargetBand ? (
+          <rect
+            x={PAD.left}
+            y={scaleY(targetHigh!, yMin, yMax, innerHeight)}
+            width={innerWidth}
+            height={Math.max(0, scaleY(targetLow!, yMin, yMax, innerHeight) - scaleY(targetHigh!, yMin, yMax, innerHeight))}
+            fill="#10b981"
+            fillOpacity={0.12}
+            rx={2}
+          />
+        ) : null}
 
         {yTicks.map((tick) => {
           const y = scaleY(tick, yMin, yMax, innerHeight);
@@ -99,8 +151,9 @@ export function CgmGlucoseChart({ points, units, targetLow, targetHigh, classNam
             y1={scaleY(value, yMin, yMax, innerHeight)}
             x2={WIDTH - PAD.right}
             y2={scaleY(value, yMin, yMax, innerHeight)}
-            stroke="currentColor"
-            strokeOpacity={0.35}
+            stroke="#10b981"
+            strokeOpacity={0.55}
+            strokeWidth={1.25}
             strokeDasharray="6 4"
           />
         ))}
@@ -116,21 +169,29 @@ export function CgmGlucoseChart({ points, units, targetLow, targetHigh, classNam
         <path
           d={linePath}
           fill="none"
-          stroke="hsl(var(--chart-2))"
+          stroke={hasTargetBand ? glucoseRangeChartStroke(latestStatus) : "hsl(var(--chart-2))"}
           strokeWidth={2.5}
           strokeLinejoin="round"
           strokeLinecap="round"
+          strokeOpacity={0.85}
         />
 
-        {points.map((p, i) => (
-          <circle
-            key={`${p.recordedAt}-${i}`}
-            cx={scaleX(i, points.length, innerWidth)}
-            cy={scaleY(p.value, yMin, yMax, innerHeight)}
-            r={points.length > 40 ? 0 : 2.5}
-            fill="hsl(var(--chart-2))"
-          />
-        ))}
+        {points.map((p, i) => {
+          const status = pointStatuses[i] ?? "in_range";
+          const isLatest = i === points.length - 1;
+          const r = isLatest ? 5 : points.length > 40 ? 0 : 2.5;
+          return (
+            <circle
+              key={`${p.recordedAt}-${i}`}
+              cx={scaleX(i, points.length, innerWidth)}
+              cy={scaleY(p.value, yMin, yMax, innerHeight)}
+              r={r}
+              fill={hasTargetBand ? glucoseRangeChartStroke(status) : "hsl(var(--chart-2))"}
+              stroke={isLatest ? "hsl(var(--background))" : "none"}
+              strokeWidth={isLatest ? 2 : 0}
+            />
+          );
+        })}
 
         {xLabelIndices.map((i) => {
           const p = points[i];

@@ -1689,6 +1689,13 @@ export default function Settings() {
     });
   };
 
+  const handleExerciseCgmAlertThreshold = (threshold: number) => {
+    const updated = { ...notifSettings, exerciseCgmAlertThreshold: threshold };
+    setNotifSettings(updated);
+    storage.saveNotificationSettings(updated);
+    void syncNotificationPreferences(updated);
+  };
+
   const handleNotifThreshold = (key: "criticalThresholdDays" | "lowThresholdDays", value: string) => {
     const numValue = parseInt(value) || 0;
     const updated = { ...notifSettings, [key]: numValue };
@@ -2175,6 +2182,7 @@ export default function Settings() {
         onToggle={handleNotifToggle}
         onThreshold={handleNotifThreshold}
         onBedtimeReminderTimeChange={handleBedtimeReminderTime}
+        onExerciseCgmAlertThresholdChange={handleExerciseCgmAlertThreshold}
         supporterMode={inSupporterSession}
         showBedtimeCheckReminders={showBedtimeCheckReminders}
       />

@@ -26,6 +26,7 @@ vi.mock("@/hooks/use-cgm-history", () => ({
     loading: false,
     error: null,
     connected: true,
+    sourceLabel: "Dexcom Share",
     refresh: vi.fn(),
   }),
 }));
@@ -52,5 +53,6 @@ describe("CgmLivePage", () => {
     );
     expect(screen.getByTestId("cgm-live-page")).toBeTruthy();
     expect(screen.getByTestId("cgm-glucose-chart")).toBeTruthy();
+    expect(screen.getByTestId("cgm-live-range-status").textContent).toMatch(/Above target/i);
   });
 });

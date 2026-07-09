@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { KeyboardInsets } from "@/components/keyboard-insets";
 import { AlcoholReminderPoller } from "@/components/alcohol-reminder-poller";
 import { PumpFailureReminderPoller } from "@/components/pump-failure-reminder-poller";
+import { ExerciseCgmAlertPoller } from "@/components/exercise-cgm-alert-poller";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -1126,6 +1127,7 @@ function UnverifiedAccountShell({
       {!suppressClinicalPollers ? <SickDayMedDuePoller /> : null}
       {!suppressClinicalPollers ? <AlcoholReminderPoller /> : null}
       {!suppressClinicalPollers ? <PumpFailureReminderPoller /> : null}
+      {!suppressClinicalPollers ? <ExerciseCgmAlertPoller /> : null}
       <AppShellBackdrop tone="rich" />
       <AppTopBar
         isCarer={isCarerMode}
@@ -1384,6 +1386,7 @@ function AuthenticatedShell() {
         ) : null}
         {!suppressClinicalPollers ? <AlcoholReminderPoller /> : null}
         {!suppressClinicalPollers ? <PumpFailureReminderPoller /> : null}
+        {!suppressClinicalPollers ? <ExerciseCgmAlertPoller /> : null}
       </DeferredAfterFirstPaint>
       <AppShellBackdrop tone="rich" />
       <AppTopBar

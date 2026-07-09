@@ -1169,6 +1169,12 @@ export interface NotificationSettings {
   communityFeedAlerts?: boolean;
   /** Direct messages — in-app inbox; synced as dm_alerts. */
   communityDmAlerts?: boolean;
+  /** During an active exercise session, alert when live CGM crosses your low threshold. */
+  exerciseCgmAlerts?: boolean;
+  /** Alert when BG falls below this (profile BG units). Default 5.6 mmol/L · 100 mg/dL. */
+  exerciseCgmAlertThreshold?: number;
+  /** When true (default), also alert when BG is falling toward your threshold. */
+  exerciseCgmAlertTrendAware?: boolean;
 }
 
 export type AppointmentType = "clinic" | "eye_check" | "foot_check" | "blood_test" | "pump_review" | "other";
@@ -3767,6 +3773,8 @@ export const storage = {
       hypoDashboardQuickNotify: false,
       communityFeedAlerts: true,
       communityDmAlerts: true,
+      exerciseCgmAlerts: true,
+      exerciseCgmAlertTrendAware: true,
     };
     const data = localStorage.getItem(STORAGE_KEYS.NOTIFICATION_SETTINGS);
     if (!data) return defaults;
@@ -3789,6 +3797,14 @@ export const storage = {
         typeof parsed.bedtimeReminderTime === "string" && /^\d{1,2}:\d{2}$/.test(parsed.bedtimeReminderTime)
           ? parsed.bedtimeReminderTime
           : defaults.bedtimeReminderTime,
+      exerciseCgmAlerts: parsed.exerciseCgmAlerts !== false,
+      exerciseCgmAlertTrendAware: parsed.exerciseCgmAlertTrendAware !== false,
+      exerciseCgmAlertThreshold:
+        typeof parsed.exerciseCgmAlertThreshold === "number" &&
+        Number.isFinite(parsed.exerciseCgmAlertThreshold) &&
+        parsed.exerciseCgmAlertThreshold > 0
+          ? parsed.exerciseCgmAlertThreshold
+          : undefined,
     };
   },
 

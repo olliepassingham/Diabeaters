@@ -20,6 +20,9 @@ export function toCloudPrefs(settings: NotificationSettings): Record<string, unk
     scenario_alerts: settings.scenarioAlerts !== false,
     feed_alerts: settings.communityFeedAlerts !== false,
     dm_alerts: settings.communityDmAlerts !== false,
+    exercise_cgm_alerts: settings.exerciseCgmAlerts !== false,
+    exercise_cgm_alert_threshold: settings.exerciseCgmAlertThreshold ?? null,
+    exercise_cgm_alert_trend_aware: settings.exerciseCgmAlertTrendAware !== false,
   };
 }
 
