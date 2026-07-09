@@ -2,6 +2,8 @@
  * Environment flags. Safe feature-flag utility for banners, robots, and conditional UI.
  * Never expose secrets. Values come from VITE_APP_ENV at build time.
  */
+import { Capacitor } from "@capacitor/core";
+
 export const APP_ENV =
   (import.meta.env.VITE_APP_ENV as string)?.trim() ||
   (import.meta.env.PROD ? "production" : "development");
@@ -11,12 +13,22 @@ export const isProd = APP_ENV === "production";
 export const isDev = APP_ENV === "development";
 
 /**
- * Community (timeline + DMs). Production: set `VITE_FEATURE_COMMUNITY=true`.
- * Development: on unless `VITE_FEATURE_COMMUNITY=false`.
+ * Community (timeline + DMs).
+ * - Explicit `VITE_FEATURE_COMMUNITY=true|false` always wins.
+ * - Dev: on unless `false`.
+ * - Production web (Vercel): requires `true` at build time.
+ * - Production native (iOS/Android store bundles): on unless explicitly `false`
+ *   so a missing env var during `ios:release:sync` does not hide Feed.
  */
-export const isCommunityEnabled =
-  import.meta.env.VITE_FEATURE_COMMUNITY === "true" ||
-  (import.meta.env.DEV && import.meta.env.VITE_FEATURE_COMMUNITY !== "false");
+export function resolveCommunityEnabled(): boolean {
+  if (import.meta.env.VITE_FEATURE_COMMUNITY === "true") return true;
+  if (import.meta.env.VITE_FEATURE_COMMUNITY === "false") return false;
+  if (import.meta.env.DEV) return true;
+  if (import.meta.env.PROD && Capacitor.isNativePlatform?.()) return true;
+  return false;
+}
+
+export const isCommunityEnabled = resolveCommunityEnabled();
 
 /** DM threads count toward the home-screen badge only when Messages appears in the header. */
 export function includeDmThreadsInHomeScreenBadge(): boolean {
