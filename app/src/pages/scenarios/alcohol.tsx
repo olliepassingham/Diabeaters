@@ -58,10 +58,8 @@ import { getMealDoseRoundingGuide, type MealDoseResult } from "@/lib/meal-dose";
 import { cn } from "@/lib/utils";
 import { BgTrendThreeButtons } from "@/components/bg-trend-three-buttons";
 import { CgmPrefillButton } from "@/components/cgm-prefill-button";
-import { useBgPrefill } from "@/hooks/use-bg-prefill";
+import { useAutoCgmBgField } from "@/hooks/use-auto-cgm-bg-field";
 import { cgmTrendForAlcohol } from "@/lib/cgm/apply-cgm-trend";
-import { getCgmEmptyHint } from "@/lib/cgm/cgm-empty-hint";
-import { isCgmPrefillActive } from "@/lib/cgm/preferences";
 
 const FROM_SCENARIOS = "from=/scenarios";
 
@@ -754,8 +752,15 @@ export default function AlcoholScenarioPage() {
   }, []);
 
   const bgUnits = normalizeBgUnits(profile.bgUnits);
-  const { prefill: bgPrefill, loading: bgPrefillLoading, refresh: refreshBgPrefill } = useBgPrefill();
-  const cgmPrefillActive = isCgmPrefillActive();
+  const alcoholCgm = useAutoCgmBgField({
+    bgValue: bgInput,
+    onApplyBg: setBgInput,
+    onApplyTrend: (trend) => {
+      const mapped = cgmTrendForAlcohol(trend);
+      if (mapped) setBgTrend(mapped);
+    },
+    autoApplyKey: phase === "inputs" ? "alcohol" : undefined,
+  });
   const carbUnit: "grams" | "cp" = profile.carbUnits === "cp" ? "cp" : "grams";
 
   const stepIndex = phase === "situation" ? 0 : phase === "inputs" ? 1 : 2;
@@ -1109,22 +1114,23 @@ export default function AlcoholScenarioPage() {
                         inputMode="decimal"
                         placeholder={bgUnits === "mmol/L" ? "e.g. 5.6" : "e.g. 100"}
                         value={bgInput}
-                        onChange={(e) => setBgInput(e.target.value)}
+                        onChange={(e) => alcoholCgm.onBgChange(e.target.value)}
                         autoComplete="off"
                         data-testid="input-alcohol-bg"
                       />
                       <CgmPrefillButton
-                        prefill={bgPrefill}
-                        loading={bgPrefillLoading}
+                        prefill={alcoholCgm.prefill}
+                        loading={alcoholCgm.loading}
                         bgUnits={bgUnits}
                         currentValue={bgInput}
-                        onApply={setBgInput}
+                        onApply={alcoholCgm.onBgChange}
                         onApplyTrend={(trend) => {
                           const mapped = cgmTrendForAlcohol(trend);
                           if (mapped) setBgTrend(mapped);
                         }}
-                        onRefresh={refreshBgPrefill}
-                        emptyHint={cgmPrefillActive ? getCgmEmptyHint() : undefined}
+                        onRefresh={alcoholCgm.refresh}
+                        emptyHint={alcoholCgm.emptyHint}
+                        allowSync
                         testId="button-alcohol-cgm-prefill"
                       />
                     </div>

@@ -28,10 +28,8 @@ import { BedtimeLastNightCard } from "@/components/scenarios/bedtime-last-night-
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
 import { calculateBedtimeCorrectionDose, type BedtimeCorrectionSuggestion } from "@/lib/bedtime-correction-dose";
 import { CgmPrefillButton } from "@/components/cgm-prefill-button";
-import { useBgPrefill } from "@/hooks/use-bg-prefill";
+import { useAutoCgmBgField } from "@/hooks/use-auto-cgm-bg-field";
 import { cgmTrendForBedtime } from "@/lib/cgm/apply-cgm-trend";
-import { getCgmEmptyHint } from "@/lib/cgm/cgm-empty-hint";
-import { isCgmPrefillActive } from "@/lib/cgm/preferences";
 import { useBedtimeLastNight } from "@/hooks/use-bedtime-last-night";
 import { resolveUserTargetBgRange } from "@/lib/target-bg-range";
 import { upsertScenario } from "@/lib/scenarios-supabase";
@@ -142,8 +140,15 @@ export default function Bedtime() {
   const [currentBg, setCurrentBg] = useState("");
   const [bgUnits, setBgUnits] = useState<"mmol/L" | "mg/dL">("mmol/L");
   const [bgTrend, setBgTrend] = useState<BedtimeBgTrend>("not_sure");
-  const { prefill: bgPrefill, loading: bgPrefillLoading, refresh: refreshBgPrefill } = useBgPrefill();
-  const cgmPrefillActive = isCgmPrefillActive();
+  const bedtimeCgm = useAutoCgmBgField({
+    bgValue: currentBg,
+    onApplyBg: setCurrentBg,
+    onApplyTrend: (trend) => {
+      const mapped = cgmTrendForBedtime(trend);
+      if (mapped) setBgTrend(mapped);
+    },
+    autoApplyKey: "bedtime",
+  });
   const [hoursSinceFood, setHoursSinceFood] = useState("");
   const [mealCarbs, setMealCarbs] = useState("");
   const [hoursSinceInsulin, setHoursSinceInsulin] = useState("");
@@ -907,7 +912,7 @@ export default function Bedtime() {
                       step="0.1"
                       placeholder={bgUnits === "mmol/L" ? "e.g. 7.2" : "e.g. 130"}
                       value={currentBg}
-                      onChange={(e) => setCurrentBg(e.target.value)}
+                      onChange={(e) => bedtimeCgm.onBgChange(e.target.value)}
                       className="h-10 flex-1 text-base"
                       data-testid="input-bedtime-bg"
                     />
@@ -916,17 +921,18 @@ export default function Bedtime() {
                     </span>
                   </div>
                   <CgmPrefillButton
-                    prefill={bgPrefill}
-                    loading={bgPrefillLoading}
+                    prefill={bedtimeCgm.prefill}
+                    loading={bedtimeCgm.loading}
                     bgUnits={bgUnits}
                     currentValue={currentBg}
-                    onApply={setCurrentBg}
+                    onApply={bedtimeCgm.onBgChange}
                     onApplyTrend={(trend) => {
                       const mapped = cgmTrendForBedtime(trend);
                       if (mapped) setBgTrend(mapped);
                     }}
-                    onRefresh={refreshBgPrefill}
-                    emptyHint={cgmPrefillActive ? getCgmEmptyHint() : undefined}
+                    onRefresh={bedtimeCgm.refresh}
+                    emptyHint={bedtimeCgm.emptyHint}
+                    allowSync
                     testId="button-bedtime-cgm-prefill"
                   />
                   <div className="space-y-1">

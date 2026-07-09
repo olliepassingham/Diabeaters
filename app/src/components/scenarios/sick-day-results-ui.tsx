@@ -11,6 +11,8 @@ import { Disclaimer } from "@/components/disclaimer";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
+import { CgmPrefillButton } from "@/components/cgm-prefill-button";
+import type { BgPrefillResult } from "@/lib/cgm/prefill";
 import { cn } from "@/lib/utils";
 
 export type KetoneLevel = "none" | "trace" | "small" | "moderate" | "large";
@@ -84,6 +86,13 @@ function formatKetone(level: KetoneLevel | "") {
   return level.charAt(0).toUpperCase() + level.slice(1);
 }
 
+export type SickDayCgmBgFieldProps = {
+  prefill: BgPrefillResult | null;
+  loading: boolean;
+  onRefresh: () => void;
+  emptyHint?: string;
+};
+
 export type SickDayReadingsFieldsProps = {
   severity: string;
   onSeverityChange: (v: string) => void;
@@ -93,6 +102,7 @@ export type SickDayReadingsFieldsProps = {
   onKetoneLevelChange: (v: KetoneLevel) => void;
   bgUnits: string;
   idPrefix?: string;
+  cgm?: SickDayCgmBgFieldProps;
 };
 
 export function SickDayReadingsFields({
@@ -104,6 +114,7 @@ export function SickDayReadingsFields({
   onKetoneLevelChange,
   bgUnits,
   idPrefix = "sickday",
+  cgm,
 }: SickDayReadingsFieldsProps) {
   const severityId = `${idPrefix}-severity`;
   const bgId = `${idPrefix}-bg`;
@@ -139,6 +150,19 @@ export function SickDayReadingsFields({
             onChange={(e) => onBgLevelChange(e.target.value)}
             data-testid="input-bg-level"
           />
+          {cgm ? (
+            <CgmPrefillButton
+              prefill={cgm.prefill}
+              loading={cgm.loading}
+              bgUnits={bgUnits}
+              currentValue={bgLevel}
+              onApply={onBgLevelChange}
+              onRefresh={cgm.onRefresh}
+              emptyHint={cgm.emptyHint}
+              allowSync
+              testId={`${idPrefix}-cgm-prefill`}
+            />
+          ) : null}
         </div>
         <div className="space-y-2">
           <Label htmlFor={ketoneId} className="flex items-center gap-1 text-sm font-medium">
@@ -215,6 +239,7 @@ type SickDayUpdateReadingsCollapsibleProps = {
   bgUnits: string;
   onCalculate: () => void;
   idPrefix?: "standalone" | "active";
+  cgm?: SickDayCgmBgFieldProps;
 };
 
 export function SickDayUpdateReadingsCollapsible({
@@ -229,6 +254,7 @@ export function SickDayUpdateReadingsCollapsible({
   bgUnits,
   onCalculate,
   idPrefix = "standalone",
+  cgm,
 }: SickDayUpdateReadingsCollapsibleProps) {
   const summary =
     bgLevel && ketoneLevel && severity
@@ -266,6 +292,7 @@ export function SickDayUpdateReadingsCollapsible({
               onKetoneLevelChange={onKetoneLevelChange}
               bgUnits={bgUnits}
               idPrefix={idPrefix === "active" ? "update-active" : "update"}
+              cgm={cgm}
             />
             <Button
               type="button"

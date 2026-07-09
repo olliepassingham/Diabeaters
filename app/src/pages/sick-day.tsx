@@ -45,7 +45,10 @@ import {
   SickDayReadingsFields,
   SickDayTddField,
   scrollToSickDayPageTop,
+  type SickDayCgmBgFieldProps,
 } from "@/components/scenarios/sick-day-results-ui";
+import { CgmPrefillButton } from "@/components/cgm-prefill-button";
+import { useAutoCgmBgField } from "@/hooks/use-auto-cgm-bg-field";
 import { cancelSickDayMedReminder, scheduleSickDayMedReminder } from "@/lib/sick-day-med-reminders";
 import { createSickDayMedInAppNotification } from "@/lib/sick-day-med-inapp";
 import {
@@ -477,6 +480,26 @@ export default function SickDay() {
     return "now";
   });
   const [nowTick, setNowTick] = useState(() => Date.now());
+  const [pageHydrated, setPageHydrated] = useState(false);
+
+  const readingsCgm = useAutoCgmBgField({
+    bgValue: bgLevel,
+    onApplyBg: setBgLevel,
+    autoApplyKey: pageHydrated ? "sickday-readings" : undefined,
+  });
+
+  const journalCgm = useAutoCgmBgField({
+    bgValue: journalBg,
+    onApplyBg: setJournalBg,
+    autoApplyKey: pageHydrated && activeModeTab === "log" ? "sickday-journal" : undefined,
+  });
+
+  const sickDayCgmProps: SickDayCgmBgFieldProps = {
+    prefill: readingsCgm.prefill,
+    loading: readingsCgm.loading,
+    onRefresh: readingsCgm.refresh,
+    emptyHint: readingsCgm.emptyHint,
+  };
 
   useEffect(() => {
     if (storage.getScenarioState().sickDayActive) {
@@ -545,6 +568,7 @@ export default function SickDay() {
     } else {
       localStorage.removeItem(SICK_DAY_STORAGE_KEY);
     }
+    setPageHydrated(true);
   }, []);
 
   useEffect(() => {
@@ -1982,12 +2006,13 @@ export default function SickDay() {
               severity={severity}
               onSeverityChange={setSeverity}
               bgLevel={bgLevel}
-              onBgLevelChange={setBgLevel}
+              onBgLevelChange={readingsCgm.onBgChange}
               ketoneLevel={ketoneLevel}
               onKetoneLevelChange={setKetoneLevel}
               bgUnits={bgUnits}
               onCalculate={handleCalculate}
               idPrefix="active"
+              cgm={sickDayCgmProps}
             />
 
             {/* Sick Day Journal Summary */}
@@ -2080,9 +2105,20 @@ export default function SickDay() {
                         type="number"
                         placeholder={bgUnits === "mmol/L" ? "e.g., 12.5" : "e.g., 225"}
                         value={journalBg}
-                        onChange={(e) => setJournalBg(e.target.value)}
+                        onChange={(e) => journalCgm.onBgChange(e.target.value)}
                         className="h-11"
                         data-testid="input-journal-bg"
+                      />
+                      <CgmPrefillButton
+                        prefill={journalCgm.prefill}
+                        loading={journalCgm.loading}
+                        bgUnits={bgUnits}
+                        currentValue={journalBg}
+                        onApply={journalCgm.onBgChange}
+                        onRefresh={journalCgm.refresh}
+                        emptyHint={journalCgm.emptyHint}
+                        allowSync
+                        testId="button-sickday-journal-cgm-prefill"
                       />
                     </div>
                     <div className="space-y-2">
@@ -2503,10 +2539,11 @@ export default function SickDay() {
                 severity={severity}
                 onSeverityChange={setSeverity}
                 bgLevel={bgLevel}
-                onBgLevelChange={setBgLevel}
+                onBgLevelChange={readingsCgm.onBgChange}
                 ketoneLevel={ketoneLevel}
                 onKetoneLevelChange={setKetoneLevel}
                 bgUnits={bgUnits}
+                cgm={sickDayCgmProps}
               />
               <SickDayTddField tdd={tdd} hasTdd={hasConfiguredTdd(settings)} />
               <Button
@@ -2577,12 +2614,13 @@ export default function SickDay() {
             severity={severity}
             onSeverityChange={setSeverity}
             bgLevel={bgLevel}
-            onBgLevelChange={setBgLevel}
+            onBgLevelChange={readingsCgm.onBgChange}
             ketoneLevel={ketoneLevel}
             onKetoneLevelChange={setKetoneLevel}
             bgUnits={bgUnits}
             onCalculate={handleCalculate}
             idPrefix="standalone"
+            cgm={sickDayCgmProps}
           />
 
           <SickDayDisclaimerFooter />

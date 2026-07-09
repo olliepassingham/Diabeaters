@@ -17,11 +17,9 @@ import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { canShowDrivingReadiness } from "@/lib/user-age";
 import { normalizeBgUnits } from "@/lib/alcohol-night-tool";
 import { formatDrivingTargetRange, getRecentHypoForDriving } from "@/lib/driving-prefill";
-import { useBgPrefill } from "@/hooks/use-bg-prefill";
+import { useAutoCgmBgField } from "@/hooks/use-auto-cgm-bg-field";
 import { CgmPrefillButton } from "@/components/cgm-prefill-button";
 import { cgmTrendForDriving } from "@/lib/cgm/apply-cgm-trend";
-import { getCgmEmptyHint } from "@/lib/cgm/cgm-empty-hint";
-import { isCgmPrefillActive } from "@/lib/cgm/preferences";
 import {
   buildDrivingReadinessOutcome,
   type DrivingReadinessOutcome,
@@ -127,8 +125,15 @@ export default function DrivingScenarioPage() {
   const isPumpUser = isPumpDeliveryMethod(profile?.insulinDeliveryMethod);
   const targetRangeLine = formatDrivingTargetRange(settings, bgUnits);
   const recentHypoLogged = getRecentHypoForDriving(4);
-  const { prefill: bgPrefill, loading: bgPrefillLoading, refresh: refreshBgPrefill } = useBgPrefill();
-  const cgmPrefillActive = isCgmPrefillActive();
+  const drivingCgm = useAutoCgmBgField({
+    bgValue: bgInput,
+    onApplyBg: setBgInput,
+    onApplyTrend: (trend) => {
+      const mapped = cgmTrendForDriving(trend);
+      if (mapped) setBgTrend(mapped);
+    },
+    autoApplyKey: phase === "form" ? "driving" : undefined,
+  });
 
   const progressPct = phase === "form" ? ((wizardStep + 1) / FORM_WIZARD_STEPS) * 100 : 100;
 
@@ -350,23 +355,24 @@ export default function DrivingScenarioPage() {
                         inputMode="decimal"
                         placeholder={bgUnits === "mmol/L" ? "e.g. 5.6" : "e.g. 100"}
                         value={bgInput}
-                        onChange={(e) => setBgInput(e.target.value)}
+                        onChange={(e) => drivingCgm.onBgChange(e.target.value)}
                         autoComplete="off"
                         data-testid="input-driving-bg"
                       />
                     </div>
                     <CgmPrefillButton
-                      prefill={bgPrefill}
-                      loading={bgPrefillLoading}
+                      prefill={drivingCgm.prefill}
+                      loading={drivingCgm.loading}
                       bgUnits={bgUnits}
                       currentValue={bgInput}
-                      onApply={setBgInput}
+                      onApply={drivingCgm.onBgChange}
                       onApplyTrend={(trend) => {
                         const mapped = cgmTrendForDriving(trend);
                         if (mapped) setBgTrend(mapped);
                       }}
-                      onRefresh={refreshBgPrefill}
-                      emptyHint={cgmPrefillActive ? getCgmEmptyHint() : undefined}
+                      onRefresh={drivingCgm.refresh}
+                      emptyHint={drivingCgm.emptyHint}
+                      allowSync
                       testId="button-driving-use-prefill"
                     />
                     <BgTrendThreeButtons
