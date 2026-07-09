@@ -1,7 +1,7 @@
 # Minimal Supabase CLI config. Run migrations and deploy functions from repo root:
 #   supabase link
 #   supabase db push
-#   supabase functions deploy notify_carers_on_hypo --no-verify-jwt
+#   supabase functions deploy notify_carers_on_live_glucose --no-verify-jwt
 #   supabase functions deploy notify_scenario_started --no-verify-jwt
 #   supabase functions deploy notify_supply_low --no-verify-jwt
 #   supabase functions deploy notify_supply_low_cron --no-verify-jwt
@@ -21,6 +21,9 @@ project_id = "ffgcivxvbtdlmfnttwjm"
 enabled = true
 
 [functions.notify_carers_on_hypo]
+verify_jwt = false
+
+[functions.notify_carers_on_live_glucose]
 verify_jwt = false
 
 [functions.notify_scenario_started]

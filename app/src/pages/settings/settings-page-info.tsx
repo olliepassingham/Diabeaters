@@ -131,30 +131,40 @@ export function SettingsAboutInfoDialog() {
 
 export function SettingsCgmInfoDialog() {
   return (
-    <PageInfoDialog title="About CGM prefill" description="Optional blood glucose suggestions from your phone health app">
-      <InfoSection title="How it works">
+    <PageInfoDialog
+      title="About CGM prefill"
+      description="Optional blood glucose suggestions from near-live bridges or your phone health app"
+    >
+      <InfoSection title="Near-live (recommended)">
         <p>
-          Diabeaters reads the latest blood glucose sample your CGM app has shared with Apple Health or Health Connect.
-          When you open a tool like Driving or Exercise, you can tap to fill in a recent value — you can always edit or
-          ignore it.
+          <strong>Dexcom Share</strong> or <strong>LibreLink Up</strong> give the freshest readings, trend arrows,
+          glucose trend charts, bedtime overnight review, and live BG for linked supporters. Logins stay on this device
+          only — they are never uploaded to Diabeaters.
         </p>
       </InfoSection>
-      <InfoSection title="Setup">
+      <InfoSection title="Apple Health / Health Connect (fallback)">
         <p>
-          In your Dexcom or Libre app, enable sharing blood glucose to Apple Health (or Health Connect on Android). Then
-          turn on prefill here and tap Connect to grant read permission.
+          Reads the latest blood glucose sample your CGM app has already shared with Apple Health (iPhone) or Health
+          Connect (Android). No extra login in Diabeaters — only an OS permission. Readings are often delayed (Dexcom
+          may write to Apple Health about three hours late). Use this if you prefer not to connect Share/LibreLink Up,
+          or only sync via your CGM app to the health store.
+        </p>
+      </InfoSection>
+      <InfoSection title="How prefill works">
+        <p>
+          When you open a tool like Driving or Exercise, you can tap to apply a recent value — you can always edit or
+          ignore it. If more than one source is enabled, Diabeaters uses whichever reading is freshest.
         </p>
       </InfoSection>
       <InfoSection title="Delays & freshness">
         <p>
-          Prefilled values may be delayed — Dexcom often writes to Apple Health about three hours late. Diabeaters shows
-          how old each reading is. Readings over three hours old are not offered.
+          Diabeaters shows how old each reading is. Readings over three hours old are not offered for automatic prefill.
         </p>
       </InfoSection>
-      <InfoSection title="Privacy (v1)">
+      <InfoSection title="Privacy">
         <p>
-          CGM streams are never uploaded to Diabeaters servers. Readings are fetched on your phone when you open a tool
-          or tap prefill, used locally, and not stored in Supabase.
+          CGM history is not uploaded. Share/Libre credentials stay on your phone. When you allow Live glucose for a
+          supporter, only the latest snapshot (value, trend, time) may sync — not charts or logins.
         </p>
       </InfoSection>
       <InfoSection title="Safety">

@@ -23,7 +23,7 @@
     "cap:sync": "npx cap sync",
     "cap:ios": "npx cap open ios",
     "cap:android": "npx cap open android",
-    "ios:release:sync": "npm run web:build && npx cap sync ios && node scripts/verify-ios-bundled-config.mjs && node scripts/verify-ios-healthkit.mjs",
+    "ios:release:sync": "npm run web:build && npx cap sync ios && node scripts/patch-ios-local-plugins.mjs && node scripts/verify-ios-bundled-config.mjs && node scripts/verify-ios-healthkit.mjs && node scripts/verify-ios-bg-prefill-bundle.mjs && node scripts/verify-ios-bedtime-overnight-bundle.mjs",
     "ios:release:sync:internal": "npm run web:build:internal && npx cap sync ios",
     "ios:release:sync:remote": "CAPACITOR_SERVER_URL=https://diabeaters.vercel.app npm run ios:release:sync",
     "android:release:sync": "npm run web:build && npx cap sync android",

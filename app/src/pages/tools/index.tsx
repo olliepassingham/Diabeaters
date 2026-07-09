@@ -16,6 +16,7 @@ import {
   ScrollText,
   Sparkles,
   Users,
+  Activity,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -37,6 +38,7 @@ import { RatiosSetupNotice } from "@/components/ratios-setup-notice";
 import { useOffline } from "@/hooks/use-offline";
 import { filterOfflineCloudTools } from "@/lib/offline-app-gate";
 import { OfflineDeviceNotice } from "@/components/offline-device-notice";
+import { hasLiveCgmCredentials, readCgmPreferences } from "@/lib/cgm/preferences";
 
 function tileEnterDelay(index: number, stepMs = 12, capMs = 72): string {
   return `${Math.min(index * stepMs, capMs)}ms`;
@@ -137,7 +139,17 @@ function patientToolsForHub(): ToolDef[] {
           `${AI_ASSISTANT_NAME} is an educational guide for type 1 diabetes in the UK. Not medical advice.`,
       }
     : undefined;
-  return coach ? [coach, ...PATIENT_TOOLS] : [...PATIENT_TOOLS];
+  const cgmLive: ToolDef | undefined = hasLiveCgmCredentials(readCgmPreferences())
+    ? {
+        id: "cgm-live",
+        href: "/tools/cgm-live",
+        icon: Activity,
+        title: "Glucose trends",
+        description: "Near-live CGM chart — 3h, 12h, and 24h on this device only.",
+      }
+    : undefined;
+  const tools = coach ? [coach, ...PATIENT_TOOLS] : [...PATIENT_TOOLS];
+  return cgmLive ? [cgmLive, ...tools] : tools;
 }
 
 export const CARER_TOOLS: ToolDef[] = [

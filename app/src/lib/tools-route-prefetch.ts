@@ -24,6 +24,10 @@ export function prefetchToolsDestinationHref(href: string): void {
     void import("@/pages/tools/correction-help");
     return;
   }
+  if (path === "/tools/cgm-live") {
+    void import("@/pages/tools/cgm-live");
+    return;
+  }
   if (path === "/tools/tips") {
     void import("@/pages/tools/tips");
     return;

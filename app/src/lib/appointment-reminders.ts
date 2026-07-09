@@ -1,4 +1,3 @@
-import { Capacitor } from "@capacitor/core";
 import { LocalNotifications } from "@capacitor/local-notifications";
 
 import {
@@ -10,7 +9,7 @@ import {
   type AppointmentReminderKind,
 } from "@/lib/appointment-reminder-schedule";
 import { ensureNativeLocalNotificationPermission } from "@/lib/native-local-notifications";
-import { supportsNativeLocalNotifications } from "@/lib/native-platform";
+import { androidNotificationChannel, supportsNativeLocalNotifications } from "@/lib/native-platform";
 import type { Appointment } from "@/lib/storage";
 import { storage } from "@/lib/storage";
 
@@ -24,7 +23,7 @@ type ScheduledNotification = {
 };
 
 function androidChannel(): { channelId?: string } {
-  return Capacitor.getPlatform() === "android" ? { channelId: "diabeaters_appointments" } : {};
+  return androidNotificationChannel("diabeaters_appointments");
 }
 
 function buildReminder(

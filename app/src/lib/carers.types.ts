@@ -4,6 +4,8 @@ export type CarerScopes = {
   appointments: boolean;
   scenarios: boolean;
   hypo_alerts: boolean;
+  /** When true, supporter may see the patient's latest near-live CGM reading in the status strip. */
+  live_glucose: boolean;
   emergency_info: boolean;
   /** When true, supporter may view/update cloud clinical basics on the patient's profile (delivery, TDD, DOB). */
   clinical_settings: boolean;
@@ -16,6 +18,7 @@ export const DEFAULT_CARER_SCOPES: CarerScopes = {
   appointments: true,
   scenarios: true,
   hypo_alerts: true,
+  live_glucose: true,
   emergency_info: true,
   clinical_settings: false,
   public_profile_mention: false,
@@ -76,4 +79,17 @@ export type CloudHypoLogRow = {
   treatment: string | null;
   notes: string | null;
   created_at: string;
+};
+
+export type CloudPatientLiveGlucoseRow = {
+  user_id: string;
+  value: number;
+  units: "mmol/L" | "mg/dL";
+  trend: "rising" | "falling" | "flat" | null;
+  source_label: string;
+  recorded_at: string;
+  updated_at: string;
+  target_low: number | null;
+  target_high: number | null;
+  range_status: "low" | "in_range" | "high" | null;
 };

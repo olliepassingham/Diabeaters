@@ -1,8 +1,7 @@
-import { Capacitor } from "@capacitor/core";
 import { LocalNotifications } from "@capacitor/local-notifications";
 
 import { ensureNativeLocalNotificationPermission } from "@/lib/native-local-notifications";
-import { supportsNativeLocalNotifications } from "@/lib/native-platform";
+import { androidNotificationChannel, supportsNativeLocalNotifications } from "@/lib/native-platform";
 import { storage, type AlcoholReminder, type AlcoholReminderKind, type AlcoholSession } from "@/lib/storage";
 
 function notificationId(sessionId: string, kind: AlcoholReminderKind): number {
@@ -12,7 +11,7 @@ function notificationId(sessionId: string, kind: AlcoholReminderKind): number {
 }
 
 function androidChannel(): { channelId?: string } {
-  return Capacitor.getPlatform() === "android" ? { channelId: "diabeaters_scenarios" } : {};
+  return androidNotificationChannel("diabeaters_scenarios");
 }
 
 function buildNotificationBody(kind: AlcoholReminderKind): { title: string; body: string } {

@@ -19,6 +19,9 @@ import { normalizeBgUnits } from "@/lib/alcohol-night-tool";
 import { formatDrivingTargetRange, getRecentHypoForDriving } from "@/lib/driving-prefill";
 import { useBgPrefill } from "@/hooks/use-bg-prefill";
 import { CgmPrefillButton } from "@/components/cgm-prefill-button";
+import { cgmTrendForDriving } from "@/lib/cgm/apply-cgm-trend";
+import { getCgmEmptyHint } from "@/lib/cgm/cgm-empty-hint";
+import { isCgmPrefillActive } from "@/lib/cgm/preferences";
 import {
   buildDrivingReadinessOutcome,
   type DrivingReadinessOutcome,
@@ -125,6 +128,7 @@ export default function DrivingScenarioPage() {
   const targetRangeLine = formatDrivingTargetRange(settings, bgUnits);
   const recentHypoLogged = getRecentHypoForDriving(4);
   const { prefill: bgPrefill, loading: bgPrefillLoading, refresh: refreshBgPrefill } = useBgPrefill();
+  const cgmPrefillActive = isCgmPrefillActive();
 
   const progressPct = phase === "form" ? ((wizardStep + 1) / FORM_WIZARD_STEPS) * 100 : 100;
 
@@ -357,7 +361,12 @@ export default function DrivingScenarioPage() {
                       bgUnits={bgUnits}
                       currentValue={bgInput}
                       onApply={setBgInput}
+                      onApplyTrend={(trend) => {
+                        const mapped = cgmTrendForDriving(trend);
+                        if (mapped) setBgTrend(mapped);
+                      }}
                       onRefresh={refreshBgPrefill}
+                      emptyHint={cgmPrefillActive ? getCgmEmptyHint() : undefined}
                       testId="button-driving-use-prefill"
                     />
                     <BgTrendThreeButtons

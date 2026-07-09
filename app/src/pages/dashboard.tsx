@@ -68,6 +68,10 @@ import { invokeNotifyCarersOnHypo } from "@/lib/invoke-notify-carers-hypo";
 import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
 import { PageHeader, PageShell } from "@/components/layout";
 import { PendingHypoCheckInBanner } from "@/components/pending-hypo-check-in-banner";
+import { CgmPrefillButton } from "@/components/cgm-prefill-button";
+import { useBgPrefill } from "@/hooks/use-bg-prefill";
+import { getCgmEmptyHint } from "@/lib/cgm/cgm-empty-hint";
+import { isCgmPrefillActive } from "@/lib/cgm/preferences";
 import { SupplyTrackerTodaySection } from "@/components/dashboard/SupplyTrackerTodaySection";
 import { isAiCoachEnabled, isCommunityEnabled } from "@/lib/flags";
 import { useOffline } from "@/hooks/use-offline";
@@ -298,6 +302,31 @@ function DashboardInfoDialog() {
         <p>The red Help Now button gives you instant access to emergency resources, contacts, and guidance for urgent situations.</p>
       </InfoSection>
     </PageInfoDialog>
+  );
+}
+
+function HypoGlucosePrefill({
+  bgUnits,
+  currentValue,
+  onApply,
+}: {
+  bgUnits: "mmol/L" | "mg/dL";
+  currentValue: string;
+  onApply: (value: string) => void;
+}) {
+  const { prefill, loading, refresh } = useBgPrefill();
+  const cgmPrefillActive = isCgmPrefillActive();
+  return (
+    <CgmPrefillButton
+      prefill={prefill}
+      loading={loading}
+      bgUnits={bgUnits}
+      currentValue={currentValue}
+      onApply={onApply}
+      onRefresh={refresh}
+      emptyHint={cgmPrefillActive ? getCgmEmptyHint() : undefined}
+      testId="button-dashboard-hypo-cgm-prefill"
+    />
   );
 }
 
@@ -566,6 +595,11 @@ function HeroCard({
                 value={hypoGlucose}
                 onChange={(e) => setHypoGlucose(e.target.value)}
                 data-testid="input-dashboard-hypo-glucose"
+              />
+              <HypoGlucosePrefill
+                bgUnits={bgUnitsLabel}
+                currentValue={hypoGlucose}
+                onApply={setHypoGlucose}
               />
             </div>
             <div className="space-y-2">

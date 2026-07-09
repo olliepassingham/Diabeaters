@@ -43,6 +43,9 @@ import { cancelExerciseReminders, scheduleExerciseActiveReminders } from "@/lib/
 import { cn } from "@/lib/utils";
 import { CgmPrefillButton } from "@/components/cgm-prefill-button";
 import { useBgPrefill } from "@/hooks/use-bg-prefill";
+import { cgmTrendForExercise } from "@/lib/cgm/apply-cgm-trend";
+import { getCgmEmptyHint } from "@/lib/cgm/cgm-empty-hint";
+import { isCgmPrefillActive } from "@/lib/cgm/preferences";
 import type { BgPrefillResult } from "@/lib/cgm/prefill";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
 import {
@@ -360,7 +363,12 @@ function ExerciseReadingPrompt({
               bgUnits={bgUnits}
               currentValue={raw}
               onApply={setRaw}
+              onApplyTrend={(t) => {
+                const mapped = cgmTrendForExercise(t);
+                if (mapped) setTrend(mapped);
+              }}
               onRefresh={onRefreshBgPrefill}
+              emptyHint={isCgmPrefillActive() ? getCgmEmptyHint() : undefined}
               testId="button-exercise-cgm-prefill"
             />
           </div>
@@ -608,6 +616,7 @@ function getTypeConfig(type: ExerciseType): ExerciseTypeConfig {
 export function ActiveExerciseBanner() {
   const { toast } = useToast();
   const { prefill: bgPrefill, loading: bgPrefillLoading, refresh: refreshBgPrefill } = useBgPrefill();
+  const cgmPrefillActive = isCgmPrefillActive();
   const [session, setSession] = useState<ActiveExerciseSession | null>(null);
   const [expanded, setExpanded] = useState(true);
   const [preDraftBg, setPreDraftBg] = useState("");
@@ -1047,6 +1056,20 @@ export function ActiveExerciseBanner() {
                             className="h-9 max-w-[11rem] text-sm"
                             placeholder="e.g. 6.2"
                             data-testid="input-pre-exercise-bg"
+                          />
+                          <CgmPrefillButton
+                            prefill={bgPrefill}
+                            loading={bgPrefillLoading}
+                            bgUnits={bgUnits}
+                            currentValue={preDraftBg}
+                            onApply={setPreDraftBg}
+                            onApplyTrend={(t) => {
+                              const mapped = cgmTrendForExercise(t);
+                              if (mapped) setPreDraftTrend(mapped);
+                            }}
+                            onRefresh={refreshBgPrefill}
+                            emptyHint={cgmPrefillActive ? getCgmEmptyHint() : undefined}
+                            testId="button-pre-exercise-cgm-prefill"
                           />
                         </div>
                         <BgTrendThreeButtons

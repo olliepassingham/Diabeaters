@@ -24,8 +24,16 @@ import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
 import { BedtimeResultView } from "@/components/scenarios/bedtime-result-view";
+import { BedtimeLastNightCard } from "@/components/scenarios/bedtime-last-night-card";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
 import { calculateBedtimeCorrectionDose, type BedtimeCorrectionSuggestion } from "@/lib/bedtime-correction-dose";
+import { CgmPrefillButton } from "@/components/cgm-prefill-button";
+import { useBgPrefill } from "@/hooks/use-bg-prefill";
+import { cgmTrendForBedtime } from "@/lib/cgm/apply-cgm-trend";
+import { getCgmEmptyHint } from "@/lib/cgm/cgm-empty-hint";
+import { isCgmPrefillActive } from "@/lib/cgm/preferences";
+import { useBedtimeLastNight } from "@/hooks/use-bedtime-last-night";
+import { resolveUserTargetBgRange } from "@/lib/target-bg-range";
 import { upsertScenario } from "@/lib/scenarios-supabase";
 import {
   buildBedtimePersonalizedCopy,
@@ -134,6 +142,8 @@ export default function Bedtime() {
   const [currentBg, setCurrentBg] = useState("");
   const [bgUnits, setBgUnits] = useState<"mmol/L" | "mg/dL">("mmol/L");
   const [bgTrend, setBgTrend] = useState<BedtimeBgTrend>("not_sure");
+  const { prefill: bgPrefill, loading: bgPrefillLoading, refresh: refreshBgPrefill } = useBgPrefill();
+  const cgmPrefillActive = isCgmPrefillActive();
   const [hoursSinceFood, setHoursSinceFood] = useState("");
   const [mealCarbs, setMealCarbs] = useState("");
   const [hoursSinceInsulin, setHoursSinceInsulin] = useState("");
@@ -194,12 +204,16 @@ export default function Bedtime() {
 
   const isPumpUser = isPumpDeliveryMethod(profile?.insulinDeliveryMethod);
 
-  const getTargetRange = () => {
-    if (userSettings?.targetBgLow && userSettings?.targetBgHigh) {
-      return { low: userSettings.targetBgLow, high: userSettings.targetBgHigh };
-    }
-    return bgUnits === "mmol/L" ? { low: 5.0, high: 8.0 } : { low: 90, high: 144 };
-  };
+  const getTargetRange = () => resolveUserTargetBgRange(userSettings, bgUnits);
+
+  const targetRange = getTargetRange();
+  const {
+    insight: lastNightInsight,
+    status: lastNightStatus,
+    message: lastNightMessage,
+    reviewTarget: lastNightReview,
+    refresh: refreshLastNight,
+  } = useBedtimeLastNight(bedtimeLogs, bgUnits);
 
   const persistBedtimeCheck = (level: ReadinessLevel, correctionDose: number | null) => {
     const isFirstBedtimeCheck = storage.getBedtimeLogs().length === 0;
@@ -822,6 +836,17 @@ export default function Bedtime() {
         </div>
       )}
 
+      <BedtimeLastNightCard
+        insight={lastNightInsight}
+        status={lastNightStatus}
+        message={lastNightMessage}
+        usedCalendarFallback={lastNightReview?.source === "calendar_fallback"}
+        units={bgUnits}
+        targetLow={targetRange.low}
+        targetHigh={targetRange.high}
+        onRefresh={refreshLastNight}
+      />
+
       {result ? (
         <BedtimeResultView
           result={result}
@@ -890,6 +915,20 @@ export default function Bedtime() {
                       {bgUnits}
                     </span>
                   </div>
+                  <CgmPrefillButton
+                    prefill={bgPrefill}
+                    loading={bgPrefillLoading}
+                    bgUnits={bgUnits}
+                    currentValue={currentBg}
+                    onApply={setCurrentBg}
+                    onApplyTrend={(trend) => {
+                      const mapped = cgmTrendForBedtime(trend);
+                      if (mapped) setBgTrend(mapped);
+                    }}
+                    onRefresh={refreshBgPrefill}
+                    emptyHint={cgmPrefillActive ? getCgmEmptyHint() : undefined}
+                    testId="button-bedtime-cgm-prefill"
+                  />
                   <div className="space-y-1">
                     <span id="label-bedtime-bg-direction" className="text-sm font-medium text-foreground">
                       Direction

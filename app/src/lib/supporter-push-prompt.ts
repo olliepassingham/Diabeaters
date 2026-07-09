@@ -56,6 +56,7 @@ export async function enableSupporterPushNotifications(): Promise<void> {
     enabled: true,
     pushNotifications: true,
     hypoAlerts: true,
+    liveGlucoseAlerts: true,
     supplyAlerts: true,
     scenarioAlerts: true,
     appointmentAlerts: true,

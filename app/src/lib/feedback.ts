@@ -1,6 +1,4 @@
-import { Capacitor } from "@capacitor/core";
-
-import { getSupportEmail } from "@/lib/support";
+import { getDevicePlatform } from "@/lib/native-platform";
 
 export type FeedbackKind = "suggestion" | "bug";
 
@@ -11,7 +9,7 @@ export const FEEDBACK_EMAIL_SUBJECT: Record<FeedbackKind, string> = {
 
 export function feedbackPlatformLabel(): string {
   try {
-    const platform = Capacitor.getPlatform();
+    const platform = getDevicePlatform();
     if (platform === "ios") return "iOS";
     if (platform === "android") return "Android";
     return "Web";

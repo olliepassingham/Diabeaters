@@ -1,7 +1,9 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { App as CapacitorApp } from "@capacitor/app";
 import { Disclaimer } from "@/components/disclaimer";
 import { InfoTooltip } from "@/components/info-tooltip";
 import { APP_VERSION } from "@/lib/app-version";
+import { isCapacitorNativeShell } from "@/lib/native-platform";
 import { BookOpen, Info, Shield } from "lucide-react";
 import { Link } from "wouter";
 import {
@@ -24,6 +26,30 @@ export function SettingsAboutRoute() {
   const { toast } = useToast();
   /** Count consecutive taps; reset if the gap since the *previous* tap is too long. */
   const versionTapRef = useRef({ count: 0, lastAt: 0 });
+  const [nativeLabel, setNativeLabel] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isCapacitorNativeShell()) {
+      setNativeLabel(null);
+      return;
+    }
+    let cancelled = false;
+    void CapacitorApp.getInfo()
+      .then((info) => {
+        if (cancelled) return;
+        const version = info.version?.trim() || APP_VERSION;
+        const build = info.build?.trim();
+        setNativeLabel(build ? `${version} (${build})` : version);
+      })
+      .catch(() => {
+        if (!cancelled) setNativeLabel(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const versionLabel = nativeLabel ?? APP_VERSION;
 
   const onVersionTap = useCallback(() => {
     if (isProd || !isNativeShellForPushTestUi()) return;
@@ -65,10 +91,10 @@ export function SettingsAboutRoute() {
                   type="button"
                   className="min-h-11 rounded-lg px-2 text-sm tabular-nums text-muted-foreground touch-manipulation hover:bg-muted/60 active:bg-muted"
                   data-testid="text-app-version"
-                  aria-label={`App version ${APP_VERSION}`}
+                  aria-label={`App version ${versionLabel}`}
                   onClick={onVersionTap}
                 >
-                  {APP_VERSION}
+                  {versionLabel}
                 </button>
               </div>
               <div className="border-t border-border/40 px-3.5 py-3 text-xs text-muted-foreground sm:px-4" data-testid="text-copyright">

@@ -66,6 +66,7 @@ const VerifiedReturn = lazy(() => import("@/pages/verified-return"));
 const FamilyCarers = lazy(() => import("@/pages/family-carers"));
 const CarerView = lazy(() => import("@/pages/carer-view"));
 const CarerActivityLogPage = lazy(() => import("@/pages/carer-view/activity-log"));
+const CarerLiveGlucosePage = lazy(() => import("@/pages/carer-view/live-glucose"));
 const CarerSetup = lazy(() => import("@/pages/carer-setup"));
 const ModeChooser = lazy(() => import("@/pages/mode"));
 const NotificationsPage = lazy(() => import("@/pages/notifications"));
@@ -154,6 +155,7 @@ const HypoHistoryPage = lazy(() => import("@/pages/tools/hypo-history"));
 const ActivityLogPage = lazy(() => import("@/pages/tools/activity-log"));
 const AchievementsPage = lazy(() => import("@/pages/tools/achievements"));
 const CorrectionHelpPage = lazy(() => import("@/pages/tools/correction-help"));
+const CgmLivePage = lazy(() => import("@/pages/tools/cgm-live"));
 const TipsPage = lazy(() => import("@/pages/tools/tips"));
 const GlossaryIndex = lazy(() => import("@/pages/education/index"));
 const GlossaryDetail = lazy(() => import("@/pages/education/[slug]"));
@@ -663,6 +665,11 @@ function InnerRouter() {
           <CarerActivityLogPage />
         </Suspense>
       </Route>
+      <Route path="/carer-view/glucose">
+        <Suspense fallback={<RouteFallback />}>
+          <CarerLiveGlucosePage />
+        </Suspense>
+      </Route>
       <Route path="/carer-view/:section">
         <Suspense fallback={<RouteFallback />}>
           <CarerView />
@@ -828,6 +835,13 @@ function InnerRouter() {
       <Route path="/tools/routines">
         <PatientRouteGuard>
           <Redirect to="/routines" replace />
+        </PatientRouteGuard>
+      </Route>
+      <Route path="/tools/cgm-live">
+        <PatientRouteGuard>
+          <Suspense fallback={<RouteFallback />}>
+            <CgmLivePage />
+          </Suspense>
         </PatientRouteGuard>
       </Route>
       <Route path="/tools/correction">
@@ -1399,14 +1413,18 @@ function AuthenticatedShell() {
           </Alert>
         </div>
       ) : null}
-      {!suppressClinicalPollers && !isDmThreadView ? <AppStatusStrip /> : null}
+      {!suppressClinicalPollers && !isDmThreadView ? (
+        <div className="relative z-40 mx-auto w-full max-w-3xl px-4 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:max-w-4xl md:px-6">
+          <AppStatusStrip />
+        </div>
+      ) : null}
       <main
         id="app-scroll-main"
         className={cn(
           "relative z-[1] min-h-0 w-full min-w-0 flex-1 overflow-x-hidden [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]",
           isFillHeightChatView
             ? "flex flex-col overflow-hidden p-0 md:p-0"
-            : "overflow-y-auto p-4 md:p-6",
+            : "overflow-y-auto px-4 pb-4 pt-1.5 md:px-6 md:pb-6 md:pt-2",
         )}
         style={{
           paddingBottom: isFillHeightChatView ? 0 : MAIN_BOTTOM_SCROLL_PADDING,

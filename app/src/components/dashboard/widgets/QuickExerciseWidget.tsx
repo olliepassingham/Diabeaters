@@ -13,7 +13,11 @@ import { cn } from "@/lib/utils";
 import { HomeCardEmpty } from "@/components/home/home-ui";
 import { computeExerciseHypoSuggestion, resolveExerciseBgForHypo } from "@/lib/exercise-hypo-auto";
 import { calculateExercisePlan } from "@/lib/exercise-plan";
+import { getExerciseReadinessVerdict, getReadinessToneClasses } from "@/lib/exercise-readiness";
 import { ExerciseHypoTreatmentHint, ExerciseWorkoutProgressBar } from "@/components/exercise-active-session-extras";
+import { useBgPrefill } from "@/hooks/use-bg-prefill";
+import { EXERCISE_CGM_POLL_MS } from "@/hooks/use-exercise-cgm-bg";
+import { cgmTrendForExercise } from "@/lib/cgm/apply-cgm-trend";
 
 const EXERCISE_ICONS: Record<ExerciseType, typeof Dumbbell> = {
   cardio: Flame,
@@ -28,6 +32,7 @@ const EXERCISE_ICONS: Record<ExerciseType, typeof Dumbbell> = {
 
 export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
   const compact = isCompactLayout(props);
+  const { prefill: cgmPrefill } = useBgPrefill({ pollIntervalMs: EXERCISE_CGM_POLL_MS });
   const [exercises, setExercises] = useState<ExerciseRoutine[] | null>(null);
   const [activeSession, setActiveSession] = useState<ActiveExerciseSession | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -86,11 +91,27 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
 
   const hypoWidgetSuggestion = useMemo(() => {
     if (!activeSession) return null;
-    const bg = resolveExerciseBgForHypo(activeSession);
-    if (bg == null) return null;
-    const settings = storage.getSettings();
     const profile = storage.getProfile();
     const u = (profile?.bgUnits === "mg/dL" ? "mg/dL" : "mmol/L") as "mmol/L" | "mg/dL";
+    let bg = resolveExerciseBgForHypo(activeSession);
+    let trend =
+      activeSession.phase === "pre"
+        ? activeSession.preTrend
+        : activeSession.phase === "active"
+          ? activeSession.midTrend ?? activeSession.preTrend
+          : activeSession.recoveryTrend ?? activeSession.midTrend ?? activeSession.preTrend;
+
+    if (cgmPrefill?.fromCgm && cgmPrefill.reading) {
+      const live = parseFloat(cgmPrefill.value.replace(",", "."));
+      if (Number.isFinite(live)) {
+        bg = live;
+        const mapped = cgmTrendForExercise(cgmPrefill.reading.trend);
+        if (mapped) trend = mapped;
+      }
+    }
+
+    if (bg == null) return null;
+    const settings = storage.getSettings();
     const plan = calculateExercisePlan({
       exerciseType: activeSession.exerciseType,
       durationMinutes: activeSession.durationMinutes,
@@ -98,13 +119,8 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
       minutesUntilStart: 0,
       bgUnits: u,
       currentBg: bg,
+      bgTrend: trend ?? undefined,
     });
-    const trend =
-      activeSession.phase === "pre"
-        ? activeSession.preTrend
-        : activeSession.phase === "active"
-          ? activeSession.midTrend ?? activeSession.preTrend
-          : activeSession.recoveryTrend ?? activeSession.midTrend;
     const lowThreshold = parseFloat(plan.pre.lowThreshold);
     return computeExerciseHypoSuggestion(bg, settings, u, profile ?? {}, {
       trend,
@@ -112,7 +128,53 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
       exerciseLowThreshold: Number.isFinite(lowThreshold) ? lowThreshold : undefined,
       carbsIfLow: plan.pre.carbsIfLow,
     });
-  }, [activeSession]);
+  }, [activeSession, cgmPrefill]);
+
+  const widgetReadiness = useMemo(() => {
+    if (!activeSession) return null;
+    const profile = storage.getProfile();
+    const u = (profile?.bgUnits === "mg/dL" ? "mg/dL" : "mmol/L") as "mmol/L" | "mg/dL";
+    let bg = resolveExerciseBgForHypo(activeSession);
+    let trend =
+      activeSession.phase === "pre"
+        ? activeSession.preTrend
+        : activeSession.phase === "active"
+          ? activeSession.midTrend ?? activeSession.preTrend
+          : activeSession.recoveryTrend ?? activeSession.midTrend ?? activeSession.preTrend;
+
+    if (cgmPrefill?.fromCgm && cgmPrefill.reading) {
+      const live = parseFloat(cgmPrefill.value.replace(",", "."));
+      if (Number.isFinite(live)) {
+        bg = live;
+        const mapped = cgmTrendForExercise(cgmPrefill.reading.trend);
+        if (mapped) trend = mapped;
+      }
+    }
+
+    if (bg == null) return null;
+    const sc = storage.getScenarioState();
+    const plan = calculateExercisePlan({
+      exerciseType: activeSession.exerciseType,
+      durationMinutes: activeSession.durationMinutes,
+      intensity: activeSession.intensity,
+      minutesUntilStart: 0,
+      bgUnits: u,
+      currentBg: bg,
+      bgTrend: trend ?? undefined,
+    });
+    return getExerciseReadinessVerdict({
+      exercisePlanResult: plan,
+      currentBg: bg,
+      bgUnits: u,
+      sickDayActive: sc.sickDayActive,
+      sickDaySeverity: sc.sickDaySeverity,
+      exerciseType: activeSession.exerciseType,
+      intensity: activeSession.intensity,
+      bgTrend: trend ?? null,
+      phase: activeSession.phase,
+      preRapidInsulin2h: activeSession.preRapidInsulin2h ?? null,
+    });
+  }, [activeSession, cgmPrefill]);
 
   const handleQuickStart = (exercise: ExerciseRoutine) => {
     try {
@@ -250,6 +312,18 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
                 nowMs={nowTick}
                 compact
               />
+            ) : null}
+            {widgetReadiness ? (
+              <div
+                className={cn(
+                  "rounded-lg border px-2.5 py-2 text-xs leading-snug",
+                  getReadinessToneClasses(widgetReadiness.verdict),
+                )}
+                data-testid="widget-exercise-readiness"
+              >
+                <p className="font-semibold text-foreground">{widgetReadiness.title}</p>
+                <p className="text-foreground/85 mt-0.5">{widgetReadiness.detail}</p>
+              </div>
             ) : null}
             {hypoWidgetSuggestion ? <ExerciseHypoTreatmentHint suggestion={hypoWidgetSuggestion} /> : null}
           </div>

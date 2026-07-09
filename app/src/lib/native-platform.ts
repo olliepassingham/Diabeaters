@@ -4,6 +4,9 @@ import { isIosLikeUserAgent } from "@/lib/ios-user-agent";
 
 export type NativePushPlatform = "ios" | "android";
 
+/** Resolved OS: native shell only. `web` = mobile browser or desktop, not the Diabeaters app. */
+export type DevicePlatform = NativePushPlatform | "web";
+
 /** True when the page runs inside a Capacitor WKWebView (not Mobile Safari). */
 export function hasCapacitorNativeWebViewBridge(): boolean {
   if (typeof window === "undefined") return false;
@@ -12,6 +15,59 @@ export function hasCapacitorNativeWebViewBridge(): boolean {
   ).webkit?.messageHandlers;
   if (!handlers) return false;
   return "bridge" in handlers || "capacitor" in handlers;
+}
+
+function isAndroidLikeUserAgent(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /Android/i.test(navigator.userAgent);
+}
+
+/**
+ * Resolve iOS vs Android inside a Capacitor shell when `Capacitor.getPlatform()` may report `"web"`
+ * (common with remote `server.url` builds or trimmed user agents).
+ */
+export function resolveNativeDevicePlatform(): NativePushPlatform | null {
+  const reported = Capacitor.getPlatform();
+  if (reported === "android") return "android";
+  if (reported === "ios") return "ios";
+  if (reported !== "web") return null;
+
+  if (isAndroidLikeUserAgent()) return "android";
+  if (isIosLikeUserAgent()) return "ios";
+
+  if (Capacitor.isNativePlatform?.()) {
+    // Trimmed UA on a real device — WKWebView bridge is iOS-only.
+    if (hasCapacitorNativeWebViewBridge()) return "ios";
+    return "ios";
+  }
+
+  if (hasCapacitorNativeWebViewBridge()) {
+    return isAndroidLikeUserAgent() ? "android" : "ios";
+  }
+
+  return null;
+}
+
+/** Best-effort OS for UI, CGM labels, notifications, and feature branching. */
+export function getDevicePlatform(): DevicePlatform {
+  const native = resolveNativeDevicePlatform();
+  if (native) return native;
+  if (isCapacitorNativeShell()) {
+    return isAndroidLikeUserAgent() ? "android" : "ios";
+  }
+  return "web";
+}
+
+export function isIosDevice(): boolean {
+  return getDevicePlatform() === "ios";
+}
+
+export function isAndroidDevice(): boolean {
+  return getDevicePlatform() === "android";
+}
+
+export function isWebClient(): boolean {
+  return getDevicePlatform() === "web";
 }
 
 /** True when running in a Capacitor native shell (iOS or Android). */
@@ -30,30 +86,28 @@ export function isNativePushPlatform(): boolean {
 }
 
 export function getNativePushPlatform(): NativePushPlatform | null {
-  const p = Capacitor.getPlatform();
-  if (p === "android") return "android";
-  if (p === "ios") return "ios";
-  if (p !== "web") return null;
+  return resolveNativeDevicePlatform();
+}
 
-  if (isIosLikeUserAgent()) return "ios";
-
-  const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
-  if (/Android/i.test(ua) && Capacitor.isNativePlatform?.()) return "android";
-
-  // Remote `server.url` iOS App Store shell: platform "web", trimmed UA — still APNs/iOS.
-  if (Capacitor.isNativePlatform?.()) return "ios";
-
-  if (hasCapacitorNativeWebViewBridge()) {
-    if (/Android/i.test(ua)) return "android";
-    return "ios";
+/** Apple Health on iOS, Health Connect on Android; sensible label on web by user agent. */
+export function healthPlatformLabel(): string {
+  if (isAndroidDevice()) return "Health Connect";
+  if (isIosDevice()) return "Apple Health";
+  if (typeof navigator !== "undefined") {
+    if (/Android/i.test(navigator.userAgent)) return "Health Connect";
+    if (isIosLikeUserAgent()) return "Apple Health";
   }
+  return "Apple Health / Health Connect";
+}
 
-  return null;
+/** Android notification channels are required on API 26+; omitted on iOS. */
+export function androidNotificationChannel(channelId: string): { channelId?: string } {
+  return isAndroidDevice() ? { channelId } : {};
 }
 
 /** True when OS-scheduled local notifications are supported in this shell. */
 export function supportsNativeLocalNotifications(): boolean {
-  return isCapacitorNativeShell() && (Capacitor.getPlatform() === "ios" || Capacitor.getPlatform() === "android");
+  return isCapacitorNativeShell() && getDevicePlatform() !== "web";
 }
 
 /** Whether to show native push test tooling (About unlock, dev panel). */
@@ -65,7 +119,7 @@ export function isNativeShellForPushTestUi(): boolean {
 }
 
 export function nativePlatformLabel(): string {
-  const p = Capacitor.getPlatform();
+  const p = getDevicePlatform();
   if (p === "android") return "Android";
   if (p === "ios") return "iPhone";
   return "device";

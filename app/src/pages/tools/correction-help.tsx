@@ -32,6 +32,10 @@ import {
   getPostExerciseEducationalCopy,
   inferPostExerciseLoadTier,
 } from "@/lib/post-exercise-nudge";
+import { CgmPrefillButton } from "@/components/cgm-prefill-button";
+import { useBgPrefill } from "@/hooks/use-bg-prefill";
+import { getCgmEmptyHint } from "@/lib/cgm/cgm-empty-hint";
+import { isCgmPrefillActive } from "@/lib/cgm/preferences";
 
 function parseBgInput(raw: string): number | null {
   const n = parseFloat(raw.replace(",", "."));
@@ -45,6 +49,8 @@ export default function CorrectionHelpPage() {
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [bgUnits, setBgUnits] = useState<BgUnits>("mmol/L");
   const [bgInput, setBgInput] = useState("");
+  const { prefill: bgPrefill, loading: bgPrefillLoading, refresh: refreshBgPrefill } = useBgPrefill();
+  const cgmPrefillActive = isCgmPrefillActive();
   const [targetOverride, setTargetOverride] = useState("");
   const [postExerciseNudgeRev, setPostExerciseNudgeRev] = useState(0);
   const load = useCallback(() => {
@@ -212,6 +218,16 @@ export default function CorrectionHelpPage() {
                     value={bgInput}
                     onChange={(e) => setBgInput(e.target.value)}
                     data-testid="input-correction-bg"
+                  />
+                  <CgmPrefillButton
+                    prefill={bgPrefill}
+                    loading={bgPrefillLoading}
+                    bgUnits={unitLabel}
+                    currentValue={bgInput}
+                    onApply={setBgInput}
+                    onRefresh={refreshBgPrefill}
+                    emptyHint={cgmPrefillActive ? getCgmEmptyHint() : undefined}
+                    testId="button-correction-cgm-prefill"
                   />
                 </div>
                 <div className="space-y-2">

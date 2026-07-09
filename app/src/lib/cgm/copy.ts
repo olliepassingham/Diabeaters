@@ -7,14 +7,15 @@ export const CGM_NOT_MEDICAL_DEVICE =
   "Diabeaters is not a medical device. CGM prefill is a convenience only — always confirm on your CGM receiver or meter before treating.";
 
 export const CGM_PREFILL_DISCLAIMER =
-  "Prefilled values come from Apple Health or Health Connect. They may be delayed (Dexcom often writes to Apple Health about 3 hours late). You can always edit or ignore the suggestion.";
+  "Prefilled values may come from Dexcom Share or LibreLink Up (near-live) or Apple Health / Health Connect (often delayed). Always confirm on your CGM before treating.";
 
 export const CGM_DATA_RETENTION_POLICY = {
   v1Storage: "on_device_only" as const,
-  serverUpload: false,
+  serverUpload: "latest_snapshot_only" as const,
   description:
-    "v1 never uploads CGM streams to Diabeaters servers. Readings are fetched when you open a tool or tap prefill, used locally, and not stored in Supabase.",
-  healthCredentials: "OS health permissions only — no LibreLinkUp or Dexcom Share passwords in v1.",
+    "v1 does not upload CGM history. When you allow Live glucose for a supporter, your device may sync only the latest reading (value, trend, time) so they can see it in the top bar — not charts or credentials.",
+  healthCredentials:
+    "Apple Health uses OS permissions only. Dexcom Share and LibreLink Up credentials (if you enable them) are stored on this device only and are never uploaded to Diabeaters servers.",
 };
 
 export const CGM_HEALTH_SETUP_IOS =

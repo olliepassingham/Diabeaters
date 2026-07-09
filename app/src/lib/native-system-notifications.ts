@@ -1,4 +1,4 @@
-import { Capacitor } from "@capacitor/core";
+import { isAndroidDevice, isIosDevice } from "@/lib/native-platform";
 import { LocalNotifications } from "@capacitor/local-notifications";
 
 import {
@@ -60,7 +60,7 @@ export async function showNativeSystemNotificationNow(params: {
       deep_link: params.deepLink ?? null,
       tag: params.tag ?? null,
     },
-    ...(Capacitor.getPlatform() === "ios" ? { sound: "default" as const } : {}),
+    ...(isIosDevice() ? { sound: "default" as const } : {}),
   };
 
   try {

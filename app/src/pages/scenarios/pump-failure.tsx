@@ -41,6 +41,10 @@ import {
   type PumpFailureTriageKind,
 } from "@/lib/storage";
 import { useToast } from "@/hooks/use-toast";
+import { useBgPrefill } from "@/hooks/use-bg-prefill";
+import { getCgmEmptyHint } from "@/lib/cgm/cgm-empty-hint";
+import { isCgmPrefillActive } from "@/lib/cgm/preferences";
+import type { BgPrefillResult } from "@/lib/cgm/prefill";
 
 const STEPS = [
   {
@@ -81,6 +85,19 @@ export default function PumpFailurePage() {
   const { toast } = useToast();
   const [profile, setProfile] = useState(() => storage.getProfile());
   const bgUnits: "mmol/L" | "mg/dL" = profile?.bgUnits === "mg/dL" ? "mg/dL" : "mmol/L";
+  const { prefill: bgPrefill, loading: bgPrefillLoading, refresh: refreshBgPrefill } = useBgPrefill();
+  const cgmPrefillActive = isCgmPrefillActive();
+  const cgmPrefillProps = {
+    bgPrefill,
+    bgPrefillLoading,
+    onRefreshBgPrefill: refreshBgPrefill,
+    cgmEmptyHint: cgmPrefillActive ? getCgmEmptyHint() : undefined,
+  } satisfies {
+    bgPrefill: BgPrefillResult | null;
+    bgPrefillLoading: boolean;
+    onRefreshBgPrefill: () => void;
+    cgmEmptyHint?: string;
+  };
 
   useEffect(() => {
     const onProfile = () => setProfile(storage.getProfile());
@@ -303,6 +320,7 @@ export default function PumpFailurePage() {
                   bgUnits={bgUnits}
                   ketones={recheckKetones}
                   onKetonesChange={setRecheckKetones}
+                  {...cgmPrefillProps}
                 />
                 <Button onClick={saveRecheck} className="w-full min-h-11" data-testid="button-pumpfailure-save-recheck">
                   Save recheck
@@ -356,6 +374,7 @@ export default function PumpFailurePage() {
               bgUnits={bgUnits}
               ketones={ketones}
               onKetonesChange={setKetones}
+              {...cgmPrefillProps}
             />
             <Button onClick={() => void startActive()} className="w-full min-h-11" data-testid="button-pumpfailure-start">
               Start pump failure mode

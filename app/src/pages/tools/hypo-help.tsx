@@ -35,6 +35,10 @@ import {
   suggestedRecoveryTargetBg,
 } from "@/lib/hypo-context";
 import { classifyHypoSeverity } from "@/lib/hypo-severity";
+import { CgmPrefillButton } from "@/components/cgm-prefill-button";
+import { useBgPrefill } from "@/hooks/use-bg-prefill";
+import { getCgmEmptyHint } from "@/lib/cgm/cgm-empty-hint";
+import { isCgmPrefillActive } from "@/lib/cgm/preferences";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { ScenarioResultHero } from "@/components/scenarios/scenario-result-hero";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
@@ -170,6 +174,8 @@ export default function HypoHelpPage() {
   const [lastHypoDetail, setLastHypoDetail] = useState<{ at: string; label: string } | null>(null);
   const [targetPrefilledFromRange, setTargetPrefilledFromRange] = useState(false);
   const [currentBg, setCurrentBg] = useState("");
+  const { prefill: bgPrefill, loading: bgPrefillLoading, refresh: refreshBgPrefill } = useBgPrefill();
+  const cgmPrefillActive = isCgmPrefillActive();
   const [targetBg, setTargetBg] = useState("");
   const [userWeight, setUserWeight] = useState("");
   const [weightUnit, setWeightUnit] = useState<WeightDisplayUnit>("kg");
@@ -381,6 +387,19 @@ export default function HypoHelpPage() {
               }}
               className="h-16 border-border/60 bg-muted/15 text-center text-3xl font-semibold tabular-nums tracking-tight"
               data-testid="input-current-bg"
+            />
+            <CgmPrefillButton
+              prefill={bgPrefill}
+              loading={bgPrefillLoading}
+              bgUnits={bgUnits}
+              currentValue={currentBg}
+              onApply={(value) => {
+                setCurrentBg(value);
+                setHypoResult(null);
+              }}
+              onRefresh={refreshBgPrefill}
+              emptyHint={cgmPrefillActive ? getCgmEmptyHint() : undefined}
+              testId="button-hypo-cgm-prefill"
             />
             {severityView ? (
               <div

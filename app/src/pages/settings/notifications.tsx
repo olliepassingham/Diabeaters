@@ -53,6 +53,7 @@ export function NotificationsTab({
   const hypoOn = notifSettings.hypoAlerts !== false;
   const supplyOn = notifSettings.supplyAlerts !== false;
   const scenarioOn = notifSettings.scenarioAlerts !== false;
+  const liveGlucoseOn = notifSettings.liveGlucoseAlerts !== false;
   const isPumpUser = isPumpDeliveryMethod(storage.getProfile()?.insulinDeliveryMethod);
   const communityFeedOn = notifSettings.communityFeedAlerts !== false;
   const communityDmOn = notifSettings.communityDmAlerts !== false;
@@ -110,6 +111,14 @@ export function NotificationsTab({
               onCheckedChange={(checked) => onToggle("hypoAlerts", checked)}
               disabled={masterOff}
               testId="switch-hypo-alerts"
+            />
+            <SettingsToggleRow
+              label="Glucose out of range"
+              description="When their latest shared reading is below or above their target range"
+              checked={liveGlucoseOn}
+              onCheckedChange={(checked) => onToggle("liveGlucoseAlerts", checked)}
+              disabled={masterOff}
+              testId="switch-live-glucose-alerts"
             />
             <SettingsToggleRow
               label="Supply alerts"

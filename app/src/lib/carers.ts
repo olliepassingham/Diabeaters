@@ -11,6 +11,7 @@ import type {
   CarerLinkWithProfile,
   CarerScopes,
   CloudHypoLogRow,
+  CloudPatientLiveGlucoseRow,
   CloudSupplyRow,
   LinkedPatientInfo,
   LinkedPatientWithProfile,
@@ -216,6 +217,7 @@ export function normaliseScopes(raw: unknown): CarerScopes {
     appointments: Boolean(o.appointments),
     scenarios: Boolean(o.scenarios),
     hypo_alerts: Boolean(o.hypo_alerts),
+    live_glucose: o.live_glucose !== false,
     emergency_info: Boolean(o.emergency_info),
     clinical_settings: Boolean(o.clinical_settings),
     public_profile_mention: Boolean(o.public_profile_mention),
@@ -703,6 +705,90 @@ export async function fetchHypoLogsForLinkedPatient(
   }));
 
   return { data: rows, error: null };
+}
+
+/** Carer: latest near-live glucose for linked patient (RLS + live_glucose scope). */
+export async function fetchLiveGlucoseForLinkedPatient(
+  patientId: string,
+): Promise<{ data: CloudPatientLiveGlucoseRow | null; error: Error | null }> {
+  const supabase = getSupabase();
+  if (!supabase) return { data: null, error: NOT_CONFIGURED };
+
+  const { data, error } = await supabase
+    .from("patient_live_glucose")
+    .select(
+      "user_id, value, units, trend, source_label, recorded_at, updated_at, target_low, target_high, range_status",
+    )
+    .eq("user_id", patientId)
+    .maybeSingle();
+
+  if (error) return { data: null, error: new Error(error.message) };
+  if (!data) return { data: null, error: null };
+
+  const row = data as Record<string, unknown>;
+  const units = row.units === "mg/dL" ? "mg/dL" : "mmol/L";
+  const trendRaw = row.trend;
+  const trend =
+    trendRaw === "rising" || trendRaw === "falling" || trendRaw === "flat" ? trendRaw : null;
+  const rangeRaw = row.range_status;
+  const range_status =
+    rangeRaw === "low" || rangeRaw === "in_range" || rangeRaw === "high" ? rangeRaw : null;
+
+  return {
+    data: {
+      user_id: String(row.user_id),
+      value: Number(row.value),
+      units,
+      trend,
+      source_label: String(row.source_label ?? "Dexcom Share"),
+      recorded_at: String(row.recorded_at),
+      updated_at: String(row.updated_at),
+      target_low: row.target_low == null ? null : Number(row.target_low),
+      target_high: row.target_high == null ? null : Number(row.target_high),
+      range_status,
+    },
+    error: null,
+  };
+}
+
+/** Patient: upsert latest CGM reading for opted-in supporters. */
+export async function upsertPatientLiveGlucose(reading: {
+  value: number;
+  units: "mmol/L" | "mg/dL";
+  trend: "rising" | "falling" | "flat" | null;
+  sourceLabel: string;
+  recordedAt: string;
+  targetLow: number;
+  targetHigh: number;
+  rangeStatus: "low" | "in_range" | "high";
+}): Promise<{ error: Error | null }> {
+  const supabase = getSupabase();
+  if (!supabase) return { error: NOT_CONFIGURED };
+
+  const uid = await getSessionUserId();
+  if ("error" in uid) return { error: uid.error };
+
+  const { error } = await supabase.from("patient_live_glucose").upsert({
+    user_id: uid.id,
+    value: reading.value,
+    units: reading.units,
+    trend: reading.trend,
+    source_label: reading.sourceLabel,
+    recorded_at: reading.recordedAt,
+    target_low: reading.targetLow,
+    target_high: reading.targetHigh,
+    range_status: reading.rangeStatus,
+    updated_at: new Date().toISOString(),
+  });
+
+  if (error) return { error: new Error(error.message) };
+  return { error: null };
+}
+
+/** Patient: any linked supporter has live glucose sharing enabled. */
+export async function patientHasLiveGlucoseSharingEnabled(): Promise<boolean> {
+  const { data } = await listCarerLinksForPatient();
+  return (data ?? []).some((link) => link.scopes.live_glucose !== false);
 }
 
 /** Carer: appointment rows for linked patient (RLS + scope). */

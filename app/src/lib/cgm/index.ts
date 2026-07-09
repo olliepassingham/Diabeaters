@@ -23,7 +23,7 @@ export {
   DEFAULT_CGM_PREFERENCES,
   type CgmPreferences,
 } from "./preferences";
-export { fetchLatestCgmReading, connectHealthPlatformCgm, listCgmAdapters, getCgmAdapter } from "./registry";
+export { fetchLatestCgmReading, connectHealthPlatformCgm, connectDexcomShareCgm, disconnectDexcomShareCgm, listCgmAdapters, getCgmAdapter } from "./registry";
 export { getBgPrefill, bgPrefillFromReading, type BgPrefillResult } from "./prefill";
 export { assessReadingStaleness, formatAgeMinutes } from "./staleness";
 export { mgDlToMmol, mmolToMgDl, convertGlucoseValue } from "./units";

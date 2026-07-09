@@ -11,7 +11,7 @@ describe("CGM v1 scope", () => {
   });
 
   it("documents on-device-only retention", () => {
-    expect(CGM_DATA_RETENTION_POLICY.serverUpload).toBe(false);
+    expect(CGM_DATA_RETENTION_POLICY.serverUpload).toBe("latest_snapshot_only");
     expect(CGM_DATA_RETENTION_POLICY.v1Storage).toBe("on_device_only");
   });
 });

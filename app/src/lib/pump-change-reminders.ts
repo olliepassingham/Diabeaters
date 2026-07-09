@@ -1,4 +1,3 @@
-import { Capacitor } from "@capacitor/core";
 import { LocalNotifications } from "@capacitor/local-notifications";
 
 import {
@@ -7,11 +6,11 @@ import {
   upcomingPumpChangeReminderSlots,
 } from "@/lib/pump-change-reminder-schedule";
 import { ensureNativeLocalNotificationPermission } from "@/lib/native-local-notifications";
-import { supportsNativeLocalNotifications } from "@/lib/native-platform";
+import { androidNotificationChannel, supportsNativeLocalNotifications } from "@/lib/native-platform";
 import { storage } from "@/lib/storage";
 
 function androidChannel(): { channelId?: string } {
-  return Capacitor.getPlatform() === "android" ? { channelId: "diabeaters_general" } : {};
+  return androidNotificationChannel("diabeaters_general");
 }
 
 export async function cancelAllPumpChangeReminders(): Promise<void> {

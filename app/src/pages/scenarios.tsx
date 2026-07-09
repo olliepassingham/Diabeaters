@@ -25,7 +25,7 @@ const SCENARIO_CARDS: ScenarioCardDef[] = [
     href: "/scenarios/exercise",
     icon: Dumbbell,
     title: "Exercise",
-    description: "Pre-workout fuel and insulin, plus active session tracking.",
+    description: "Pre-workout fuel and insulin, plus active session tracking. CGM can prefill BG and trend.",
   },
   {
     href: "/scenarios/bedtime",
@@ -55,7 +55,7 @@ const SCENARIO_CARDS: ScenarioCardDef[] = [
     href: "/scenarios/driving",
     icon: Car,
     title: "Driving",
-    description: "Quick readiness check from glucose, trend, and recent hypos.",
+    description: "Readiness from glucose, trend, and recent hypos — with CGM prefill when connected.",
   },
 ];
 
@@ -153,7 +153,8 @@ export default function Scenarios() {
       <InfoSection title="Exercise">
         <p>
           Plan pre-workout fuel and insulin using your ratios and targets, with session carry carbs and an optional active
-          workout timer. Guided steps and links to exercise routines and the coach are on the guide page.
+          workout timer. When Apple Health or Dexcom Share is connected in Settings → CGM, recent BG and trend can prefill
+          on the exercise flow and status strip.
         </p>
       </InfoSection>
       <InfoSection title="Bedtime">
@@ -194,8 +195,8 @@ export default function Scenarios() {
       <InfoSection title="Driving">
         <p>
           A short wizard on current glucose, trend, time since your last check, and recent hypos gives a ready, wait, or
-          check-again suggestion. For adults only — does not confirm you are legally fit to drive. Follow licensing rules
-          and your care team.
+          check-again suggestion. With CGM connected, Diabeaters can offer your latest reading and arrow trend. For adults
+          only — does not confirm you are legally fit to drive. Follow licensing rules and your care team.
         </p>
       </InfoSection>
     </PageInfoDialog>

@@ -1,0 +1,96 @@
+import type { BedtimeLog } from "@/lib/storage";
+
+/** Default assumed sleep duration when estimating overnight window. */
+export const BEDTIME_DEFAULT_SLEEP_HOURS = 8;
+
+export type BedtimeSleepWindow = {
+  startMs: number;
+  endMs: number;
+  startIso: string;
+  endIso: string;
+  /** Hours from check to estimated sleep start (0 = at check time). */
+  hoursUntilSleep: number;
+};
+
+/**
+ * Estimate sleep window from a bedtime check: check time + "sleep in" offset → +8h asleep.
+ */
+export function computeBedtimeSleepWindow(
+  log: Pick<BedtimeLog, "date" | "hoursUntilSleep">,
+  sleepHours = BEDTIME_DEFAULT_SLEEP_HOURS,
+): BedtimeSleepWindow | null {
+  const checkMs = new Date(log.date).getTime();
+  if (!Number.isFinite(checkMs)) return null;
+
+  const hoursUntilSleep =
+    typeof log.hoursUntilSleep === "number" && Number.isFinite(log.hoursUntilSleep)
+      ? Math.max(0, log.hoursUntilSleep)
+      : 0;
+
+  const startMs = checkMs + hoursUntilSleep * 60 * 60 * 1000;
+  const endMs = startMs + sleepHours * 60 * 60 * 1000;
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) return null;
+
+  return {
+    startMs,
+    endMs,
+    startIso: new Date(startMs).toISOString(),
+    endIso: new Date(endMs).toISOString(),
+    hoursUntilSleep,
+  };
+}
+
+/** Most recent log whose estimated sleep window has fully ended (for morning review). */
+export function findReviewableBedtimeLog(logs: BedtimeLog[], nowMs = Date.now()): BedtimeLog | null {
+  const sorted = [...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  for (const log of sorted) {
+    const window = computeBedtimeSleepWindow(log);
+    if (!window) continue;
+    if (window.endMs <= nowMs) return log;
+  }
+  return null;
+}
+
+/** Fallback when no bedtime log: last completed ~8h block ending at the most recent 7:00 local. */
+export function inferCalendarSleepWindow(nowMs = Date.now()): BedtimeSleepWindow {
+  const end = new Date(nowMs);
+  end.setHours(7, 0, 0, 0);
+  if (end.getTime() > nowMs) {
+    end.setDate(end.getDate() - 1);
+  }
+  const start = new Date(end.getTime() - BEDTIME_DEFAULT_SLEEP_HOURS * 60 * 60 * 1000);
+  return {
+    startMs: start.getTime(),
+    endMs: end.getTime(),
+    startIso: start.toISOString(),
+    endIso: end.toISOString(),
+    hoursUntilSleep: 0,
+  };
+}
+
+export type OvernightReviewTarget = {
+  log: BedtimeLog | null;
+  window: BedtimeSleepWindow;
+  /** Log-based window vs calendar estimate when no completed check exists. */
+  source: "bedtime_log" | "calendar_fallback";
+};
+
+/** Pick the best overnight window: prefer a completed bedtime check, else last calendar night. */
+export function resolveOvernightReviewTarget(logs: BedtimeLog[], nowMs = Date.now()): OvernightReviewTarget | null {
+  const log = findReviewableBedtimeLog(logs, nowMs);
+  if (log) {
+    const window = computeBedtimeSleepWindow(log);
+    if (window && window.endMs <= nowMs) {
+      return { log, window, source: "bedtime_log" };
+    }
+  }
+  const calendar = inferCalendarSleepWindow(nowMs);
+  if (calendar.endMs > nowMs) return null;
+  return { log: null, window: calendar, source: "calendar_fallback" };
+}
+
+export function formatSleepWindowLabel(startMs: number, endMs: number): string {
+  const fmt = (ms: number) =>
+    new Date(ms).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  return `${fmt(startMs)} – ${fmt(endMs)}`;
+}

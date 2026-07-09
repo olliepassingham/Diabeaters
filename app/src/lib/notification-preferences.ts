@@ -16,6 +16,7 @@ export function toCloudPrefs(settings: NotificationSettings): Record<string, unk
     supporter_appointment_reminders: settings.supporterAppointmentReminders !== false,
     appointment_alerts: settings.appointmentAlerts !== false,
     hypo_alerts: settings.hypoAlerts !== false,
+    live_glucose_alerts: settings.liveGlucoseAlerts !== false,
     scenario_alerts: settings.scenarioAlerts !== false,
     feed_alerts: settings.communityFeedAlerts !== false,
     dm_alerts: settings.communityDmAlerts !== false,

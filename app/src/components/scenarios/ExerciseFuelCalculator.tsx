@@ -1,6 +1,6 @@
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState, useCallback, type ReactNode } from "react";
 import { Link } from "wouter";
-import { Calculator, ChevronDown, Dumbbell, Minus, TrendingDown, TrendingUp, X } from "lucide-react";
+import { Calculator, ChevronDown, Dumbbell, X } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
@@ -43,21 +43,11 @@ import {
 } from "@/lib/storage";
 import { useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { ExerciseCgmBgField } from "@/components/exercise-cgm-bg-field";
+import { CgmReadingSourceNote } from "@/components/cgm-reading-source-note";
+import { useExerciseCgmBg } from "@/hooks/use-exercise-cgm-bg";
 
 type FoodMode = "known" | "suggest";
-
-const BG_TREND_BUTTONS: {
-  value: ExerciseBgTrend | "";
-  shortLabel: string;
-  ariaLabel: string;
-  testId: string;
-  icon?: "none" | "up" | "down";
-}[] = [
-  { value: "", shortLabel: "—", ariaLabel: "Trend not set", testId: "efc-trend-none" },
-  { value: "flat", shortLabel: "Flat", ariaLabel: "Flat trend", testId: "efc-trend-flat" },
-  { value: "rising", shortLabel: "Up", ariaLabel: "Rising trend", testId: "efc-trend-rising", icon: "up" },
-  { value: "falling", shortLabel: "Down", ariaLabel: "Falling trend", testId: "efc-trend-falling", icon: "down" },
-];
 
 /** Shared pill grid so timing/trend controls fit one row on narrow phones. */
 const EFC_PILL_GRID =
@@ -431,8 +421,71 @@ export function ExerciseFuelCalculator() {
   const [isPump, setIsPump] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
+  const hasCalculatedRef = useRef(false);
   const [hasActiveExercise, setHasActiveExercise] = useState(() => Boolean(storage.getActiveExercise()));
   const [profile, setProfile] = useState<Partial<UserProfile> | undefined>(() => storage.getProfile() ?? undefined);
+
+  const onFuelTrendChange = (t: ExerciseBgTrend) => {
+    setBgTrend(t === "not_sure" ? "" : t);
+  };
+
+  const {
+    prefill: cgmPrefill,
+    loading: cgmLoading,
+    refresh: refreshCgm,
+    emptyHint: cgmEmptyHint,
+    onBgChange: onBgFieldChange,
+  } = useExerciseCgmBg({
+    bgValue: currentBg,
+    onApplyBg: setCurrentBg,
+    onApplyTrend: onFuelTrendChange,
+    autoApplyKey: "fuel-calculator",
+  });
+
+  const buildFuelPlanResult = useCallback((): ExerciseFuelCalculatorResult | null => {
+    const durationMinutes = parseInt(duration, 10);
+    if (!Number.isFinite(durationMinutes) || durationMinutes < 1) return null;
+
+    const settings = storage.getSettings();
+    const bgParsed = parseFloat(currentBg.replace(",", "."));
+    const mealCarbsGrams = foodMode === "known" ? parseInt(mealCarbs, 10) : undefined;
+    const lastMins = lastMealMins.trim() ? parseInt(lastMealMins, 10) : undefined;
+    const lastCarbs = lastMealCarbs.trim() ? parseInt(lastMealCarbs, 10) : undefined;
+
+    return computeExerciseFuelPlan({
+      exerciseType,
+      intensity,
+      durationMinutes,
+      minutesUntilStart,
+      fasted,
+      bgUnits,
+      settings,
+      isPump,
+      mealCarbsGrams: mealCarbsGrams != null && Number.isFinite(mealCarbsGrams) ? mealCarbsGrams : undefined,
+      mealType,
+      currentBg: Number.isFinite(bgParsed) ? bgParsed : undefined,
+      bgTrend: bgTrend || null,
+      rapidInsulinLast2h: rapidInsulin2h,
+      lastMealMinutesAgo: Number.isFinite(lastMins) ? lastMins : undefined,
+      lastMealCarbsGrams: Number.isFinite(lastCarbs) ? lastCarbs : undefined,
+    });
+  }, [
+    bgTrend,
+    bgUnits,
+    currentBg,
+    duration,
+    exerciseType,
+    fasted,
+    foodMode,
+    intensity,
+    isPump,
+    lastMealCarbs,
+    lastMealMins,
+    mealCarbs,
+    mealType,
+    minutesUntilStart,
+    rapidInsulin2h,
+  ]);
 
   useEffect(() => {
     const sync = () => {
@@ -469,33 +522,9 @@ export function ExerciseFuelCalculator() {
   }, [duration, foodMode, mealCarbs, currentBg]);
 
   const handleCalculate = () => {
-    const durationMinutes = parseInt(duration, 10);
-    if (!Number.isFinite(durationMinutes) || durationMinutes < 1) return;
-
-    const settings = storage.getSettings();
-    const bgParsed = parseFloat(currentBg.replace(",", "."));
-    const mealCarbsGrams =
-      foodMode === "known" ? parseInt(mealCarbs, 10) : undefined;
-    const lastMins = lastMealMins.trim() ? parseInt(lastMealMins, 10) : undefined;
-    const lastCarbs = lastMealCarbs.trim() ? parseInt(lastMealCarbs, 10) : undefined;
-
-    const next = computeExerciseFuelPlan({
-      exerciseType,
-      intensity,
-      durationMinutes,
-      minutesUntilStart,
-      fasted,
-      bgUnits,
-      settings,
-      isPump,
-      mealCarbsGrams: mealCarbsGrams != null && Number.isFinite(mealCarbsGrams) ? mealCarbsGrams : undefined,
-      mealType,
-      currentBg: Number.isFinite(bgParsed) ? bgParsed : undefined,
-      bgTrend: bgTrend || null,
-      rapidInsulinLast2h: rapidInsulin2h,
-      lastMealMinutesAgo: Number.isFinite(lastMins) ? lastMins : undefined,
-      lastMealCarbsGrams: Number.isFinite(lastCarbs) ? lastCarbs : undefined,
-    });
+    const next = buildFuelPlanResult();
+    if (!next) return;
+    hasCalculatedRef.current = true;
     setResult(next);
     setFormOpen(false);
     storage.recordExerciseToolUse("calculate");
@@ -503,6 +532,13 @@ export function ExerciseFuelCalculator() {
       resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   };
+
+  useEffect(() => {
+    if (!hasCalculatedRef.current || !canCalculate || formOpen) return;
+    const next = buildFuelPlanResult();
+    if (!next) return;
+    setResult(next);
+  }, [buildFuelPlanResult, canCalculate, formOpen]);
 
   const sessionLine = useMemo(() => {
     const typeLabel = EXERCISE_TYPE_OPTIONS.find((o) => o.value === exerciseType)?.label ?? exerciseType;
@@ -609,51 +645,26 @@ export function ExerciseFuelCalculator() {
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="efc-bg">BG now ({bgUnits})</Label>
-                <Input
-                  id="efc-bg"
-                  inputMode="decimal"
-                  placeholder="optional"
-                  value={currentBg}
-                  onChange={(e) => setCurrentBg(e.target.value)}
-                  data-testid="efc-bg"
-                />
-              </div>
-              <div className="flex items-end pb-0.5">
-                <label className="flex items-center gap-2 text-sm">
-                  <Switch checked={rapidInsulin2h} onCheckedChange={setRapidInsulin2h} data-testid="efc-rapid-insulin" />
-                  Insulin in last 2h
-                </label>
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Trend</Label>
-              <div className={cn(EFC_PILL_GRID, "grid-cols-4")} role="group" aria-label="Blood glucose trend">
-                {BG_TREND_BUTTONS.map((opt) => (
-                  <Button
-                    key={opt.testId}
-                    type="button"
-                    size="sm"
-                    variant={bgTrend === opt.value ? "default" : "outline"}
-                    className="w-full flex flex-col items-center justify-center gap-0.5 leading-none"
-                    onClick={() => setBgTrend(opt.value)}
-                    data-testid={opt.testId}
-                    aria-label={opt.ariaLabel}
-                    aria-pressed={bgTrend === opt.value}
-                  >
-                    {opt.value === "" ? (
-                      <Minus className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                    ) : opt.icon === "up" ? (
-                      <TrendingUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                    ) : opt.icon === "down" ? (
-                      <TrendingDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                    ) : null}
-                    <span>{opt.shortLabel}</span>
-                  </Button>
-                ))}
-              </div>
+            <ExerciseCgmBgField
+              bgUnits={bgUnits}
+              bgValue={currentBg}
+              trend={bgTrend || null}
+              onBgChange={onBgFieldChange}
+              onTrendChange={onFuelTrendChange}
+              prefill={cgmPrefill}
+              loading={cgmLoading}
+              onRefresh={refreshCgm}
+              emptyHint={cgmEmptyHint}
+              inputTestId="efc-bg"
+              trendTestIdPrefix="efc-trend"
+              className="sm:col-span-2 space-y-3"
+            />
+
+            <div className="flex items-center justify-between rounded-lg border border-border/50 bg-muted/15 px-3 py-2 sm:col-span-2">
+              <Label htmlFor="efc-rapid-insulin" className="text-sm cursor-pointer">
+                Rapid-acting insulin in last 2h
+              </Label>
+              <Switch id="efc-rapid-insulin" checked={rapidInsulin2h} onCheckedChange={setRapidInsulin2h} data-testid="efc-rapid-insulin" />
             </div>
 
             <div className="flex items-center justify-between rounded-lg border border-border/50 bg-muted/15 px-3 py-2">
@@ -803,6 +814,7 @@ export function ExerciseFuelCalculator() {
                 size="icon"
                 className="h-8 w-8 shrink-0"
                 onClick={() => {
+                  hasCalculatedRef.current = false;
                   setResult(null);
                   setFormOpen(true);
                 }}
@@ -827,6 +839,7 @@ export function ExerciseFuelCalculator() {
                 }
               />
             </div>
+            <CgmReadingSourceNote prefill={cgmPrefill} bgValue={currentBg} />
           </CardHeader>
           <CardContent className="space-y-4">
             {result.userEnteredMealCarbs && result.mealCarbs > 0 ? (

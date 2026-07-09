@@ -60,6 +60,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        // Keep local Capacitor plugins in the Release binary (prevents dead-code strip).
+        _ = AppIconBadgePlugin.self
+        _ = NotificationSettingsPlugin.self
+        _ = HealthAuthorizationPlugin.self
+
         clearApplicationIconBadge()
         DispatchQueue.main.async {
             application.registerForRemoteNotifications()

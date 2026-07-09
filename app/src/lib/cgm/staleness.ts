@@ -9,7 +9,7 @@ export type StalenessAssessment = {
 export function assessReadingStaleness(recordedAtIso: string, nowMs = Date.now()): StalenessAssessment {
   const recordedMs = new Date(recordedAtIso).getTime();
   const ageMinutes = Number.isFinite(recordedMs)
-    ? Math.max(0, Math.round((nowMs - recordedMs) / 60_000))
+    ? Math.max(0, Math.floor((nowMs - recordedMs) / 60_000))
     : Number.POSITIVE_INFINITY;
 
   if (ageMinutes > CGM_PREFILL_STALE_AGE_MINUTES) {

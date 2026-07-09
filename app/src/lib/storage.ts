@@ -1161,6 +1161,8 @@ export interface NotificationSettings {
   appointmentAlerts?: boolean;
   hypoAlerts?: boolean;
   scenarioAlerts?: boolean;
+  /** Supporter: alerts when their linked person's latest shared glucose is out of target range. */
+  liveGlucoseAlerts?: boolean;
   /** When true, dashboard "Treated a Hypo" logs and notifies without opening the detail dialog first. */
   hypoDashboardQuickNotify?: boolean;
   /** Likes and comments on your community posts (in-app inbox; synced as feed_alerts). */
@@ -3759,8 +3761,9 @@ export const storage = {
       pumpChangeReminders: true,
       supporterAppointmentReminders: true,
       appointmentAlerts: true,
-      hypoAlerts: true,
-      scenarioAlerts: true,
+    hypoAlerts: true,
+    liveGlucoseAlerts: true,
+    scenarioAlerts: true,
       hypoDashboardQuickNotify: false,
       communityFeedAlerts: true,
       communityDmAlerts: true,
@@ -3778,6 +3781,7 @@ export const storage = {
       communityDmAlerts: parsed.communityDmAlerts !== false,
       supporterAppointmentReminders: parsed.supporterAppointmentReminders !== false,
       appointmentAlerts: parsed.appointmentAlerts !== false,
+      liveGlucoseAlerts: parsed.liveGlucoseAlerts !== false,
       /** Default on for habit building; only explicit `false` in stored settings turns it off. */
       bedtimeCheckReminders: parsed.bedtimeCheckReminders !== false,
       pumpChangeReminders: parsed.pumpChangeReminders !== false,

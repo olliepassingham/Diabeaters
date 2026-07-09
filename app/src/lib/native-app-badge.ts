@@ -2,10 +2,7 @@ import { Badge } from "@capawesome/capacitor-badge";
 
 import { AppIconBadge } from "@/lib/app-icon-badge";
 import { fetchNativeAppBadgeCount } from "@/lib/native-app-badge-count";
-import {
-  getNativePushPlatform,
-  isCapacitorNativeShell,
-} from "@/lib/native-platform";
+import { getDevicePlatform, getNativePushPlatform } from "@/lib/native-platform";
 
 let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 let inFlight: Promise<void> | null = null;
@@ -24,9 +21,10 @@ export function isNativeHomeScreenBadgeEnabled(): boolean {
 
 /** Where to write the OS icon badge (handles remote server.url shells). */
 function resolveNativeBadgeWritePlatform(): "ios" | "android" | null {
+  const platform = getDevicePlatform();
+  if (platform === "ios" || platform === "android") return platform;
   const pushPlatform = getNativePushPlatform();
   if (pushPlatform) return pushPlatform;
-  if (isCapacitorNativeShell()) return "ios";
   return null;
 }
 

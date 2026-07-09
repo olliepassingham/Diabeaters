@@ -1,0 +1,103 @@
+import { describe, expect, it } from "vitest";
+import {
+  analyzeBedtimeOvernight,
+  computeOvernightStats,
+  entriesToOvernightReadings,
+  filterEntriesToSleepWindow,
+} from "./bedtime-overnight-analysis";
+import { computeBedtimeSleepWindow, findReviewableBedtimeLog, resolveOvernightReviewTarget } from "./bedtime-overnight-window";
+import type { BedtimeLog } from "@/lib/storage";
+
+function makeLog(overrides: Partial<BedtimeLog> = {}): BedtimeLog {
+  return {
+    id: "log-1",
+    date: "2026-07-08T22:00:00.000Z",
+    currentBg: 7.2,
+    bgUnits: "mmol/L",
+    readinessLevel: "monitor",
+    hoursSinceFood: 3,
+    hoursSinceInsulin: 2,
+    hoursUntilSleep: 1,
+    exercisedToday: true,
+    hadAlcohol: false,
+    sickDayActive: false,
+    travelModeActive: false,
+    correctionGiven: null,
+    notes: "",
+    ...overrides,
+  };
+}
+
+describe("bedtime overnight window", () => {
+  it("estimates sleep start from check time plus sleep-in offset", () => {
+    const window = computeBedtimeSleepWindow(makeLog());
+    expect(window).not.toBeNull();
+    expect(window!.hoursUntilSleep).toBe(1);
+    expect(window!.endMs - window!.startMs).toBe(8 * 60 * 60 * 1000);
+  });
+
+  it("finds the latest log with a completed sleep window", () => {
+    const now = new Date("2026-07-09T10:00:00.000Z").getTime();
+    const logs = [
+      makeLog({ id: "old", date: "2026-07-07T22:00:00.000Z", hoursUntilSleep: 1 }),
+      makeLog({ id: "last-night", date: "2026-07-08T22:00:00.000Z", hoursUntilSleep: 1 }),
+    ];
+    expect(findReviewableBedtimeLog(logs, now)?.id).toBe("last-night");
+  });
+
+  it("uses calendar fallback when no completed bedtime log exists", () => {
+    const now = new Date("2026-07-09T10:00:00.000Z").getTime();
+    const target = resolveOvernightReviewTarget([], now);
+    expect(target).not.toBeNull();
+    expect(target!.source).toBe("calendar_fallback");
+    expect(target!.window.endMs).toBeLessThanOrEqual(now);
+  });
+});
+
+describe("bedtime overnight analysis", () => {
+  it("flags overnight low and links exercise from the log", () => {
+    const log = makeLog({ exercisedToday: true });
+    const window = computeBedtimeSleepWindow(log)!;
+    const entries = [
+      { valueMgDl: 126, recordedAt: new Date(window.startMs + 2 * 60 * 60 * 1000).toISOString(), trend: "flat" as const },
+      { valueMgDl: 61, recordedAt: new Date(window.startMs + 5 * 60 * 60 * 1000).toISOString(), trend: "flat" as const },
+    ];
+    const filtered = filterEntriesToSleepWindow(entries, window);
+    const readings = entriesToOvernightReadings(filtered, "mmol/L");
+    const stats = computeOvernightStats(readings, 4, 10)!;
+    const insight = analyzeBedtimeOvernight(log, readings, window, 4, 10)!;
+
+    expect(stats.hadLow).toBe(true);
+    expect(insight.headline).toMatch(/low/i);
+    expect(insight.explanations.some((l) => /exercise/i.test(l))).toBe(true);
+  });
+
+  it("computes time in range against user targets, not overnight extrema", () => {
+    const readings = [
+      { timeMs: 1, recordedAt: new Date(1).toISOString(), value: 8, units: "mmol/L" as const },
+      { timeMs: 2, recordedAt: new Date(2).toISOString(), value: 9, units: "mmol/L" as const },
+      { timeMs: 3, recordedAt: new Date(3).toISOString(), value: 11, units: "mmol/L" as const },
+      { timeMs: 4, recordedAt: new Date(4).toISOString(), value: 13.9, units: "mmol/L" as const },
+    ];
+    const stats = computeOvernightStats(readings, 4, 10)!;
+    expect(stats.inRangePercent).toBe(50);
+    expect(stats.hadHigh).toBe(true);
+    expect(stats.min).toBe(8);
+    expect(stats.max).toBe(13.9);
+  });
+
+  it("uses a nuanced headline when part of the night was in range before rising", () => {
+    const log = makeLog();
+    const window = computeBedtimeSleepWindow(log)!;
+    const readings = Array.from({ length: 10 }, (_, i) => ({
+      timeMs: window.startMs + i * 60 * 60 * 1000,
+      recordedAt: new Date(window.startMs + i * 60 * 60 * 1000).toISOString(),
+      value: 8 + i * 0.7,
+      units: "mmol/L" as const,
+    }));
+    const insight = analyzeBedtimeOvernight(log, readings, window, 4, 10)!;
+    expect(insight.headline).toMatch(/rose above target/i);
+    expect(insight.summary).toContain("4–10");
+    expect(insight.considerations.length).toBeGreaterThan(0);
+  });
+});

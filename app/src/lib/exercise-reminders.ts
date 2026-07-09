@@ -1,8 +1,7 @@
-import { Capacitor } from "@capacitor/core";
 import { LocalNotifications } from "@capacitor/local-notifications";
 
 import { ensureNativeLocalNotificationPermission } from "@/lib/native-local-notifications";
-import { supportsNativeLocalNotifications } from "@/lib/native-platform";
+import { androidNotificationChannel, supportsNativeLocalNotifications } from "@/lib/native-platform";
 import { storage, type ActiveExerciseSession } from "@/lib/storage";
 
 export type ExerciseReminderKind =
@@ -50,7 +49,7 @@ function copyFor(kind: ExerciseReminderKind, exerciseName: string): { title: str
 }
 
 function exerciseAndroidChannel(): { channelId?: string } {
-  return Capacitor.getPlatform() === "android" ? { channelId: "diabeaters_exercise" } : {};
+  return androidNotificationChannel("diabeaters_exercise");
 }
 
 async function ensureReminderPermission(): Promise<boolean> {

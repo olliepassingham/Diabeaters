@@ -1,8 +1,7 @@
-import { Capacitor } from "@capacitor/core";
 import { LocalNotifications } from "@capacitor/local-notifications";
 
 import { ensureNativeLocalNotificationPermission } from "@/lib/native-local-notifications";
-import { supportsNativeLocalNotifications } from "@/lib/native-platform";
+import { androidNotificationChannel, supportsNativeLocalNotifications } from "@/lib/native-platform";
 import { storage, type PumpFailureReminderKind, type PumpFailureSession } from "@/lib/storage";
 
 function notificationId(sessionId: string, kind: PumpFailureReminderKind): number {
@@ -12,7 +11,7 @@ function notificationId(sessionId: string, kind: PumpFailureReminderKind): numbe
 }
 
 function androidChannel(): { channelId?: string } {
-  return Capacitor.getPlatform() === "android" ? { channelId: "diabeaters_scenarios" } : {};
+  return androidNotificationChannel("diabeaters_scenarios");
 }
 
 function copyFor(kind: PumpFailureReminderKind): { title: string; body: string } {

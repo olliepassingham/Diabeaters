@@ -1,4 +1,3 @@
-import { Capacitor } from "@capacitor/core";
 import { LocalNotifications } from "@capacitor/local-notifications";
 
 import {
@@ -10,12 +9,8 @@ import {
 } from "@/lib/bedtime-reminder-schedule";
 import { shouldReceiveBedtimeCheckReminders } from "@/lib/bedtime-reminder-eligibility";
 import { ensureNativeLocalNotificationPermission } from "@/lib/native-local-notifications";
-import { supportsNativeLocalNotifications } from "@/lib/native-platform";
+import { androidNotificationChannel, supportsNativeLocalNotifications } from "@/lib/native-platform";
 import { storage } from "@/lib/storage";
-
-function androidChannel(): { channelId?: string } {
-  return Capacitor.getPlatform() === "android" ? { channelId: "diabeaters_general" } : {};
-}
 
 export async function rescheduleBedtimeReminders(
   options?: { hasCarerLink?: boolean; cloudCommunityProfile?: boolean },
@@ -60,7 +55,7 @@ export async function rescheduleBedtimeReminders(
       deep_link: "/scenarios/bedtime",
       day_key: dayKey,
     },
-    ...androidChannel(),
+    ...androidNotificationChannel("diabeaters_general"),
   }));
 
   if (notifications.length === 0) return;

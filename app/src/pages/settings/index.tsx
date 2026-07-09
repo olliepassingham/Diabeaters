@@ -2092,7 +2092,7 @@ export default function Settings() {
             <SettingsHubNavLink
               href="/settings/cgm"
               label="CGM prefill"
-              description="Recent BG from Apple Health or Health Connect"
+              description="Near-live Dexcom/Libre, or delayed Apple Health / Health Connect"
               icon={Activity}
             />
           </SettingsHubGroup>

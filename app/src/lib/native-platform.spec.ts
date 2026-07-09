@@ -60,6 +60,55 @@ describe("getNativePushPlatform", () => {
   });
 });
 
+describe("getDevicePlatform", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    capacitorState.platform = "web";
+    capacitorState.isNativePlatform = false;
+  });
+
+  it("returns web in a desktop browser", async () => {
+    capacitorState.isNativePlatform = false;
+    vi.stubGlobal("window", {});
+    vi.stubGlobal("navigator", {
+      userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+      maxTouchPoints: 0,
+    });
+    const { getDevicePlatform } = await import("@/lib/native-platform");
+    expect(getDevicePlatform()).toBe("web");
+  });
+
+  it("returns android for a native shell with an Android user agent", async () => {
+    capacitorState.isNativePlatform = true;
+    vi.stubGlobal("navigator", {
+      userAgent: "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36",
+      maxTouchPoints: 5,
+    });
+    const { getDevicePlatform, healthPlatformLabel } = await import("@/lib/native-platform");
+    expect(getDevicePlatform()).toBe("android");
+    expect(healthPlatformLabel()).toBe("Health Connect");
+  });
+
+  it("returns ios when Capacitor reports ios directly", async () => {
+    capacitorState.platform = "ios";
+    const { getDevicePlatform, healthPlatformLabel } = await import("@/lib/native-platform");
+    expect(getDevicePlatform()).toBe("ios");
+    expect(healthPlatformLabel()).toBe("Apple Health");
+  });
+
+  it("labels Health Connect on web with an Android user agent", async () => {
+    capacitorState.platform = "web";
+    capacitorState.isNativePlatform = false;
+    vi.stubGlobal("window", {});
+    vi.stubGlobal("navigator", {
+      userAgent: "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36",
+      maxTouchPoints: 5,
+    });
+    const { healthPlatformLabel } = await import("@/lib/native-platform");
+    expect(healthPlatformLabel()).toBe("Health Connect");
+  });
+});
+
 describe("isCapacitorNativeShell", () => {
   beforeEach(() => {
     vi.resetModules();

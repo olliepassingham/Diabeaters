@@ -70,6 +70,17 @@ Use `npm run version:patch`, `version:minor`, or `version:major` to bump `packag
 
 - [ ] **Remote notifications**: In Xcode → Target → **Signing & Capabilities**, add **Push Notifications** if it is not already present (the project uses `AppDebug.entitlements` / `AppRelease.entitlements` with `aps-environment`). `Info.plist` includes `UIBackgroundModes` → `remote-notification` for background delivery.
 
+- [ ] **HealthKit (CGM prefill)**: Required for Apple Health blood glucose reads.
+  - **Apple Developer** → Identifiers → `com.passingtime.diabeaters` → enable **HealthKit**
+  - **Xcode** → App target → **Signing & Capabilities** → **HealthKit** must appear (not just the entitlements file)
+  - Release builds use `AppRelease.entitlements` (`com.apple.developer.healthkit`)
+  - `Info.plist` includes `NSHealthShareUsageDescription`
+  - After Archive, verify before upload:
+    ```bash
+    node scripts/verify-xcarchive-healthkit.mjs ~/Library/Developer/Xcode/Archives/.../App.xcarchive
+    ```
+  - **Test**: Diabeaters only appears under Health → Data Access & Devices **after** tapping Connect and seeing the Apple permission sheet. If it never appears, the signed IPA lacks HealthKit.
+
 ---
 
 ## 6. Icons & Launch Screen

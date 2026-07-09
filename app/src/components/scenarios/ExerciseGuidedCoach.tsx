@@ -28,8 +28,6 @@ import {
   Sparkles,
   Sun,
   Thermometer,
-  TrendingDown,
-  TrendingUp,
   Wind,
 } from "lucide-react";
 
@@ -94,6 +92,10 @@ import {
   ExerciseWorkoutProgressBar,
   formatExerciseElapsedShort,
 } from "@/components/exercise-active-session-extras";
+import { ExerciseCgmBgField } from "@/components/exercise-cgm-bg-field";
+import { CgmReadingSourceNote } from "@/components/cgm-reading-source-note";
+import { useExerciseCgmBg } from "@/hooks/use-exercise-cgm-bg";
+import type { BgPrefillResult } from "@/lib/cgm/prefill";
 
 // ----- Type / intensity catalogues kept local so the form can be self-contained -----
 
@@ -450,8 +452,9 @@ export function ExerciseGuidedCoach() {
       currentBg: bg,
       bgUnits,
       intensity: activeSession.intensity,
+      trend: trendForReadiness,
     });
-  }, [activeSession, bgInput, bgUnits, exercisePlan, profile, readiness]);
+  }, [activeSession, bgInput, bgUnits, exercisePlan, profile, readiness, trendForReadiness]);
 
   const fuelPlanVariant =
     activeSession?.phase === "pre"
@@ -503,6 +506,28 @@ export function ExerciseGuidedCoach() {
     if (activeSession.phase === "pre") update({ preTrend: t });
     else if (activeSession.phase === "active") update({ midTrend: t });
     else update({ recoveryTrend: t });
+  };
+
+  const cgmAutoApplyKey = activeSession ? `${activeSession.id}-${activeSession.phase}` : undefined;
+  const {
+    prefill: cgmPrefill,
+    loading: cgmLoading,
+    refresh: refreshCgm,
+    emptyHint: cgmEmptyHint,
+    onBgChange: onBgFieldChange,
+  } = useExerciseCgmBg({
+    bgValue: bgInput,
+    onApplyBg: onBgChange,
+    onApplyTrend: onTrendChange,
+    autoApplyKey: cgmAutoApplyKey,
+  });
+
+  const cgmPhaseProps = {
+    cgmPrefill,
+    cgmLoading,
+    cgmEmptyHint,
+    onCgmRefresh: refreshCgm,
+    onBgFieldChange,
   };
 
   const beginGuidedSession = (
@@ -892,6 +917,7 @@ export function ExerciseGuidedCoach() {
                     ) : null}
                   </div>
                   <p className="text-sm leading-snug text-foreground/90">{readiness.detail}</p>
+                  <CgmReadingSourceNote prefill={cgmPrefill} bgValue={bgInput} className="pt-0.5" />
                   {fuelPlanLines.length > 0 ? (
                     <ExerciseFuelPlanSummary
                       lines={fuelPlanLines}
@@ -945,9 +971,10 @@ export function ExerciseGuidedCoach() {
                   session={activeSession}
                   bgUnits={bgUnits}
                   bgInput={bgInput}
-                  onBgChange={onBgChange}
+                  onBgChange={onBgFieldChange}
                   onTrendChange={onTrendChange}
                   update={update}
+                  {...cgmPhaseProps}
                 />
               </div>
             </TabsContent>
@@ -964,9 +991,10 @@ export function ExerciseGuidedCoach() {
                   session={activeSession}
                   bgUnits={bgUnits}
                   bgInput={bgInput}
-                  onBgChange={onBgChange}
+                  onBgChange={onBgFieldChange}
                   onTrendChange={onTrendChange}
                   update={update}
+                  {...cgmPhaseProps}
                 />
               </div>
             </TabsContent>
@@ -983,9 +1011,10 @@ export function ExerciseGuidedCoach() {
                   session={activeSession}
                   bgUnits={bgUnits}
                   bgInput={bgInput}
-                  onBgChange={onBgChange}
+                  onBgChange={onBgFieldChange}
                   onTrendChange={onTrendChange}
                   update={update}
+                  {...cgmPhaseProps}
                 />
                 {exercisePlan ? (
                   <p className="text-xs text-muted-foreground leading-snug">
@@ -1049,60 +1078,34 @@ type PhaseProps = {
   onBgChange: (v: string) => void;
   onTrendChange: (t: ExerciseBgTrend) => void;
   update: (updates: Parameters<typeof storage.updateActiveExercise>[0]) => void;
+  cgmPrefill: BgPrefillResult | null;
+  cgmLoading: boolean;
+  cgmEmptyHint?: string;
+  onCgmRefresh: () => void;
+  onBgFieldChange: (v: string) => void;
 };
 
-function BgAndTrendRow({
-  bgUnits,
-  bgInput,
-  session,
-  onBgChange,
-  onTrendChange,
-  inputRef,
-}: Omit<PhaseProps, "update"> & { inputRef?: React.RefObject<HTMLInputElement | null> }) {
-  const trend =
-    session.phase === "pre"
-      ? session.preTrend
-      : session.phase === "active"
-        ? session.midTrend
-        : session.recoveryTrend;
-  return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between gap-2">
-        <Label className="text-xs">BG now</Label>
-        <Label className="text-xs text-muted-foreground">Trend</Label>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <Input
-          ref={inputRef as any}
-          inputMode="decimal"
-          value={bgInput}
-          onChange={(e) => onBgChange(e.target.value)}
-          placeholder={bgUnits === "mmol/L" ? "e.g. 7.2" : "e.g. 130"}
-          className="h-9 min-w-[10rem] flex-1"
-          data-testid="input-coach-bg"
-        />
-        <div className="flex flex-wrap gap-2">
-          {(["flat", "rising", "falling"] as const).map((t) => (
-            <Button
-              key={t}
-              type="button"
-              size="sm"
-              variant={trend === t ? "default" : "outline"}
-              className="h-7 px-2 text-xs"
-              onClick={() => onTrendChange(trend === t ? ("not_sure" as ExerciseBgTrend) : t)}
-              data-testid={`button-coach-trend-${t}`}
-            >
-              {t === "rising" ? <TrendingUp className="h-3.5 w-3.5 mr-1" /> : t === "falling" ? <TrendingDown className="h-3.5 w-3.5 mr-1" /> : null}
-              {t}
-            </Button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
+function sessionTrend(session: ActiveExerciseSession): ExerciseBgTrend | null | undefined {
+  return session.phase === "pre"
+    ? session.preTrend
+    : session.phase === "active"
+      ? session.midTrend
+      : session.recoveryTrend;
 }
 
-function PreQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange, update }: PhaseProps) {
+function PreQuestions({
+  session,
+  bgUnits,
+  bgInput,
+  onBgChange,
+  onTrendChange,
+  update,
+  cgmPrefill,
+  cgmLoading,
+  cgmEmptyHint,
+  onCgmRefresh,
+  onBgFieldChange,
+}: PhaseProps) {
   const sleepPresets = [4, 6, 8, 10] as const;
   const sleepIsPreset = session.preSleepHours != null && sleepPresets.includes(session.preSleepHours as (typeof sleepPresets)[number]);
   const mealPresets = [0, 30, 60, 120] as const;
@@ -1111,12 +1114,18 @@ function PreQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange, up
 
   return (
     <div className="space-y-4">
-      <BgAndTrendRow
-        session={session}
+      <ExerciseCgmBgField
         bgUnits={bgUnits}
-        bgInput={bgInput}
-        onBgChange={onBgChange}
+        bgValue={bgInput}
+        trend={sessionTrend(session)}
+        onBgChange={onBgFieldChange}
         onTrendChange={onTrendChange}
+        prefill={cgmPrefill}
+        loading={cgmLoading}
+        onRefresh={onCgmRefresh}
+        emptyHint={cgmEmptyHint}
+        inputTestId="input-coach-bg"
+        trendTestIdPrefix="button-coach-trend"
       />
 
       <FieldRow icon={Pill} label="Rapid-acting insulin in last 2h?">
@@ -1341,7 +1350,19 @@ function PreQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange, up
   );
 }
 
-function DuringQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange, update }: PhaseProps) {
+function DuringQuestions({
+  session,
+  bgUnits,
+  bgInput,
+  onBgChange,
+  onTrendChange,
+  update,
+  cgmPrefill,
+  cgmLoading,
+  cgmEmptyHint,
+  onCgmRefresh,
+  onBgFieldChange,
+}: PhaseProps) {
   const bgRef = useRef<HTMLInputElement | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [hypoRecheckEndsAt, setHypoRecheckEndsAt] = useState<number | null>(null);
@@ -1427,12 +1448,18 @@ function DuringQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange,
         </div>
       ) : null}
 
-      <BgAndTrendRow
-        session={session}
+      <ExerciseCgmBgField
         bgUnits={bgUnits}
-        bgInput={bgInput}
-        onBgChange={onBgChange}
+        bgValue={bgInput}
+        trend={sessionTrend(session)}
+        onBgChange={onBgFieldChange}
         onTrendChange={onTrendChange}
+        prefill={cgmPrefill}
+        loading={cgmLoading}
+        onRefresh={onCgmRefresh}
+        emptyHint={cgmEmptyHint}
+        inputTestId="input-coach-bg"
+        trendTestIdPrefix="button-coach-trend"
         inputRef={bgRef}
       />
 
@@ -1687,15 +1714,33 @@ function DuringQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange,
   );
 }
 
-function RecoveryQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange, update }: PhaseProps) {
+function RecoveryQuestions({
+  session,
+  bgUnits,
+  bgInput,
+  onBgChange,
+  onTrendChange,
+  update,
+  cgmPrefill,
+  cgmLoading,
+  cgmEmptyHint,
+  onCgmRefresh,
+  onBgFieldChange,
+}: PhaseProps) {
   return (
     <div className="space-y-4">
-      <BgAndTrendRow
-        session={session}
+      <ExerciseCgmBgField
         bgUnits={bgUnits}
-        bgInput={bgInput}
-        onBgChange={onBgChange}
+        bgValue={bgInput}
+        trend={sessionTrend(session)}
+        onBgChange={onBgFieldChange}
         onTrendChange={onTrendChange}
+        prefill={cgmPrefill}
+        loading={cgmLoading}
+        onRefresh={onCgmRefresh}
+        emptyHint={cgmEmptyHint}
+        inputTestId="input-coach-bg"
+        trendTestIdPrefix="button-coach-trend"
       />
 
       <Field label="Carbs eaten since stopping (g)">

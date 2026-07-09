@@ -1,7 +1,6 @@
-import { Capacitor } from "@capacitor/core";
 import { LocalNotifications } from "@capacitor/local-notifications";
 
-import { supportsNativeLocalNotifications } from "@/lib/native-platform";
+import { androidNotificationChannel, isAndroidDevice, supportsNativeLocalNotifications } from "@/lib/native-platform";
 import { storage } from "@/lib/storage";
 
 const CHANNELS = [
@@ -47,7 +46,7 @@ export type NativeNotificationChannelId = (typeof CHANNELS)[number]["id"];
 let channelsReady = false;
 
 export async function ensureNativeNotificationChannels(): Promise<void> {
-  if (!supportsNativeLocalNotifications() || Capacitor.getPlatform() !== "android") return;
+  if (!supportsNativeLocalNotifications() || !isAndroidDevice()) return;
   if (channelsReady) return;
   try {
     for (const ch of CHANNELS) {
@@ -72,7 +71,7 @@ export async function ensureNativeLocalNotificationPermission(): Promise<boolean
 
   try {
     const perm = await LocalNotifications.requestPermissions();
-    if (Capacitor.getPlatform() === "android") {
+    if (isAndroidDevice()) {
       return perm.display === "granted";
     }
     return perm.display === "granted";

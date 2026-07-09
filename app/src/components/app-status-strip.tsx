@@ -53,8 +53,13 @@ import {
   type ExerciseReadinessResult,
 } from "@/lib/exercise-readiness";
 import { cancelExerciseReminders, scheduleExerciseActiveReminders } from "@/lib/exercise-reminders";
+import { CgmLiveBgChip } from "@/components/cgm-live-bg-chip";
 import { CgmPrefillButton } from "@/components/cgm-prefill-button";
+import { cgmTrendForExercise } from "@/lib/cgm/apply-cgm-trend";
+import { isCgmPrefillActive } from "@/lib/cgm/preferences";
 import { useBgPrefill } from "@/hooks/use-bg-prefill";
+import { useLinkedPatient } from "@/hooks/use-linked-patient";
+import { useSupporterLiveBg } from "@/hooks/use-supporter-live-bg";
 import { syncSickDayDeactivatedToCloud } from "@/lib/scenarios-supabase";
 import { cancelSickDayMedReminder } from "@/lib/sick-day-med-reminders";
 import {
@@ -229,11 +234,35 @@ function postExerciseTipPresentation(text: string, index: number): { Icon: Lucid
  */
 export function AppStatusStrip() {
   const { toast } = useToast();
-  const { prefill: bgPrefill, loading: bgPrefillLoading, refresh: refreshBgPrefill } = useBgPrefill();
+  const [pathname, setLocation] = useLocation();
+  const { data: linkedPatient } = useLinkedPatient();
+  const inSupporterSession = Boolean(linkedPatient);
+  const supporterLiveGlucoseScope = linkedPatient?.scopes.live_glucose !== false;
+  const { prefill: bgPrefill, loading: bgPrefillLoading, refresh: refreshBgPrefill } = useBgPrefill({
+    pollIntervalMs: inSupporterSession ? undefined : 5 * 60_000,
+  });
+  const {
+    prefill: supporterBgPrefill,
+    loading: supporterBgLoading,
+    refresh: refreshSupporterBg,
+  } = useSupporterLiveBg(linkedPatient?.patientId ?? null, inSupporterSession && supporterLiveGlucoseScope);
+  const cgmPrefillActive = isCgmPrefillActive();
+  const showPatientCgmLiveChip =
+    !inSupporterSession && cgmPrefillActive && (bgPrefillLoading || Boolean(bgPrefill?.fromCgm));
+  const showSupporterCgmLiveChip =
+    inSupporterSession &&
+    supporterLiveGlucoseScope &&
+    (supporterBgLoading || Boolean(supporterBgPrefill?.fromCgm));
+  const showCgmLiveChip = showPatientCgmLiveChip || showSupporterCgmLiveChip;
+
+  useEffect(() => {
+    if (!showCgmLiveChip) return;
+    void import("@/pages/tools/cgm-live");
+  }, [showCgmLiveChip]);
+
   const online = useOnline();
   const [sc, setSc] = useState<ScenarioState>(() => storage.getScenarioState());
   const [ex, setEx] = useState<ActiveExerciseSession | null>(() => storage.getActiveExercise());
-  const [pathname] = useLocation();
   /** Bumps when post-exercise snooze/resume changes so we re-read localStorage. */
   const [postExerciseRev, setPostExerciseRev] = useState(0);
   const inPostExerciseWindow = useMemo(() => {
@@ -369,7 +398,13 @@ export function AppStatusStrip() {
   const travelDays = useMemo(() => daysRemaining(sc.travelEndDate), [sc.travelEndDate]);
   const travelStyleBadge = tripStyleLabel(sc.travelTripStyle);
   const show =
-    sc.sickDayActive || sc.travelModeActive || Boolean(ex) || inPostExerciseWindow || sc.pumpFailureActive || !online;
+    sc.sickDayActive ||
+    sc.travelModeActive ||
+    Boolean(ex) ||
+    inPostExerciseWindow ||
+    sc.pumpFailureActive ||
+    !online ||
+    showCgmLiveChip;
 
   const isExerciseScenarioPage = pathname === "/scenarios/exercise";
 
@@ -557,8 +592,9 @@ export function AppStatusStrip() {
       currentBg: readiness.bg,
       bgUnits,
       intensity: ex.intensity,
+      trend: trendForReadiness,
     });
-  }, [bgUnits, ex?.exerciseType, ex?.intensity, ex?.phase, exercisePlan, readiness?.bg, readiness?.verdict, stripProfile]);
+  }, [bgUnits, ex?.exerciseType, ex?.intensity, ex?.phase, exercisePlan, readiness?.bg, readiness?.verdict, stripProfile, trendForReadiness]);
 
   const activeFuelPlanLines = useMemo(() => {
     if (ex?.phase !== "active" || !exercisePlan || !readiness?.verdict) return [];
@@ -686,6 +722,15 @@ export function AppStatusStrip() {
     setEx(storage.getActiveExercise());
   };
 
+  const applyExerciseCgmPrefill = (value: string) => {
+    onExerciseBgInputChange(value);
+  };
+
+  const applyExerciseCgmTrend = (trend: ExerciseBgTrend) => {
+    const mapped = cgmTrendForExercise(trend);
+    if (mapped) onExerciseTrendPick(mapped);
+  };
+
   const trendButtonSelected = (t: "flat" | "rising" | "falling") => {
     if (!ex) return false;
     const current =
@@ -696,7 +741,24 @@ export function AppStatusStrip() {
   if (!show) return null;
 
   return (
-    <div className="relative z-40 -mt-2 mb-2 space-y-1.5 sm:space-y-2" data-testid="app-status-strip">
+    <div className="relative z-40 -mt-1 mb-0 space-y-1 sm:space-y-1.5" data-testid="app-status-strip">
+      {showCgmLiveChip ? (
+        <CgmLiveBgChip
+          prefill={
+            showSupporterCgmLiveChip
+              ? supporterBgPrefill?.fromCgm
+                ? supporterBgPrefill
+                : null
+              : bgPrefill?.fromCgm
+                ? bgPrefill
+                : null
+          }
+          loading={showSupporterCgmLiveChip ? supporterBgLoading : bgPrefillLoading}
+          onRefresh={showSupporterCgmLiveChip ? refreshSupporterBg : refreshBgPrefill}
+          onOpen={showSupporterCgmLiveChip ? () => setLocation("/carer-view/glucose") : () => setLocation("/tools/cgm-live")}
+        />
+      ) : null}
+
       {!online ? (
         <div className={rowClass} role="status" aria-live="polite">
           <div className="flex min-w-0 flex-1 items-center gap-2 text-sm text-muted-foreground">
@@ -1002,7 +1064,8 @@ export function AppStatusStrip() {
                     loading={bgPrefillLoading}
                     bgUnits={bgUnits}
                     currentValue={exerciseBgInput}
-                    onApply={setExerciseBgInput}
+                    onApply={applyExerciseCgmPrefill}
+                    onApplyTrend={applyExerciseCgmTrend}
                     onRefresh={refreshBgPrefill}
                     testId="button-exercise-cgm-prefill"
                   />
@@ -1043,7 +1106,8 @@ export function AppStatusStrip() {
                     loading={bgPrefillLoading}
                     bgUnits={bgUnits}
                     currentValue={exerciseBgInput}
-                    onApply={setExerciseBgInput}
+                    onApply={applyExerciseCgmPrefill}
+                    onApplyTrend={applyExerciseCgmTrend}
                     onRefresh={refreshBgPrefill}
                     testId="button-exercise-cgm-prefill"
                   />

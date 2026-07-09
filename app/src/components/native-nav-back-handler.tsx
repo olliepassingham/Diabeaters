@@ -1,10 +1,9 @@
 import { useEffect } from "react";
 import { App as CapacitorApp } from "@capacitor/app";
-import { Capacitor } from "@capacitor/core";
 import { useEdgeSwipeBack } from "@/hooks/use-edge-swipe-back";
 import { useNavHistoryTracker } from "@/hooks/use-nav-history-tracker";
 import { canNavigateBack, navigateBack } from "@/lib/nav-back";
-import { isCapacitorNativeShell } from "@/lib/native-platform";
+import { isAndroidDevice, isCapacitorNativeShell } from "@/lib/native-platform";
 
 type NativeNavBackHandlerProps = {
   pathname: string;
@@ -31,7 +30,7 @@ export function NativeNavBackHandler({ pathname, setLocation, enabled = true }: 
         navigateBack(pathOnly, setLocation);
         return;
       }
-      if (Capacitor.getPlatform() === "android") {
+      if (isAndroidDevice()) {
         void CapacitorApp.exitApp();
       }
     }).then((listener) => {

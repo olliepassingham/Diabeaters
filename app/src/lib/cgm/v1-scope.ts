@@ -9,7 +9,7 @@ export const CGM_V1_MODE = "prefill_health_only" as const;
 export const CGM_PREFILL_WARN_AGE_MINUTES = 60;
 
 /** Readings older than this are stale for automatic prefill. */
-export const CGM_PREFILL_STALE_AGE_MINUTES = 180;
+export const CGM_PREFILL_STALE_AGE_MINUTES = 360;
 
 /** Sources enabled in v1. */
 export const CGM_V1_ENABLED_SOURCES = ["health_platform"] as const;

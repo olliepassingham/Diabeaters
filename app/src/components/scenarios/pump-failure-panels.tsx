@@ -18,6 +18,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { CgmPrefillButton } from "@/components/cgm-prefill-button";
+import type { BgPrefillResult } from "@/lib/cgm/prefill";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { readLocalEmergencyProfile } from "@/lib/emergency-sync";
@@ -446,6 +448,10 @@ export function PumpFailureReadingInputs({
   ketones,
   onKetonesChange,
   idPrefix,
+  bgPrefill,
+  bgPrefillLoading,
+  onRefreshBgPrefill,
+  cgmEmptyHint,
 }: {
   bgInput: string;
   onBgInputChange: (v: string) => void;
@@ -453,6 +459,10 @@ export function PumpFailureReadingInputs({
   ketones: PumpFailureKetoneLevel;
   onKetonesChange: (v: PumpFailureKetoneLevel) => void;
   idPrefix: string;
+  bgPrefill?: BgPrefillResult | null;
+  bgPrefillLoading?: boolean;
+  onRefreshBgPrefill?: () => void;
+  cgmEmptyHint?: string;
 }) {
   return (
     <div className="space-y-4">
@@ -472,6 +482,18 @@ export function PumpFailureReadingInputs({
             {bgUnits}
           </span>
         </div>
+        {bgPrefill !== undefined ? (
+          <CgmPrefillButton
+            prefill={bgPrefill}
+            loading={bgPrefillLoading}
+            bgUnits={bgUnits}
+            currentValue={bgInput}
+            onApply={onBgInputChange}
+            onRefresh={onRefreshBgPrefill}
+            emptyHint={cgmEmptyHint}
+            testId={`${idPrefix}-cgm-prefill`}
+          />
+        ) : null}
       </div>
       <div className="space-y-2">
         <Label htmlFor={`${idPrefix}-ketones`}>Ketones (if known)</Label>

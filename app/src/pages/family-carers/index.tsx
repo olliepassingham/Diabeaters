@@ -17,7 +17,7 @@ import {
 } from "@/lib/carers";
 import type { CarerInviteRow, CarerLinkWithProfile, CarerScopes } from "@/lib/carers.types";
 import { DEFAULT_CARER_SCOPES } from "@/lib/carers.types";
-import { carerScopePresetSummary } from "@/lib/carer-scopes-by-age";
+import { invalidateLiveGlucoseShareCache } from "@/lib/cgm/live-glucose-sync";
 import { getAgeBand } from "@/lib/user-age";
 import { getSupabase } from "@/lib/supabase";
 import { useProfile } from "@/lib/profile";
@@ -102,6 +102,12 @@ const PRIVACY_TOGGLES = [
     testId: "privacy-toggle-hypo-alerts",
   },
   {
+    key: "live_glucose" as const,
+    label: "Live glucose",
+    description: "Latest near-live CGM reading in the top bar (from their device — not a full history).",
+    testId: "privacy-toggle-live-glucose",
+  },
+  {
     key: "appointments" as const,
     label: "Appointments",
     description:
@@ -165,6 +171,7 @@ function aggregateScopes(links: CarerLinkWithProfile[]): CarerScopes {
     appointments: true,
     scenarios: true,
     hypo_alerts: true,
+    live_glucose: true,
     emergency_info: true,
     clinical_settings: true,
     public_profile_mention: true,
@@ -175,6 +182,7 @@ function aggregateScopes(links: CarerLinkWithProfile[]): CarerScopes {
       appointments: acc.appointments && l.scopes.appointments,
       scenarios: acc.scenarios && l.scopes.scenarios,
       hypo_alerts: acc.hypo_alerts && l.scopes.hypo_alerts,
+      live_glucose: acc.live_glucose && l.scopes.live_glucose,
       emergency_info: acc.emergency_info && l.scopes.emergency_info,
       clinical_settings: acc.clinical_settings && l.scopes.clinical_settings,
       public_profile_mention: acc.public_profile_mention && l.scopes.public_profile_mention,
@@ -278,6 +286,7 @@ export default function FamilyCarersPage() {
         title: "Privacy updated",
         description: "This applies to everyone you have linked for now.",
       });
+      if (key === "live_glucose") invalidateLiveGlucoseShareCache();
       await refresh();
     } catch (e) {
       toast({

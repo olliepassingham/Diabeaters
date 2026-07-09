@@ -31,6 +31,13 @@ if (!plugins.includes("HealthPlugin")) {
   console.error("capacitor.config.json packageClassList must include HealthPlugin for CGM prefill.");
   process.exit(1);
 }
+if (!plugins.includes("HealthAuthorizationPlugin")) {
+  console.error(
+    "capacitor.config.json packageClassList must include HealthAuthorizationPlugin.\n" +
+      "Run: node scripts/patch-ios-local-plugins.mjs",
+  );
+  process.exit(1);
+}
 
 if (!existsSync(pbxprojPath)) {
   console.error(`Missing ${pbxprojPath}`);
@@ -42,4 +49,6 @@ if (!pbx.includes("com.apple.HealthKit")) {
   process.exit(1);
 }
 
-console.log("✓ iOS HealthKit config looks ready (entitlements, HealthPlugin, Xcode capability)");
+console.log(
+  "✓ iOS HealthKit config looks ready (entitlements, HealthPlugin, HealthAuthorizationPlugin, Xcode capability)",
+);
