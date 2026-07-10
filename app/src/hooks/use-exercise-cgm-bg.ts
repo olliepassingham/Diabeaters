@@ -4,9 +4,10 @@ import type { BgPrefillResult } from "@/lib/cgm/prefill";
 import { getCgmEmptyHint } from "@/lib/cgm/cgm-empty-hint";
 import { isCgmPrefillActive } from "@/lib/cgm/preferences";
 import type { ExerciseBgTrend } from "@/lib/storage";
+import { EXERCISE_LIVE_CGM_POLL_MS } from "@/lib/exercise-live-cgm-sync";
 import { useBgPrefill } from "@/hooks/use-bg-prefill";
 
-export const EXERCISE_CGM_POLL_MS = 5 * 60_000;
+export { EXERCISE_LIVE_CGM_POLL_MS as EXERCISE_CGM_POLL_MS } from "@/lib/exercise-live-cgm-sync";
 
 type UseExerciseCgmBgOptions = {
   bgValue: string;
@@ -33,7 +34,7 @@ export function useExerciseCgmBg({
   applyFromCgm: () => void;
   onBgChange: (value: string) => void;
 } {
-  const { prefill, loading, refresh } = useBgPrefill({ pollIntervalMs: EXERCISE_CGM_POLL_MS });
+  const { prefill, loading, refresh } = useBgPrefill({ pollIntervalMs: EXERCISE_LIVE_CGM_POLL_MS });
   const cgmActive = isCgmPrefillActive();
   const lastAutoKey = useRef("");
   const lastPollRecordedAt = useRef("");

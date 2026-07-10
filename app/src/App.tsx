@@ -23,6 +23,7 @@ import { KeyboardInsets } from "@/components/keyboard-insets";
 import { AlcoholReminderPoller } from "@/components/alcohol-reminder-poller";
 import { PumpFailureReminderPoller } from "@/components/pump-failure-reminder-poller";
 import { ExerciseCgmAlertPoller } from "@/components/exercise-cgm-alert-poller";
+import { ExerciseCgmServerMonitorSync } from "@/components/exercise-cgm-server-monitor-sync";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -1128,6 +1129,7 @@ function UnverifiedAccountShell({
       {!suppressClinicalPollers ? <AlcoholReminderPoller /> : null}
       {!suppressClinicalPollers ? <PumpFailureReminderPoller /> : null}
       {!suppressClinicalPollers ? <ExerciseCgmAlertPoller /> : null}
+      {!suppressClinicalPollers ? <ExerciseCgmServerMonitorSync /> : null}
       <AppShellBackdrop tone="rich" />
       <AppTopBar
         isCarer={isCarerMode}
@@ -1387,6 +1389,7 @@ function AuthenticatedShell() {
         {!suppressClinicalPollers ? <AlcoholReminderPoller /> : null}
         {!suppressClinicalPollers ? <PumpFailureReminderPoller /> : null}
         {!suppressClinicalPollers ? <ExerciseCgmAlertPoller /> : null}
+      {!suppressClinicalPollers ? <ExerciseCgmServerMonitorSync /> : null}
       </DeferredAfterFirstPaint>
       <AppShellBackdrop tone="rich" />
       <AppTopBar

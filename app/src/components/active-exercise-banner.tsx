@@ -17,6 +17,7 @@ import {
   ExerciseOutcome,
   type ExerciseBgTrend,
   DIABEATER_PROFILE_CHANGED_EVENT,
+  DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT,
 } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { usesClosedLoop } from "@/lib/closed-loop";
@@ -691,7 +692,11 @@ export function ActiveExerciseBanner() {
   useEffect(() => {
     const onP = () => loadSession();
     window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onP);
-    return () => window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onP);
+    window.addEventListener(DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT, onP);
+    return () => {
+      window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onP);
+      window.removeEventListener(DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT, onP);
+    };
   }, [loadSession]);
 
   useEffect(() => {
@@ -831,6 +836,7 @@ export function ActiveExerciseBanner() {
       midTrend: trend,
       midBgAt: new Date().toISOString(),
       midCheckDone: true,
+      midBgSource: "manual",
     });
     setShowMidCheck(false);
     loadSession();

@@ -697,7 +697,8 @@ export function AppStatusStrip() {
     const raw = value.trim().replace(",", ".");
     if (raw === "") {
       if (ex.phase === "pre") storage.updateActiveExercise({ preBg: undefined, preBgAt: undefined });
-      else if (ex.phase === "active") storage.updateActiveExercise({ midBg: undefined, midBgAt: undefined });
+      else if (ex.phase === "active")
+        storage.updateActiveExercise({ midBg: undefined, midBgAt: undefined, midBgSource: undefined });
       else storage.updateActiveExercise({ recoveryBg: undefined, recoveryBgAt: undefined });
       setEx(storage.getActiveExercise());
       return;
@@ -706,7 +707,13 @@ export function AppStatusStrip() {
     if (!Number.isFinite(n)) return;
     const now = new Date().toISOString();
     if (ex.phase === "pre") storage.updateActiveExercise({ preBg: n, preBgAt: now });
-    else if (ex.phase === "active") storage.updateActiveExercise({ midBg: n, midBgAt: now, midCheckDone: true });
+    else if (ex.phase === "active")
+      storage.updateActiveExercise({
+        midBg: n,
+        midBgAt: now,
+        midCheckDone: true,
+        midBgSource: "manual",
+      });
     else storage.updateActiveExercise({ recoveryBg: n, recoveryBgAt: now });
     setEx(storage.getActiveExercise());
   };
@@ -723,7 +730,23 @@ export function AppStatusStrip() {
   };
 
   const applyExerciseCgmPrefill = (value: string) => {
-    onExerciseBgInputChange(value);
+    setExerciseBgInput(value);
+    if (!ex) return;
+    const raw = value.trim().replace(",", ".");
+    if (raw === "") return;
+    const n = parseFloat(raw);
+    if (!Number.isFinite(n)) return;
+    const now = new Date().toISOString();
+    if (ex.phase === "pre") storage.updateActiveExercise({ preBg: n, preBgAt: now });
+    else if (ex.phase === "active")
+      storage.updateActiveExercise({
+        midBg: n,
+        midBgAt: now,
+        midCheckDone: true,
+        midBgSource: "cgm",
+      });
+    else storage.updateActiveExercise({ recoveryBg: n, recoveryBgAt: now });
+    setEx(storage.getActiveExercise());
   };
 
   const applyExerciseCgmTrend = (trend: ExerciseBgTrend) => {

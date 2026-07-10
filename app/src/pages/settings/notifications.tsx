@@ -302,7 +302,8 @@ export function NotificationsTab({
                   />
                   <p className="text-[11px] text-muted-foreground">
                     Uses your exercise-during carb favourite. Only fires while an exercise session is in the active
-                    phase. Educational — confirm on meter/CGM before treating.
+                    phase. With Dexcom Share and push enabled, alerts can reach you when the app is in the background.
+                    Educational — confirm on meter/CGM before treating.
                   </p>
                 </div>
               ) : null}

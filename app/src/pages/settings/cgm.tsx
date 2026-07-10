@@ -561,7 +561,9 @@ export function SettingsCgmRoute() {
             info={
               <p>
                 Near-live readings via Dexcom&apos;s Share service. Use your Dexcom app login (not a Follower account).
-                Share must be on in the Dexcom app. Credentials stay on this device only.
+                Share must be on in the Dexcom app. Credentials stay on this device except during an active exercise
+                session with low-glucose alerts enabled — then they are sent encrypted to our server for background
+                polling and deleted when the session ends.
               </p>
             }
             checked={Boolean(prefs.dexcomShareEnabled)}

@@ -1360,6 +1360,8 @@ export interface ActiveExerciseSession {
   midBg?: number;
   midTrend?: ExerciseBgTrend;
   midBgAt?: string;
+  /** When "manual", live CGM sync will not overwrite midBg until the session ends. */
+  midBgSource?: "cgm" | "manual";
   midBgSkipped?: boolean;
   /** Start of recovery window. */
   recoveryBg?: number;

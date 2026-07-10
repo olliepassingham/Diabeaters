@@ -15,7 +15,7 @@ export const CGM_DATA_RETENTION_POLICY = {
   description:
     "v1 does not upload CGM history. When you allow Live glucose for a supporter, your device may sync only the latest reading (value, trend, time) so they can see it in the top bar — not charts or credentials.",
   healthCredentials:
-    "Apple Health uses OS permissions only. Dexcom Share and LibreLink Up credentials (if you enable them) are stored on this device only and are never uploaded to Diabeaters servers.",
+    "Apple Health uses OS permissions only. Dexcom Share and LibreLink Up credentials are stored on this device. If you enable exercise low-glucose alerts with Dexcom Share, your login is sent encrypted to our server only while an exercise session is active so we can poll in the background; it is removed when the session ends.",
 };
 
 export const CGM_HEALTH_SETUP_IOS =

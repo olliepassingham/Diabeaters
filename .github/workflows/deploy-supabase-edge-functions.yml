@@ -31,28 +31,56 @@ jobs:
             exit 1
           fi
 
-      - name: Deploy Edge Functions
+      - name: Verify Supabase auth
+        run: |
+          set -euo pipefail
+          if ! supabase projects list >/dev/null 2>&1; then
+            echo "::error::Supabase CLI returned Unauthorized. Regenerate SUPABASE_ACCESS_TOKEN at https://supabase.com/dashboard/account/tokens and update the GitHub Actions secret."
+            exit 1
+          fi
+
+      - name: Deploy notify + exercise Edge Functions
         env:
           PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
         run: |
           set -euo pipefail
           REF="${PROJECT_REF:-ffgcivxvbtdlmfnttwjm}"
-          if ! supabase projects list >/dev/null 2>&1; then
-            echo "::error::Supabase CLI returned Unauthorized. Regenerate SUPABASE_ACCESS_TOKEN at https://supabase.com/dashboard/account/tokens and update the GitHub Actions secret."
+          FUNCTIONS=(
+            notify_carers_on_hypo
+            notify_carers_on_live_glucose
+            notify_scenario_started
+            notify_alcohol_night_mode
+            notify_supply_low
+            notify_supply_low_cron
+            beatie_feed_post_cron
+            notify_supporter_appointment_reminders
+            notify_dm_push
+            notify_feed_push
+            notify_patient_hypo_acknowledged
+            notify_patient_hypo_check_in
+            notify_carer_hypo_check_in_response
+            notify_push_test
+            exercise_cgm_monitor
+            exercise_cgm_monitor_cron
+          )
+          FAILED=0
+          for fn in "${FUNCTIONS[@]}"; do
+            echo "::group::Deploy ${fn}"
+            if ! supabase functions deploy "${fn}" --project-ref "$REF" --no-verify-jwt; then
+              echo "::error::Failed to deploy ${fn}"
+              FAILED=1
+            fi
+            echo "::endgroup::"
+          done
+          if [ "${FAILED}" -ne 0 ]; then
             exit 1
           fi
-          supabase functions deploy notify_carers_on_hypo --project-ref "$REF" --no-verify-jwt
-          supabase functions deploy notify_scenario_started --project-ref "$REF" --no-verify-jwt
-          supabase functions deploy notify_alcohol_night_mode --project-ref "$REF" --no-verify-jwt
-          supabase functions deploy notify_supply_low --project-ref "$REF" --no-verify-jwt
-          supabase functions deploy notify_supply_low_cron --project-ref "$REF" --no-verify-jwt
-          supabase functions deploy beatie_feed_post_cron --project-ref "$REF" --no-verify-jwt
-          supabase functions deploy notify_supporter_appointment_reminders --project-ref "$REF" --no-verify-jwt
-          supabase functions deploy notify_dm_push --project-ref "$REF" --no-verify-jwt
-          supabase functions deploy notify_feed_push --project-ref "$REF" --no-verify-jwt
-          supabase functions deploy notify_patient_hypo_acknowledged --project-ref "$REF" --no-verify-jwt
-          supabase functions deploy notify_patient_hypo_check_in --project-ref "$REF" --no-verify-jwt
-          supabase functions deploy notify_carer_hypo_check_in_response --project-ref "$REF" --no-verify-jwt
-          supabase functions deploy notify_push_test --project-ref "$REF" --no-verify-jwt
+
+      - name: Deploy ai_coach
+        continue-on-error: true
+        env:
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          REF="${PROJECT_REF:-ffgcivxvbtdlmfnttwjm}"
           # JWT verified at gateway + in handler (see supabase/config.toml). Do not pass --no-verify-jwt.
           supabase functions deploy ai_coach --project-ref "$REF"

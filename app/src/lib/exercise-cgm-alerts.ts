@@ -3,6 +3,7 @@ import { Capacitor } from "@capacitor/core";
 import { cgmTrendForExercise } from "@/lib/cgm/apply-cgm-trend";
 import { isCgmPrefillActive } from "@/lib/cgm/preferences";
 import { getBgPrefill } from "@/lib/cgm/prefill";
+import { syncLiveCgmToActiveExerciseSession } from "@/lib/exercise-live-cgm-sync";
 import type { GlucoseReading } from "@/lib/cgm/types";
 import { calculateExercisePlan, type ExercisePlanContext } from "@/lib/exercise-plan";
 import {
@@ -25,7 +26,7 @@ import {
   type UserSettings,
 } from "@/lib/storage";
 
-export const EXERCISE_CGM_ALERT_POLL_MS = 2 * 60_000;
+export { EXERCISE_LIVE_CGM_POLL_MS as EXERCISE_CGM_ALERT_POLL_MS } from "@/lib/exercise-live-cgm-sync";
 export const EXERCISE_CGM_ALERT_COOLDOWN_MS = 12 * 60_000;
 
 export type ExerciseCgmAlertReason = "below_threshold" | "falling_toward" | "clinical_hypo";
@@ -216,6 +217,82 @@ async function showExerciseCgmAlertNotification(input: {
   }
 }
 
+function manualExerciseReading(
+  bg: number,
+  bgUnits: "mmol/L" | "mg/dL",
+  recordedAt: string,
+  trend: ExerciseBgTrend | null,
+): GlucoseReading {
+  return {
+    value: bg,
+    units: bgUnits,
+    recordedAt,
+    source: "health_platform",
+    sourceLabel: "Logged BG",
+    trend,
+    ageMinutes: 0,
+    isStale: false,
+    stalenessNote: null,
+  };
+}
+
+type ActiveExerciseBgSample = {
+  bg: number;
+  trend: ExerciseBgTrend | null;
+  reading: GlucoseReading;
+};
+
+async function resolveActiveExerciseBgSample(
+  session: ActiveExerciseSession,
+  bgUnits: "mmol/L" | "mg/dL",
+  syncedPrefill: Awaited<ReturnType<typeof syncLiveCgmToActiveExerciseSession>>,
+): Promise<ActiveExerciseBgSample | null> {
+  const freshSession = storage.getActiveExercise() ?? session;
+
+  if (freshSession.midBgSource === "manual" && freshSession.midBg != null) {
+    return {
+      bg: freshSession.midBg,
+      trend: freshSession.midTrend ?? null,
+      reading: manualExerciseReading(
+        freshSession.midBg,
+        bgUnits,
+        freshSession.midBgAt ?? new Date().toISOString(),
+        freshSession.midTrend ?? null,
+      ),
+    };
+  }
+
+  if (syncedPrefill?.fromCgm && syncedPrefill.reading && !syncedPrefill.reading.isStale) {
+    return {
+      bg: syncedPrefill.reading.value,
+      trend: cgmTrendForExercise(syncedPrefill.reading.trend) ?? null,
+      reading: syncedPrefill.reading,
+    };
+  }
+
+  if (freshSession.midBgSource === "cgm" && freshSession.midBg != null) {
+    return {
+      bg: freshSession.midBg,
+      trend: freshSession.midTrend ?? null,
+      reading: manualExerciseReading(
+        freshSession.midBg,
+        bgUnits,
+        freshSession.midBgAt ?? new Date().toISOString(),
+        freshSession.midTrend ?? null,
+      ),
+    };
+  }
+
+  const prefill = await getBgPrefill(bgUnits);
+  if (!prefill?.fromCgm || !prefill.reading || prefill.reading.isStale) return null;
+
+  return {
+    bg: prefill.reading.value,
+    trend: cgmTrendForExercise(prefill.reading.trend) ?? null,
+    reading: prefill.reading,
+  };
+}
+
 let runLock = false;
 
 export async function runExerciseCgmAlertNotifier(): Promise<void> {
@@ -235,18 +312,17 @@ export async function runExerciseCgmAlertNotifier(): Promise<void> {
     const threshold = resolveExerciseCgmAlertThreshold(notifSettings, bgUnits);
     const trendAware = notifSettings.exerciseCgmAlertTrendAware !== false;
 
-    const prefill = await getBgPrefill(bgUnits);
-    if (!prefill?.fromCgm || !prefill.reading) return;
-    if (prefill.reading.isStale) return;
+    const syncedPrefill = await syncLiveCgmToActiveExerciseSession();
+    const sample = await resolveActiveExerciseBgSample(session, bgUnits, syncedPrefill);
+    if (!sample) return;
 
-    const trend = cgmTrendForExercise(prefill.reading.trend) ?? null;
-    const plan = exercisePlanForSession(session, bgUnits);
+    const plan = exercisePlanForSession(storage.getActiveExercise() ?? session, bgUnits);
     const carbsIfLow = plan ? parsePlanNumber(plan.pre.carbsIfLow) ?? undefined : undefined;
 
     const evaluation = evaluateExerciseCgmAlert({
-      bg: prefill.reading.value,
+      bg: sample.bg,
       bgUnits,
-      trend,
+      trend: sample.trend,
       threshold,
       trendAware,
       userSettings,
@@ -255,20 +331,18 @@ export async function runExerciseCgmAlertNotifier(): Promise<void> {
     });
     if (!evaluation.shouldAlert || !evaluation.reason) return;
 
-    if (
-      shouldSkipExerciseCgmAlertDueToCooldown(session.id, prefill.reading.value, threshold, bgUnits)
-    ) {
+    if (shouldSkipExerciseCgmAlertDueToCooldown(session.id, sample.bg, threshold, bgUnits)) {
       return;
     }
 
     await showExerciseCgmAlertNotification({
       session,
-      reading: prefill.reading,
+      reading: sample.reading,
       evaluation,
       bgUnits,
-      trend,
+      trend: sample.trend,
     });
-    markExerciseCgmAlertShown(session.id, prefill.reading.value, evaluation.reason);
+    markExerciseCgmAlertShown(session.id, sample.bg, evaluation.reason);
   } finally {
     runLock = false;
   }

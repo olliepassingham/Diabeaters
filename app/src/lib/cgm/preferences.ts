@@ -14,7 +14,7 @@ export type CgmPreferences = {
    * HealthKit does not expose true read-grant status to apps.
    */
   iosHealthPromptCompleted?: boolean;
-  /** Near-live Dexcom Share (unofficial API). Credentials stay on this device only. */
+  /** Near-live Dexcom Share (unofficial API). Device-stored; temporarily encrypted on server during active exercise alerts. */
   dexcomShareEnabled?: boolean;
   dexcomShareUsername?: string;
   dexcomSharePassword?: string;

@@ -489,7 +489,8 @@ export function ExerciseGuidedCoach() {
     const raw = value.trim().replace(",", ".");
     if (raw === "") {
       if (activeSession.phase === "pre") update({ preBg: undefined, preBgAt: undefined });
-      else if (activeSession.phase === "active") update({ midBg: undefined, midBgAt: undefined });
+      else if (activeSession.phase === "active")
+        update({ midBg: undefined, midBgAt: undefined, midBgSource: undefined });
       else update({ recoveryBg: undefined, recoveryBgAt: undefined });
       return;
     }
@@ -497,7 +498,22 @@ export function ExerciseGuidedCoach() {
     if (!Number.isFinite(n)) return;
     const at = new Date().toISOString();
     if (activeSession.phase === "pre") update({ preBg: n, preBgAt: at });
-    else if (activeSession.phase === "active") update({ midBg: n, midBgAt: at, midCheckDone: true });
+    else if (activeSession.phase === "active")
+      update({ midBg: n, midBgAt: at, midCheckDone: true, midBgSource: "manual" });
+    else update({ recoveryBg: n, recoveryBgAt: at });
+  };
+
+  const applyCgmBg = (value: string) => {
+    setBgInput(value);
+    if (!activeSession) return;
+    const raw = value.trim().replace(",", ".");
+    if (raw === "") return;
+    const n = parseFloat(raw);
+    if (!Number.isFinite(n)) return;
+    const at = new Date().toISOString();
+    if (activeSession.phase === "pre") update({ preBg: n, preBgAt: at });
+    else if (activeSession.phase === "active")
+      update({ midBg: n, midBgAt: at, midCheckDone: true, midBgSource: "cgm" });
     else update({ recoveryBg: n, recoveryBgAt: at });
   };
 
@@ -517,7 +533,7 @@ export function ExerciseGuidedCoach() {
     onBgChange: onBgFieldChange,
   } = useExerciseCgmBg({
     bgValue: bgInput,
-    onApplyBg: onBgChange,
+    onApplyBg: applyCgmBg,
     onApplyTrend: onTrendChange,
     autoApplyKey: cgmAutoApplyKey,
   });
