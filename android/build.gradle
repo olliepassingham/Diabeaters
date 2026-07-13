@@ -1,14 +1,16 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 
 buildscript {
-    
+    ext.kotlinVersion = '2.1.10'
     repositories {
         google()
         mavenCentral()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:9.2.1'
+        // Stay on AGP 8.x for Capacitor + Capgo Health compatibility (Studio may offer AGP 9).
+        classpath 'com.android.tools.build:gradle:8.13.0'
         classpath 'com.google.gms:google-services:4.4.4'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
 
         // NOTE: Do not place your application dependencies here; they belong
         // in the individual module build.gradle files
@@ -21,6 +23,18 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+    }
+}
+
+subprojects { subproject ->
+    // Capgo Health pins its own kotlin-stdlib; force one version matching the root Kotlin plugin.
+    subproject.configurations.configureEach {
+        resolutionStrategy {
+            def kv = rootProject.ext.kotlinVersion
+            force "org.jetbrains.kotlin:kotlin-stdlib:$kv"
+            force "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kv"
+            force "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kv"
+        }
     }
 }
 
