@@ -18,6 +18,7 @@ import {
 import type { CarerInviteRow, CarerLinkWithProfile, CarerScopes } from "@/lib/carers.types";
 import { DEFAULT_CARER_SCOPES } from "@/lib/carers.types";
 import { invalidateLiveGlucoseShareCache } from "@/lib/cgm/live-glucose-sync";
+import { carerScopePresetSummary } from "@/lib/carer-scopes-by-age";
 import { getAgeBand } from "@/lib/user-age";
 import { getSupabase } from "@/lib/supabase";
 import { useProfile } from "@/lib/profile";
