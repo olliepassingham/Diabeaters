@@ -33,9 +33,7 @@ import {
   inferPostExerciseLoadTier,
 } from "@/lib/post-exercise-nudge";
 import { CgmPrefillButton } from "@/components/cgm-prefill-button";
-import { useBgPrefill } from "@/hooks/use-bg-prefill";
-import { getCgmEmptyHint } from "@/lib/cgm/cgm-empty-hint";
-import { isCgmPrefillActive } from "@/lib/cgm/preferences";
+import { useAutoCgmBgField } from "@/hooks/use-auto-cgm-bg-field";
 
 function parseBgInput(raw: string): number | null {
   const n = parseFloat(raw.replace(",", "."));
@@ -49,8 +47,11 @@ export default function CorrectionHelpPage() {
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [bgUnits, setBgUnits] = useState<BgUnits>("mmol/L");
   const [bgInput, setBgInput] = useState("");
-  const { prefill: bgPrefill, loading: bgPrefillLoading, refresh: refreshBgPrefill } = useBgPrefill();
-  const cgmPrefillActive = isCgmPrefillActive();
+  const correctionCgm = useAutoCgmBgField({
+    bgValue: bgInput,
+    onApplyBg: setBgInput,
+    autoApplyKey: "correction",
+  });
   const [targetOverride, setTargetOverride] = useState("");
   const [postExerciseNudgeRev, setPostExerciseNudgeRev] = useState(0);
   const load = useCallback(() => {
@@ -216,17 +217,18 @@ export default function CorrectionHelpPage() {
                     inputMode="decimal"
                     placeholder={bgUnits === "mg/dL" ? "e.g., 180" : "e.g., 10.5"}
                     value={bgInput}
-                    onChange={(e) => setBgInput(e.target.value)}
+                    onChange={(e) => correctionCgm.onBgChange(e.target.value)}
                     data-testid="input-correction-bg"
                   />
                   <CgmPrefillButton
-                    prefill={bgPrefill}
-                    loading={bgPrefillLoading}
+                    prefill={correctionCgm.prefill}
+                    loading={correctionCgm.loading}
                     bgUnits={unitLabel}
                     currentValue={bgInput}
-                    onApply={setBgInput}
-                    onRefresh={refreshBgPrefill}
-                    emptyHint={cgmPrefillActive ? getCgmEmptyHint() : undefined}
+                    onApply={correctionCgm.onBgChange}
+                    onRefresh={correctionCgm.refresh}
+                    emptyHint={correctionCgm.emptyHint}
+                    allowSync
                     testId="button-correction-cgm-prefill"
                   />
                 </div>

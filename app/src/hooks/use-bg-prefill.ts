@@ -9,7 +9,7 @@ import { storage } from "@/lib/storage";
 const PREFILL_HARD_TIMEOUT_MS = 16_000;
 const LIVE_CGM_POLL_MS = 5 * 60_000;
 
-type UseBgPrefillOptions = {
+export type UseBgPrefillOptions = {
   /** When CGM is enabled, re-fetch on this interval (e.g. status strip live chip). */
   pollIntervalMs?: number;
 };

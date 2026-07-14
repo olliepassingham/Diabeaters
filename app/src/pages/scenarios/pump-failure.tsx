@@ -41,10 +41,7 @@ import {
   type PumpFailureTriageKind,
 } from "@/lib/storage";
 import { useToast } from "@/hooks/use-toast";
-import { useBgPrefill } from "@/hooks/use-bg-prefill";
-import { getCgmEmptyHint } from "@/lib/cgm/cgm-empty-hint";
-import { isCgmPrefillActive } from "@/lib/cgm/preferences";
-import type { BgPrefillResult } from "@/lib/cgm/prefill";
+import { useAutoCgmBgField } from "@/hooks/use-auto-cgm-bg-field";
 
 const STEPS = [
   {
@@ -85,19 +82,6 @@ export default function PumpFailurePage() {
   const { toast } = useToast();
   const [profile, setProfile] = useState(() => storage.getProfile());
   const bgUnits: "mmol/L" | "mg/dL" = profile?.bgUnits === "mg/dL" ? "mg/dL" : "mmol/L";
-  const { prefill: bgPrefill, loading: bgPrefillLoading, refresh: refreshBgPrefill } = useBgPrefill();
-  const cgmPrefillActive = isCgmPrefillActive();
-  const cgmPrefillProps = {
-    bgPrefill,
-    bgPrefillLoading,
-    onRefreshBgPrefill: refreshBgPrefill,
-    cgmEmptyHint: cgmPrefillActive ? getCgmEmptyHint() : undefined,
-  } satisfies {
-    bgPrefill: BgPrefillResult | null;
-    bgPrefillLoading: boolean;
-    onRefreshBgPrefill: () => void;
-    cgmEmptyHint?: string;
-  };
 
   useEffect(() => {
     const onProfile = () => setProfile(storage.getProfile());
@@ -120,6 +104,16 @@ export default function PumpFailurePage() {
   const [recheckKetones, setRecheckKetones] = useState<PumpFailureKetoneLevel>("unknown");
 
   const isActive = sc.pumpFailureActive;
+  const startCgm = useAutoCgmBgField({
+    bgValue: bgInput,
+    onApplyBg: setBgInput,
+    autoApplyKey: !isActive ? "pump-failure" : undefined,
+  });
+  const recheckCgm = useAutoCgmBgField({
+    bgValue: recheckBg,
+    onApplyBg: setRecheckBg,
+    autoApplyKey: isActive ? "pump-failure-recheck" : undefined,
+  });
 
   const displayBg = isActive ? session?.bgValue ?? null : parsePumpFailureBgInput(bgInput);
   const displayBgUnits = isActive ? session?.bgUnits ?? bgUnits : bgUnits;
@@ -316,11 +310,14 @@ export default function PumpFailurePage() {
                 <PumpFailureReadingInputs
                   idPrefix="pumpfailure-recheck"
                   bgInput={recheckBg}
-                  onBgInputChange={setRecheckBg}
+                  onBgInputChange={recheckCgm.onBgChange}
                   bgUnits={bgUnits}
                   ketones={recheckKetones}
                   onKetonesChange={setRecheckKetones}
-                  {...cgmPrefillProps}
+                  bgPrefill={recheckCgm.prefill}
+                  bgPrefillLoading={recheckCgm.loading}
+                  onRefreshBgPrefill={recheckCgm.refresh}
+                  cgmEmptyHint={recheckCgm.emptyHint}
                 />
                 <Button onClick={saveRecheck} className="w-full min-h-11" data-testid="button-pumpfailure-save-recheck">
                   Save recheck
@@ -370,11 +367,14 @@ export default function PumpFailurePage() {
             <PumpFailureReadingInputs
               idPrefix="pumpfailure-start"
               bgInput={bgInput}
-              onBgInputChange={setBgInput}
+              onBgInputChange={startCgm.onBgChange}
               bgUnits={bgUnits}
               ketones={ketones}
               onKetonesChange={setKetones}
-              {...cgmPrefillProps}
+              bgPrefill={startCgm.prefill}
+              bgPrefillLoading={startCgm.loading}
+              onRefreshBgPrefill={startCgm.refresh}
+              cgmEmptyHint={startCgm.emptyHint}
             />
             <Button onClick={() => void startActive()} className="w-full min-h-11" data-testid="button-pumpfailure-start">
               Start pump failure mode

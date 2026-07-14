@@ -69,9 +69,7 @@ import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/n
 import { PageHeader, PageShell } from "@/components/layout";
 import { PendingHypoCheckInBanner } from "@/components/pending-hypo-check-in-banner";
 import { CgmPrefillButton } from "@/components/cgm-prefill-button";
-import { useBgPrefill } from "@/hooks/use-bg-prefill";
-import { getCgmEmptyHint } from "@/lib/cgm/cgm-empty-hint";
-import { isCgmPrefillActive } from "@/lib/cgm/preferences";
+import { useAutoCgmBgField } from "@/hooks/use-auto-cgm-bg-field";
 import { SupplyTrackerTodaySection } from "@/components/dashboard/SupplyTrackerTodaySection";
 import { isAiCoachEnabled, isCommunityEnabled } from "@/lib/flags";
 import { useOffline } from "@/hooks/use-offline";
@@ -305,31 +303,6 @@ function DashboardInfoDialog() {
   );
 }
 
-function HypoGlucosePrefill({
-  bgUnits,
-  currentValue,
-  onApply,
-}: {
-  bgUnits: "mmol/L" | "mg/dL";
-  currentValue: string;
-  onApply: (value: string) => void;
-}) {
-  const { prefill, loading, refresh } = useBgPrefill();
-  const cgmPrefillActive = isCgmPrefillActive();
-  return (
-    <CgmPrefillButton
-      prefill={prefill}
-      loading={loading}
-      bgUnits={bgUnits}
-      currentValue={currentValue}
-      onApply={onApply}
-      onRefresh={refresh}
-      emptyHint={cgmPrefillActive ? getCgmEmptyHint() : undefined}
-      testId="button-dashboard-hypo-cgm-prefill"
-    />
-  );
-}
-
 function HeroCard({
   status,
   profile,
@@ -350,6 +323,11 @@ function HeroCard({
   const { toast } = useToast();
   const [hypoDialogOpen, setHypoDialogOpen] = useState(false);
   const [hypoGlucose, setHypoGlucose] = useState("");
+  const dashHypoCgm = useAutoCgmBgField({
+    bgValue: hypoGlucose,
+    onApplyBg: setHypoGlucose,
+    autoApplyKey: hypoDialogOpen ? "dashboard-hypo" : undefined,
+  });
   const [hypoTreatment, setHypoTreatment] = useState("");
   const [hypoNotes, setHypoNotes] = useState("");
   const [showHypoHistory, setShowHypoHistory] = useState(false);
@@ -593,13 +571,19 @@ function HeroCard({
                 step={glucoseStep}
                 placeholder={glucosePlaceholder}
                 value={hypoGlucose}
-                onChange={(e) => setHypoGlucose(e.target.value)}
+                onChange={(e) => dashHypoCgm.onBgChange(e.target.value)}
                 data-testid="input-dashboard-hypo-glucose"
               />
-              <HypoGlucosePrefill
+              <CgmPrefillButton
+                prefill={dashHypoCgm.prefill}
+                loading={dashHypoCgm.loading}
                 bgUnits={bgUnitsLabel}
                 currentValue={hypoGlucose}
-                onApply={setHypoGlucose}
+                onApply={dashHypoCgm.onBgChange}
+                onRefresh={dashHypoCgm.refresh}
+                emptyHint={dashHypoCgm.emptyHint}
+                allowSync
+                testId="button-dashboard-hypo-cgm-prefill"
               />
             </div>
             <div className="space-y-2">

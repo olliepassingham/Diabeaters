@@ -4,7 +4,7 @@ import type { BgPrefillResult } from "@/lib/cgm/prefill";
 import { getCgmEmptyHint } from "@/lib/cgm/cgm-empty-hint";
 import { isCgmPrefillActive } from "@/lib/cgm/preferences";
 import type { ExerciseBgTrend } from "@/lib/storage";
-import { useBgPrefill } from "@/hooks/use-bg-prefill";
+import { useSessionBgPrefill } from "@/hooks/use-session-bg-prefill";
 
 type UseAutoCgmBgFieldOptions = {
   bgValue: string;
@@ -17,7 +17,7 @@ type UseAutoCgmBgFieldOptions = {
   pollIntervalMs?: number;
 };
 
-/** Auto-apply live CGM into a BG field when empty; respects manual edits. */
+/** Auto-apply live CGM (or supporter live BG) into a BG field when empty; respects manual edits. */
 export function useAutoCgmBgField({
   bgValue,
   onApplyBg,
@@ -33,9 +33,11 @@ export function useAutoCgmBgField({
   emptyHint: string | undefined;
   applyFromCgm: () => void;
   onBgChange: (value: string) => void;
+  fromSupporter: boolean;
 } {
-  const { prefill, loading, refresh } = useBgPrefill({ pollIntervalMs });
-  const cgmActive = isCgmPrefillActive();
+  const { prefill, loading, refresh, fromSupporter } = useSessionBgPrefill({ pollIntervalMs });
+  const deviceCgmActive = isCgmPrefillActive();
+  const cgmActive = fromSupporter || deviceCgmActive;
   const lastAutoKey = useRef("");
   const lastPollRecordedAt = useRef("");
   const lastCgmAppliedValue = useRef("");
@@ -92,13 +94,20 @@ export function useAutoCgmBgField({
     applyFromCgm(prefill!);
   }, [applyFromCgm, bgValue, prefill, syncOnPoll]);
 
+  const emptyHint = fromSupporter
+    ? "No recent live glucose from your linked person yet."
+    : deviceCgmActive
+      ? getCgmEmptyHint()
+      : undefined;
+
   return {
     prefill,
     loading,
     refresh,
     cgmActive,
-    emptyHint: cgmActive ? getCgmEmptyHint() : undefined,
+    emptyHint,
     applyFromCgm: applyLatestFromCgm,
     onBgChange,
+    fromSupporter,
   };
 }

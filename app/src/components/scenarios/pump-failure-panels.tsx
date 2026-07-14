@@ -491,6 +491,7 @@ export function PumpFailureReadingInputs({
             onApply={onBgInputChange}
             onRefresh={onRefreshBgPrefill}
             emptyHint={cgmEmptyHint}
+            allowSync
             testId={`${idPrefix}-cgm-prefill`}
           />
         ) : null}

@@ -36,9 +36,7 @@ import {
 } from "@/lib/hypo-context";
 import { classifyHypoSeverity } from "@/lib/hypo-severity";
 import { CgmPrefillButton } from "@/components/cgm-prefill-button";
-import { useBgPrefill } from "@/hooks/use-bg-prefill";
-import { getCgmEmptyHint } from "@/lib/cgm/cgm-empty-hint";
-import { isCgmPrefillActive } from "@/lib/cgm/preferences";
+import { useAutoCgmBgField } from "@/hooks/use-auto-cgm-bg-field";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { ScenarioResultHero } from "@/components/scenarios/scenario-result-hero";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
@@ -174,13 +172,19 @@ export default function HypoHelpPage() {
   const [lastHypoDetail, setLastHypoDetail] = useState<{ at: string; label: string } | null>(null);
   const [targetPrefilledFromRange, setTargetPrefilledFromRange] = useState(false);
   const [currentBg, setCurrentBg] = useState("");
-  const { prefill: bgPrefill, loading: bgPrefillLoading, refresh: refreshBgPrefill } = useBgPrefill();
-  const cgmPrefillActive = isCgmPrefillActive();
   const [targetBg, setTargetBg] = useState("");
   const [userWeight, setUserWeight] = useState("");
   const [weightUnit, setWeightUnit] = useState<WeightDisplayUnit>("kg");
   const [useProfileWeight, setUseProfileWeight] = useState(true);
   const [hypoResult, setHypoResult] = useState<ReturnType<typeof computeHypoCarbEquivalents> | null>(null);
+  const hypoCgm = useAutoCgmBgField({
+    bgValue: currentBg,
+    onApplyBg: (v) => {
+      setCurrentBg(v);
+      setHypoResult(null);
+    },
+    autoApplyKey: "hypo-help",
+  });
   const [hypoCalcError, setHypoCalcError] = useState<string | null>(null);
   const [postExerciseNudgeRev, setPostExerciseNudgeRev] = useState(0);
   const [recheckEndsAt, setRecheckEndsAt] = useState<number | null>(null);
@@ -382,23 +386,21 @@ export default function HypoHelpPage() {
               placeholder={bgUnits === "mmol/L" ? "3.2" : "58"}
               value={currentBg}
               onChange={(e) => {
-                setCurrentBg(e.target.value);
+                hypoCgm.onBgChange(e.target.value);
                 setHypoResult(null);
               }}
               className="h-16 border-border/60 bg-muted/15 text-center text-3xl font-semibold tabular-nums tracking-tight"
               data-testid="input-current-bg"
             />
             <CgmPrefillButton
-              prefill={bgPrefill}
-              loading={bgPrefillLoading}
+              prefill={hypoCgm.prefill}
+              loading={hypoCgm.loading}
               bgUnits={bgUnits}
               currentValue={currentBg}
-              onApply={(value) => {
-                setCurrentBg(value);
-                setHypoResult(null);
-              }}
-              onRefresh={refreshBgPrefill}
-              emptyHint={cgmPrefillActive ? getCgmEmptyHint() : undefined}
+              onApply={hypoCgm.onBgChange}
+              onRefresh={hypoCgm.refresh}
+              emptyHint={hypoCgm.emptyHint}
+              allowSync
               testId="button-hypo-cgm-prefill"
             />
             {severityView ? (

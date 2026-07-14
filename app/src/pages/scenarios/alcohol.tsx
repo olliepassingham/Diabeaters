@@ -59,6 +59,7 @@ import { cn } from "@/lib/utils";
 import { BgTrendThreeButtons } from "@/components/bg-trend-three-buttons";
 import { CgmPrefillButton } from "@/components/cgm-prefill-button";
 import { useAutoCgmBgField } from "@/hooks/use-auto-cgm-bg-field";
+import { AlcoholMorningCgmCard } from "@/components/scenarios/alcohol-morning-cgm-card";
 import { cgmTrendForAlcohol } from "@/lib/cgm/apply-cgm-trend";
 
 const FROM_SCENARIOS = "from=/scenarios";
@@ -934,6 +935,8 @@ export default function AlcoholScenarioPage() {
             <span className="font-medium text-foreground">Pump:</span> Check IOB before bolusing — hypos can linger for hours after drinking.
           </p>
         ) : null}
+
+        {phase === "situation" ? <AlcoholMorningCgmCard units={bgUnits} /> : null}
 
         {phase === "situation" ? (
           <section className="space-y-3">
