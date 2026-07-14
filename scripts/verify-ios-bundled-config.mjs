@@ -4,7 +4,7 @@ import { join } from "node:path";
 const configPath = join(process.cwd(), "ios", "App", "App", "capacitor.config.json");
 
 if (!existsSync(configPath)) {
-  console.error(`Missing ${configPath} — run npm run ios:release:sync first.`);
+  console.error(`Missing ${configPath} — run npm run ios:release:sync:bundled first.`);
   process.exit(1);
 }
 
@@ -14,9 +14,8 @@ if (config.server?.url) {
     [
       "iOS capacitor.config.json is set to a remote server URL:",
       `  ${config.server.url}`,
-      "Store / offline builds must bundle dist/ instead.",
-      "Run: npm run ios:release:sync",
-      "Do not use: npm run ios:release:sync:remote",
+      "Bundled / offline builds must omit server.url.",
+      "Run: npm run ios:release:sync:bundled",
     ].join("\n"),
   );
   process.exit(1);
