@@ -75,8 +75,8 @@ export default function Login() {
     }
     if (err) {
       toast({
-        title: "Sign in failed",
-        description: decodeURIComponent(err),
+        title: "Login failed",
+        description: describeAuthNetworkError(decodeURIComponent(err)),
         variant: "destructive",
       });
       window.history.replaceState({}, "", "/login");

@@ -16,6 +16,24 @@ type AuthResult<T> = {
 
 export type OAuthProvider = "apple" | "google" | "azure";
 
+const AUTH_TRY_AGAIN = "Try again.";
+
+function isTechnicalAuthMessage(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m.includes("supabase") ||
+    m.includes("vite_") ||
+    m.includes(".env") ||
+    m.includes("anon_key") ||
+    m.includes("fetch") ||
+    m.includes("network") ||
+    m.includes("cors") ||
+    m.includes("jwt") ||
+    m.includes("api key") ||
+    m.includes("not configured")
+  );
+}
+
 /** Maps Supabase auth errors to friendly copy; use for login and signup. */
 export function describeAuthErrorForDisplay(error: AuthError | Error): {
   message: string;
@@ -27,7 +45,6 @@ export function describeAuthErrorForDisplay(error: AuthError | Error): {
     "code" in error && typeof (error as AuthError).code === "string"
       ? ((error as AuthError).code ?? "")
       : "";
-
   if (
     code === "email_not_confirmed" ||
     msg.includes("email not confirmed") ||
@@ -46,23 +63,27 @@ export function describeAuthErrorForDisplay(error: AuthError | Error): {
     code === "invalid_credentials" ||
     msg.includes("wrong password")
   ) {
-    return { message: "Wrong email or password." };
+    return { message: AUTH_TRY_AGAIN };
   }
-  return { message: raw || "Something went wrong." };
+  if (!raw || isTechnicalAuthMessage(raw)) {
+    return { message: AUTH_TRY_AGAIN };
+  }
+  return { message: raw };
 }
 
-/** Browser-specific messages when fetch to Supabase never completes. */
+/** User-facing copy when the auth request never completes (offline, DNS, etc.). */
 export function describeAuthNetworkError(message: string): string {
   const m = message.toLowerCase();
   if (
     m === "failed to fetch" ||
     m === "load failed" ||
     m.includes("networkerror") ||
-    m.includes("network request failed")
+    m.includes("network request failed") ||
+    isTechnicalAuthMessage(message)
   ) {
-    return "Could not connect to Supabase. Check your network and VPN, confirm VITE_SUPABASE_URL in .env/.env.local, restart the dev server after env changes, and ensure your Supabase project is active.";
+    return AUTH_TRY_AGAIN;
   }
-  return message;
+  return message || AUTH_TRY_AGAIN;
 }
 
 export async function signup(
