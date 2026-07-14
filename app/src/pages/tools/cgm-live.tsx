@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CgmGlucoseChart } from "@/components/cgm-glucose-chart";
+import { CgmSuggestedHypoCard } from "@/components/cgm-suggested-hypo-card";
 import { InfoTooltip } from "@/components/info-tooltip";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
@@ -43,6 +44,8 @@ export default function CgmLivePage() {
   const [highlightSleep, setHighlightSleep] = useState(false);
   const [highlightExercise, setHighlightExercise] = useState(false);
   const { points, units, loading, error, connected, sourceLabel, refresh } = useCgmHistory(range);
+  /** Always scan up to 24h for possible low suggestions (independent of chart range). */
+  const history24h = useCgmHistory("24h");
   const settings = storage.getSettings();
   const { low: targetLow, high: targetHigh } = resolveUserTargetBgRange(settings, units);
 
@@ -107,6 +110,10 @@ export default function CgmLivePage() {
             </Button>
           </AlertDescription>
         </Alert>
+      ) : null}
+
+      {connected && history24h.points.length > 0 ? (
+        <CgmSuggestedHypoCard points={history24h.points} targetLow={targetLow} units={units} />
       ) : null}
 
       <Card className={cn("overflow-hidden rounded-2xl shadow-none", latestStatus ? glucoseRangeCardClasses(latestStatus) : undefined)}>

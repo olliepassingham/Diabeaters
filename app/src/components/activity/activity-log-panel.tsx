@@ -26,6 +26,7 @@ import {
   type ActivityEvent,
   type ActivityKind,
 } from "@/lib/activity-history";
+import { formatHypoMonthSummaryLine, getHypoMonthSummary } from "@/lib/hypo-month-summary";
 import {
   computeStreakStats,
   isStreakFilterKind,
@@ -329,6 +330,16 @@ export function ActivityLogPanel({
     return computeStreakStats(events, kindFilter);
   }, [events, kindFilter]);
 
+  const hypoMonthLine = useMemo(() => {
+    if (kindFilter !== "hypo_treated") return null;
+    const hypos = filterActivityEvents(events, "hypo_treated").map((e) => ({
+      id: e.id,
+      timestamp: e.at,
+      carerNotified: false,
+    }));
+    return formatHypoMonthSummaryLine(getHypoMonthSummary(hypos));
+  }, [events, kindFilter]);
+
   const streakRunDayKeys = useMemo(() => {
     if (!streakStats) return new Set<string>();
     return new Set(streakStats.currentRunDayKeys);
@@ -407,6 +418,19 @@ export function ActivityLogPanel({
       <CardContent className="space-y-4 px-3 pb-4 pt-4 sm:px-4 sm:pb-5">
         {streakStats && isStreakFilterKind(kindFilter) ? (
           <StreakSummaryBar kind={kindFilter} stats={streakStats} />
+        ) : null}
+
+        {hypoMonthLine ? (
+          <div
+            className="rounded-xl border border-red-500/20 bg-red-500/5 px-3 py-2.5 text-sm"
+            data-testid="activity-hypo-month-summary"
+          >
+            <p className="font-medium text-foreground">Hypo log this month</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{hypoMonthLine}</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Based on hypos you logged (including ones confirmed from glucose trends). Educational only.
+            </p>
+          </div>
         ) : null}
 
         <ActivityCalendarContext.Provider value={calendarContextValue}>
