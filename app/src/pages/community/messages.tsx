@@ -34,7 +34,7 @@ import {
 } from "@/lib/profile";
 import { CommunityProfileSetupPrompt } from "@/components/community-profile-setup-prompt";
 import { dmThreadQueryKey, fetchDmThreadBundle } from "@/lib/dm-thread-query";
-import { DM_INBOX_QK, type DmInboxPayload } from "@/lib/dm-inbox-query";
+import { DM_INBOX_QK, type DmInboxPayload as DmInboxQueryPayload } from "@/lib/dm-inbox-query";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { formatDistanceToNow } from "date-fns";
 
@@ -124,7 +124,7 @@ function writeThreadIdList(key: string, ids: string[]): void {
 }
 
 type DmInboxDetails = Pick<
-  DmInboxPayload,
+  DmInboxQueryPayload,
   | "lastByThreadId"
   | "labels"
   | "avatarByUserId"
@@ -201,10 +201,9 @@ async function fetchDmInboxThreadDetails(
   };
 }
 
-type DmInboxPayload = {
-  threads: ThreadWithMembers[];
+type DmInboxPayload = DmInboxQueryPayload & {
   blockedUserIds: Set<string>;
-} & DmInboxDetails;
+};
 
 function prefetchDmThreadRoute(queryClient: QueryClient, threadId: string, viewerId: string) {
   void import("@/pages/community/thread");

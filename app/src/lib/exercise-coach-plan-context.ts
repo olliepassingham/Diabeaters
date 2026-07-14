@@ -1,5 +1,5 @@
-import type { ActiveExerciseSession, ExerciseBgTrend, ExerciseHistoryBias } from "@/lib/storage";
-import type { ExercisePlanContext, ExerciseHistoryBias as PlanHistoryBias } from "@/lib/exercise-plan";
+import type { ActiveExerciseSession, ExerciseBgTrend } from "@/lib/storage";
+import type { ExercisePlanContext, ExerciseHistoryBias } from "@/lib/exercise-plan";
 
 /** Build {@link ExercisePlanContext} from guided coach session inputs. */
 export function buildExercisePlanContextFromCoachSession(input: {
@@ -41,7 +41,7 @@ export function buildExercisePlanContextFromCoachSession(input: {
   if (session.preIobUnits != null) ctx.iobUnits = session.preIobUnits;
 
   if (input.historyBias) {
-    ctx.historyBias = input.historyBias as PlanHistoryBias;
+    ctx.historyBias = input.historyBias;
   }
 
   if (session.preFasted) {

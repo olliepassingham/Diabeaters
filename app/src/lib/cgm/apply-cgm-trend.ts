@@ -2,12 +2,14 @@ import type { AlcoholTrend } from "@/lib/alcohol-night-tool";
 import type { DrivingTrend } from "@/lib/driving-readiness-tool";
 import type { ExerciseBgTrend } from "@/lib/storage";
 
-function usableCgmTrend(trend: ExerciseBgTrend | null | undefined): ExerciseBgTrend | undefined {
+type UsableCgmTrend = Exclude<ExerciseBgTrend, "not_sure">;
+
+function usableCgmTrend(trend: ExerciseBgTrend | null | undefined): UsableCgmTrend | undefined {
   if (!trend || trend === "not_sure") return undefined;
   return trend;
 }
 
-export function cgmTrendForExercise(trend: ExerciseBgTrend | null | undefined): ExerciseBgTrend | undefined {
+export function cgmTrendForExercise(trend: ExerciseBgTrend | null | undefined): UsableCgmTrend | undefined {
   return usableCgmTrend(trend);
 }
 

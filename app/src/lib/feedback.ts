@@ -1,4 +1,5 @@
 import { getDevicePlatform } from "@/lib/native-platform";
+import { getSupportEmail } from "@/lib/support";
 
 export type FeedbackKind = "suggestion" | "bug";
 

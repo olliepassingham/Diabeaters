@@ -24,8 +24,8 @@ export async function syncLiveCgmToActiveExerciseSession(): Promise<BgPrefillRes
   const session = storage.getActiveExercise();
   if (!session || !shouldSyncLiveCgmToSession(session)) return null;
 
-  const profile = storage.getProfile() ?? {};
-  const bgUnits = normalizeBgUnits(profile.bgUnits);
+  const profile = storage.getProfile();
+  const bgUnits = normalizeBgUnits(profile?.bgUnits);
   const prefill = await getBgPrefill(bgUnits);
   if (!prefill?.fromCgm || !prefill.reading || prefill.reading.isStale) return null;
 

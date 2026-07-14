@@ -8,10 +8,12 @@ vi.mock("@/lib/native-app-badge-count", () => ({
 }));
 
 const getNativePushPlatform = vi.fn(() => "ios" as const);
+const getDevicePlatform = vi.fn(() => "ios" as const);
 
 vi.mock("@/lib/native-platform", () => ({
   isNativePushPlatform: () => true,
   getNativePushPlatform: () => getNativePushPlatform(),
+  getDevicePlatform: () => getDevicePlatform(),
 }));
 
 vi.mock("@capacitor/core", () => ({
@@ -36,6 +38,7 @@ describe("syncNativeAppBadgeNow", () => {
     applyCounts.length = 0;
     fetchNativeAppBadgeCount.mockReset();
     getNativePushPlatform.mockReturnValue("ios");
+    getDevicePlatform.mockReturnValue("ios");
   });
 
   it("runs a follow-up sync when another sync is requested while in flight", async () => {

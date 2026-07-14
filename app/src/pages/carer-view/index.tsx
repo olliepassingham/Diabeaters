@@ -1338,8 +1338,10 @@ export default function CarerViewPage() {
         appointments: false,
         scenarios: false,
         hypo_alerts: false,
+        live_glucose: false,
         emergency_info: false,
         clinical_settings: false,
+        public_profile_mention: false,
       };
     }
     const n = normaliseScopes(activeLink.scopes);
@@ -1348,8 +1350,10 @@ export default function CarerViewPage() {
       appointments: !!n.appointments,
       scenarios: !!n.scenarios,
       hypo_alerts: !!n.hypo_alerts,
+      live_glucose: !!n.live_glucose,
       emergency_info: !!n.emergency_info,
       clinical_settings: !!n.clinical_settings,
+      public_profile_mention: !!n.public_profile_mention,
     };
   }, [activeLink]);
 

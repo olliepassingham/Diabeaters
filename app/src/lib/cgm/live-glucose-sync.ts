@@ -1,3 +1,4 @@
+import { cgmTrendForExercise } from "@/lib/cgm/apply-cgm-trend";
 import { bgPrefillFromReading } from "@/lib/cgm/prefill";
 import type { CgmSourceId, GlucoseReading } from "@/lib/cgm/types";
 import { assessReadingStaleness } from "@/lib/cgm/staleness";
@@ -66,7 +67,7 @@ export async function maybePublishLiveGlucoseForSupporters(reading: GlucoseReadi
   const { error } = await upsertPatientLiveGlucose({
     value: reading.value,
     units: reading.units,
-    trend: reading.trend,
+    trend: cgmTrendForExercise(reading.trend) ?? null,
     sourceLabel: reading.sourceLabel,
     recordedAt: reading.recordedAt,
     targetLow,

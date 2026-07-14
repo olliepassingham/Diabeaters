@@ -45,8 +45,8 @@ export async function registerExerciseCgmServerMonitor(session: ActiveExerciseSe
   const password = prefs.dexcomSharePassword;
   if (!username || !password) return;
 
-  const profile = storage.getProfile() ?? {};
-  const bgUnits = normalizeBgUnits(profile.bgUnits) as "mmol/L" | "mg/dL";
+  const profile = storage.getProfile();
+  const bgUnits = normalizeBgUnits(profile?.bgUnits) as "mmol/L" | "mg/dL";
   const notif = storage.getNotificationSettings();
   const userSettings = storage.getSettings();
   const threshold = resolveExerciseCgmAlertThreshold(notif, bgUnits);
@@ -68,7 +68,7 @@ export async function registerExerciseCgmServerMonitor(session: ActiveExerciseSe
     if (session.preEnvironments?.length) planCtx.environments = [...session.preEnvironments];
     const plan = calculateExercisePlan(planCtx, userSettings);
     carbsIfLow = parsePlanNumber(plan.pre.carbsIfLow) ?? undefined;
-    const suggestion = computeExerciseHypoSuggestion(bg, userSettings, bgUnits, profile, {
+    const suggestion = computeExerciseHypoSuggestion(bg, userSettings, bgUnits, profile ?? {}, {
       phase: "active",
       exerciseLowThreshold: threshold,
       carbsIfLow,

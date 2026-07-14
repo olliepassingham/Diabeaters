@@ -154,7 +154,8 @@ export async function prefetchMainCommunityFeed(
     staleTime: COMMUNITY_FEED_STALE_MS,
     gcTime: 10 * 60_000,
     queryFn: async ({ pageParam }) => fetchMainFeedPage(feedTab, MAIN_FEED_PAGE_SIZE, pageParam, null),
-    getNextPageParam: (lastPage) => getCommunityFeedNextPageParam(lastPage, MAIN_FEED_PAGE_SIZE),
+    getNextPageParam: (lastPage: CommunityPostRow[]) =>
+      getCommunityFeedNextPageParam(lastPage, MAIN_FEED_PAGE_SIZE),
   });
 }
 

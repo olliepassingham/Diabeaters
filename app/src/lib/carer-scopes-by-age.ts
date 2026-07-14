@@ -17,6 +17,7 @@ export function defaultCarerScopesForAgeBand(band: UserAgeBand): CarerScopes {
       appointments: true,
       scenarios: true,
       hypo_alerts: true,
+      live_glucose: true,
       emergency_info: true,
       clinical_settings: true,
       public_profile_mention: false,

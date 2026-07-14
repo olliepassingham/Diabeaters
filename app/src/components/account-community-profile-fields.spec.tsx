@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, fireEvent, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
 import { AccountCommunityProfileFields } from "./account-community-profile-fields";
@@ -73,7 +74,14 @@ const profilePublic: ProfileRow = {
 
 function renderWithRouter(ui: ReactElement) {
   const { hook } = memoryLocation({ path: "/" });
-  return render(<Router hook={hook}>{ui}</Router>);
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <Router hook={hook}>{ui}</Router>
+    </QueryClientProvider>,
+  );
 }
 
 describe("AccountCommunityProfileFields", () => {

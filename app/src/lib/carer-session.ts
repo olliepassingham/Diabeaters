@@ -216,8 +216,9 @@ export function isSupporterOnlyAccount(): boolean {
   const path = getOnboardingAccountPath();
   if (path === "patient" || path === "both") return false;
   if (localIndicatesPatientAccount()) return false;
-  if (getPrimaryAppRole() === "patient") return false;
+  /** Explicit onboarding choice takes priority over a stale/wrong cached cloud role fallback. */
   if (path === "supporter") return true;
+  if (getPrimaryAppRole() === "patient") return false;
   if (isPersistedSupporterAccount()) return true;
 
   const cloud = getCachedCloudPrimaryAppRole();

@@ -186,7 +186,7 @@ export default function HypoHelpPage() {
   const [recheckEndsAt, setRecheckEndsAt] = useState<number | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
-  const bgUnits = profile.bgUnits || "mmol/L";
+  const bgUnits = profile.bgUnits === "mg/dL" ? "mg/dL" : "mmol/L";
   const hypoCarbSource = resolveCarbSource(profile, "hypo");
   const hypoTreatmentLine = (grams: number) => formatCarbsForScenario(grams, profile, "hypo");
   const postExerciseHypoCopy = useMemo(() => {

@@ -1,4 +1,4 @@
-import { format, formatDistanceStrict, isToday, isTomorrow, startOfDay } from "date-fns";
+import { format, formatDistanceStrict, startOfDay } from "date-fns";
 
 export type EventTiming = "past" | "today" | "tomorrow" | "soon" | "upcoming";
 
@@ -17,9 +17,9 @@ export function getEventTiming(iso: string, now: Date = new Date()): EventTiming
   const d = parseEventDate(iso);
   if (!d) return "upcoming";
   if (d.getTime() < now.getTime()) return "past";
-  if (isToday(d)) return "today";
-  if (isTomorrow(d)) return "tomorrow";
   const days = Math.ceil((startOfDay(d).getTime() - startOfDay(now).getTime()) / 86_400_000);
+  if (days === 0) return "today";
+  if (days === 1) return "tomorrow";
   if (days <= 7) return "soon";
   return "upcoming";
 }

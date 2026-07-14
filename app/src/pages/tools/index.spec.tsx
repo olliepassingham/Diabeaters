@@ -1,5 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+
+vi.mock("@/hooks/use-community-push-prompt-after-onboarding", () => ({
+  useCommunityPushPromptAfterOnboarding: () => ({
+    communityPushPromptOpen: false,
+    setCommunityPushPromptOpen: () => {},
+  }),
+}));
+
 import { CARER_TOOLS, ToolsHubPage } from "./index";
 
 describe("ToolsHubPage", () => {

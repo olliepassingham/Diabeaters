@@ -4547,7 +4547,7 @@ export const storage = {
       midSymptoms: midSymptoms && midSymptoms.length > 0 ? midSymptoms : undefined,
       preEnvironments,
     };
-    delete (normalized as Record<string, unknown>).preEnvironment;
+    delete (normalized as unknown as Record<string, unknown>).preEnvironment;
     return normalized;
   },
 

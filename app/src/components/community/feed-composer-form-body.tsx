@@ -53,8 +53,8 @@ export type FeedComposerFormBodyProps = {
   removeComposerVideo: () => void;
   composerImageAlts: string[];
   setComposerImageAlts: Dispatch<SetStateAction<string[]>>;
-  fileInputRef: RefObject<HTMLInputElement | null>;
-  videoInputRef: RefObject<HTMLInputElement | null>;
+  fileInputRef: RefObject<HTMLInputElement>;
+  videoInputRef: RefObject<HTMLInputElement>;
   onPickImages: (files: FileList | null) => void;
   onPickVideo: (files: FileList | null) => void;
   pickImagesFromLibraryOnly: () => Promise<void>;

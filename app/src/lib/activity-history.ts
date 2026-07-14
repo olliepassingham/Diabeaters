@@ -404,7 +404,6 @@ const VALID_FILTERS = new Set<ActivityKind | "all">([
   "supply_pickup",
   "appointment",
   "adviser_session",
-  "appointment_past",
 ]);
 
 export function loadStoredActivityFilter(): ActivityKind | "all" {

@@ -94,10 +94,9 @@ export async function listFollowers(
   });
 
   if (error) return { ids: [], error: new Error(error.message) };
-  const ids = (data ?? []).map((row) => {
-    const r = row as { user_id?: string };
-    return String(r.user_id ?? "");
-  }).filter(Boolean);
+  const ids = ((data ?? []) as Array<{ user_id?: string }>)
+    .map((row) => String(row.user_id ?? ""))
+    .filter(Boolean);
   return { ids, error: null };
 }
 
@@ -114,10 +113,9 @@ export async function listFollowing(
   });
 
   if (error) return { ids: [], error: new Error(error.message) };
-  const ids = (data ?? []).map((row) => {
-    const r = row as { user_id?: string };
-    return String(r.user_id ?? "");
-  }).filter(Boolean);
+  const ids = ((data ?? []) as Array<{ user_id?: string }>)
+    .map((row) => String(row.user_id ?? ""))
+    .filter(Boolean);
   return { ids, error: null };
 }
 

@@ -211,7 +211,13 @@ export function FeedPostList(props: {
     ],
   );
 
-  const feedQuery = useInfiniteQuery({
+  const feedQuery = useInfiniteQuery<
+    CommunityPostRow[],
+    Error,
+    InfiniteData<CommunityPostRow[], FeedCursor | null>,
+    typeof feedQueryKey,
+    FeedCursor | null
+  >({
     queryKey: feedQueryKey,
     initialPageParam: null as FeedCursor | null,
     enabled: isSupabaseConfigured(),
@@ -238,13 +244,6 @@ export function FeedPostList(props: {
       return res.data ?? [];
     },
     getNextPageParam: (lastPage) => getCommunityFeedNextPageParam(lastPage, pageSize),
-    onError: (err: Error) => {
-      toast({
-        title: useServerSearch ? "Search failed" : "Could not load posts",
-        description: err.message,
-        variant: "destructive",
-      });
-    },
   });
 
   const posts = useMemo(() => feedQuery.data?.pages.flatMap((p) => p) ?? [], [feedQuery.data]);
@@ -252,7 +251,17 @@ export function FeedPostList(props: {
   postsRef.current = posts;
 
   const loadingPosts = feedQuery.status === "pending" && posts.length === 0;
-  const feedError = feedQuery.status === "error" ? (feedQuery.error as Error | null) : null;
+  const feedError = feedQuery.status === "error" ? feedQuery.error : null;
+
+  const feedLoadErrorKey = feedError?.message ?? null;
+  useEffect(() => {
+    if (!feedLoadErrorKey || !feedError) return;
+    toast({
+      title: useServerSearch ? "Search failed" : "Could not load posts",
+      description: feedError.message,
+      variant: "destructive",
+    });
+  }, [feedLoadErrorKey, feedError, useServerSearch, toast]);
   const [refreshing, setRefreshing] = useState(false);
 
   const runRefresh = useCallback(async () => {

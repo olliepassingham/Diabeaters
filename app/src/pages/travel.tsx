@@ -1007,11 +1007,14 @@ export default function Travel() {
   const [prepNotes, setPrepNotes] = useState("");
   const [prepChecklistOpen, setPrepChecklistOpen] = useState(false);
   const [resultsTab, setResultsTab] = useState<"packing" | "emergency" | "climate">("packing");
-  const [selectedLanguage, setSelectedLanguage] = useState("English");
+  const [selectedLanguage, setSelectedLanguage] = useState<keyof typeof EMERGENCY_PHRASES>("English");
 
   const isPumpUser = isPumpDeliveryMethod(profile?.insulinDeliveryMethod);
   const regionDefaults = getRegionDefaultsForProfile(profile);
-  const emergencyPhrases = useMemo(() => {
+  const emergencyPhrases = useMemo((): Record<
+    string,
+    { lang: string; iAmDiabetic: string; needSugar: string; needHelp: string; emergencyNumber: string }
+  > => {
     const englishNumber = travelEnglishEmergencyNumber(profile);
     return {
       ...EMERGENCY_PHRASES,

@@ -306,8 +306,8 @@ export async function runExerciseCgmAlertNotifier(): Promise<void> {
     const notifSettings = storage.getNotificationSettings();
     if (!notificationsAllowed(notifSettings)) return;
 
-    const profile = storage.getProfile() ?? {};
-    const bgUnits = normalizeBgUnits(profile.bgUnits);
+    const profile = storage.getProfile();
+    const bgUnits = normalizeBgUnits(profile?.bgUnits);
     const userSettings = storage.getSettings();
     const threshold = resolveExerciseCgmAlertThreshold(notifSettings, bgUnits);
     const trendAware = notifSettings.exerciseCgmAlertTrendAware !== false;
@@ -326,7 +326,7 @@ export async function runExerciseCgmAlertNotifier(): Promise<void> {
       threshold,
       trendAware,
       userSettings,
-      profile,
+      profile: profile ?? {},
       carbsIfLow,
     });
     if (!evaluation.shouldAlert || !evaluation.reason) return;

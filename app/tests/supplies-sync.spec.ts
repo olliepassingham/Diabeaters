@@ -78,7 +78,6 @@ describe("supplies sync", () => {
         cloud_id: "cloud-row-1",
         updated_at: "2026-03-01T12:00:00.000Z",
       }),
-      { skipCloudSync: true },
     );
   });
 
@@ -120,7 +119,6 @@ describe("supplies sync", () => {
       expect.objectContaining({
         updated_at: "2026-03-02T12:00:00.000Z",
       }),
-      { skipCloudSync: true },
     );
   });
 

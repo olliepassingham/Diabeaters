@@ -33,7 +33,7 @@ export function profileIndicatesExistingPatientAccount(profile: ProfileRow | nul
   if (profile?.account_type === "patient") return true;
   if (profile?.primary_app_role === "patient" && profile?.onboarding_complete === true) return true;
   if (profile?.onboarding_complete === true) {
-    return profile?.primary_app_role !== "community";
+    return true;
   }
   if (profile) return false;
   return localIndicatesPatientAccount();

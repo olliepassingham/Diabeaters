@@ -27,9 +27,9 @@ type HealthSample = {
 };
 
 const BG_AUTH_OPTIONS = {
-  read: ["bloodGlucose"] as const,
-  write: [] as const,
-};
+  read: ["bloodGlucose"],
+  write: [],
+} as import("@capgo/capacitor-health").AuthorizationOptions;
 
 const HEALTH_CHECK_TIMEOUT_MS = 8_000;
 const HEALTH_REQUEST_TIMEOUT_MS = 90_000;

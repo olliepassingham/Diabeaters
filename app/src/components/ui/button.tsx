@@ -20,6 +20,7 @@ const buttonVariants = cva(
           "rounded-xl border-0 bg-muted text-foreground shadow-sm hover:bg-muted/80 dark:bg-secondary dark:text-secondary-foreground",
         ghost:
           "border border-transparent shadow-none text-foreground hover:bg-muted/70 dark:text-muted-foreground dark:hover:bg-card/80",
+        link: "border-0 bg-transparent text-primary underline-offset-4 shadow-none hover:underline",
       },
       size: {
         default: "min-h-11 px-4 py-2.5",

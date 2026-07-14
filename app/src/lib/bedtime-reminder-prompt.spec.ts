@@ -11,7 +11,14 @@ import {
   resolveBedtimeReminderPromptAfterOnboarding,
   shouldOfferBedtimeReminderSecondChance,
 } from "@/lib/bedtime-reminder-prompt";
+import { setOnboardingAccountPath, setPrimaryAppRole } from "@/lib/carer-session";
 import { storage } from "@/lib/storage";
+
+/** These prompts only fire for User Mode patients — mark this session as such. */
+function markUserModeSession(): void {
+  setOnboardingAccountPath("patient");
+  setPrimaryAppRole("patient");
+}
 
 vi.mock("@/lib/notification-preferences", () => ({
   syncNotificationPreferences: vi.fn().mockResolvedValue(undefined),
@@ -67,6 +74,7 @@ describe("bedtime-reminder-prompt", () => {
   });
 
   it("resolveBedtimeReminderPromptAfterOnboarding shows when pending and not dismissed", () => {
+    markUserModeSession();
     storage.saveNotificationSettings({
       ...storage.getNotificationSettings(),
       bedtimeCheckReminders: false,
@@ -118,6 +126,7 @@ describe("bedtime-reminder-prompt", () => {
   });
 
   it("enableBedtimeCheckReminders turns on prefs with chosen time", async () => {
+    markUserModeSession();
     await enableBedtimeCheckReminders("21:00");
 
     const raw = localStorage.getItem(NOTIF_KEY);

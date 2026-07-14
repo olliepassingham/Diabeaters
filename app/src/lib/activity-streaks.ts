@@ -162,7 +162,9 @@ export function streakKindLabel(kind: StreakTrackKind): string {
   return labels[kind];
 }
 
-export function isStreakFilterKind(kind: ActivityKind | "all"): kind is StreakTrackKind {
+export function isStreakFilterKind(
+  kind: ActivityKind | StreakTrackKind | "all",
+): kind is StreakTrackKind {
   return kind !== "all" && (STREAK_TRACK_KINDS as readonly string[]).includes(kind);
 }
 

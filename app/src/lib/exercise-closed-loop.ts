@@ -1,4 +1,5 @@
 import { filterPumpTipsForClosedLoop, usesClosedLoop } from "@/lib/closed-loop";
+import type { ExercisePlanResult } from "@/lib/exercise-plan";
 import type { UserSettings } from "@/lib/storage";
 
 export type ClosedLoopExercisePhase = "pre" | "during" | "post" | "recovery";

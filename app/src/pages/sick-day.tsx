@@ -46,6 +46,7 @@ import {
   SickDayTddField,
   scrollToSickDayPageTop,
   type SickDayCgmBgFieldProps,
+  type SickDayVerdictViewModel,
 } from "@/components/scenarios/sick-day-results-ui";
 import { CgmPrefillButton } from "@/components/cgm-prefill-button";
 import { useAutoCgmBgField } from "@/hooks/use-auto-cgm-bg-field";
@@ -678,12 +679,12 @@ export default function SickDay() {
     return { overdue, label };
   }, [nextCheckDueAtIso, nowTick]);
 
-  const verdict = useMemo(() => {
+  const verdict = useMemo((): SickDayVerdictViewModel | null => {
     if (!results) return null;
     const urgent = results.ketoneActionRequired === "urgent" || results.ketoneActionRequired === "emergency";
     const caution = results.ketoneActionRequired === "monitor" || severity === "severe";
     const label = urgent ? "Needs attention" : caution ? "Caution" : "Ready";
-    const tone = urgent ? "critical" : caution ? "caution" : "ok";
+    const tone: SickDayVerdictViewModel["tone"] = urgent ? "critical" : caution ? "caution" : "ok";
     const title = urgent
       ? "Act now"
       : caution

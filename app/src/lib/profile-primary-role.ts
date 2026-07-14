@@ -94,10 +94,10 @@ export async function backfillSupporterRoleToCloudIfNeeded(
   profile: ProfileRow | null | undefined,
   hasCarerLink: boolean,
 ): Promise<ProfileRow | null> {
-  if (!userId.trim() || cloudPrimaryAppRoleFromProfile(profile)) return profile;
-  if (!inferSupporterOnlyFromLegacySignals(profile, hasCarerLink)) return profile;
+  if (!userId.trim() || cloudPrimaryAppRoleFromProfile(profile)) return profile ?? null;
+  if (!inferSupporterOnlyFromLegacySignals(profile, hasCarerLink)) return profile ?? null;
   const { error } = await syncPrimaryAppRoleToCloud(userId, "carer");
-  if (error) return profile;
+  if (error) return profile ?? null;
   const { profile: refreshed } = await getProfile(userId);
   return refreshed ?? { ...profile!, primary_app_role: "carer" };
 }

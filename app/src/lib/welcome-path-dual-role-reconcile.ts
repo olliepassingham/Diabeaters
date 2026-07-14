@@ -41,11 +41,10 @@ async function isDualRolePatientSupporter(userId: string): Promise<boolean> {
 export async function repairDualRoleMarkersIfCorrupted(userId: string): Promise<void> {
   if (!userId.trim()) return;
   if (!(await isDualRolePatientSupporter(userId))) return;
+  /** Explicitly choosing Supporter this session is legitimate for dual-role accounts — not corruption to heal. */
+  if (getOnboardingAccountPath() === "supporter") return;
   const needsHeal =
-    isSupporterOnlyAccount() ||
-    getOnboardingAccountPath() === "supporter" ||
-    getPrimaryAppRole() === "carer" ||
-    isPersistedSupporterAccount();
+    isSupporterOnlyAccount() || getPrimaryAppRole() === "carer" || isPersistedSupporterAccount();
   if (!needsHeal) return;
   restoreDualRolePatientSessionMarkers();
   await syncPrimaryAppRoleToCloud(userId, "patient");
@@ -62,11 +61,12 @@ export async function healDualRolePatientSessionIfNeeded(
   if (!(await isDualRolePatientSupporter(userId))) {
     return { healed: false };
   }
+  /** Explicitly choosing Supporter this session is legitimate for dual-role accounts — not corruption to heal. */
+  if (getOnboardingAccountPath() === "supporter") {
+    return { healed: false };
+  }
   const needsHeal =
-    isSupporterOnlyAccount() ||
-    getOnboardingAccountPath() === "supporter" ||
-    getPrimaryAppRole() === "carer" ||
-    isPersistedSupporterAccount();
+    isSupporterOnlyAccount() || getPrimaryAppRole() === "carer" || isPersistedSupporterAccount();
   if (!needsHeal) {
     return { healed: false };
   }

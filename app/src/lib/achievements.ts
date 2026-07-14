@@ -258,6 +258,9 @@ function streakMeetsMilestone(
     );
     return stats.best >= def.requiredDays || stats.current >= def.requiredDays;
   }
+  if (isDiabetesTenureKind(def.streakKind)) {
+    return false;
+  }
 
   const stats = computeStreakStats(events, def.streakKind, today);
   return stats.best >= def.requiredDays || stats.current >= def.requiredDays;

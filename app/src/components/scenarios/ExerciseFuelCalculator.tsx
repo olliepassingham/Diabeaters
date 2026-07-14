@@ -995,7 +995,7 @@ export function ExerciseFuelCalculator() {
             ) : null}
 
             <MedicalNumericOutputDisclaimer collapsible />
-            <MedicalSourcesLink section="exercise" />
+            <MedicalSourcesLink anchor="exercise" />
 
             <Button variant="outline" size="sm" className="w-full" asChild>
               <Link href="/adviser?tab=meal&exercise=1&exerciseTiming=before" data-testid="efc-adviser-link">
