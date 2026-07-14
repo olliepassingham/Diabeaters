@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CgmGlucoseChart } from "@/components/cgm-glucose-chart";
+import { InfoTooltip } from "@/components/info-tooltip";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
 import { liveCgmConnectMessage } from "@/lib/cgm/live-cgm-source";
@@ -86,7 +87,12 @@ export default function CgmLivePage() {
       <PageHeader
         leading={<PageBackButton />}
         title="Glucose trends"
-        description="Near-live CGM readings on this device only — not stored in the cloud."
+        actions={
+          <InfoTooltip
+            term="On this device"
+            explanation="Near-live CGM readings are fetched for this chart on your phone only. They are not stored in the Diabeaters cloud."
+          />
+        }
       />
 
       {!connected ? (
@@ -245,11 +251,24 @@ export default function CgmLivePage() {
                   <p className="text-muted-foreground">
                     <span className="font-medium text-foreground">{inRangePercent}%</span> in target for this window
                   </p>
-                  <p className="tabular-nums text-muted-foreground">
-                    Target {formatTargetBgInput(targetLow, units)}–{formatTargetBgInput(targetHigh, units)} {units}
-                  </p>
+                  <div className="flex items-center gap-1">
+                    <p className="tabular-nums text-muted-foreground">
+                      Target {formatTargetBgInput(targetLow, units)}–{formatTargetBgInput(targetHigh, units)} {units}
+                    </p>
+                    <InfoTooltip
+                      term="Chart key"
+                      explanation="Green band: your target range. Optional indigo (sleep) and blue (exercise) bands come from bedtime checks and logged workouts on this device. Dots use green (in range), amber (low), or orange (high)."
+                    />
+                  </div>
                 </div>
-              ) : null}
+              ) : (
+                <div className="flex justify-end">
+                  <InfoTooltip
+                    term="Chart key"
+                    explanation="Green band: your target range. Optional indigo (sleep) and blue (exercise) bands come from bedtime checks and logged workouts on this device. Dots use green (in range), amber (low), or orange (high)."
+                  />
+                </div>
+              )}
             </>
           ) : loading ? (
             <div className="flex min-h-[220px] items-center justify-center text-sm text-muted-foreground">
@@ -257,11 +276,6 @@ export default function CgmLivePage() {
               Loading chart…
             </div>
           ) : null}
-
-          <p className="text-[11px] text-muted-foreground">
-            Green band: your target range. Optional indigo (sleep) and blue (exercise) bands come from bedtime checks and
-            logged workouts on this device. Dots use green (in range), amber (low), or orange (high).
-          </p>
         </CardContent>
       </Card>
 

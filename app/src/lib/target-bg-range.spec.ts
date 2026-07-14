@@ -9,6 +9,7 @@ describe("resolveUserTargetBgRange", () => {
   });
 
   it("falls back to defaults when settings are missing", () => {
-    expect(resolveUserTargetBgRange(undefined, "mmol/L")).toEqual({ low: 5, high: 8 });
+    expect(resolveUserTargetBgRange(undefined, "mmol/L")).toEqual({ low: 4, high: 10 });
+    expect(resolveUserTargetBgRange(undefined, "mg/dL")).toEqual({ low: 72, high: 180 });
   });
 });
