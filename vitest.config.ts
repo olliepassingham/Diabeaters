@@ -1,10 +1,17 @@
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
 const appDir = path.resolve(rootDir, "app");
+const appReact = path.resolve(appDir, "node_modules/react");
+const rootReact = path.resolve(rootDir, "node_modules/react");
+const reactDir = fs.existsSync(appReact) ? appReact : rootReact;
+const reactDomDir = fs.existsSync(path.resolve(path.dirname(reactDir), "react-dom"))
+  ? path.resolve(path.dirname(reactDir), "react-dom")
+  : path.resolve(rootDir, "node_modules/react-dom");
 
 export default defineConfig({
   plugins: [react()],
@@ -13,9 +20,9 @@ export default defineConfig({
       "@": path.resolve(rootDir, "app", "src"),
       "@shared": path.resolve(rootDir, "shared"),
       "@assets": path.resolve(rootDir, "attached_assets"),
-      // App deps live under app/; force one React copy so hooks work in Vitest + RTL.
-      react: path.resolve(appDir, "node_modules/react"),
-      "react-dom": path.resolve(appDir, "node_modules/react-dom"),
+      // Prefer app/node_modules when present (see CI `npm --prefix app ci`); else root.
+      react: reactDir,
+      "react-dom": reactDomDir,
     },
     dedupe: ["react", "react-dom"],
   },
@@ -32,4 +39,3 @@ export default defineConfig({
     restoreMocks: true,
   },
 });
-
