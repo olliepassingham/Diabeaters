@@ -61,16 +61,16 @@ describe("push-notification-deep-link", () => {
     expect(consumePendingPushDeepLink()).toBeNull();
   });
 
-  it("resolves notification bell deep link from push data", () => {
+  it("resolves supporter hypo push to carer view instead of bell", () => {
     expect(
       getPathForPushNotificationData({
         kind: "hypo_logged",
         deep_link: NOTIFICATION_BELL_DEEP_LINK,
       }),
-    ).toBe(NOTIFICATION_BELL_DEEP_LINK);
+    ).toBe("/carer-view");
   });
 
-  it("opens notification bell instead of navigating", () => {
+  it("opens notification bell when applyPushDeepLinkPath receives bell path", () => {
     let navigated: string | null = null;
     let bellOpened = false;
     window.addEventListener(OPEN_NOTIFICATION_BELL_EVENT, () => {

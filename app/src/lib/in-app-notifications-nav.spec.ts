@@ -49,6 +49,30 @@ describe("getPathForInAppNotification", () => {
     );
   });
 
+  it("maps supporter supplies_low with bell deep link to carer view", () => {
+    expect(
+      getPathForInAppNotification(
+        row({
+          id: "1",
+          user_id: "u",
+          data: { kind: "supplies_low", deep_link: NOTIFICATION_BELL_DEEP_LINK },
+        }),
+      ),
+    ).toBe("/carer-view");
+  });
+
+  it("maps appointment_reminder and exercise_cgm_alert", () => {
+    expect(
+      getPathForInAppNotification(row({ id: "1", user_id: "u", data: { kind: "appointment_reminder" } })),
+    ).toBe("/appointments");
+    expect(
+      getPathForInAppNotification(row({ id: "1", user_id: "u", data: { kind: "exercise_cgm_alert" } })),
+    ).toBe("/scenarios/exercise");
+    expect(
+      getPathForInAppNotification(row({ id: "1", user_id: "u", data: { kind: "live_glucose_out_of_range" } })),
+    ).toBe("/carer-view/glucose");
+  });
+
   it("maps hypo_logged_self and hypo_logged", () => {
     expect(getPathForInAppNotification(row({ id: "1", user_id: "u", data: { kind: "hypo_logged_self" } }))).toBe(
       "/tools/hypo-history",
@@ -132,5 +156,13 @@ describe("getPathForInAppNotification", () => {
 
   it("returns null for unknown kind without deep_link", () => {
     expect(getPathForInAppNotification(row({ id: "1", user_id: "u", data: { kind: "future_kind" } }))).toBeNull();
+  });
+
+  it("falls back to notification bell for unknown kind with bell deep link", () => {
+    expect(
+      getPathForInAppNotification(
+        row({ id: "1", user_id: "u", data: { kind: "future_kind", deep_link: NOTIFICATION_BELL_DEEP_LINK } }),
+      ),
+    ).toBe(NOTIFICATION_BELL_DEEP_LINK);
   });
 });

@@ -27,9 +27,6 @@ function notificationDataRecord(notification: PushNotificationSchema): Record<st
 
 /** Resolve in-app route from push custom data (APNs root keys / FCM data map). */
 export function getPathForPushNotificationData(data: Record<string, unknown>): string | null {
-  const target = typeof data.deep_link === "string" ? data.deep_link.trim() : "";
-  if (target && isNotificationBellDeepLink(target)) return target;
-
   return getPathForInAppNotification({
     id: "",
     user_id: "",

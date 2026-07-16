@@ -66,7 +66,11 @@ export async function schedulePumpFailureReminders(session: PumpFailureSession):
           title: copy.title,
           body: copy.body,
           schedule: { at },
-          extra: { pump_failure_session_id: session.id, kind: r.kind },
+          extra: {
+            pump_failure_session_id: session.id,
+            kind: r.kind,
+            deep_link: "/scenarios/pump-failure",
+          },
           ...androidChannel(),
         };
       })
@@ -75,7 +79,7 @@ export async function schedulePumpFailureReminders(session: PumpFailureSession):
         title: string;
         body: string;
         schedule: { at: Date };
-        extra: { pump_failure_session_id: string; kind: PumpFailureReminderKind };
+        extra: { pump_failure_session_id: string; kind: PumpFailureReminderKind; deep_link: string };
       }>;
 
     if (notifications.length === 0) return;

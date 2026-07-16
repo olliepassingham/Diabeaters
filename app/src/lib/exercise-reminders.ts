@@ -52,6 +52,16 @@ function exerciseAndroidChannel(): { channelId?: string } {
   return androidNotificationChannel("diabeaters_exercise");
 }
 
+const EXERCISE_DEEP_LINK = "/scenarios/exercise";
+
+function exerciseReminderExtra(sessionId: string, kind: ExerciseReminderKind) {
+  return {
+    exercise_session_id: sessionId,
+    kind,
+    deep_link: EXERCISE_DEEP_LINK,
+  };
+}
+
 async function ensureReminderPermission(): Promise<boolean> {
   return ensureNativeLocalNotificationPermission();
 }
@@ -90,7 +100,7 @@ export async function scheduleExercisePreReminders(session: ActiveExerciseSessio
       title: c.title,
       body: c.body,
       schedule: { at: new Date(soonMs) },
-      extra: { exercise_session_id: session.id, kind: "start_soon" },
+      extra: exerciseReminderExtra(session.id, "start_soon"),
       ...exerciseAndroidChannel(),
     });
   }
@@ -102,7 +112,7 @@ export async function scheduleExercisePreReminders(session: ActiveExerciseSessio
       title: c.title,
       body: c.body,
       schedule: { at: new Date(startMs) },
-      extra: { exercise_session_id: session.id, kind: "start_now" },
+      extra: exerciseReminderExtra(session.id, "start_now"),
       ...exerciseAndroidChannel(),
     });
   }
@@ -145,7 +155,7 @@ export async function scheduleExerciseActiveReminders(session: ActiveExerciseSes
         title: c.title,
         body: c.body,
         schedule: { at: new Date(x.atMs) },
-        extra: { exercise_session_id: session.id, kind: x.kind },
+        extra: exerciseReminderExtra(session.id, x.kind),
         ...exerciseAndroidChannel(),
       };
     });

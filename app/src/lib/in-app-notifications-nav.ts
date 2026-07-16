@@ -1,34 +1,31 @@
 import type { InAppNotificationRow } from "@/lib/carer-notify-types";
 import { HYPO_LOG_DEEP_LINK } from "@/lib/hypo-check-in-events";
-import { isNotificationBellDeepLink } from "@/lib/notification-inbox-deep-link";
+import { isNotificationBellDeepLink, NOTIFICATION_BELL_DEEP_LINK } from "@/lib/notification-inbox-deep-link";
 
 export { HYPO_LOG_DEEP_LINK, isHypoLogDeepLink } from "@/lib/hypo-check-in-events";
 
-/**
- * Resolves the in-app route for a notification row (explicit deep_link or known `data.kind`).
- * Returns null when there is no recognised target (full page leaves you in place; bell may fall back).
- */
-export function getPathForInAppNotification(row: InAppNotificationRow): string | null {
-  const data = row.data && typeof row.data === "object" ? (row.data as Record<string, unknown>) : {};
-  const kind = typeof data.kind === "string" ? data.kind : "";
-  const target = typeof data.deep_link === "string" ? data.deep_link.trim() : "";
-  if (target && !isNotificationBellDeepLink(target)) {
-    if (kind === "hypo_logged_self" && (target === "/" || target === "/dashboard")) {
-      return "/tools/hypo-history";
-    }
-    if (target === "/dashboard") return "/";
-    return target;
-  }
+function notificationData(row: InAppNotificationRow): Record<string, unknown> {
+  return row.data && typeof row.data === "object" ? (row.data as Record<string, unknown>) : {};
+}
 
+function pathFromKind(kind: string, data: Record<string, unknown>, bellDeepLink: boolean): string | null {
   if (kind === "bedtime_reminder") return "/scenarios/bedtime";
-  if (kind === "supplies_low") return "/supplies";
+  if (kind === "appointment_reminder") return "/appointments";
+  if (kind === "supplies_low") return bellDeepLink ? "/carer-view" : "/supplies";
   if (kind === "hypo_logged_self") return "/tools/hypo-history";
   if (kind === "hypo_acknowledged") return "/tools/hypo-history";
   if (kind === "hypo_check_in") return "/";
   if (kind === "hypo_check_in_response") return "/carer-view";
-  if (kind === "hypo_logged" || kind === "scenario_started" || kind === "alcohol_night_mode" || kind === "appointment_reminder_support") {
+  if (
+    kind === "hypo_logged" ||
+    kind === "scenario_started" ||
+    kind === "alcohol_night_mode" ||
+    kind === "appointment_reminder_support"
+  ) {
     return "/carer-view";
   }
+  if (kind === "live_glucose_out_of_range") return "/carer-view/glucose";
+  if (kind === "exercise_cgm_alert") return "/scenarios/exercise";
   if (
     kind === "feed_post_like" ||
     kind === "feed_post_comment" ||
@@ -47,6 +44,32 @@ export function getPathForInAppNotification(row: InAppNotificationRow): string |
     const threadId = typeof data.thread_id === "string" ? data.thread_id : "";
     return threadId ? `/community/messages/${threadId}` : "/community/messages";
   }
+
+  return null;
+}
+
+/**
+ * Resolves the in-app route for a notification row (explicit deep_link or known `data.kind`).
+ * Returns null when there is no recognised target (full page leaves you in place; bell may fall back).
+ */
+export function getPathForInAppNotification(row: InAppNotificationRow): string | null {
+  const data = notificationData(row);
+  const kind = typeof data.kind === "string" ? data.kind : "";
+  const target = typeof data.deep_link === "string" ? data.deep_link.trim() : "";
+  const bellDeepLink = Boolean(target && isNotificationBellDeepLink(target));
+
+  if (target && !bellDeepLink) {
+    if (kind === "hypo_logged_self" && (target === "/" || target === "/dashboard")) {
+      return "/tools/hypo-history";
+    }
+    if (target === "/dashboard") return "/";
+    return target;
+  }
+
+  const byKind = pathFromKind(kind, data, bellDeepLink);
+  if (byKind) return byKind;
+
+  if (bellDeepLink) return NOTIFICATION_BELL_DEEP_LINK;
 
   return null;
 }

@@ -89,7 +89,11 @@ export async function scheduleAlcoholReminders(session: AlcoholSession): Promise
         title: copy.title,
         body: copy.body,
         schedule: { at },
-        extra: { alcohol_session_id: session.id, kind: r.kind },
+        extra: {
+          alcohol_session_id: session.id,
+          kind: r.kind,
+          deep_link: "/scenarios/alcohol",
+        },
         ...androidChannel(),
       };
     })
@@ -98,7 +102,7 @@ export async function scheduleAlcoholReminders(session: AlcoholSession): Promise
       title: string;
       body: string;
       schedule: { at: Date };
-      extra: { alcohol_session_id: string; kind: AlcoholReminderKind };
+      extra: { alcohol_session_id: string; kind: AlcoholReminderKind; deep_link: string };
     }>;
 
   if (notifications.length === 0) return;

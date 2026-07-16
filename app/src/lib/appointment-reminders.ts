@@ -18,7 +18,12 @@ type ScheduledNotification = {
   title: string;
   body: string;
   schedule: { at: Date };
-  extra: { appointment_id: string; reminder_kind: AppointmentReminderKind };
+  extra: {
+    appointment_id: string;
+    reminder_kind: AppointmentReminderKind;
+    kind: "appointment_reminder";
+    deep_link: "/appointments";
+  };
   channelId?: string;
 };
 
@@ -39,7 +44,12 @@ function buildReminder(
     title,
     body,
     schedule: { at: remindAt },
-    extra: { appointment_id: a.id, reminder_kind: kind },
+    extra: {
+      appointment_id: a.id,
+      reminder_kind: kind,
+      kind: "appointment_reminder",
+      deep_link: "/appointments",
+    },
     ...androidChannel(),
   };
 }
