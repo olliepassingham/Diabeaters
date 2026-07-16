@@ -33,6 +33,7 @@ import {
   MapPin,
   Check,
   Trash2,
+  Pencil,
   Eye,
   Stethoscope,
   Heart,
@@ -171,11 +172,13 @@ function UpcomingAppointmentCard({
   appointment,
   today,
   onComplete,
+  onEdit,
   onDelete,
 }: {
   appointment: Appointment;
   today: Date;
   onComplete: (id: string) => void;
+  onEdit: (appointment: Appointment) => void;
   onDelete: (id: string) => void;
 }) {
   const meta = getTypeMeta(appointment.type);
@@ -252,6 +255,16 @@ function UpcomingAppointmentCard({
         </Button>
         <Button
           size="sm"
+          variant="outline"
+          className="min-h-9 rounded-xl"
+          onClick={() => onEdit(appointment)}
+          data-testid={`button-edit-${appointment.id}`}
+          aria-label="Edit appointment"
+        >
+          <Pencil className="h-4 w-4" aria-hidden />
+        </Button>
+        <Button
+          size="sm"
           variant="ghost"
           className="min-h-9 rounded-xl text-muted-foreground hover:text-destructive"
           onClick={() => onDelete(appointment.id)}
@@ -275,7 +288,8 @@ const CHECKUP_TIPS = [
 export default function Appointments() {
   const { user } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [title, setTitle] = useState("");
   const [type, setType] = useState<AppointmentType>("clinic");
   const [date, setDate] = useState("");
@@ -302,21 +316,32 @@ export default function Appointments() {
     void rescheduleAppointmentReminders(storage.getAppointmentsForUser(uid));
   }, [user?.id]);
 
-  const handleAdd = async () => {
+  const handleSave = async () => {
     if (!title || !date || !user?.id) return;
 
-    storage.addAppointment({
-      title,
-      type,
-      date,
-      time: time || undefined,
-      location: location || undefined,
-      notes: notes || undefined,
-      isCompleted: false,
-    });
+    if (editingAppointment) {
+      storage.updateAppointment(editingAppointment.id, {
+        title,
+        type,
+        date,
+        time: time || undefined,
+        location: location || undefined,
+        notes: notes || undefined,
+      });
+    } else {
+      storage.addAppointment({
+        title,
+        type,
+        date,
+        time: time || undefined,
+        location: location || undefined,
+        notes: notes || undefined,
+        isCompleted: false,
+      });
+    }
 
     setAppointments(storage.getAppointmentsForUser(user.id));
-    setIsAddOpen(false);
+    setIsFormOpen(false);
     resetForm();
     await syncAppointments();
     await rescheduleAppointmentReminders(storage.getAppointmentsForUser(user.id));
@@ -329,6 +354,18 @@ export default function Appointments() {
     setTime("");
     setLocation("");
     setNotes("");
+    setEditingAppointment(null);
+  };
+
+  const openEditDialog = (appointment: Appointment) => {
+    setEditingAppointment(appointment);
+    setTitle(appointment.title);
+    setType(appointment.type);
+    setDate(appointment.date);
+    setTime(appointment.time ?? "");
+    setLocation(appointment.location ?? "");
+    setNotes(appointment.notes ?? "");
+    setIsFormOpen(true);
   };
 
   const handleComplete = async (id: string) => {
@@ -411,6 +448,9 @@ export default function Appointments() {
                   allow it.
                 </p>
               </InfoSection>
+              <InfoSection title="Editing">
+                <p>Tap the pencil on any appointment to change the date, time, location, or notes.</p>
+              </InfoSection>
               <InfoSection title="Marking complete">
                 <p>After you attend, tap Mark done to move the visit to your history.</p>
               </InfoSection>
@@ -418,17 +458,34 @@ export default function Appointments() {
           }
         />
 
-        <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+        <Dialog
+          open={isFormOpen}
+          onOpenChange={(open) => {
+            setIsFormOpen(open);
+            if (!open) resetForm();
+          }}
+        >
           <DialogTrigger asChild>
-            <Button className="min-h-11 shrink-0 rounded-2xl px-4 shadow-sm" data-testid="button-add-appointment">
+            <Button
+              className="min-h-11 shrink-0 rounded-2xl px-4 shadow-sm"
+              data-testid="button-add-appointment"
+              onClick={() => resetForm()}
+            >
               <Plus className="mr-2 h-4 w-4" aria-hidden />
               Add
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-h-[min(90dvh,720px)] overflow-y-auto rounded-3xl sm:max-w-md">
+          <DialogContent
+            className="max-h-[min(90dvh,720px)] overflow-y-auto rounded-3xl sm:max-w-md"
+            data-testid="dialog-appointment-form"
+          >
             <DialogHeader>
-              <DialogTitle>Add appointment</DialogTitle>
-              <DialogDescription>Schedule a diabetes-related visit or check-up</DialogDescription>
+              <DialogTitle>{editingAppointment ? "Edit appointment" : "Add appointment"}</DialogTitle>
+              <DialogDescription>
+                {editingAppointment
+                  ? "Update the details for this visit"
+                  : "Schedule a diabetes-related visit or check-up"}
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-5 pt-2">
               <div className="space-y-2">
@@ -520,12 +577,12 @@ export default function Appointments() {
               </div>
 
               <Button
-                onClick={() => void handleAdd()}
+                onClick={() => void handleSave()}
                 className="h-12 w-full rounded-2xl"
                 disabled={!title || !date}
                 data-testid="button-save-appointment"
               >
-                Save appointment
+                {editingAppointment ? "Save changes" : "Save appointment"}
               </Button>
             </div>
           </DialogContent>
@@ -547,6 +604,16 @@ export default function Appointments() {
               >
                 <Check className="mr-1.5 h-4 w-4" aria-hidden />
                 Mark done
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="min-h-9 rounded-xl"
+                onClick={() => openEditDialog(nextAppointment)}
+                data-testid={`button-edit-${nextAppointment.id}`}
+                aria-label="Edit appointment"
+              >
+                <Pencil className="h-4 w-4" aria-hidden />
               </Button>
               <Button
                 size="sm"
@@ -597,7 +664,10 @@ export default function Appointments() {
             <Button
               variant="outline"
               className="shrink-0 rounded-2xl"
-              onClick={() => setIsAddOpen(true)}
+              onClick={() => {
+                resetForm();
+                setIsFormOpen(true);
+              }}
               data-testid="button-add-first-appointment"
             >
               <Plus className="mr-2 h-4 w-4" aria-hidden />
@@ -635,6 +705,7 @@ export default function Appointments() {
                     appointment={appointment}
                     today={today}
                     onComplete={handleComplete}
+                    onEdit={openEditDialog}
                     onDelete={requestDelete}
                   />
                 ))}
@@ -672,6 +743,16 @@ export default function Appointments() {
                             {appointment.isCompleted ? " · Completed" : ""}
                           </p>
                         </div>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-9 w-9 shrink-0 text-muted-foreground"
+                          onClick={() => openEditDialog(appointment)}
+                          data-testid={`button-edit-past-${appointment.id}`}
+                          aria-label="Edit appointment"
+                        >
+                          <Pencil className="h-4 w-4" aria-hidden />
+                        </Button>
                         <Button
                           size="icon"
                           variant="ghost"
