@@ -24,6 +24,11 @@ export type BedtimeLastNightStatus =
   | "no_readings"
   | "error";
 
+/** Content key so callers that pass a fresh `JSON.parse` array each render do not restart the fetch. */
+export function bedtimeLogsContentKey(logs: BedtimeLog[]): string {
+  return logs.map((l) => `${l.id}:${l.date}:${l.hoursUntilSleep ?? ""}`).join("|");
+}
+
 export function useBedtimeLastNight(logs: BedtimeLog[], units: BgUnits): {
   insight: BedtimeOvernightInsight | null;
   log: BedtimeLog | null;
@@ -34,7 +39,17 @@ export function useBedtimeLastNight(logs: BedtimeLog[], units: BgUnits): {
   refresh: () => void;
 } {
   const connected = hasLiveCgmCredentials(readCgmPreferences());
-  const reviewTarget = useMemo(() => resolveOvernightReviewTarget(logs), [logs]);
+  const logsRef = useRef(logs);
+  logsRef.current = logs;
+  const logsKey = bedtimeLogsContentKey(logs);
+  const reviewTarget = useMemo(
+    () => resolveOvernightReviewTarget(logsRef.current),
+    [logsKey],
+  );
+  const reviewKey = reviewTarget
+    ? `${reviewTarget.source}:${reviewTarget.window.startMs}:${reviewTarget.window.endMs}`
+    : "none";
+
   const [insight, setInsight] = useState<BedtimeOvernightInsight | null>(null);
   const [status, setStatus] = useState<BedtimeLastNightStatus>(connected ? "loading" : "no_cgm");
   const [message, setMessage] = useState<string | null>(connected ? null : liveCgmOvernightMessage());
@@ -125,7 +140,7 @@ export function useBedtimeLastNight(logs: BedtimeLog[], units: BgUnits): {
         setMessage(e instanceof Error ? e.message : "Could not load overnight review.");
       });
     }
-  }, [connected, reviewTarget, units]);
+  }, [connected, reviewTarget, reviewKey, units]);
 
   useEffect(() => {
     void load();

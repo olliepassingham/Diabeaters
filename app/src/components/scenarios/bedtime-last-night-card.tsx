@@ -51,7 +51,7 @@ function collapsedPreview(
   targetHigh: number | undefined,
   units: BgUnits,
 ): string {
-  if (status === "loading") return "Loading overnight readings…";
+  if (status === "loading") return "Loading overnight CGM…";
   if (message) return message;
   if (insight) {
     const range =
@@ -203,7 +203,8 @@ export function BedtimeLastNightCard({
   const chartTargetLow = insight?.targetLow ?? targetLow;
   const chartTargetHigh = insight?.targetHigh ?? targetHigh;
   const preview = collapsedPreview(insight, status, message, chartTargetLow, chartTargetHigh, units);
-  const canExpand = insight != null;
+  // Expand for insights, or for a finished empty/error state so the full message is readable.
+  const canExpand = insight != null || (status !== "loading" && status !== "no_cgm" && Boolean(message));
   const showRefresh = Boolean(onRefresh) && status !== "no_cgm";
 
   const cardClassName = cn(
