@@ -253,7 +253,10 @@ export function AppStatusStrip() {
   const pathOnly = pathname.split("?")[0] ?? pathname;
   const onSupporterGlucosePage = pathOnly === "/carer-view/glucose";
   const showSupporterCgmLiveChip =
-    inSupporterSession && supporterLiveGlucoseScope && !onSupporterGlucosePage;
+    inSupporterSession &&
+    supporterLiveGlucoseScope &&
+    !onSupporterGlucosePage &&
+    Boolean(supporterBgPrefill?.fromCgm);
   const showCgmLiveChip = showPatientCgmLiveChip || showSupporterCgmLiveChip;
 
   useEffect(() => {
@@ -783,8 +786,6 @@ export function AppStatusStrip() {
       onRefresh={showSupporterCgmLiveChip ? refreshSupporterBg : refreshBgPrefill}
       onOpen={showSupporterCgmLiveChip ? () => setLocation("/carer-view/glucose") : () => setLocation("/tools/cgm-live")}
       openLabel={showSupporterCgmLiveChip ? "Open live glucose" : "Open glucose trends"}
-      showWaiting={showSupporterCgmLiveChip}
-      waitingLabel="Waiting for live BG"
       rangeStatus={showSupporterCgmLiveChip ? supporterBgRow?.range_status ?? null : null}
     />
   ) : null;

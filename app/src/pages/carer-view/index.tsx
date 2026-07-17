@@ -22,6 +22,7 @@ import {
   History,
   ChevronDown,
   ChevronUp,
+  Moon,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
@@ -228,12 +229,44 @@ function formatCarerTravelSingleDate(iso: string): string | null {
   });
 }
 
-function scenarioBannerLines(rows: Record<string, unknown>[]): string[] {
-  const lines: string[] = [];
+type CarerSituationTone = "active" | "attention" | "calm" | "ended";
+
+type CarerSituationLine = {
+  id: string;
+  kind: "sick_day" | "travel" | "bedtime" | "other";
+  title: string;
+  detail?: string;
+  tone: CarerSituationTone;
+};
+
+function bedtimeAttentionDetail(rawState: Record<string, unknown> | null): string | undefined {
+  if (!rawState || rawState.bedtime_ready === true) return undefined;
+
+  const level = typeof rawState.readiness_level === "string" ? rawState.readiness_level.trim() : "";
+  if (level === "alert") return "Higher overnight risk flagged at check-in";
+  if (level === "monitor") return "Worth a closer watch tonight";
+
+  const summary =
+    rawState.inputs_summary && typeof rawState.inputs_summary === "object"
+      ? (rawState.inputs_summary as Record<string, unknown>)
+      : null;
+  if (!summary) return "Something at check-in needs a closer look";
+
+  const bits: string[] = [];
+  if (summary.recent_hypos === true) bits.push("recent hypo");
+  if (summary.had_alcohol === true) bits.push("alcohol");
+  if (summary.trend === "falling") bits.push("falling BG");
+  if (summary.exercised_today === true) bits.push("exercise today");
+  if (bits.length > 0) return bits.slice(0, 2).join(" · ");
+  return "Something at check-in needs a closer look";
+}
+
+function scenarioSituationLines(rows: Record<string, unknown>[]): CarerSituationLine[] {
+  const lines: CarerSituationLine[] = [];
   const now = Date.now();
   const recentlyEndedWindowMs = 24 * 60 * 60 * 1000;
 
-  for (const row of rows.slice(0, 8)) {
+  for (const [index, row] of rows.slice(0, 8).entries()) {
     const scenarioKey =
       typeof row.scenario_key === "string" && row.scenario_key.trim()
         ? row.scenario_key.trim()
@@ -249,6 +282,11 @@ function scenarioBannerLines(rows: Record<string, unknown>[]): string[] {
     const startedAt = toIsoString(rawState?.started_at) ?? toIsoString(rawState?.activated_at);
     const endedAt = toIsoString(rawState?.ended_at) ?? toIsoString(rawState?.deactivated_at);
     const checkedAt = toIsoString(rawState?.checked_at);
+    const rowId = String(
+      (row as { id?: unknown }).id ??
+        (row as { client_id?: unknown }).client_id ??
+        `${scenarioKey ?? "row"}-${index}`,
+    );
 
     if (scenarioKey === "sick_day") {
       const active = isSickDayScenarioActive(rawState);
@@ -257,29 +295,59 @@ function scenarioBannerLines(rows: Record<string, unknown>[]): string[] {
       if (active) {
         const startT = startedAt ? new Date(startedAt).getTime() : NaN;
         const dur = Number.isNaN(startT) ? null : durationLabel(now - startT);
-        const startLabel = startedAt ? `Started ${new Date(startedAt).toLocaleString(undefined, { timeStyle: "short" })}` : "Started";
-        lines.push(`Sick day${sevLabel} — ${startLabel}${dur ? ` · ${dur}` : ""}`);
-        const meds = rawState?.meds_next_due && typeof rawState.meds_next_due === "object" ? (rawState.meds_next_due as Record<string, unknown>) : null;
+        const startLabel = startedAt
+          ? `Started ${new Date(startedAt).toLocaleString(undefined, { timeStyle: "short" })}`
+          : "Started";
+        lines.push({
+          id: `${rowId}-sick-active`,
+          kind: "sick_day",
+          title: `Sick day${sevLabel} — ${startLabel}${dur ? ` · ${dur}` : ""}`,
+          tone: "active",
+        });
+        const meds =
+          rawState?.meds_next_due && typeof rawState.meds_next_due === "object"
+            ? (rawState.meds_next_due as Record<string, unknown>)
+            : null;
         const medName = meds && typeof meds.name === "string" ? meds.name.trim() : "";
         const dueAt = meds && typeof meds.due_at === "string" ? meds.due_at : null;
         if (medName && dueAt) {
           const t = new Date(dueAt).getTime();
           if (!Number.isNaN(t)) {
             const when = formatDistanceToNowStrict(new Date(dueAt), { addSuffix: true });
-            lines.push(`Next meds: ${medName} · ${when}`);
+            lines.push({
+              id: `${rowId}-sick-meds`,
+              kind: "sick_day",
+              title: `Next meds: ${medName} · ${when}`,
+              tone: "active",
+            });
           }
         }
         const medsActive = rawState?.meds_active;
         if (Array.isArray(medsActive) && medsActive.length > 1) {
-          lines.push(`${medsActive.length} active medication reminders shared`);
+          lines.push({
+            id: `${rowId}-sick-meds-count`,
+            kind: "sick_day",
+            title: `${medsActive.length} active medication reminders shared`,
+            tone: "active",
+          });
         }
         const tempRecent = rawState?.temp_recent;
         if (Array.isArray(tempRecent) && tempRecent.length > 1) {
-          lines.push(`${tempRecent.length} patient temperature readings shared`);
+          lines.push({
+            id: `${rowId}-sick-temps`,
+            kind: "sick_day",
+            title: `${tempRecent.length} patient temperature readings shared`,
+            tone: "active",
+          });
         }
         const carerTemps = rawState?.carer_temp_recent;
         if (Array.isArray(carerTemps) && carerTemps.length > 0) {
-          lines.push(`${carerTemps.length} supporter temperature log entr${carerTemps.length === 1 ? "y" : "ies"}`);
+          lines.push({
+            id: `${rowId}-sick-carer-temps`,
+            kind: "sick_day",
+            title: `${carerTemps.length} supporter temperature log entr${carerTemps.length === 1 ? "y" : "ies"}`,
+            tone: "active",
+          });
         }
         const temp =
           rawState?.temp_latest && typeof rawState.temp_latest === "object"
@@ -292,7 +360,12 @@ function scenarioBannerLines(rows: Record<string, unknown>[]): string[] {
           const tT = new Date(tempAt).getTime();
           if (!Number.isNaN(tT)) {
             const when = formatDistanceToNowStrict(new Date(tempAt), { addSuffix: true });
-            lines.push(`Temp: ${tempVal}°${tempUnit.toUpperCase()} · ${when}`);
+            lines.push({
+              id: `${rowId}-sick-temp-latest`,
+              kind: "sick_day",
+              title: `Temp: ${tempVal}°${tempUnit.toUpperCase()} · ${when}`,
+              tone: "active",
+            });
           }
         }
         continue;
@@ -305,7 +378,12 @@ function scenarioBannerLines(rows: Record<string, unknown>[]): string[] {
             startedAt && !Number.isNaN(new Date(startedAt).getTime())
               ? durationLabel(endT - new Date(startedAt).getTime())
               : null;
-          lines.push(`Sick day${sevLabel} — Ended ${endedText}${dur ? ` · ${dur}` : ""}`);
+          lines.push({
+            id: `${rowId}-sick-ended`,
+            kind: "sick_day",
+            title: `Sick day${sevLabel} — Ended ${endedText}${dur ? ` · ${dur}` : ""}`,
+            tone: "ended",
+          });
           continue;
         }
       }
@@ -333,14 +411,19 @@ function scenarioBannerLines(rows: Record<string, unknown>[]): string[] {
           : null;
       const core = `Travel — ${destLabel}${dates ? ` · ${dates}` : ""}${tripDays ? ` (${tripDays} days)` : ""}`;
       if (active) {
-        lines.push(core);
+        lines.push({ id: `${rowId}-travel-active`, kind: "travel", title: core, tone: "active" });
         continue;
       }
       if (endedAt) {
         const endT = new Date(endedAt).getTime();
         if (!Number.isNaN(endT) && now - endT <= recentlyEndedWindowMs) {
           const endedText = formatDistanceToNowStrict(new Date(endedAt), { addSuffix: true });
-          lines.push(`${core} — Ended ${endedText}`);
+          lines.push({
+            id: `${rowId}-travel-ended`,
+            kind: "travel",
+            title: `${core} — Ended ${endedText}`,
+            tone: "ended",
+          });
           continue;
         }
       }
@@ -353,20 +436,45 @@ function scenarioBannerLines(rows: Record<string, unknown>[]): string[] {
       const checkT = new Date(checkedAt).getTime();
       if (Number.isNaN(checkT) || now - checkT > recentlyEndedWindowMs) continue;
       const when = formatDistanceToNowStrict(new Date(checkedAt), { addSuffix: true });
-      lines.push(`Bedtime — ${ready ? "Ready" : "Needs attention"} · Checked ${when}`);
+      lines.push({
+        id: `${rowId}-bedtime`,
+        kind: "bedtime",
+        title: `Bedtime — ${ready ? "Ready" : "Needs attention"} · Checked ${when}`,
+        detail: ready ? undefined : bedtimeAttentionDetail(rawState),
+        tone: ready ? "calm" : "attention",
+      });
       continue;
     }
 
-    // Fallback: keep existing label if present.
     if (typeof row.label === "string" && row.label.trim()) {
-      lines.push(row.label.trim());
+      lines.push({ id: rowId, kind: "other", title: row.label.trim(), tone: "calm" });
     } else if (typeof row.title === "string" && row.title.trim()) {
-      lines.push(row.title.trim());
+      lines.push({ id: rowId, kind: "other", title: row.title.trim(), tone: "calm" });
     } else if (scenarioKey) {
-      lines.push(scenarioKey);
+      lines.push({ id: rowId, kind: "other", title: scenarioKey, tone: "calm" });
     }
   }
-  return lines;
+
+  const toneRank: Record<CarerSituationTone, number> = {
+    attention: 0,
+    active: 1,
+    calm: 2,
+    ended: 3,
+  };
+  return lines.sort((a, b) => toneRank[a.tone] - toneRank[b.tone]);
+}
+
+function situationRowClass(tone: CarerSituationTone): string {
+  if (tone === "active") {
+    return "border-orange-500/30 bg-orange-500/[0.07]";
+  }
+  if (tone === "attention") {
+    return "border-amber-500/35 bg-amber-500/[0.08]";
+  }
+  if (tone === "ended") {
+    return "border-border/40 bg-muted/20 text-muted-foreground";
+  }
+  return "border-border/50 bg-background/50";
 }
 
 /**
@@ -1507,7 +1615,7 @@ export default function CarerViewPage() {
       .sort((a, b) => a.t - b.t)
       .map((x) => x.row);
   }, [appointmentRows]);
-  const scenarioLines = scenarioBannerLines(scenarioRows);
+  const scenarioLines = scenarioSituationLines(scenarioRows);
   const sickDayState = useMemo(() => sickDayScenarioState(scenarioRows), [scenarioRows]);
   const carerActivityEvents = useMemo(
     () =>
@@ -1892,21 +2000,52 @@ export default function CarerViewPage() {
                     description="Travel, sick day, or bedtime flags will show here when shared."
                   />
                 ) : (
-                  scenarioLines.map((line, i) => (
-                    <div
-                      key={`${line}-${i}`}
-                      className="flex items-start gap-2 text-sm rounded-lg border border-border/50 px-3 py-2 bg-background/50"
-                    >
-                      {line.toLowerCase().includes("sick") ? (
-                        <Thermometer className="h-4 w-4 shrink-0 mt-0.5 text-orange-600" />
-                      ) : line.toLowerCase().includes("travel") ? (
-                        <Plane className="h-4 w-4 shrink-0 mt-0.5 text-purple-600" />
-                      ) : (
-                        <Info className="h-4 w-4 shrink-0 mt-0.5 text-muted-foreground" />
-                      )}
-                      <span>{line}</span>
-                    </div>
-                  ))
+                  scenarioLines.map((line) => {
+                    const Icon =
+                      line.kind === "sick_day"
+                        ? Thermometer
+                        : line.kind === "travel"
+                          ? Plane
+                          : line.kind === "bedtime"
+                            ? Moon
+                            : Info;
+                    const iconClass =
+                      line.kind === "sick_day"
+                        ? "text-orange-600 dark:text-orange-400"
+                        : line.kind === "travel"
+                          ? "text-purple-600 dark:text-purple-400"
+                          : line.kind === "bedtime" && line.tone === "attention"
+                            ? "text-amber-700 dark:text-amber-300"
+                            : line.kind === "bedtime"
+                              ? "text-indigo-600 dark:text-indigo-400"
+                              : "text-muted-foreground";
+                    return (
+                      <div
+                        key={line.id}
+                        className={cn(
+                          "flex items-start gap-2 rounded-lg border px-3 py-2.5 text-sm",
+                          situationRowClass(line.tone),
+                        )}
+                        data-testid={`carer-situation-${line.kind}-${line.tone}`}
+                      >
+                        <Icon className={cn("mt-0.5 h-4 w-4 shrink-0", iconClass)} aria-hidden />
+                        <div className="min-w-0 flex-1 space-y-0.5">
+                          <p className="font-medium leading-snug text-foreground">{line.title}</p>
+                          {line.detail ? (
+                            <p className="text-xs leading-snug text-muted-foreground">{line.detail}</p>
+                          ) : null}
+                        </div>
+                        {line.tone === "attention" ? (
+                          <Badge
+                            variant="secondary"
+                            className="shrink-0 rounded-full border-0 bg-amber-500/20 text-[10px] font-semibold text-amber-950 dark:text-amber-100"
+                          >
+                            Attention
+                          </Badge>
+                        ) : null}
+                      </div>
+                    );
+                  })
                 )}
               </CardContent>
             </CarerMutedCard>
