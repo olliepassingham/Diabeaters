@@ -101,7 +101,7 @@ function StreakSummaryBar({
 }) {
   return (
     <div
-      className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3 py-2.5 text-sm"
+      className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3 py-2.5 dark:bg-emerald-950/25 text-sm"
       data-testid={`activity-streak-summary-${kind}`}
     >
       <p className="font-medium text-foreground">
@@ -422,7 +422,7 @@ export function ActivityLogPanel({
 
         {hypoMonthLine ? (
           <div
-            className="rounded-xl border border-red-500/20 bg-red-500/5 px-3 py-2.5 text-sm"
+            className="rounded-xl border border-red-500/20 bg-red-500/5 px-3 py-2.5 dark:bg-red-950/25 text-sm"
             data-testid="activity-hypo-month-summary"
           >
             <p className="font-medium text-foreground">Hypo log this month</p>

@@ -46,6 +46,7 @@ export function PageInfoDialog({
           <Button
             variant="ghost"
             size="icon"
+            aria-label={`About ${title}`}
             data-testid="button-page-info"
             className={cn(compact && "h-9 w-9")}
           >

@@ -101,7 +101,7 @@ export function CgmLiveBgChip({
             type="button"
             variant="ghost"
             size="icon"
-            className="h-7 w-7 shrink-0"
+            className="h-9 w-9 shrink-0 -my-1"
             onClick={onRefresh}
             aria-label="Refresh glucose reading"
             data-testid="button-cgm-live-refresh"
@@ -121,8 +121,8 @@ export function CgmLiveBgChip({
   const toneClass = resolvedRange
     ? glucoseRangeCardClasses(resolvedRange)
     : stale
-      ? "border-amber-500/30 bg-amber-500/10"
-      : "border-emerald-500/25 bg-emerald-500/10";
+      ? "border-amber-500/30 bg-amber-500/10 dark:border-amber-500/40 dark:bg-amber-950/40"
+      : "border-emerald-500/25 bg-emerald-500/10 dark:border-emerald-500/35 dark:bg-emerald-950/30";
 
   const body = (
     <>
@@ -176,7 +176,7 @@ export function CgmLiveBgChip({
           type="button"
           variant="ghost"
           size="icon"
-          className="h-7 w-7 shrink-0"
+          className="h-9 w-9 shrink-0 -my-1"
           onClick={onRefresh}
           aria-label="Refresh glucose reading"
           data-testid="button-cgm-live-refresh"

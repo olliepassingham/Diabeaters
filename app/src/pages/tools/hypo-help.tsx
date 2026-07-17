@@ -161,8 +161,8 @@ function HypoContextChips({ chips }: { chips: ContextChip[] }) {
           key={chip.id}
           className={cn(
             "inline-flex max-w-full items-start gap-2 rounded-xl border px-2.5 py-2 text-xs leading-snug",
-            chip.tone === "emerald" && "border-emerald-500/30 bg-emerald-500/10",
-            chip.tone === "amber" && "border-amber-500/35 bg-amber-500/10",
+            chip.tone === "emerald" && "border-emerald-500/30 bg-emerald-500/10 dark:bg-emerald-950/30",
+            chip.tone === "amber" && "border-amber-500/35 bg-amber-500/10 dark:bg-amber-950/30",
             (!chip.tone || chip.tone === "default") && "border-border/60 bg-muted/25",
           )}
           data-testid={`hypo-context-chip-${chip.id}`}
@@ -294,7 +294,7 @@ export default function HypoHelpPage() {
             type="button"
             variant="ghost"
             size="icon"
-            className="h-6 w-6 shrink-0"
+            className="h-9 w-9 shrink-0 -my-1.5"
             aria-label="Snooze exercise reminders for 8 hours"
             onClick={() => {
               storage.snoozePostExerciseNudges(8);
@@ -382,7 +382,7 @@ export default function HypoHelpPage() {
       <Card className="surface-card overflow-hidden rounded-2xl border-border/70 shadow-sm">
         <CardHeader className="pb-3">
           <CardTitle className="text-h3 flex items-center gap-2 text-foreground">
-            <Droplet className="h-5 w-5 shrink-0 text-red-500" aria-hidden />
+            <Droplet className="h-5 w-5 shrink-0 text-red-500 dark:text-red-400" aria-hidden />
             Treatment estimate
           </CardTitle>
         </CardHeader>
@@ -421,8 +421,8 @@ export default function HypoHelpPage() {
                 className={cn(
                   "flex flex-wrap items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm",
                   severityView.tone === "critical"
-                    ? "border border-red-500/35 bg-red-500/10"
-                    : "border border-amber-500/30 bg-amber-500/10",
+                    ? "border border-red-500/35 bg-red-500/10 dark:bg-red-950/35"
+                    : "border border-amber-500/30 bg-amber-500/10 dark:bg-amber-950/30",
                 )}
                 data-testid="hypo-severity-band"
               >
@@ -567,7 +567,7 @@ export default function HypoHelpPage() {
           {parseFloat(currentBg) > 0 &&
             parseFloat(targetBg) > 0 &&
             parseFloat(currentBg) >= parseFloat(targetBg) && (
-              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2.5 text-sm text-emerald-900 dark:text-emerald-100">
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2.5 text-sm text-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100">
                 Already at or above target — no treatment needed.
               </div>
             )}
@@ -602,7 +602,7 @@ export default function HypoHelpPage() {
 
               {recheckRemainingSec != null ? (
                 <div
-                  className="flex items-center justify-between gap-3 rounded-xl border border-amber-500/35 bg-amber-500/10 px-3 py-2.5"
+                  className="flex items-center justify-between gap-3 rounded-xl border border-amber-500/35 bg-amber-500/10 px-3 py-2.5 dark:bg-amber-950/30"
                   data-testid="panel-hypo-recheck-timer"
                 >
                   <div className="min-w-0">
@@ -617,7 +617,7 @@ export default function HypoHelpPage() {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8"
+                      className="h-10 w-10"
                       aria-label="Dismiss timer"
                       onClick={() => setRecheckEndsAt(null)}
                     >

@@ -929,7 +929,7 @@ export default function AlcoholScenarioPage() {
 
         {isPumpDeliveryMethod(profile?.insulinDeliveryMethod) && phase !== "result" ? (
           <p
-            className="rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-xs leading-snug text-muted-foreground"
+            className="rounded-lg border border-amber-500/25 bg-amber-500/5 dark:bg-amber-950/25 px-3 py-2 text-xs leading-snug text-muted-foreground"
             data-testid="alert-alcohol-pump"
           >
             <span className="font-medium text-foreground">Pump:</span> Check IOB before bolusing — hypos can linger for hours after drinking.

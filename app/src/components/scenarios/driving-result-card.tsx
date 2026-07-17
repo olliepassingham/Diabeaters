@@ -16,14 +16,14 @@ const TONE_STYLES = {
     doNowLabel: "text-destructive",
   },
   caution: {
-    hero: "from-amber-500/25 via-amber-500/10 to-background",
+    hero: "from-amber-500/25 via-amber-500/10 to-background dark:from-amber-950/40 dark:via-amber-950/20",
     border: "border-amber-500/45",
     accent: "text-amber-800 dark:text-amber-200",
-    doNow: "border-amber-500/35 bg-amber-500/10",
+    doNow: "border-amber-500/35 bg-amber-500/10 dark:bg-amber-950/35",
     doNowLabel: "text-amber-900 dark:text-amber-100",
   },
   likely_ok: {
-    hero: "from-emerald-500/20 via-emerald-500/8 to-background",
+    hero: "from-emerald-500/20 via-emerald-500/8 to-background dark:from-emerald-950/35 dark:via-emerald-950/15",
     border: "border-emerald-600/35",
     accent: "text-emerald-800 dark:text-emerald-200",
     doNow: "border-primary/25 bg-primary/8",
@@ -39,7 +39,7 @@ function OutcomeBadge({ outcome }: { outcome: DrivingReadinessOutcome }) {
     return (
       <Badge
         variant="outline"
-        className="border-amber-500/70 bg-amber-500/15 text-amber-950 dark:text-amber-50"
+        className="border-amber-500/70 bg-amber-500/15 text-amber-950 dark:bg-amber-950/40 dark:text-amber-50"
       >
         Caution
       </Badge>

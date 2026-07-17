@@ -1744,7 +1744,7 @@ export default function Travel() {
                   </Button>
                   <Button asChild variant="outline" size="sm" className="min-h-9" data-testid="button-overview-emergency">
                     <Link href="/emergency-card">
-                      <Globe className="h-3.5 w-3.5 mr-1.5 text-red-600" aria-hidden />
+                      <Globe className="h-3.5 w-3.5 mr-1.5 text-red-600 dark:text-red-400" aria-hidden />
                       Emergency card
                     </Link>
                   </Button>
@@ -2125,7 +2125,13 @@ export default function Travel() {
                         <p className="text-xs text-muted-foreground mt-1">{holidayPrep.notes}</p>
                       )}
                     </div>
-                    <Button variant="ghost" size="icon" onClick={handleDeleteHolidayPrep} data-testid="button-delete-holiday-prep">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleDeleteHolidayPrep}
+                      aria-label="Delete holiday prep"
+                      data-testid="button-delete-holiday-prep"
+                    >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
@@ -2987,9 +2993,9 @@ export default function Travel() {
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base font-semibold flex items-center gap-2">
                     {plan.weatherChange === "warmer" ? (
-                      <Sun className="h-4 w-4 shrink-0 text-red-500" aria-hidden />
+                      <Sun className="h-4 w-4 shrink-0 text-red-500 dark:text-red-400" aria-hidden />
                     ) : plan.weatherChange === "colder" ? (
-                      <Snowflake className="h-4 w-4 shrink-0 text-blue-500" aria-hidden />
+                      <Snowflake className="h-4 w-4 shrink-0 text-blue-500 dark:text-blue-400" aria-hidden />
                     ) : (
                       <Thermometer className="h-4 w-4 shrink-0" aria-hidden />
                     )}

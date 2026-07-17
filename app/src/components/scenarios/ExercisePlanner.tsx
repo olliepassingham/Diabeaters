@@ -791,6 +791,7 @@ export function ExercisePlanner() {
                   setMealBolusNoRatios(false);
                   setPlannerInputsOpen(true);
                 }}
+                aria-label="Clear exercise plan"
                 data-testid="button-clear-exercise-result"
               >
                 <X className="h-4 w-4" />

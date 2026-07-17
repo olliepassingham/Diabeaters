@@ -66,19 +66,19 @@ function levelTone(level: ReadinessLevel) {
     case "steady":
       return {
         border: "border-emerald-500/30",
-        bg: "bg-gradient-to-br from-emerald-500/8 via-card to-card",
+        bg: "bg-gradient-to-br from-emerald-500/8 via-card to-card dark:from-emerald-950/35",
         badge: "bg-emerald-500/15 text-emerald-800 dark:text-emerald-200",
       };
     case "monitor":
       return {
         border: "border-amber-500/35",
-        bg: "bg-gradient-to-br from-amber-500/8 via-card to-card",
+        bg: "bg-gradient-to-br from-amber-500/8 via-card to-card dark:from-amber-950/35",
         badge: "bg-amber-500/15 text-amber-900 dark:text-amber-100",
       };
     case "alert":
       return {
         border: "border-red-500/35",
-        bg: "bg-gradient-to-br from-red-500/10 via-card to-card",
+        bg: "bg-gradient-to-br from-red-500/10 via-card to-card dark:from-red-950/40",
         badge: "bg-red-500/15 text-red-800 dark:text-red-100",
       };
   }
@@ -111,7 +111,7 @@ export function BedtimeResultView({
   return (
     <div className="space-y-3" data-testid="card-bedtime-result">
       <div
-        className="flex items-center gap-2.5 rounded-xl border border-emerald-500/25 bg-emerald-500/[0.06] px-3 py-2.5"
+        className="flex items-center gap-2.5 rounded-xl border border-emerald-500/25 bg-emerald-500/[0.06] px-3 py-2.5 dark:bg-emerald-950/30"
         data-testid="card-bedtime-save-prompt"
       >
         <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
@@ -163,7 +163,7 @@ export function BedtimeResultView({
 
       {result.correctionUnavailable ? (
         <div
-          className="rounded-2xl border border-amber-500/30 bg-amber-500/[0.06] px-4 py-3.5 text-sm"
+          className="rounded-2xl border border-amber-500/30 bg-amber-500/[0.06] px-4 py-3.5 text-sm dark:bg-amber-950/30"
           data-testid="card-correction-unavailable"
         >
           <p className="font-medium text-foreground">Above target — dose not calculated</p>
@@ -177,7 +177,7 @@ export function BedtimeResultView({
       ) : null}
 
       {!result.correction && result.snack ? (
-        <div className="overflow-hidden rounded-2xl border border-amber-500/30 bg-amber-500/[0.08] px-4 py-4">
+        <div className="overflow-hidden rounded-2xl border border-amber-500/30 bg-amber-500/[0.08] px-4 py-4 dark:bg-amber-950/35">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Suggested snack</p>
           <p className="mt-1 font-display text-3xl font-bold tabular-nums text-foreground">
             {result.snack.grams}

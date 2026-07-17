@@ -23,7 +23,7 @@ const STRUGGLE_CONFIGS: Record<string, StruggleConfig> = {
     cta: "Open Supply Tracker",
     link: "/supplies",
     iconColor: "text-blue-600 dark:text-blue-400",
-    iconBg: "bg-blue-500/10",
+    iconBg: "bg-blue-500/10 dark:bg-blue-500/20",
   },
   meals: {
     icon: Utensils,
@@ -32,7 +32,7 @@ const STRUGGLE_CONFIGS: Record<string, StruggleConfig> = {
     cta: "Plan a meal",
     link: "/adviser?tab=meal",
     iconColor: "text-orange-600 dark:text-orange-400",
-    iconBg: "bg-orange-500/10",
+    iconBg: "bg-orange-500/10 dark:bg-orange-500/20",
   },
   exercise: {
     icon: Dumbbell,
@@ -41,7 +41,7 @@ const STRUGGLE_CONFIGS: Record<string, StruggleConfig> = {
     cta: "Open exercise guide",
     link: "/scenarios/exercise",
     iconColor: "text-green-600 dark:text-green-400",
-    iconBg: "bg-green-500/10",
+    iconBg: "bg-green-500/10 dark:bg-green-500/20",
   },
   overview: {
     icon: LayoutDashboard,
@@ -50,7 +50,7 @@ const STRUGGLE_CONFIGS: Record<string, StruggleConfig> = {
     cta: "Browse tools",
     link: "/tools",
     iconColor: "text-purple-600 dark:text-purple-400",
-    iconBg: "bg-purple-500/10",
+    iconBg: "bg-purple-500/10 dark:bg-purple-500/20",
   },
 };
 

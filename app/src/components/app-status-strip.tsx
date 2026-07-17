@@ -520,7 +520,7 @@ export function AppStatusStrip() {
 
   const rowClass =
     "flex items-center justify-between gap-2 rounded-2xl border border-border/60 bg-background/55 px-3 py-2 backdrop-blur [padding-left:max(0.75rem,env(safe-area-inset-left))] [padding-right:max(0.75rem,env(safe-area-inset-right))]";
-  const btnClass = "h-7 px-2 text-xs";
+  const btnClass = "h-8 px-2.5 text-xs";
 
   const bgUnits = stripProfile?.bgUnits || "mg/dL";
   const isPump = isPumpDeliveryMethod(stripProfile?.insulinDeliveryMethod);
@@ -934,7 +934,7 @@ export function AppStatusStrip() {
                         type="button"
                         size="sm"
                         variant="outline"
-                        className={cn(btnClass, "w-8 px-0")}
+                        className={cn(btnClass, "w-9 px-0")}
                         aria-label="Travel and exercise options"
                         data-testid="status-travel-exercise-more"
                       >
@@ -997,7 +997,7 @@ export function AppStatusStrip() {
                       type="button"
                       size="sm"
                       variant="outline"
-                      className={cn(btnClass, "w-8 px-0")}
+                      className={cn(btnClass, "w-9 px-0")}
                       aria-label="Travel and exercise options"
                       data-testid="status-travel-exercise-more"
                     >
@@ -1259,7 +1259,7 @@ export function AppStatusStrip() {
                               type="button"
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 shrink-0 -mr-1 -mt-0.5 text-muted-foreground hover:text-foreground"
+                              className="h-9 w-9 shrink-0 -mr-1.5 -mt-1 text-muted-foreground hover:text-foreground"
                               onClick={() => setExerciseDetailOpen(true)}
                               aria-label="More exercise guidance"
                               data-testid="status-exercise-more-info"
@@ -1295,7 +1295,7 @@ export function AppStatusStrip() {
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 shrink-0 -mr-1 -mt-0.5 text-muted-foreground hover:text-foreground"
+                          className="h-9 w-9 shrink-0 -mr-1.5 -mt-1 text-muted-foreground hover:text-foreground"
                           onClick={() => setExerciseDetailOpen(true)}
                           aria-label="More recovery guidance"
                           data-testid="status-exercise-more-info"
@@ -1327,7 +1327,7 @@ export function AppStatusStrip() {
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 shrink-0 -mr-1 -mt-0.5 text-muted-foreground hover:text-foreground"
+                          className="h-9 w-9 shrink-0 -mr-1.5 -mt-1 text-muted-foreground hover:text-foreground"
                           onClick={() => setExerciseDetailOpen(true)}
                           aria-label="More pre-workout guidance"
                           data-testid="status-exercise-more-info"
@@ -1464,7 +1464,7 @@ export function AppStatusStrip() {
                               type="button"
                               size="sm"
                               variant="outline"
-                              className={cn(btnClass, "w-8 px-0")}
+                              className={cn(btnClass, "w-9 px-0")}
                               aria-label="Travel options"
                               data-testid="status-travel-post-exercise-more"
                             >
@@ -1635,7 +1635,7 @@ export function AppStatusStrip() {
                       type="button"
                       size="sm"
                       variant="outline"
-                      className={cn(btnClass, "w-8 px-0")}
+                      className={cn(btnClass, "w-9 px-0")}
                       aria-label="Travel options"
                       data-testid="status-travel-post-exercise-snoozed-more"
                     >

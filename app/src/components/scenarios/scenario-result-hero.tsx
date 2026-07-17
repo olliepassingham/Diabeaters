@@ -6,9 +6,9 @@ export type ScenarioResultHeroTone = "default" | "caution" | "critical" | "hypo"
 
 const toneSurface: Record<ScenarioResultHeroTone, string> = {
   default: "border-primary/30 bg-gradient-to-b from-primary/10 via-card to-card",
-  caution: "border-amber-500/35 bg-gradient-to-b from-amber-500/10 via-card to-card",
-  critical: "border-red-500/35 bg-gradient-to-b from-red-500/12 via-card to-card",
-  hypo: "border-red-500/35 bg-gradient-to-b from-red-500/10 via-card to-card",
+  caution: "border-amber-500/35 bg-gradient-to-b from-amber-500/10 via-card to-card dark:from-amber-950/40",
+  critical: "border-red-500/35 bg-gradient-to-b from-red-500/12 via-card to-card dark:from-red-950/40",
+  hypo: "border-red-500/35 bg-gradient-to-b from-red-500/10 via-card to-card dark:from-red-950/40",
 };
 
 const toneEyebrow: Record<ScenarioResultHeroTone, string> = {

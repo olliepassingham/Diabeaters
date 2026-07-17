@@ -120,7 +120,7 @@ export default function Welcome() {
                 data-testid="welcome-supporter"
               >
                 <div className="flex items-start gap-3">
-                  <div className="mt-0.5 rounded-xl bg-blue-500/10 p-2.5">
+                  <div className="mt-0.5 rounded-xl bg-blue-500/10 p-2.5 dark:bg-blue-500/20">
                     <HeartHandshake className="h-5 w-5 text-blue-600 dark:text-blue-400" aria-hidden />
                   </div>
                   <div className="min-w-0 flex-1">
@@ -146,7 +146,7 @@ export default function Welcome() {
                 data-testid="welcome-community"
               >
                 <div className="flex items-start gap-3">
-                  <div className="mt-0.5 rounded-xl bg-emerald-500/10 p-2.5">
+                  <div className="mt-0.5 rounded-xl bg-emerald-500/10 p-2.5 dark:bg-emerald-500/20">
                     <Eye className="h-5 w-5 text-emerald-700 dark:text-emerald-400" aria-hidden />
                   </div>
                   <div className="min-w-0 flex-1">

@@ -20,9 +20,9 @@ export function glucoseRangeStatusLabel(status: GlucoseRangeStatus): string {
 }
 
 export function glucoseRangeCardClasses(status: GlucoseRangeStatus): string {
-  if (status === "low") return "border-amber-500/35 bg-amber-500/10";
-  if (status === "high") return "border-orange-500/35 bg-orange-500/10";
-  return "border-emerald-500/30 bg-emerald-500/8";
+  if (status === "low") return "border-amber-500/35 bg-amber-500/10 dark:border-amber-500/40 dark:bg-amber-950/40";
+  if (status === "high") return "border-orange-500/35 bg-orange-500/10 dark:border-orange-500/40 dark:bg-orange-950/40";
+  return "border-emerald-500/30 bg-emerald-500/8 dark:border-emerald-500/35 dark:bg-emerald-950/30";
 }
 
 export function glucoseRangeValueClasses(status: GlucoseRangeStatus): string {

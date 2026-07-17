@@ -45,7 +45,7 @@ export function ScenarioPastHistoryCard({ kind }: { kind: ScenarioHistoryKind })
               <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
               <span className="truncate">{title}</span>
             </div>
-            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" tabIndex={-1} type="button">
+            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" tabIndex={-1} type="button" aria-hidden>
               {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </Button>
           </CardTitle>

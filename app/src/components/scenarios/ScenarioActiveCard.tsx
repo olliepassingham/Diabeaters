@@ -17,11 +17,11 @@ export function ScenarioActiveCard(props: {
 }) {
   const tone =
     props.tone === "red"
-      ? "border-red-500/30 bg-red-500/[0.06]"
+      ? "border-red-500/30 bg-red-500/[0.06] dark:border-red-500/40 dark:bg-red-950/35"
       : props.tone === "amber"
-        ? "border-amber-500/30 bg-amber-500/[0.06]"
+        ? "border-amber-500/30 bg-amber-500/[0.06] dark:border-amber-500/40 dark:bg-amber-950/35"
         : props.tone === "blue"
-          ? "border-blue-500/30 bg-blue-500/[0.06]"
+          ? "border-blue-500/30 bg-blue-500/[0.06] dark:border-blue-500/40 dark:bg-blue-950/35"
           : "border-border/60 bg-card/70";
 
   return (

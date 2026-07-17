@@ -48,14 +48,14 @@ export function PendingHypoCheckInBanner() {
   return (
     <Card
       variant="glass-muted"
-      className="border-rose-500/30 bg-rose-500/[0.05] shadow-sm"
+      className="border-rose-500/30 bg-rose-500/[0.05] shadow-sm dark:bg-rose-950/30"
       data-testid="pending-hypo-check-in-banner"
     >
       <CardContent className="p-0">
         <button
           type="button"
           onClick={openRespondSheet}
-          className="flex w-full items-center gap-3 p-4 text-left outline-none transition-colors hover:bg-rose-500/[0.04] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="flex w-full items-center gap-3 p-4 text-left outline-none transition-colors hover:bg-rose-500/[0.04] dark:hover:bg-rose-950/25 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           <div className="min-w-0 flex-1 space-y-2">
             <HypoCheckInPrompt carerName={first.carer_name} />

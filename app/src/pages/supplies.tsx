@@ -378,9 +378,9 @@ function PrescriptionCyclePanel({
                 <div
                   className={`rounded-lg px-3 py-2 ${
                     orderOverdue
-                      ? "bg-red-500/10"
+                      ? "bg-red-500/10 dark:bg-red-950/30"
                       : orderSoon
-                        ? "bg-amber-500/10"
+                        ? "bg-amber-500/10 dark:bg-amber-950/30"
                         : "bg-muted/40"
                   }`}
                   data-testid="card-next-order"
@@ -409,7 +409,7 @@ function PrescriptionCyclePanel({
               {daysUntilCollection !== null ? (
                 <div
                   className={`rounded-lg px-3 py-2 ${
-                    collectionAdjustedForTravel ? "bg-blue-500/10" : "bg-muted/40"
+                    collectionAdjustedForTravel ? "bg-blue-500/10 dark:bg-blue-950/30" : "bg-muted/40"
                   }`}
                   data-testid="card-next-collection"
                 >
@@ -799,9 +799,9 @@ function SupplyCard({
               className={[
                 "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border",
                 status === "critical"
-                  ? "border-red-500/30 bg-red-500/10"
+                  ? "border-red-500/30 bg-red-500/10 dark:bg-red-950/30"
                   : status === "low"
-                    ? "border-amber-500/25 bg-amber-500/10"
+                    ? "border-amber-500/25 bg-amber-500/10 dark:bg-amber-950/30"
                     : "border-border/60 bg-primary/10",
               ].join(" ")}
             >
@@ -856,15 +856,22 @@ function SupplyCard({
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
+              className="h-9 w-9"
               onClick={() => onEdit(supply)}
+              aria-label={`Edit ${supply.name}`}
               data-testid={`button-edit-${supply.id}`}
             >
               <Pencil className="h-3.5 w-3.5" />
             </Button>
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" data-testid={`button-delete-${supply.id}`}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9"
+                  aria-label={`Delete ${supply.name}`}
+                  data-testid={`button-delete-${supply.id}`}
+                >
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </AlertDialogTrigger>
@@ -978,7 +985,7 @@ function SupplyCard({
           <Button
             variant="default"
             size="sm"
-            className="h-8 shrink-0 px-3"
+            className="h-9 shrink-0 px-3"
             onClick={() => onLogPickup(supply)}
             data-testid={`button-refill-${supply.id}`}
           >
@@ -993,7 +1000,8 @@ function SupplyCard({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8 px-2 text-xs"
+                  className="h-9 px-3 text-xs"
+                  aria-label="Decrease quantity"
                   onClick={() => {
                     const nextQuantity = Math.max(0, currentNow - inc.amount);
                     onAdjustQuantity({
@@ -1017,7 +1025,8 @@ function SupplyCard({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8 px-2 text-xs"
+                  className="h-9 px-3 text-xs"
+                  aria-label="Increase quantity"
                   onClick={() => {
                     const nextQuantity = currentNow + inc.amount;
                     onAdjustQuantity({

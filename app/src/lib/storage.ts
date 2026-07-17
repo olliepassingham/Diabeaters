@@ -1477,16 +1477,16 @@ export interface ExerciseToolUse {
 }
 
 export const ALL_QUICK_ACTIONS: { id: QuickActionId; label: string; href: string; iconName: string; color: string }[] = [
-  { id: "supplies", label: "Supplies", href: "/supplies", iconName: "Package", color: "text-blue-600" },
-  { id: "activity", label: "Activity", href: "/adviser", iconName: "Dumbbell", color: "text-green-600" },
-  { id: "bedtime", label: "Bedtime", href: "/scenarios/bedtime", iconName: "Moon", color: "text-indigo-600" },
-  { id: "routines", label: "Routines", href: "/tools/routines", iconName: "Repeat", color: "text-emerald-600" },
-  { id: "sick-day", label: "Sick day", href: "/scenarios/sick-day", iconName: "Thermometer", color: "text-orange-600" },
-  { id: "travel", label: "Travel", href: "/scenarios/travel", iconName: "Plane", color: "text-purple-600" },
-  { id: "ratios", label: "Ratios", href: "/settings/ratios", iconName: "Calculator", color: "text-teal-600" },
-  { id: "appointments", label: "Appointments", href: "/appointments", iconName: "Calendar", color: "text-cyan-600" },
-  { id: "emergency-card", label: "Travel Emergency", href: "/emergency-card", iconName: "ShieldAlert", color: "text-red-600" },
-  { id: "settings", label: "Settings", href: "/settings", iconName: "Settings", color: "text-gray-600" },
+  { id: "supplies", label: "Supplies", href: "/supplies", iconName: "Package", color: "text-blue-600 dark:text-blue-400" },
+  { id: "activity", label: "Activity", href: "/adviser", iconName: "Dumbbell", color: "text-green-600 dark:text-green-400" },
+  { id: "bedtime", label: "Bedtime", href: "/scenarios/bedtime", iconName: "Moon", color: "text-indigo-600 dark:text-indigo-400" },
+  { id: "routines", label: "Routines", href: "/tools/routines", iconName: "Repeat", color: "text-emerald-600 dark:text-emerald-400" },
+  { id: "sick-day", label: "Sick day", href: "/scenarios/sick-day", iconName: "Thermometer", color: "text-orange-600 dark:text-orange-400" },
+  { id: "travel", label: "Travel", href: "/scenarios/travel", iconName: "Plane", color: "text-purple-600 dark:text-purple-400" },
+  { id: "ratios", label: "Ratios", href: "/settings/ratios", iconName: "Calculator", color: "text-teal-600 dark:text-teal-400" },
+  { id: "appointments", label: "Appointments", href: "/appointments", iconName: "Calendar", color: "text-cyan-600 dark:text-cyan-400" },
+  { id: "emergency-card", label: "Travel Emergency", href: "/emergency-card", iconName: "ShieldAlert", color: "text-red-600 dark:text-red-400" },
+  { id: "settings", label: "Settings", href: "/settings", iconName: "Settings", color: "text-gray-600 dark:text-gray-400" },
 ];
 
 export const DEFAULT_QUICK_ACTIONS: QuickActionConfig[] = [

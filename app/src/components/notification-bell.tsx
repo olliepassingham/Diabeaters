@@ -414,7 +414,7 @@ export function NotificationBell() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 rounded-full"
+                      className="h-9 w-9 rounded-full"
                       type="button"
                       aria-label="Mark all read"
                       onClick={() => void handleMarkAllRead()}
@@ -425,7 +425,7 @@ export function NotificationBell() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive"
+                    className="h-9 w-9 rounded-full text-muted-foreground hover:text-destructive"
                     type="button"
                     aria-label="Clear all notifications"
                     onClick={() => {

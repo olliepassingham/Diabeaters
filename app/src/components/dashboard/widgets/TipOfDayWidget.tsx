@@ -32,7 +32,7 @@ export function TipOfDayWidget(_props: DashboardWidgetLayoutProps) {
       <CardHeader className="p-4 pb-2 md:p-6 md:pb-3">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <Lightbulb className="h-5 w-5 text-amber-500 shrink-0" />
+            <Lightbulb className="h-5 w-5 text-amber-500 dark:text-amber-400 shrink-0" />
             <Link
               href="/tools/tips"
               className="rounded-md underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
@@ -44,7 +44,7 @@ export function TipOfDayWidget(_props: DashboardWidgetLayoutProps) {
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 shrink-0"
+            className="h-9 w-9 shrink-0"
             onClick={showRandom ? handleResetToday : handleShuffle}
             title={showRandom ? "Back to today's tip" : "Show another tip"}
             data-testid="button-shuffle-tip"

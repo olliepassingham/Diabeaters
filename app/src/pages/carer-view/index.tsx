@@ -466,10 +466,10 @@ function scenarioSituationLines(rows: Record<string, unknown>[]): CarerSituation
 
 function situationRowClass(tone: CarerSituationTone): string {
   if (tone === "active") {
-    return "border-orange-500/30 bg-orange-500/[0.07]";
+    return "border-orange-500/30 bg-orange-500/[0.07] dark:bg-orange-950/35";
   }
   if (tone === "attention") {
-    return "border-amber-500/35 bg-amber-500/[0.08]";
+    return "border-amber-500/35 bg-amber-500/[0.08] dark:bg-amber-950/35";
   }
   if (tone === "ended") {
     return "border-border/40 bg-muted/20 text-muted-foreground";
@@ -881,7 +881,7 @@ function SickDaySupporterCareCard(props: {
     <CarerUrgentCard accent="amber" testId="carer-sick-day-care" id="carer-sick-day-care">
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-base">
-          <Thermometer className="h-5 w-5 text-orange-600" />
+          <Thermometer className="h-5 w-5 text-orange-600 dark:text-orange-400" />
           Sick day — temperatures & medication notes
         </CardTitle>
         <CardDescription>
@@ -1009,7 +1009,7 @@ function SickDaySupporterCareCard(props: {
                 return (
                   <li key={id} className="rounded-lg border border-border/60 px-3 py-2 text-sm space-y-2">
                     <div className="flex items-start gap-2">
-                      <Pill className="h-4 w-4 shrink-0 mt-0.5 text-orange-600" />
+                      <Pill className="h-4 w-4 shrink-0 mt-0.5 text-orange-600 dark:text-orange-400" />
                       <div className="min-w-0 flex-1">
                         <p className="font-medium truncate">{name}</p>
                         {dose ? <p className="text-xs text-muted-foreground">{dose}</p> : null}
@@ -1130,9 +1130,9 @@ function SickDaySupporterCareCard(props: {
                   className="flex items-start gap-2 rounded-lg border border-border/50 bg-background/80 px-2 py-2 text-sm"
                 >
                   {row.kind === "dose" ? (
-                    <Pill className="h-4 w-4 shrink-0 mt-0.5 text-orange-600" aria-hidden />
+                    <Pill className="h-4 w-4 shrink-0 mt-0.5 text-orange-600 dark:text-orange-400" aria-hidden />
                   ) : (
-                    <Thermometer className="h-4 w-4 shrink-0 mt-0.5 text-orange-600" aria-hidden />
+                    <Thermometer className="h-4 w-4 shrink-0 mt-0.5 text-orange-600 dark:text-orange-400" aria-hidden />
                   )}
                   <div className="min-w-0 flex-1">
                     <p className="font-medium leading-snug">{row.title}</p>

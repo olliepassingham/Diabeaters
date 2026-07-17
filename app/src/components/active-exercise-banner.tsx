@@ -506,7 +506,7 @@ function ExerciseEducationDialog({
             <div className="space-y-2">
               {tips.map((tip, i) => (
                 <div key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <Droplet className="h-3.5 w-3.5 shrink-0 mt-0.5 text-blue-500" />
+                  <Droplet className="h-3.5 w-3.5 shrink-0 mt-0.5 text-blue-500 dark:text-blue-400" />
                   <span>{tip}</span>
                 </div>
               ))}
@@ -581,7 +581,7 @@ function ExerciseEducationDialog({
               {patterns.droppedCount > patterns.stableCount ? (
                 <TrendingDown className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
               ) : patterns.roseCount > patterns.stableCount ? (
-                <TrendingUp className="h-3.5 w-3.5 text-red-500 shrink-0 mt-0.5" />
+                <TrendingUp className="h-3.5 w-3.5 text-red-500 dark:text-red-400 shrink-0 mt-0.5" />
               ) : (
                 <Minus className="h-3.5 w-3.5 text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
               )}
@@ -1476,9 +1476,9 @@ function ExerciseOutcomeDialog({
             <Label className="text-sm">How did your BG respond?</Label>
             <div className="flex gap-2 flex-wrap">
               {([
-                { value: "dropped" as const, label: "Dropped", icon: TrendingDown, color: "text-amber-600" },
-                { value: "stable" as const, label: "Stayed stable", icon: Minus, color: "text-green-600" },
-                { value: "rose" as const, label: "Rose", icon: TrendingUp, color: "text-red-500" },
+                { value: "dropped" as const, label: "Dropped", icon: TrendingDown, color: "text-amber-600 dark:text-amber-400" },
+                { value: "stable" as const, label: "Stayed stable", icon: Minus, color: "text-green-600 dark:text-green-400" },
+                { value: "rose" as const, label: "Rose", icon: TrendingUp, color: "text-red-500 dark:text-red-400" },
               ]).map(opt => (
                 <Button
                   key={opt.value}

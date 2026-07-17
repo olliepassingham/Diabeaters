@@ -143,8 +143,9 @@ export function TravelBanner() {
         <Button
           variant="ghost"
           size="sm"
-          className="h-7 w-7 px-0 text-white hover:bg-white/20"
+          className="h-9 w-9 px-0 text-white hover:bg-white/20"
           onClick={() => setDismissed(true)}
+          aria-label="Dismiss travel banner"
           data-testid="button-banner-dismiss-travel"
         >
           <X className="h-4 w-4" />

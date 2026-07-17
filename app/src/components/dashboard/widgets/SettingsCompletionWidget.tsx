@@ -47,10 +47,10 @@ export function SettingsCompletionWidget(props: DashboardWidgetLayoutProps) {
 
   if (error) {
     return (
-      <WidgetCard className="ring-1 ring-amber-200/80" data-testid="widget-settings-completion">
+      <WidgetCard className="ring-1 ring-amber-200/80 dark:ring-amber-800/60" data-testid="widget-settings-completion">
         <CardHeader className="p-4 pb-2 md:p-6 md:pb-3">
           <div className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-amber-600 shrink-0" />
+            <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
             <CardTitle className="text-h3 text-foreground">Settings progress</CardTitle>
           </div>
         </CardHeader>
@@ -99,12 +99,12 @@ export function SettingsCompletionWidget(props: DashboardWidgetLayoutProps) {
   }
 
   return (
-    <WidgetCard className="ring-1 ring-amber-200/70 bg-amber-50/40 dark:bg-amber-950/20" data-testid="widget-settings-completion">
+    <WidgetCard className="ring-1 ring-amber-200/70 bg-amber-50/40 dark:ring-amber-800/60 dark:bg-amber-950/20" data-testid="widget-settings-completion">
       <CardHeader className="p-4 pb-2 md:p-6 md:pb-3">
         <div className="flex items-center justify-between gap-2">
           <Link href="/settings">
             <div className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer min-w-0">
-              <AlertCircle className="h-5 w-5 text-amber-600 shrink-0" />
+              <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
               <CardTitle className="text-h3 text-foreground">Complete your settings</CardTitle>
             </div>
           </Link>
@@ -128,16 +128,16 @@ export function SettingsCompletionWidget(props: DashboardWidgetLayoutProps) {
             {settingsItems.map((item) => (
               <div key={item.key} className="flex items-center gap-2 text-base text-gray-700">
                 {item.complete ? (
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                 ) : (
-                  <div className="h-4 w-4 rounded-full border-2 border-amber-400 shrink-0" />
+                  <div className="h-4 w-4 rounded-full border-2 border-amber-400 dark:border-amber-600 shrink-0" />
                 )}
                 <span className={item.complete ? "text-gray-500" : "font-medium text-gray-900 dark:text-foreground"}>{item.label}</span>
               </div>
             ))}
             <div className="flex items-center gap-2 text-base text-gray-700">
               {hasEmergencyContact ? (
-                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
               ) : (
                 <div className="h-4 w-4 rounded-full border-2 border-gray-300 shrink-0" />
               )}

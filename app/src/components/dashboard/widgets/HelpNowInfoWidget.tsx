@@ -28,7 +28,7 @@ export function HelpNowInfoWidget(props: DashboardWidgetLayoutProps) {
       <CardHeader className="p-4 pb-2 md:p-6 md:pb-3">
         <Link href="/help-now">
           <div className="flex items-center gap-2 hover:opacity-90 transition-opacity cursor-pointer">
-            <Phone className="h-5 w-5 text-red-600 shrink-0" />
+            <Phone className="h-5 w-5 text-red-600 dark:text-red-400 shrink-0" />
             <CardTitle className="text-h3 text-foreground">Emergency information</CardTitle>
           </div>
         </Link>

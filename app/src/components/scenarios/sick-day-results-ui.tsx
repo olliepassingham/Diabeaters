@@ -417,7 +417,7 @@ export function SickDayResultsPanel({
       ) : null}
 
       {results.stackingWarning ? (
-        <div className="rounded-2xl border border-orange-500/25 bg-orange-500/8 px-4 py-3">
+        <div className="rounded-2xl border border-orange-500/25 bg-orange-500/8 px-4 py-3 dark:bg-orange-950/30">
           <p className="text-sm font-semibold text-foreground">Space corrections</p>
           <p className="mt-1 text-xs text-foreground/80">{results.stackingWarningBrief || results.stackingWarning}</p>
         </div>

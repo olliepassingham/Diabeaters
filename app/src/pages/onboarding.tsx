@@ -111,7 +111,7 @@ const BASE_STRUGGLE_OPTIONS: StruggleOptionDef[] = [
     title: "I keep running out of supplies",
     description: "Insulin, needles, sensors — I never know when to reorder",
     color: "text-blue-600 dark:text-blue-400",
-    bg: "bg-blue-500/10",
+    bg: "bg-blue-500/10 dark:bg-blue-500/20",
   },
   {
     id: "meals",
@@ -119,7 +119,7 @@ const BASE_STRUGGLE_OPTIONS: StruggleOptionDef[] = [
     title: "I want help around food and dosing",
     description: "Less stress at mealtimes — we'll guide you if ratios aren't settled yet",
     color: "text-amber-600 dark:text-amber-400",
-    bg: "bg-amber-500/10",
+    bg: "bg-amber-500/10 dark:bg-amber-500/20",
   },
   {
     id: "exercise",
@@ -127,7 +127,7 @@ const BASE_STRUGGLE_OPTIONS: StruggleOptionDef[] = [
     title: "Exercise throws my levels off",
     description: "Plan activity with carb and timing tips — no perfect numbers needed",
     color: "text-green-600 dark:text-green-400",
-    bg: "bg-green-500/10",
+    bg: "bg-green-500/10 dark:bg-green-500/20",
   },
   {
     id: "overview",
@@ -135,7 +135,7 @@ const BASE_STRUGGLE_OPTIONS: StruggleOptionDef[] = [
     title: "I want everything in one place",
     description: "A single hub for supplies, meals, exercise and more",
     color: "text-purple-600 dark:text-purple-400",
-    bg: "bg-purple-500/10",
+    bg: "bg-purple-500/10 dark:bg-purple-500/20",
   },
 ];
 

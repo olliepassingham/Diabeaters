@@ -35,12 +35,12 @@ function overnightChartPoints(insight: BedtimeOvernightInsight): CgmChartPoint[]
 
 function toneForHeadline(headline: string) {
   if (/low/i.test(headline)) {
-    return "border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-card to-card";
+    return "border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-card to-card dark:from-amber-950/35";
   }
   if (/high|mixed|rose/i.test(headline)) {
-    return "border-orange-500/30 bg-gradient-to-br from-orange-500/8 via-card to-card";
+    return "border-orange-500/30 bg-gradient-to-br from-orange-500/8 via-card to-card dark:from-orange-950/30";
   }
-  return "border-emerald-500/25 bg-gradient-to-br from-emerald-500/8 via-card to-card";
+  return "border-emerald-500/25 bg-gradient-to-br from-emerald-500/8 via-card to-card dark:from-emerald-950/30";
 }
 
 function collapsedPreview(

@@ -243,7 +243,7 @@ export default function EmergencyCard() {
       <PageHeader
         title={
           <span className="inline-flex items-center gap-2">
-            <AlertTriangle className="h-6 w-6 text-red-600 shrink-0" />
+            <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-400 shrink-0" />
             Emergency Card
           </span>
         }
@@ -309,15 +309,15 @@ export default function EmergencyCard() {
             </h3>
             <ul className="space-y-2">
               <li className="flex items-start gap-2 bg-red-100 dark:bg-red-900/50 p-2 rounded font-medium">
-                <span className="text-red-600">1.</span>
+                <span className="text-red-600 dark:text-red-400">1.</span>
                 <span className="text-red-800 dark:text-red-200">{t.doNotGiveInsulin}</span>
               </li>
               <li className="flex items-start gap-2 bg-amber-100 dark:bg-amber-900/50 p-2 rounded font-medium">
-                <span className="text-amber-600">2.</span>
+                <span className="text-amber-600 dark:text-amber-400">2.</span>
                 <span className="text-amber-800 dark:text-amber-200">{t.giveGlucose}</span>
               </li>
               <li className="flex items-start gap-2 bg-blue-100 dark:bg-blue-900/50 p-2 rounded font-medium">
-                <span className="text-blue-600">3.</span>
+                <span className="text-blue-600 dark:text-blue-400">3.</span>
                 <span className="text-blue-800 dark:text-blue-200">{t.callEmergency}</span>
               </li>
             </ul>
@@ -330,7 +330,7 @@ export default function EmergencyCard() {
               </h4>
               <div className="flex items-center gap-3 bg-white dark:bg-gray-900 p-3 rounded-lg border">
                 <div className="p-2 rounded-full bg-red-100 dark:bg-red-900">
-                  <Phone className="h-4 w-4 text-red-600" />
+                  <Phone className="h-4 w-4 text-red-600 dark:text-red-400" />
                 </div>
                 <div>
                   <p className="font-medium">{primaryContact.name}</p>
@@ -374,7 +374,7 @@ export default function EmergencyCard() {
       <Card className="bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
         <CardContent className="py-4">
           <div className="flex items-start gap-3">
-            <Info className="h-5 w-5 text-blue-600 mt-0.5" />
+            <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
             <div className="text-sm">
               <h4 className="font-medium mb-1">Tips for using this card</h4>
               <ul className="text-muted-foreground space-y-1">

@@ -726,6 +726,7 @@ export function RoutinesContent() {
                             size="icon"
                             variant="ghost"
                             onClick={() => openEditDialog(routine)}
+                            aria-label="Edit routine"
                             data-testid={`button-edit-routine-${routine.id}`}
                           >
                             <Pencil className="h-4 w-4" />
@@ -735,6 +736,7 @@ export function RoutinesContent() {
                             variant="ghost"
                             onClick={() => handleDelete(routine.id)}
                             className="text-destructive"
+                            aria-label="Delete routine"
                             data-testid={`button-delete-routine-${routine.id}`}
                           >
                             <Trash2 className="h-4 w-4" />
@@ -1015,6 +1017,7 @@ export function RoutinesContent() {
                         size="icon"
                         variant="ghost"
                         onClick={() => openExerciseEditDialog(routine)}
+                        aria-label="Edit exercise routine"
                         data-testid={`button-edit-exercise-${routine.id}`}
                       >
                         <Pencil className="h-4 w-4" />
@@ -1024,6 +1027,7 @@ export function RoutinesContent() {
                         variant="ghost"
                         onClick={() => handleExerciseDelete(routine.id)}
                         className="text-destructive"
+                        aria-label="Delete exercise routine"
                         data-testid={`button-delete-exercise-${routine.id}`}
                       >
                         <Trash2 className="h-4 w-4" />

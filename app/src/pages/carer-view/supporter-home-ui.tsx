@@ -113,7 +113,7 @@ export function SupporterHero({
                 asChild
                 variant="outline"
                 size="sm"
-                className="h-8 rounded-full px-3 text-xs border-amber-500/30 bg-amber-500/[0.06] hover:bg-amber-500/[0.1]"
+                className="h-8 rounded-full px-3 text-xs border-amber-500/30 bg-amber-500/[0.06] hover:bg-amber-500/[0.1] dark:bg-amber-950/30 dark:hover:bg-amber-950/45"
               >
                 <a href="#carer-sick-day-care" data-testid="chip-carer-sickday">
                   <Thermometer className="h-3.5 w-3.5 mr-1.5 text-amber-600 dark:text-amber-400" aria-hidden />
@@ -126,7 +126,7 @@ export function SupporterHero({
                 asChild
                 variant="outline"
                 size="sm"
-                className="h-8 rounded-full px-3 text-xs border-blue-500/30 bg-blue-500/[0.06] hover:bg-blue-500/[0.1]"
+                className="h-8 rounded-full px-3 text-xs border-blue-500/30 bg-blue-500/[0.06] hover:bg-blue-500/[0.1] dark:bg-blue-950/30 dark:hover:bg-blue-950/45"
               >
                 <a href="#carer-scenarios" data-testid="chip-carer-travel">
                   <Plane className="h-3.5 w-3.5 mr-1.5 text-blue-600 dark:text-blue-400" aria-hidden />

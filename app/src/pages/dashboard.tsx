@@ -551,7 +551,7 @@ function HeroCard({
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-1">
-              <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600" />
+              <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600 dark:text-green-400" />
               <span className="min-w-0 flex-1">Log Hypo Treatment</span>
               <InfoTooltip
                 term="Saving hypo treatments"
@@ -778,7 +778,7 @@ function SoftSettingsNudge({
             type="button"
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="h-9 w-9"
             aria-label="Dismiss setup reminder"
             onClick={onDismiss}
             data-testid="button-dismiss-soft-setup-nudge"
@@ -1001,7 +1001,7 @@ export default function Dashboard() {
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 -mt-1 -mr-1 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-neutral-200"
+                className="h-9 w-9 -mt-1.5 -mr-1.5 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-neutral-200"
                 aria-label="Dismiss verification welcome banner"
                 onClick={() => {
                   try {

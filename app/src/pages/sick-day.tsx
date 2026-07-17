@@ -1358,10 +1358,10 @@ export default function SickDay() {
               <span
                 className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
                   severity === "severe"
-                    ? "bg-red-500/15"
+                    ? "bg-red-500/15 dark:bg-red-950/40"
                     : severity === "moderate"
-                      ? "bg-orange-500/15"
-                      : "bg-amber-500/15"
+                      ? "bg-orange-500/15 dark:bg-orange-950/40"
+                      : "bg-amber-500/15 dark:bg-amber-950/40"
                 }`}
               >
                 <Thermometer
@@ -1385,9 +1385,9 @@ export default function SickDay() {
                   variant="secondary"
                   className={
                     verdict.tone === "critical"
-                      ? "bg-red-500/15 text-red-800 dark:text-red-200"
+                      ? "bg-red-500/15 text-red-800 dark:bg-red-950/40 dark:text-red-200"
                       : verdict.tone === "caution"
-                        ? "bg-amber-500/15 text-amber-900 dark:text-amber-100"
+                        ? "bg-amber-500/15 text-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
                         : "bg-emerald-500/15 text-emerald-900 dark:text-emerald-100"
                   }
                 >
@@ -1407,8 +1407,8 @@ export default function SickDay() {
             className={cn(
               "rounded-xl border px-3 py-2.5 text-sm leading-snug",
               duration.days >= 3
-                ? "border-red-500/35 bg-red-500/10 text-foreground"
-                : "border-orange-500/35 bg-orange-500/10 text-foreground",
+                ? "border-red-500/35 bg-red-500/10 text-foreground dark:bg-red-950/30"
+                : "border-orange-500/35 bg-orange-500/10 text-foreground dark:bg-orange-950/30",
             )}
             data-testid="text-extended-sick-warning"
           >
@@ -1880,7 +1880,7 @@ export default function SickDay() {
                               {row.kind === "dose" ? (
                                 <Pill className="h-4 w-4 shrink-0 mt-0.5 text-primary" aria-hidden />
                               ) : (
-                                <Thermometer className="h-4 w-4 shrink-0 mt-0.5 text-orange-600" aria-hidden />
+                                <Thermometer className="h-4 w-4 shrink-0 mt-0.5 text-orange-600 dark:text-orange-400" aria-hidden />
                               )}
                               <div className="min-w-0 flex-1">
                                 <p className="font-medium leading-snug">{row.title}</p>
@@ -2269,6 +2269,7 @@ export default function SickDay() {
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => handleDeleteJournalEntry(entry.id)}
+                                aria-label="Delete journal entry"
                                 data-testid={`button-delete-journal-${entry.id}`}
                               >
                                 <Trash2 className="h-4 w-4 text-muted-foreground" />
@@ -2447,7 +2448,7 @@ export default function SickDay() {
             <div className="pt-3 space-y-2">
               <Link href="/help-now">
                 <Button variant="outline" className="w-full" data-testid="button-help-now-sick">
-                  <Heart className="h-4 w-4 mr-2 text-red-600" />
+                  <Heart className="h-4 w-4 mr-2 text-red-600 dark:text-red-400" />
                   Help Now Page
                   <ChevronRight className="h-4 w-4 ml-auto" />
                 </Button>
@@ -2473,7 +2474,7 @@ export default function SickDay() {
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-2">
                 <Thermometer className={`h-5 w-5 ${
-                  severity === "severe" ? "text-red-600" : severity === "moderate" ? "text-orange-600" : "text-amber-600"
+                  severity === "severe" ? "text-red-600 dark:text-red-400" : severity === "moderate" ? "text-orange-600 dark:text-orange-400" : "text-amber-600 dark:text-amber-400"
                 }`} />
                 <div>
                   <p className="font-medium">
@@ -2566,7 +2567,7 @@ export default function SickDay() {
               {isSickDayActive ? (
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 p-3 bg-orange-50 dark:bg-orange-950/30 rounded-lg">
-                    <Check className="h-5 w-5 text-orange-600 shrink-0" />
+                    <Check className="h-5 w-5 text-orange-600 dark:text-orange-400 shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-orange-900 dark:text-orange-100">Sick day mode active</p>
                       <p className="text-xs text-orange-700 dark:text-orange-300 capitalize">{severity} severity</p>

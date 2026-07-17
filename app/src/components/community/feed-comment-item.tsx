@@ -102,7 +102,7 @@ export function FeedCommentItem({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6 text-muted-foreground"
+                className="h-8 w-8 -my-1 text-muted-foreground"
                 onClick={onReport}
                 aria-label="Report comment"
               >
@@ -114,7 +114,7 @@ export function FeedCommentItem({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                className="h-8 w-8 -my-1 text-muted-foreground hover:text-destructive"
                 onClick={onDelete}
                 aria-label="Delete comment"
                 data-testid={`button-delete-comment-${commentId}`}
