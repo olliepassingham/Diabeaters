@@ -183,9 +183,19 @@ const MAIN_BOTTOM_SCROLL_PADDING_NO_NAV =
   "calc(env(safe-area-inset-bottom, 0px) + 1.5rem)";
 
 function RouteFallback() {
+  // Hold the spinner back briefly: fast chunk loads render nothing (feels instant),
+  // only genuinely slow loads show a fading-in spinner instead of a flash.
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setShow(true), 180);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  if (!show) return <div className="min-h-[40vh]" aria-hidden />;
+
   return (
     <div
-      className="flex min-h-[40vh] flex-col items-center justify-center gap-3 text-sm text-muted-foreground"
+      className="flex min-h-[40vh] flex-col items-center justify-center gap-3 text-sm text-muted-foreground animate-in fade-in duration-300"
       role="status"
       aria-live="polite"
     >

@@ -48,7 +48,8 @@ export async function syncNativeStatusBar(effectiveTheme: "light" | "dark"): Pro
       style: effectiveTheme === "dark" ? Style.Dark : Style.Light,
     });
     if (platform === "android") {
-      await StatusBar.setBackgroundColor({ color: effectiveTheme === "dark" ? "#0f172a" : "#ffffff" });
+      // Match --app-background so the status bar blends into the shell (see theme-color metas).
+      await StatusBar.setBackgroundColor({ color: effectiveTheme === "dark" ? "#16141e" : "#f7f9fd" });
     }
   } catch {
     // Simulator / WebView edge cases

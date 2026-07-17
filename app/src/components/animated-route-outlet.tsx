@@ -48,7 +48,9 @@ export function AnimatedRouteOutlet({
   useLayoutEffect(() => {
     const el = document.getElementById("app-scroll-main");
     if (!el) return;
-    el.scrollTop = 0;
+    // Instant, not smooth: the container has `scroll-behavior: smooth` for in-page
+    // anchors, but new pages must start at the top without a visible scroll-up.
+    el.scrollTo({ top: 0, behavior: "instant" });
   }, [pathname]);
 
   const tabMotionBucket = isBottomTabRoute && stableTabOutlet;

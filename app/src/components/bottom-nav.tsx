@@ -6,6 +6,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { navigateWithViewTransition } from "@/lib/nav-view-transition";
+import { hapticLight } from "@/lib/haptics";
 import { prefetchToolsHubLinkedChunks } from "@/lib/tools-route-prefetch";
 import { prefetchCarerViewRoute, prefetchCommunityFeedChunk, prefetchDemoCriticalRoutes } from "@/lib/demo-route-prefetch";
 import { filterOfflineCloudNavTabs } from "@/lib/offline-app-gate";
@@ -421,6 +422,7 @@ export function BottomNav() {
                 return;
               }
               e.preventDefault();
+              void hapticLight();
               navigateWithViewTransition(setLocation, tab.href);
             }}
           >
