@@ -65,11 +65,62 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         _ = NotificationSettingsPlugin.self
         _ = HealthAuthorizationPlugin.self
 
+        // Categories must exist before remote pushes arrive (IDs match JS + APNs aps.category).
+        registerNotificationActionCategories()
         clearApplicationIconBadge()
         DispatchQueue.main.async {
             application.registerForRemoteNotifications()
         }
         return true
+    }
+
+    private func registerNotificationActionCategories() {
+        let hypoOk = UNNotificationAction(
+            identifier: "hypo_check_in_ok",
+            title: "I'm OK",
+            options: []
+        )
+        let hypoCategory = UNNotificationCategory(
+            identifier: "hypo_check_in",
+            actions: [hypoOk],
+            intentIdentifiers: [],
+            options: []
+        )
+
+        let medTaken = UNNotificationAction(
+            identifier: "sick_day_med_taken",
+            title: "Taken",
+            options: []
+        )
+        let medCategory = UNNotificationCategory(
+            identifier: "sick_day_med_reminder",
+            actions: [medTaken],
+            intentIdentifiers: [],
+            options: []
+        )
+
+        let bedtimeOpen = UNNotificationAction(
+            identifier: "bedtime_open_guide",
+            title: "Open guide",
+            options: [.foreground]
+        )
+        let bedtimeSkip = UNNotificationAction(
+            identifier: "bedtime_not_tonight",
+            title: "Not tonight",
+            options: []
+        )
+        let bedtimeCategory = UNNotificationCategory(
+            identifier: "bedtime_reminder",
+            actions: [bedtimeOpen, bedtimeSkip],
+            intentIdentifiers: [],
+            options: []
+        )
+
+        UNUserNotificationCenter.current().setNotificationCategories([
+            hypoCategory,
+            medCategory,
+            bedtimeCategory,
+        ])
     }
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {

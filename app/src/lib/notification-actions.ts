@@ -46,8 +46,9 @@ export async function registerNotificationActionTypes(): Promise<void> {
       ],
     });
     registered = true;
-  } catch {
-    // Older platform versions may not support categories — notifications still work without buttons.
+  } catch (e) {
+    // Don't set registered — allow a later retry after permissions / plugin ready.
+    console.warn("[notification_actions] registerActionTypes failed:", e);
   }
 }
 

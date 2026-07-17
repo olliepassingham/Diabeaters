@@ -160,10 +160,21 @@ async function sendViaRelay(
   const pushKey = Deno.env.get("PUSH_NOTIFICATION_API_KEY")?.trim();
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (pushKey) headers["Authorization"] = `Bearer ${pushKey}`;
+  const custom = data && typeof data === "object" && !Array.isArray(data)
+    ? (data as Record<string, unknown>)
+    : {};
+  // Mirror APNs category so relays that forward aps.category can show action buttons.
+  const category = custom.kind === "hypo_check_in" ? "hypo_check_in" : undefined;
   const res = await fetch(pushUrl, {
     method: "POST",
     headers,
-    body: JSON.stringify({ to: deviceToken, title, body, data }),
+    body: JSON.stringify({
+      to: deviceToken,
+      title,
+      body,
+      data,
+      ...(category ? { category, aps: { category } } : {}),
+    }),
   });
   if (!res.ok) {
     const warnBody = await res.text();

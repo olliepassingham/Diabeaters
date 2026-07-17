@@ -4,7 +4,6 @@ import { PushNotifications } from "@capacitor/push-notifications";
 import { isIosDeviceForCapacitorPush } from "@/lib/ios-user-agent";
 import { ensureNativeLocalNotificationPermission } from "@/lib/native-local-notifications";
 import { clearNativeAppBadge, scheduleNativeAppBadgeSync } from "@/lib/native-app-badge";
-import { presentAudiblePushNotificationFromRemote } from "@/lib/push-notification-present";
 import {
   getNativePushPlatform,
   isCapacitorNativeShell,
@@ -13,6 +12,7 @@ import {
 } from "@/lib/native-platform";
 import { getSupabase } from "@/lib/supabase";
 import { storage } from "@/lib/storage";
+import { registerNotificationActionTypes } from "@/lib/notification-actions";
 
 /** True while registration listeners are attached. Deep-link listeners are separate. */
 let registrationListenersBound = false;
@@ -256,16 +256,15 @@ function bindPushDeepLinkListeners(): void {
   if (deepLinkListenersBound) return;
   deepLinkListenersBound = true;
 
-  void PushNotifications.addListener("pushNotificationReceived", (notification) => {
+  void PushNotifications.addListener("pushNotificationReceived", (_notification) => {
     writePushDiag({ state: "push_received_foreground", platform: currentPushPlatform() ?? "ios" });
     // APNs/Capacitor may apply a stale aps.badge before JS runs — reset then reconcile.
     void clearNativeAppBadge();
     scheduleNativeAppBadgeSync(0);
-    if (currentPushPlatform() === "ios") {
-      void presentAudiblePushNotificationFromRemote(notification).finally(() => {
-        scheduleNativeAppBadgeSync(800);
-      });
-    }
+    // Do NOT re-post as a LocalNotification here. Capacitor already presents remote
+    // pushes in the foreground (presentationOptions: sound+alert). Re-posting caused
+    // duplicate banners (e.g. hypo check-in twice) and split action-button wiring.
+    scheduleNativeAppBadgeSync(800);
   }).then((h) => {
     deepLinkHandles.push(h);
   });
@@ -400,6 +399,8 @@ export async function ensureNativePushRegistered(): Promise<void> {
   if (platform === "ios") {
     await ensureNativeLocalNotificationPermission();
   }
+  // Categories must exist before remote pushes arrive so aps.category can show action buttons.
+  await registerNotificationActionTypes();
   try {
     await PushNotifications.register();
     writePushDiag({ state: "register_called", platform });
