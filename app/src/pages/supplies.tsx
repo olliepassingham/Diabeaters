@@ -1204,7 +1204,7 @@ function SupplyDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[min(90dvh,720px)] flex-col gap-0 overflow-hidden rounded-2xl border-border/50 p-0 sm:max-w-md">
+      <DialogContent className="flex max-h-[min(90dvh,720px)] flex-col gap-0 overflow-hidden border-border/50 p-0 sm:max-w-md">
         <DialogHeader className="shrink-0 space-y-3 border-b border-border/40 px-5 pb-4 pt-5 text-left">
           <div className="flex items-start gap-3 pr-8">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
