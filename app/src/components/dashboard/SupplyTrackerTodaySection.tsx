@@ -159,7 +159,7 @@ export function SupplyTrackerTodaySection({ healthStatus }: { healthStatus: Heal
         ? "border-red-400/80 bg-red-50/90 dark:bg-red-950/30 dark:border-red-800/60"
         : worst === "low"
           ? "border-amber-400/80 bg-amber-50/80 dark:bg-amber-950/25 dark:border-amber-800/50"
-          : "border-primary/30 bg-gradient-to-br from-primary-light/85 via-primary-light/50 to-primary/[0.1] dark:from-primary-light/22 dark:via-primary-light/12 dark:to-primary/[0.06]";
+          : "border-border/55 bg-card/70 dark:border-border/45";
 
   const supplyTopContent = () => {
     if (supplies.length === 0) {
@@ -270,7 +270,7 @@ export function SupplyTrackerEntryCard() {
         ? "border-red-400/80 bg-red-50/90 dark:bg-red-950/30 dark:border-red-800/60"
         : worst === "low"
           ? "border-amber-400/80 bg-amber-50/80 dark:bg-amber-950/25 dark:border-amber-800/50"
-          : "border-primary/30 bg-gradient-to-br from-primary-light/85 via-primary-light/50 to-primary/[0.1] dark:from-primary-light/22 dark:via-primary-light/12 dark:to-primary/[0.06]";
+          : "border-border/55 bg-card/70 dark:border-border/45";
 
   const statusLabel =
     supplies.length === 0
@@ -290,8 +290,8 @@ export function SupplyTrackerEntryCard() {
 
   const outerCardClass =
     supplies.length === 0
-      ? "dashboard-card-hover border-border/70 shadow-sm hover:shadow-md dark:border-border/50 overflow-hidden border-2 border-dashed border-muted-foreground/30 rounded-xl"
-      : `dashboard-card-hover border-border/70 shadow-sm hover:shadow-md dark:border-border/50 overflow-hidden rounded-xl border ${supplyBorderTone}`;
+      ? "dashboard-card-hover border-border/70 shadow-sm hover:shadow-md dark:border-border/50 overflow-hidden border-2 border-dashed border-muted-foreground/30 rounded-2xl"
+      : `dashboard-card-hover border-border/70 shadow-sm hover:shadow-md dark:border-border/50 overflow-hidden rounded-2xl border ${supplyBorderTone}`;
 
   const scenarioLine = (() => {
     if (scenarioState.travelModeActive && scenarioState.sickDayActive) return "Travel and sick day guides active";
@@ -468,10 +468,10 @@ export function TodayAtAGlanceCard(props: {
     <div
       className={
         worstSupplyAttention === "critical"
-          ? "rounded-lg border border-red-500/25 bg-red-500/[0.06] px-2 py-1.5 dark:bg-red-950/20"
+          ? "rounded-lg bg-red-500/[0.07] px-2 py-1.5 dark:bg-red-950/25"
           : worstSupplyAttention === "low"
-            ? "rounded-lg border border-amber-500/20 bg-amber-500/[0.06] px-2 py-1.5 dark:bg-amber-950/15"
-            : "rounded-lg border border-border/50 bg-muted/15 px-2 py-1.5 dark:bg-muted/10"
+            ? "rounded-lg bg-amber-500/[0.08] px-2 py-1.5 dark:bg-amber-950/20"
+            : "rounded-lg bg-muted/25 px-2 py-1.5 dark:bg-muted/15"
       }
     >
       <div className="mb-1.5 flex items-center justify-between gap-2">
@@ -504,7 +504,7 @@ export function TodayAtAGlanceCard(props: {
 
   return (
     <Card
-      className="dashboard-card-hover border-primary/25 shadow-sm hover:shadow-md dark:border-border/50 rounded-xl overflow-hidden bg-gradient-to-br from-primary-light/70 via-primary-light/35 to-transparent dark:from-primary-light/15 dark:via-transparent"
+      className="dashboard-card-hover border-border/55 shadow-sm hover:shadow-md dark:border-border/45 rounded-2xl overflow-hidden bg-card/70"
       data-testid="dashboard-today-card"
     >
       <CardContent className="space-y-0 px-3 py-2.5 md:px-3.5 md:py-3" data-testid="dashboard-today-inline">
@@ -547,12 +547,9 @@ export function TodayAtAGlanceCard(props: {
               </p>
             </div>
           </div>
-          <Badge
-            variant="outline"
-            className="chip max-w-[46%] shrink-0 truncate border-primary/25 bg-primary-light/60 text-[11px] font-semibold text-foreground dark:bg-primary-light/20"
-          >
+          <span className="max-w-[46%] shrink-0 truncate text-xs font-medium tabular-nums text-muted-foreground">
             {new Date().toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
-          </Badge>
+          </span>
         </Link>
 
         <div className="flex flex-col gap-2">
@@ -587,7 +584,7 @@ export function TodayAtAGlanceCard(props: {
             <div data-testid="dashboard-today-extras">
               <Link href="/scenarios/travel" className="block">
                 <div
-                  className="cursor-pointer rounded-lg border border-border/50 bg-muted/20 px-2.5 py-2 transition-colors hover:border-border hover:bg-muted/35 dark:bg-muted/10 dark:hover:bg-muted/20"
+                  className="cursor-pointer rounded-lg bg-muted/25 px-2.5 py-2 transition-colors hover:bg-muted/40 dark:bg-muted/15 dark:hover:bg-muted/25"
                   data-testid="dashboard-today-trip-countdown"
                 >
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Travel</p>

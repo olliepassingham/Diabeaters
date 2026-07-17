@@ -2040,7 +2040,7 @@ export default function CarerViewPage() {
                         {line.tone === "attention" ? (
                           <Badge
                             variant="secondary"
-                            className="shrink-0 rounded-full border-0 bg-amber-500/20 text-[10px] font-semibold text-amber-950 dark:text-amber-100"
+                            className="shrink-0 rounded-full border-0 bg-amber-500/20 text-[11px] font-semibold text-amber-950 dark:text-amber-100"
                           >
                             Attention
                           </Badge>

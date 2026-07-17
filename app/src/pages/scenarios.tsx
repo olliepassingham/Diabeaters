@@ -75,16 +75,13 @@ function ScenarioCard({ href, icon: Icon, title, description }: ScenarioCardDef)
     >
       <Card
         variant="glass"
-        className="pressable card-interactive flex h-full min-h-[7.25rem] w-full cursor-pointer flex-col gap-3 rounded-2xl px-5 py-5 ring-1 ring-inset ring-transparent transition-[ring-color,background-color] duration-[var(--app-motion-duration)] ease-[var(--app-motion-ease)] sm:min-h-[7.75rem] sm:px-6 sm:py-6 group-hover:bg-muted/15 group-hover:ring-primary/15 dark:group-hover:ring-primary/25"
+        className="pressable card-interactive flex h-full min-h-[7.25rem] w-full cursor-pointer flex-col gap-3 rounded-2xl px-5 py-5 sm:min-h-[7.75rem] sm:px-6 sm:py-6"
       >
         <div className="flex items-start gap-3 sm:gap-4">
-          <Icon
-            className="mt-0.5 h-7 w-7 shrink-0 origin-top-left text-primary transition-transform duration-[var(--app-motion-duration)] ease-[var(--app-motion-ease)] group-hover:scale-105 sm:h-8 sm:w-8"
-            aria-hidden
-          />
+          <Icon className="mt-0.5 h-7 w-7 shrink-0 text-primary sm:h-8 sm:w-8" aria-hidden />
           <div className="min-w-0 flex-1">
             <h3 className="font-display text-h3 font-semibold text-foreground">{title}</h3>
-            <p className="text-small mt-1.5 leading-relaxed text-muted-foreground sm:text-[0.9375rem]">{description}</p>
+            <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground sm:text-[0.9375rem]">{description}</p>
           </div>
         </div>
       </Card>

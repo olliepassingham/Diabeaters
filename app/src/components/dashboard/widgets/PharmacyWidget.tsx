@@ -51,7 +51,7 @@ export function PharmacyWidget(props: DashboardWidgetLayoutProps) {
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                 <Building2 className="h-4 w-4" aria-hidden />
               </span>
-              <CardTitle className="text-base font-semibold text-foreground">Pharmacy</CardTitle>
+              <CardTitle className="text-h3">Pharmacy</CardTitle>
             </div>
           </Link>
           <Link

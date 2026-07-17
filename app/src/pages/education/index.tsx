@@ -53,7 +53,7 @@ export default function GlossaryIndex() {
             <section key={letter} aria-labelledby={`glossary-letter-${letter}`} className="space-y-3">
               <h2
                 id={`glossary-letter-${letter}`}
-                className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground"
+                className="text-[11px] font-semibold uppercase tracking-[0.09em] text-muted-foreground"
               >
                 {letter === "#" ? "#" : letter}
               </h2>

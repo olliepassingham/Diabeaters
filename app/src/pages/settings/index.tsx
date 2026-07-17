@@ -2017,7 +2017,7 @@ export default function Settings() {
               <span className="min-w-0 flex-1">
                 <span className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-semibold text-foreground">Send feedback</span>
-                  <Badge variant="secondary" className="h-5 rounded-full px-2 text-[10px] font-semibold uppercase tracking-wide">
+                  <Badge variant="secondary" className="h-5 rounded-full px-2 text-[11px] font-semibold uppercase tracking-wide">
                     New
                   </Badge>
                 </span>

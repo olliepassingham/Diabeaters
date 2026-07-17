@@ -12,8 +12,8 @@ export function WidgetCard({
     <Card
       variant={variant}
       className={cn(
-        "pressable card-interactive dashboard-card-hover flex flex-col overflow-hidden rounded-2xl border border-border/55 shadow-sm ring-1 ring-border/20 dark:border-border/45",
-        variant === "glass-muted" && "ring-0",
+        // Single hairline edge — the glass surface provides the fill; no ring/shadow stacking.
+        "pressable card-interactive dashboard-card-hover flex flex-col overflow-hidden rounded-2xl border border-border/50 shadow-none dark:border-border/40",
         className,
       )}
       {...props}

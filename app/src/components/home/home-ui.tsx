@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 
 /** Shared surface for home dashboard cards (hero, setup, widgets). */
 export const homeDashboardCardClass =
-  "dashboard-card-hover animate-soft-in overflow-hidden rounded-2xl border border-primary/18 bg-gradient-to-br from-primary-light/80 via-primary-light/45 to-primary/[0.08] shadow-md ring-1 ring-primary/10 dark:border-primary/24 dark:from-primary-light/30 dark:via-primary-light/15 dark:to-primary/[0.08] dark:ring-primary/18";
+  "dashboard-card-hover animate-soft-in overflow-hidden rounded-2xl border border-primary/18 bg-gradient-to-br from-primary-light/80 via-primary-light/45 to-primary/[0.08] shadow-sm dark:border-primary/24 dark:from-primary-light/30 dark:via-primary-light/15 dark:to-primary/[0.08]";
 
 /** Warm setup / onboarding card tint. */
 export const homeSetupCardClass =

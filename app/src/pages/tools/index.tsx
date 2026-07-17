@@ -271,7 +271,7 @@ function LearnToolRow({ href, icon: Icon, title, description }: Omit<ToolDef, "i
       onFocus={warm}
       onTouchStart={warm}
     >
-      <Card variant="glass" className="pressable card-interactive cursor-pointer rounded-2xl border border-border/50">
+      <Card variant="glass" className="pressable card-interactive cursor-pointer rounded-2xl">
         <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:gap-6 sm:p-6">
           <div className="flex items-start gap-4 sm:items-center">
             <Icon className="h-9 w-9 shrink-0 text-primary sm:h-10 sm:w-10" aria-hidden />
@@ -292,11 +292,10 @@ function LearnToolRow({ href, icon: Icon, title, description }: Omit<ToolDef, "i
   );
 }
 
+/** Matches the eyebrow label style used on Account (`SettingsGroupLabel`) and the glossary. */
 function SectionHeader({ title }: { title: string }) {
   return (
-    <div>
-      <h2 className="text-h3 font-semibold text-foreground">{title}</h2>
-    </div>
+    <h2 className="text-[11px] font-semibold uppercase tracking-[0.09em] text-muted-foreground">{title}</h2>
   );
 }
 
@@ -392,7 +391,7 @@ export function ToolsHubPage({
         >
           <div className="flex items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2">
-              <Users className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+              <Users className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
               <SectionHeader title={hubVariant === "community" ? "Learn & connect" : "Supporter tools"} />
             </div>
             <ToolsAboutDialog hubVariant={hubVariant} />
@@ -415,7 +414,7 @@ export function ToolsHubPage({
             <section className="space-y-3" aria-label="Act now tools" data-testid="tools-section-act-now">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-2">
-                  <HeartPulse className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+                  <HeartPulse className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                   <SectionHeader title="Act now" />
                 </div>
                 <ToolsAboutDialog hubVariant={hubVariant} />
@@ -434,13 +433,13 @@ export function ToolsHubPage({
           ) : null}
 
           {plan.length > 0 ? (
-            <section className="space-y-4" aria-label="Plan tools" data-testid="tools-section-plan">
+            <section className="space-y-3" aria-label="Plan tools" data-testid="tools-section-plan">
               <div className="flex items-center gap-2">
-                <MapIcon className="h-5 w-5 text-primary" aria-hidden />
+                <MapIcon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                 <SectionHeader title="Plan" />
               </div>
               <ul
-                className="grid list-none grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 lg:gap-7"
+                className="grid list-none grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 lg:gap-6"
                 aria-label="Plan"
               >
                 {plan.map((t, idx) => (
@@ -459,10 +458,10 @@ export function ToolsHubPage({
           {learn.length > 0 ? (
             <section className="space-y-3" aria-label="Learn tools" data-testid="tools-section-learn">
               <div className="flex items-center gap-2">
-                <BookOpen className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+                <BookOpen className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                 <SectionHeader title="Learn" />
               </div>
-              <ul className="list-none space-y-4" aria-label="Learn">
+              <ul className="list-none space-y-3" aria-label="Learn">
                 {learn.map((t, idx) => (
                   <li
                     key={t.id}
