@@ -14,6 +14,9 @@ const DialogPortal = DialogPrimitive.Portal
 
 const DialogClose = DialogPrimitive.Close
 
+/** Overlay tier above BottomNav (z-[100]); matches sheet / bottom-sheet. */
+const OVERLAY_Z = "z-[110]"
+
 const DialogOverlay = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Overlay>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
@@ -21,7 +24,8 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-50 bg-black/80 duration-[var(--app-motion-duration)] ease-[var(--app-motion-ease)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      "fixed inset-0 bg-black/80 duration-[var(--app-motion-duration)] ease-[var(--app-motion-ease)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      OVERLAY_Z,
       className
     )}
     {...props}
@@ -52,7 +56,8 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed z-50 grid gap-4 border border-border/60 bg-background p-6 text-foreground shadow-lg duration-[var(--app-motion-duration)] ease-[var(--app-motion-ease)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+        "fixed grid gap-4 border border-border/60 bg-background p-6 text-foreground shadow-lg duration-[var(--app-motion-duration)] ease-[var(--app-motion-ease)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+        OVERLAY_Z,
         mobileSheet ? MOBILE_SHEET_CLASSES : CENTERED_MODAL_CLASSES,
         className
       )}
