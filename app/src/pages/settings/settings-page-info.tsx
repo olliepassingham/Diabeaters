@@ -88,7 +88,10 @@ export function SettingsNotificationsInfoDialog({ supporterMode = false }: { sup
     >
       {supporterMode ? (
         <InfoSection title="Supporter alerts">
-          <p>Hypo and scenario alerts from the person you support, plus feed and message notifications for your account.</p>
+          <p>
+            Hypo treated, glucose check-in (when readings pass your alert limits), supply, appointment, and travel/sick-day
+            alerts from the person you support — plus feed and message notifications for your account.
+          </p>
         </InfoSection>
       ) : (
         <>

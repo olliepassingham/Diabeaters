@@ -15,6 +15,15 @@ import {
   formatExerciseCgmAlertThresholdOption,
   resolveExerciseCgmAlertThreshold,
 } from "@/lib/exercise-cgm-alert-thresholds";
+import {
+  formatSupporterAlertLimitOption,
+  mmolToDisplayBg,
+  DEFAULT_SUPPORTER_LIVE_GLUCOSE_ALERT_HIGH_MMOL,
+  DEFAULT_SUPPORTER_LIVE_GLUCOSE_ALERT_LOW_MMOL,
+  resolveSupporterLiveGlucoseAlertLimitsMmol,
+  SUPPORTER_LIVE_GLUCOSE_ALERT_HIGH_OPTIONS_MMOL,
+  SUPPORTER_LIVE_GLUCOSE_ALERT_LOW_OPTIONS_MMOL,
+} from "@/lib/supporter-live-glucose-alerts";
 import { normalizeBgUnits } from "@/lib/alcohol-night-tool";
 import { DevPushNotificationTestPanel } from "@/components/dev-push-notification-test";
 import {
@@ -46,6 +55,7 @@ export function NotificationsTab({
   onThreshold,
   onBedtimeReminderTimeChange,
   onExerciseCgmAlertThresholdChange,
+  onSupporterLiveGlucoseAlertLimitsChange,
   embedded = false,
   supporterMode = false,
   showBedtimeCheckReminders = shouldReceiveBedtimeCheckReminders(),
@@ -55,6 +65,7 @@ export function NotificationsTab({
   onThreshold: (key: "criticalThresholdDays" | "lowThresholdDays", value: string) => void;
   onBedtimeReminderTimeChange?: (time: string) => void;
   onExerciseCgmAlertThresholdChange?: (threshold: number) => void;
+  onSupporterLiveGlucoseAlertLimitsChange?: (limits: { lowMmol: number; highMmol: number }) => void;
   embedded?: boolean;
   supporterMode?: boolean;
   showBedtimeCheckReminders?: boolean;
@@ -73,6 +84,7 @@ export function NotificationsTab({
   const cgmActive = isCgmPrefillActive();
   const exerciseAlertThreshold = resolveExerciseCgmAlertThreshold(notifSettings, bgUnits);
   const exerciseAlertThresholdOptions = exerciseCgmAlertThresholdOptions(bgUnits);
+  const liveAlertLimits = resolveSupporterLiveGlucoseAlertLimitsMmol(notifSettings);
 
   const inner = (
     <div className="space-y-5">
@@ -126,13 +138,88 @@ export function NotificationsTab({
               testId="switch-hypo-alerts"
             />
             <SettingsToggleRow
-              label="Glucose out of range"
-              description="When their latest shared reading is below or above their target range"
+              label="Glucose check-in"
+              description="When their shared reading goes past your limits — asks you to check they're OK"
               checked={liveGlucoseOn}
               onCheckedChange={(checked) => onToggle("liveGlucoseAlerts", checked)}
               disabled={masterOff}
               testId="switch-live-glucose-alerts"
             />
+            {liveGlucoseOn ? (
+              <div className="space-y-3 px-3.5 py-3 sm:px-4">
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  Wider than their day-to-day targets. Defaults{" "}
+                  {mmolToDisplayBg(DEFAULT_SUPPORTER_LIVE_GLUCOSE_ALERT_LOW_MMOL, bgUnits)}–
+                  {mmolToDisplayBg(DEFAULT_SUPPORTER_LIVE_GLUCOSE_ALERT_HIGH_MMOL, bgUnits)} {bgUnits}.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="supporter-live-bg-alert-low" className="text-xs font-medium text-muted-foreground">
+                      Alert below ({bgUnits})
+                    </Label>
+                    <Select
+                      value={String(liveAlertLimits.low)}
+                      onValueChange={(v) => {
+                        const n = parseFloat(v);
+                        if (!Number.isFinite(n)) return;
+                        onSupporterLiveGlucoseAlertLimitsChange?.({
+                          lowMmol: n,
+                          highMmol: liveAlertLimits.high,
+                        });
+                      }}
+                      disabled={masterOff}
+                    >
+                      <SelectTrigger
+                        id="supporter-live-bg-alert-low"
+                        className="h-10 rounded-xl"
+                        data-testid="select-supporter-live-bg-alert-low"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SUPPORTER_LIVE_GLUCOSE_ALERT_LOW_OPTIONS_MMOL.map((t) => (
+                          <SelectItem key={t} value={String(t)} disabled={t >= liveAlertLimits.high}>
+                            {formatSupporterAlertLimitOption(t, bgUnits)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="supporter-live-bg-alert-high" className="text-xs font-medium text-muted-foreground">
+                      Alert above ({bgUnits})
+                    </Label>
+                    <Select
+                      value={String(liveAlertLimits.high)}
+                      onValueChange={(v) => {
+                        const n = parseFloat(v);
+                        if (!Number.isFinite(n)) return;
+                        onSupporterLiveGlucoseAlertLimitsChange?.({
+                          lowMmol: liveAlertLimits.low,
+                          highMmol: n,
+                        });
+                      }}
+                      disabled={masterOff}
+                    >
+                      <SelectTrigger
+                        id="supporter-live-bg-alert-high"
+                        className="h-10 rounded-xl"
+                        data-testid="select-supporter-live-bg-alert-high"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SUPPORTER_LIVE_GLUCOSE_ALERT_HIGH_OPTIONS_MMOL.map((t) => (
+                          <SelectItem key={t} value={String(t)} disabled={t <= liveAlertLimits.low}>
+                            {formatSupporterAlertLimitOption(t, bgUnits)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            ) : null}
             <SettingsToggleRow
               label="Supply alerts"
               description="When their shared supplies run low or critical"
@@ -417,6 +504,7 @@ type SettingsNotificationsRouteProps = {
   onThreshold: (key: "criticalThresholdDays" | "lowThresholdDays", value: string) => void;
   onBedtimeReminderTimeChange?: (time: string) => void;
   onExerciseCgmAlertThresholdChange?: (threshold: number) => void;
+  onSupporterLiveGlucoseAlertLimitsChange?: (limits: { lowMmol: number; highMmol: number }) => void;
   supporterMode?: boolean;
   showBedtimeCheckReminders?: boolean;
 };
@@ -427,6 +515,7 @@ export function SettingsNotificationsRoute({
   onThreshold,
   onBedtimeReminderTimeChange,
   onExerciseCgmAlertThresholdChange,
+  onSupporterLiveGlucoseAlertLimitsChange,
   supporterMode = false,
   showBedtimeCheckReminders,
 }: SettingsNotificationsRouteProps) {
@@ -462,6 +551,7 @@ export function SettingsNotificationsRoute({
             onThreshold={onThreshold}
             onBedtimeReminderTimeChange={onBedtimeReminderTimeChange}
             onExerciseCgmAlertThresholdChange={onExerciseCgmAlertThresholdChange}
+            onSupporterLiveGlucoseAlertLimitsChange={onSupporterLiveGlucoseAlertLimitsChange}
             embedded
             supporterMode={supporterMode}
             showBedtimeCheckReminders={showBedtimeCheckReminders}

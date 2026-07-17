@@ -1,6 +1,7 @@
 /**
- * Notify linked supporters when a patient's latest shared CGM reading is out of target range.
- * Dedupes via patient_live_glucose.last_alerted_range_status.
+ * Notify linked supporters when a patient's latest shared CGM reading passes
+ * that supporter's extreme check-in limits (defaults 3.5 / 14 mmol/L).
+ * Dedupes per carer–patient via carer_live_glucose_alert_state.
  */
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { deliverPushToTokenRows, mobilePushDeliveryConfigured } from "../_shared/deliver-push.ts";
@@ -11,6 +12,9 @@ const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const DEFAULT_ALERT_LOW_MMOL = 3.5;
+const DEFAULT_ALERT_HIGH_MMOL = 14;
+
 function isUuid(s: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s);
 }
@@ -18,6 +22,31 @@ function isUuid(s: string): boolean {
 function formatBg(value: number, units: string): string {
   if (units === "mg/dL") return String(Math.round(value));
   return (Math.round(value * 10) / 10).toFixed(1);
+}
+
+function toMmol(value: number, units: string): number {
+  return units === "mg/dL" ? value / 18 : value;
+}
+
+function resolveAlertLimits(prefs: Record<string, unknown>): { low: number; high: number } {
+  const lowRaw = prefs.live_glucose_alert_low;
+  const highRaw = prefs.live_glucose_alert_high;
+  const lowNum = typeof lowRaw === "number" ? lowRaw : typeof lowRaw === "string" ? Number(lowRaw) : NaN;
+  const highNum = typeof highRaw === "number" ? highRaw : typeof highRaw === "string" ? Number(highRaw) : NaN;
+  const low = Number.isFinite(lowNum) && lowNum > 0 ? lowNum : DEFAULT_ALERT_LOW_MMOL;
+  const high = Number.isFinite(highNum) && highNum > 0 ? highNum : DEFAULT_ALERT_HIGH_MMOL;
+  if (high <= low) return { low: DEFAULT_ALERT_LOW_MMOL, high: DEFAULT_ALERT_HIGH_MMOL };
+  return { low, high };
+}
+
+type AlertStatus = "ok" | "extreme_low" | "extreme_high";
+
+function computeAlertStatus(value: number, units: string, low: number, high: number): AlertStatus {
+  if (!Number.isFinite(value) || high <= low) return "ok";
+  const mmol = toMmol(value, units);
+  if (mmol < low) return "extreme_low";
+  if (mmol > high) return "extreme_high";
+  return "ok";
 }
 
 Deno.serve(async (req: Request) => {
@@ -66,9 +95,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: row, error: rowErr } = await admin
       .from("patient_live_glucose")
-      .select(
-        "user_id, value, units, range_status, last_alerted_range_status, target_low, target_high, recorded_at",
-      )
+      .select("user_id, value, units, recorded_at")
       .eq("user_id", patientId)
       .maybeSingle();
 
@@ -78,44 +105,17 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const rangeStatus = String((row as { range_status?: string }).range_status ?? "in_range");
-    const lastAlerted = (row as { last_alerted_range_status?: string | null }).last_alerted_range_status;
-
-    if (rangeStatus === "in_range") {
-      if (lastAlerted !== "in_range") {
-        await admin
-          .from("patient_live_glucose")
-          .update({ last_alerted_range_status: "in_range" })
-          .eq("user_id", patientId);
-      }
-      return new Response(JSON.stringify({ success: true, notified: 0, skipped: "in_range" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    if (rangeStatus !== "low" && rangeStatus !== "high") {
-      return new Response(JSON.stringify({ success: true, notified: 0, skipped: "unknown_status" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    if (lastAlerted === rangeStatus) {
-      return new Response(JSON.stringify({ success: true, notified: 0, skipped: "deduped" }), {
+    const value = Number((row as { value?: number }).value);
+    const units = String((row as { units?: string }).units ?? "mmol/L");
+    if (!Number.isFinite(value)) {
+      return new Response(JSON.stringify({ success: true, notified: 0, skipped: "bad_value" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const { data: profile } = await admin.from("profiles").select("full_name").eq("id", patientId).maybeSingle();
     const patientLabel = (profile as { full_name?: string } | null)?.full_name?.trim() || "Your contact";
-    const value = Number((row as { value?: number }).value);
-    const units = String((row as { units?: string }).units ?? "mmol/L");
     const bgText = `${formatBg(value, units)} ${units}`;
-
-    const title = rangeStatus === "low" ? "Glucose below target" : "Glucose above target";
-    const bodyText =
-      rangeStatus === "low"
-        ? `${patientLabel}'s latest reading is ${bgText} — below their target range`
-        : `${patientLabel}'s latest reading is ${bgText} — above their target range`;
 
     const { data: linkRows, error: linkErr } = await admin
       .from("carer_links")
@@ -138,6 +138,12 @@ Deno.serve(async (req: Request) => {
       });
 
     const recipients = carers.map((c) => c.carer_id);
+    if (recipients.length === 0) {
+      return new Response(JSON.stringify({ success: true, notified: 0, skipped: "no_recipients" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { data: prefsRows } = await admin
       .from("notification_preferences")
       .select("user_id,prefs")
@@ -146,16 +152,19 @@ Deno.serve(async (req: Request) => {
       (prefsRows ?? []).map((r: { user_id: string; prefs: unknown }) => [String(r.user_id), r.prefs]),
     );
 
+    const { data: stateRows } = await admin
+      .from("carer_live_glucose_alert_state")
+      .select("carer_id, last_alerted_status")
+      .eq("patient_id", patientId)
+      .in("carer_id", recipients);
+    const lastByCarer = new Map<string, string>(
+      (stateRows ?? []).map((r: { carer_id: string; last_alerted_status: string }) => [
+        String(r.carer_id),
+        String(r.last_alerted_status),
+      ]),
+    );
+
     let notified = 0;
-    const payload = {
-      kind: "live_glucose_out_of_range",
-      deep_link: "/carer-view/glucose",
-      patient_user_id: patientId,
-      range_status: rangeStatus,
-      value,
-      units,
-      recorded_at: (row as { recorded_at?: string }).recorded_at,
-    };
 
     for (const rid of recipients) {
       const prefsRaw = prefsById.get(rid);
@@ -165,6 +174,47 @@ Deno.serve(async (req: Request) => {
       const inappOn = prefs.inapp !== false;
       const pushOn = prefs.push === true;
       if (!enabled || !liveGlucoseOn) continue;
+
+      const { low, high } = resolveAlertLimits(prefs);
+      const status = computeAlertStatus(value, units, low, high);
+      const lastAlerted = lastByCarer.get(rid) ?? "ok";
+
+      if (status === "ok") {
+        if (lastAlerted !== "ok") {
+          await admin.from("carer_live_glucose_alert_state").upsert(
+            {
+              carer_id: rid,
+              patient_id: patientId,
+              last_alerted_status: "ok",
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "carer_id,patient_id" },
+          );
+        }
+        continue;
+      }
+
+      if (lastAlerted === status) continue;
+
+      const title = "Check if they're OK";
+      const bodyText =
+        status === "extreme_low"
+          ? `${patientLabel}'s glucose is ${bgText} (below your alert limit) — please check they're OK`
+          : `${patientLabel}'s glucose is ${bgText} (above your alert limit) — please check they're OK`;
+
+      const payload = {
+        kind: "live_glucose_check_in",
+        deep_link: "/carer-view/glucose",
+        patient_user_id: patientId,
+        alert_status: status,
+        /** Legacy field for older clients */
+        range_status: status === "extreme_low" ? "low" : "high",
+        value,
+        units,
+        recorded_at: (row as { recorded_at?: string }).recorded_at,
+        alert_low_mmol: low,
+        alert_high_mmol: high,
+      };
 
       if (inappOn) {
         const { error: insErr } = await admin.from("notifications").insert({
@@ -184,12 +234,17 @@ Deno.serve(async (req: Request) => {
           admin,
         });
       }
-    }
 
-    await admin
-      .from("patient_live_glucose")
-      .update({ last_alerted_range_status: rangeStatus })
-      .eq("user_id", patientId);
+      await admin.from("carer_live_glucose_alert_state").upsert(
+        {
+          carer_id: rid,
+          patient_id: patientId,
+          last_alerted_status: status,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "carer_id,patient_id" },
+      );
+    }
 
     return new Response(JSON.stringify({ success: true, notified }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

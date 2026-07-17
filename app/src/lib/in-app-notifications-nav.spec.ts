@@ -71,6 +71,9 @@ describe("getPathForInAppNotification", () => {
     expect(
       getPathForInAppNotification(row({ id: "1", user_id: "u", data: { kind: "live_glucose_out_of_range" } })),
     ).toBe("/carer-view/glucose");
+    expect(
+      getPathForInAppNotification(row({ id: "1", user_id: "u", data: { kind: "live_glucose_check_in" } })),
+    ).toBe("/carer-view/glucose");
   });
 
   it("maps hypo_logged_self and hypo_logged", () => {

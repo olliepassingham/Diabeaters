@@ -105,7 +105,8 @@ const PRIVACY_TOGGLES = [
   {
     key: "live_glucose" as const,
     label: "Live glucose",
-    description: "Latest near-live CGM reading in the top bar (from their device — not a full history).",
+    description:
+      "Latest near-live CGM reading for supporters, plus check-in alerts when readings pass their extreme limits (not every out-of-target reading).",
     testId: "privacy-toggle-live-glucose",
   },
   {

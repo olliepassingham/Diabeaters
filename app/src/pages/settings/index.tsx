@@ -1696,6 +1696,17 @@ export default function Settings() {
     void syncNotificationPreferences(updated);
   };
 
+  const handleSupporterLiveGlucoseAlertLimits = (limits: { lowMmol: number; highMmol: number }) => {
+    const updated = {
+      ...notifSettings,
+      liveGlucoseAlertLowMmol: limits.lowMmol,
+      liveGlucoseAlertHighMmol: limits.highMmol,
+    };
+    setNotifSettings(updated);
+    storage.saveNotificationSettings(updated);
+    void syncNotificationPreferences(updated);
+  };
+
   const handleNotifThreshold = (key: "criticalThresholdDays" | "lowThresholdDays", value: string) => {
     const numValue = parseInt(value) || 0;
     const updated = { ...notifSettings, [key]: numValue };
@@ -2183,6 +2194,7 @@ export default function Settings() {
         onThreshold={handleNotifThreshold}
         onBedtimeReminderTimeChange={handleBedtimeReminderTime}
         onExerciseCgmAlertThresholdChange={handleExerciseCgmAlertThreshold}
+        onSupporterLiveGlucoseAlertLimitsChange={handleSupporterLiveGlucoseAlertLimits}
         supporterMode={inSupporterSession}
         showBedtimeCheckReminders={showBedtimeCheckReminders}
       />

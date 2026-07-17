@@ -24,7 +24,7 @@ function pathFromKind(kind: string, data: Record<string, unknown>, bellDeepLink:
   ) {
     return "/carer-view";
   }
-  if (kind === "live_glucose_out_of_range") return "/carer-view/glucose";
+  if (kind === "live_glucose_out_of_range" || kind === "live_glucose_check_in") return "/carer-view/glucose";
   if (kind === "exercise_cgm_alert") return "/scenarios/exercise";
   if (
     kind === "feed_post_like" ||

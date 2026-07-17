@@ -14,6 +14,12 @@ import {
   glucoseRangeValueClasses,
   type GlucoseRangeStatus,
 } from "@/lib/live-glucose-range";
+import { normalizeBgUnits } from "@/lib/alcohol-night-tool";
+import {
+  mmolToDisplayBg,
+  resolveSupporterLiveGlucoseAlertLimitsMmol,
+} from "@/lib/supporter-live-glucose-alerts";
+import { storage } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 
 function trendIcon(trend: string | null | undefined) {
@@ -33,6 +39,10 @@ export default function CarerLiveGlucosePage() {
   const rangeStatus: GlucoseRangeStatus = row?.range_status ?? "in_range";
   const TrendIcon = trendIcon(reading?.trend ?? null);
   const isLow = rangeStatus === "low";
+  const bgUnits = normalizeBgUnits(storage.getProfile()?.bgUnits);
+  const alertLimits = resolveSupporterLiveGlucoseAlertLimitsMmol(storage.getNotificationSettings());
+  const alertLowDisplay = mmolToDisplayBg(alertLimits.low, bgUnits);
+  const alertHighDisplay = mmolToDisplayBg(alertLimits.high, bgUnits);
 
   return (
     <PageShell variant="standard" density="compact" className="space-y-4" data-testid="carer-live-glucose-page">
@@ -149,9 +159,27 @@ export default function CarerLiveGlucosePage() {
               </Button>
             ) : null}
 
-            <p className="text-[11px] leading-snug text-muted-foreground">
-              Snapshot from their device — confirm on their CGM or meter before acting.
-            </p>
+            <div className="space-y-2 border-t border-border/40 pt-3">
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Confirm on their CGM or meter before acting.
+              </p>
+              <div className="flex items-center justify-between gap-3">
+                <p className="min-w-0 text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground/80">Check-in alerts</span>
+                  <span className="mx-1.5 text-border">·</span>
+                  <span className="tabular-nums">
+                    Below {alertLowDisplay} · above {alertHighDisplay} {bgUnits}
+                  </span>
+                </p>
+                <Link
+                  href="/settings/notifications"
+                  className="shrink-0 text-xs font-medium text-primary hover:underline underline-offset-2"
+                  data-testid="link-carer-glucose-alert-limits"
+                >
+                  Edit
+                </Link>
+              </div>
+            </div>
           </CardContent>
         </Card>
       )}

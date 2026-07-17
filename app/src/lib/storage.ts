@@ -1161,8 +1161,12 @@ export interface NotificationSettings {
   appointmentAlerts?: boolean;
   hypoAlerts?: boolean;
   scenarioAlerts?: boolean;
-  /** Supporter: alerts when their linked person's latest shared glucose is out of target range. */
+  /** Supporter: alerts when shared glucose passes their extreme check-in limits. */
   liveGlucoseAlerts?: boolean;
+  /** Supporter check-in alert: notify below this (always mmol/L). Default 3.5. */
+  liveGlucoseAlertLowMmol?: number;
+  /** Supporter check-in alert: notify above this (always mmol/L). Default 14. */
+  liveGlucoseAlertHighMmol?: number;
   /** When true, dashboard "Treated a Hypo" logs and notifies without opening the detail dialog first. */
   hypoDashboardQuickNotify?: boolean;
   /** Likes and comments on your community posts (in-app inbox; synced as feed_alerts). */
@@ -3792,6 +3796,18 @@ export const storage = {
       supporterAppointmentReminders: parsed.supporterAppointmentReminders !== false,
       appointmentAlerts: parsed.appointmentAlerts !== false,
       liveGlucoseAlerts: parsed.liveGlucoseAlerts !== false,
+      liveGlucoseAlertLowMmol:
+        typeof parsed.liveGlucoseAlertLowMmol === "number" &&
+        Number.isFinite(parsed.liveGlucoseAlertLowMmol) &&
+        parsed.liveGlucoseAlertLowMmol > 0
+          ? parsed.liveGlucoseAlertLowMmol
+          : undefined,
+      liveGlucoseAlertHighMmol:
+        typeof parsed.liveGlucoseAlertHighMmol === "number" &&
+        Number.isFinite(parsed.liveGlucoseAlertHighMmol) &&
+        parsed.liveGlucoseAlertHighMmol > 0
+          ? parsed.liveGlucoseAlertHighMmol
+          : undefined,
       /** Default on for habit building; only explicit `false` in stored settings turns it off. */
       bedtimeCheckReminders: parsed.bedtimeCheckReminders !== false,
       pumpChangeReminders: parsed.pumpChangeReminders !== false,

@@ -1,8 +1,12 @@
 import { DEFAULT_BEDTIME_REMINDER_TIME } from "@/lib/bedtime-reminder-schedule";
 import type { NotificationSettings } from "@/lib/storage";
 import { getSupabase } from "@/lib/supabase";
+import {
+  resolveSupporterLiveGlucoseAlertLimitsMmol,
+} from "@/lib/supporter-live-glucose-alerts";
 
 export function toCloudPrefs(settings: NotificationSettings): Record<string, unknown> {
+  const liveLimits = resolveSupporterLiveGlucoseAlertLimitsMmol(settings);
   return {
     enabled: Boolean(settings.enabled),
     push: Boolean(settings.pushNotifications),
@@ -17,6 +21,8 @@ export function toCloudPrefs(settings: NotificationSettings): Record<string, unk
     appointment_alerts: settings.appointmentAlerts !== false,
     hypo_alerts: settings.hypoAlerts !== false,
     live_glucose_alerts: settings.liveGlucoseAlerts !== false,
+    live_glucose_alert_low: liveLimits.low,
+    live_glucose_alert_high: liveLimits.high,
     scenario_alerts: settings.scenarioAlerts !== false,
     feed_alerts: settings.communityFeedAlerts !== false,
     dm_alerts: settings.communityDmAlerts !== false,
