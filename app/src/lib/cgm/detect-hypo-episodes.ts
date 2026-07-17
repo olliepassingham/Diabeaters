@@ -84,19 +84,29 @@ export function detectHypoEpisodes(
   return episodes.sort((a, b) => new Date(b.nadirAt).getTime() - new Date(a.nadirAt).getTime());
 }
 
-/** True when an existing logged hypo is near this episode (avoid double-logging). */
+/**
+ * True when an existing logged hypo falls inside (or near) this episode.
+ * Uses the full episode window [start, end] plus a buffer so a treatment
+ * logged before the CGM nadir still suppresses the confirm card.
+ */
 export function episodeMatchesLoggedHypo(
   episode: DetectedHypoEpisode,
   loggedTimestamps: string[],
-  windowMs = 60 * 60_000,
+  /** Extra time before start / after end counted as the same event. */
+  bufferMs = 45 * 60_000,
 ): boolean {
-  const nadirMs = new Date(episode.nadirAt).getTime();
   const startMs = new Date(episode.startAt).getTime();
-  if (!Number.isFinite(nadirMs)) return false;
+  const endMs = new Date(episode.endAt).getTime();
+  const nadirMs = new Date(episode.nadirAt).getTime();
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return false;
+
+  const windowStart = Math.min(startMs, Number.isFinite(nadirMs) ? nadirMs : startMs) - bufferMs;
+  const windowEnd = Math.max(endMs, Number.isFinite(nadirMs) ? nadirMs : endMs) + bufferMs;
+
   for (const raw of loggedTimestamps) {
     const t = new Date(raw).getTime();
     if (!Number.isFinite(t)) continue;
-    if (Math.abs(t - nadirMs) <= windowMs || Math.abs(t - startMs) <= windowMs) return true;
+    if (t >= windowStart && t <= windowEnd) return true;
   }
   return false;
 }

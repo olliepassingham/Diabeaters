@@ -48,21 +48,34 @@ describe("detectHypoEpisodes", () => {
 });
 
 describe("episodeMatchesLoggedHypo", () => {
-  it("matches nearby logged timestamps", () => {
-    const nadirAt = new Date(Date.UTC(2026, 6, 14, 11, 0, 0)).toISOString();
-    const episode = {
-      id: "cgm-hypo-1",
-      startAt: nadirAt,
-      endAt: nadirAt,
-      nadirAt,
-      nadirValue: 3.2,
-      readingCount: 3,
-      durationMinutes: 15,
-    };
-    const near = new Date(Date.UTC(2026, 6, 14, 11, 20, 0)).toISOString();
-    expect(episodeMatchesLoggedHypo(episode, [near])).toBe(true);
-    expect(episodeMatchesLoggedHypo(episode, [new Date(Date.UTC(2026, 6, 14, 8, 0, 0)).toISOString()])).toBe(
-      false,
-    );
+  const episode = {
+    id: "cgm-hypo-1",
+    startAt: new Date(Date.UTC(2026, 6, 14, 13, 50, 0)).toISOString(),
+    endAt: new Date(Date.UTC(2026, 6, 14, 14, 10, 0)).toISOString(),
+    nadirAt: new Date(Date.UTC(2026, 6, 14, 14, 5, 0)).toISOString(),
+    nadirValue: 3.1,
+    readingCount: 5,
+    durationMinutes: 20,
+  };
+
+  it("matches a log inside the episode window", () => {
+    const inside = new Date(Date.UTC(2026, 6, 14, 14, 0, 0)).toISOString();
+    expect(episodeMatchesLoggedHypo(episode, [inside])).toBe(true);
+  });
+
+  it("matches a treatment logged shortly before the episode starts", () => {
+    // 30 min before start — within the 45 min buffer
+    const before = new Date(Date.UTC(2026, 6, 14, 13, 20, 0)).toISOString();
+    expect(episodeMatchesLoggedHypo(episode, [before])).toBe(true);
+  });
+
+  it("matches a log shortly after the episode ends", () => {
+    const after = new Date(Date.UTC(2026, 6, 14, 14, 40, 0)).toISOString();
+    expect(episodeMatchesLoggedHypo(episode, [after])).toBe(true);
+  });
+
+  it("does not match a log hours away", () => {
+    const far = new Date(Date.UTC(2026, 6, 14, 8, 0, 0)).toISOString();
+    expect(episodeMatchesLoggedHypo(episode, [far])).toBe(false);
   });
 });
