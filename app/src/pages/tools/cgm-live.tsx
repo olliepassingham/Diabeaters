@@ -241,20 +241,73 @@ export default function CgmLivePage() {
                 overlays={chartOverlays}
               />
               {showOverlayHints ? (
-                <div className="space-y-1 text-[11px] text-muted-foreground">
+                <div className="flex flex-col gap-1.5">
                   {highlightSleep ? (
-                    <p data-testid="cgm-sleep-overlay-hint">
-                      {sleepOverlays.length > 0
-                        ? `Indigo bands: estimated sleep from ${sleepOverlays.length} bedtime check${sleepOverlays.length === 1 ? "" : "s"} in this window.`
-                        : "No bedtime checks with sleep in this window — log one in Bedtime to see estimated sleep here."}
-                    </p>
+                    sleepOverlays.length > 0 ? (
+                      <div
+                        className="flex items-center gap-2 rounded-lg bg-indigo-500/[0.08] px-2.5 py-1.5 text-xs text-foreground dark:bg-indigo-500/15"
+                        data-testid="cgm-sleep-overlay-hint"
+                      >
+                        <Moon className="h-3.5 w-3.5 shrink-0 text-indigo-600 dark:text-indigo-300" aria-hidden />
+                        <span className="min-w-0 leading-snug">
+                          <span className="font-medium">Sleep</span>
+                          <span className="text-muted-foreground">
+                            {" "}
+                            · {sleepOverlays.length} bedtime check
+                            {sleepOverlays.length === 1 ? "" : "s"} in this window
+                          </span>
+                        </span>
+                      </div>
+                    ) : (
+                      <div
+                        className="flex items-center justify-between gap-2 rounded-lg border border-dashed border-border/60 bg-background/40 px-2.5 py-1.5 text-xs"
+                        data-testid="cgm-sleep-overlay-hint"
+                      >
+                        <span className="flex min-w-0 items-center gap-2 text-muted-foreground">
+                          <Moon className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
+                          <span className="truncate">No sleep in this window</span>
+                        </span>
+                        <Link
+                          href="/scenarios/bedtime"
+                          className="shrink-0 font-medium text-primary underline-offset-2 hover:underline"
+                        >
+                          Bedtime
+                        </Link>
+                      </div>
+                    )
                   ) : null}
                   {highlightExercise ? (
-                    <p data-testid="cgm-exercise-overlay-hint">
-                      {exerciseOverlays.length > 0
-                        ? `Blue bands: exercise logged in this window (${exerciseOverlays.map((o) => o.label).join(", ")}). Times are approximate from session duration.`
-                        : "No exercise logged in this window — use Exercise to start a guided session."}
-                    </p>
+                    exerciseOverlays.length > 0 ? (
+                      <div
+                        className="flex items-center gap-2 rounded-lg bg-sky-500/[0.08] px-2.5 py-1.5 text-xs text-foreground dark:bg-sky-500/15"
+                        data-testid="cgm-exercise-overlay-hint"
+                      >
+                        <Dumbbell className="h-3.5 w-3.5 shrink-0 text-sky-600 dark:text-sky-300" aria-hidden />
+                        <span className="min-w-0 leading-snug">
+                          <span className="font-medium">Exercise</span>
+                          <span className="text-muted-foreground">
+                            {" "}
+                            · {exerciseOverlays.map((o) => o.label).join(", ")}
+                          </span>
+                        </span>
+                      </div>
+                    ) : (
+                      <div
+                        className="flex items-center justify-between gap-2 rounded-lg border border-dashed border-border/60 bg-background/40 px-2.5 py-1.5 text-xs"
+                        data-testid="cgm-exercise-overlay-hint"
+                      >
+                        <span className="flex min-w-0 items-center gap-2 text-muted-foreground">
+                          <Dumbbell className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
+                          <span className="truncate">No exercise in this window</span>
+                        </span>
+                        <Link
+                          href="/scenarios/exercise"
+                          className="shrink-0 font-medium text-primary underline-offset-2 hover:underline"
+                        >
+                          Exercise
+                        </Link>
+                      </div>
+                    )
                   ) : null}
                 </div>
               ) : null}
