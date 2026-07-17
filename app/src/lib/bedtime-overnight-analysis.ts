@@ -18,6 +18,15 @@ export type BedtimeOvernightStats = {
   max: number;
   minAtMs: number;
   maxAtMs: number;
+  /** First reading in the window (chronological). */
+  startValue: number;
+  /** Last reading in the window (chronological). */
+  endValue: number;
+  /** End − start (positive = rose overnight). */
+  overnightDelta: number;
+  /** Mean of first half of the night vs second half. */
+  firstHalfAvg: number;
+  secondHalfAvg: number;
   inRangePercent: number;
   hadLow: boolean;
   hadHigh: boolean;
@@ -59,6 +68,10 @@ function formatTime(ms: number): string {
   return new Date(ms).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
+function mean(values: number[]): number {
+  return values.reduce((a, b) => a + b, 0) / values.length;
+}
+
 export function computeOvernightStats(
   readings: BedtimeOvernightReading[],
   targetLow: number,
@@ -66,13 +79,14 @@ export function computeOvernightStats(
 ): BedtimeOvernightStats | null {
   if (readings.length === 0) return null;
 
-  let min = readings[0]!.value;
-  let max = readings[0]!.value;
-  let minAtMs = readings[0]!.timeMs;
-  let maxAtMs = readings[0]!.timeMs;
+  const sorted = [...readings].sort((a, b) => a.timeMs - b.timeMs);
+  let min = sorted[0]!.value;
+  let max = sorted[0]!.value;
+  let minAtMs = sorted[0]!.timeMs;
+  let maxAtMs = sorted[0]!.timeMs;
   let inRange = 0;
 
-  for (const r of readings) {
+  for (const r of sorted) {
     if (r.value < min) {
       min = r.value;
       minAtMs = r.timeMs;
@@ -84,42 +98,78 @@ export function computeOvernightStats(
     if (r.value >= targetLow && r.value <= targetHigh) inRange++;
   }
 
+  const mid = Math.ceil(sorted.length / 2);
+  const firstHalf = sorted.slice(0, mid).map((r) => r.value);
+  const secondHalf = sorted.slice(mid).map((r) => r.value);
+  const startValue = sorted[0]!.value;
+  const endValue = sorted[sorted.length - 1]!.value;
+
   return {
-    readingCount: readings.length,
+    readingCount: sorted.length,
     min,
     max,
     minAtMs,
     maxAtMs,
-    inRangePercent: Math.round((inRange / readings.length) * 100),
+    startValue,
+    endValue,
+    overnightDelta: endValue - startValue,
+    firstHalfAvg: mean(firstHalf),
+    secondHalfAvg: secondHalf.length > 0 ? mean(secondHalf) : mean(firstHalf),
+    inRangePercent: Math.round((inRange / sorted.length) * 100),
     hadLow: min < targetLow,
     hadHigh: max > targetHigh,
   };
 }
 
+/** Meaningful rise overnight (mmol ≈ 1.5, mg/dL ≈ 27). */
+function riseThreshold(units: BgUnits): number {
+  return units === "mg/dL" ? 27 : 1.5;
+}
+
+function lateRise(stats: BedtimeOvernightStats, units: BgUnits): boolean {
+  const thr = riseThreshold(units) * 0.6;
+  return stats.secondHalfAvg - stats.firstHalfAvg >= thr || stats.overnightDelta >= riseThreshold(units);
+}
+
+function earlyDip(stats: BedtimeOvernightStats, window: BedtimeSleepWindow): boolean {
+  const nightLength = window.endMs - window.startMs;
+  if (nightLength <= 0) return false;
+  // Lowest in the first 40% of the night
+  return stats.minAtMs <= window.startMs + nightLength * 0.4;
+}
+
 function buildExplanations(
   log: BedtimeLog | null,
   stats: BedtimeOvernightStats,
+  window: BedtimeSleepWindow,
   targetLow: number,
   targetHigh: number,
   units: BgUnits,
 ): string[] {
+  const lines: string[] = [];
+  const fmt = (n: number) => formatTargetBgInput(n, units);
+  const thr = riseThreshold(units);
+
   if (!log) {
-    const lines: string[] = [];
     if (stats.hadLow) {
       lines.push(
-        `Glucose dipped to ${formatTargetBgInput(stats.min, units)} around ${formatTime(stats.minAtMs)}. Log a bedtime check tonight so we can tie this to food, insulin, and activity.`,
+        `Glucose dipped to ${fmt(stats.min)} around ${formatTime(stats.minAtMs)}. A bedtime check tonight links this to food, insulin, and activity.`,
       );
     } else if (stats.hadHigh) {
       lines.push(
-        `Glucose peaked at ${formatTargetBgInput(stats.max, units)} around ${formatTime(stats.maxAtMs)}. A bedtime check helps connect overnight patterns to your evening context.`,
+        `Glucose peaked at ${fmt(stats.max)} around ${formatTime(stats.maxAtMs)}. A bedtime check helps connect that rise to your evening context.`,
+      );
+    } else if (lateRise(stats, units)) {
+      lines.push(
+        `You stayed in target, but glucose rose from about ${fmt(stats.startValue)} to ${fmt(stats.endValue)} overnight — a dawn-style pattern many people see.`,
       );
     } else {
-      lines.push("Glucose stayed mostly in range overnight. Log a bedtime check to build personalised overnight insights.");
+      lines.push(
+        `All readings stayed between ${fmt(targetLow)} and ${fmt(targetHigh)}. A bedtime check adds evening context so future reviews can explain *why* nights like this work.`,
+      );
     }
-    return lines;
+    return lines.slice(0, 4);
   }
-  const lines: string[] = [];
-  const fmt = (n: number) => formatTargetBgInput(n, units);
 
   if (stats.hadLow) {
     if (log.exercisedToday) {
@@ -140,9 +190,14 @@ function buildExplanations(
     if (log.bgTrend === "falling") {
       lines.push("Glucose was falling at your bedtime check, which can carry into the first part of the night.");
     }
+    if (earlyDip(stats, window)) {
+      lines.push(
+        `The lowest point was earlier in the night (${fmt(stats.min)} around ${formatTime(stats.minAtMs)}) — often linked to residual bolus or post-exercise effect rather than dawn rise.`,
+      );
+    }
     if (lines.length === 0) {
       lines.push(
-        `Glucose dipped to ${fmt(stats.min)} around ${formatTime(stats.minAtMs)} — review sensor compression and your team's overnight plan if this pattern repeats.`,
+        `Glucose dipped to ${fmt(stats.min)} around ${formatTime(stats.minAtMs)} — if this repeats, review sensor compression and your team's overnight plan.`,
       );
     }
   }
@@ -154,7 +209,12 @@ function buildExplanations(
     if (log.hoursSinceFood != null && log.hoursSinceFood <= 3) {
       lines.push("Food within a few hours of sleep can still be digesting into the early hours.");
     }
-    if (lines.length === 0 || !stats.hadLow) {
+    if (lateRise(stats, units) && stats.maxAtMs > (window.startMs + window.endMs) / 2) {
+      lines.push(
+        `The peak (${fmt(stats.max)} around ${formatTime(stats.maxAtMs)}) came later in the night — consistent with dawn phenomenon or overnight basal/food mismatch.`,
+      );
+    }
+    if (lines.length === 0 || (stats.hadLow && lines.length < 2)) {
       lines.push(
         `Peak was ${fmt(stats.max)} around ${formatTime(stats.maxAtMs)} — compare with your usual overnight pattern and correction habits.`,
       );
@@ -162,9 +222,27 @@ function buildExplanations(
   }
 
   if (!stats.hadLow && !stats.hadHigh) {
-    lines.push(
-      `Most readings stayed between ${fmt(targetLow)} and ${fmt(targetHigh)} — your bedtime factors may have lined up well for this night.`,
-    );
+    if (lateRise(stats, units)) {
+      lines.push(
+        `Fully in range, with a rise of about ${fmt(Math.abs(stats.overnightDelta))} from evening to morning (${fmt(stats.startValue)} → ${fmt(stats.endValue)}).`,
+      );
+      if (log.bgTrend === "rising") {
+        lines.push("That matches a rising trend at your bedtime check — worth watching if mornings climb further.");
+      } else if (log.exercisedToday) {
+        lines.push("You exercised yesterday; some people rebound higher overnight after activity even when they stay in range.");
+      }
+    } else if (stats.overnightDelta <= -thr) {
+      lines.push(
+        `Fully in range, drifting down about ${fmt(Math.abs(stats.overnightDelta))} overnight (${fmt(stats.startValue)} → ${fmt(stats.endValue)}).`,
+      );
+      if (log.exercisedToday || log.hadAlcohol) {
+        lines.push("Evening exercise or alcohol can contribute to a gentle overnight fall — useful to note if lows appear on similar nights.");
+      }
+    } else {
+      lines.push(
+        `All readings stayed between ${fmt(targetLow)} and ${fmt(targetHigh)} with little overnight drift — a steady night relative to your targets.`,
+      );
+    }
   }
 
   return lines.slice(0, 4);
@@ -173,6 +251,7 @@ function buildExplanations(
 function buildConsiderations(
   log: BedtimeLog | null,
   stats: BedtimeOvernightStats,
+  window: BedtimeSleepWindow,
   targetLow: number,
   targetHigh: number,
   units: BgUnits,
@@ -180,34 +259,65 @@ function buildConsiderations(
   const fmt = (n: number) => formatTargetBgInput(n, units);
   const range = `${fmt(targetLow)}–${fmt(targetHigh)}`;
   const tips: string[] = [];
-
-  if (stats.hadHigh && stats.inRangePercent >= 30) {
-    tips.push(
-      `About ${stats.inRangePercent}% of readings were in your target (${range}) — glucose may have crossed your ceiling later in the night (dawn rise or late digestion are common).`,
-    );
-  } else if (stats.hadHigh) {
-    tips.push(
-      `Most readings were above ${fmt(targetHigh)}. If this repeats, note whether glucose was already rising at bedtime and how evening food lined up with sleep.`,
-    );
-  }
+  const thr = riseThreshold(units);
 
   if (stats.hadLow) {
     tips.push(
-      "Repeated overnight lows are worth flagging with your diabetes team — sensor compression and delayed exercise lows are common causes to review.",
+      `Lowest was ${fmt(stats.min)} at ${formatTime(stats.minAtMs)}. If overnight dips repeat, note evening exercise, alcohol, and insulin timing before bed — and discuss repeated patterns with your care team.`,
     );
+    if (earlyDip(stats, window) && log?.exercisedToday) {
+      tips.push(
+        "Early-night lows after exercise days are common. A slightly higher bedtime snack carb (per your plan) or checking 2–3 hours after sleep starts can help you learn your pattern — not a dose change without your team.",
+      );
+    } else if (log?.hadAlcohol) {
+      tips.push(
+        "After alcohol, an extra planned check in the early hours (and a bedtime snack if your clinic recommends one) is often more useful than changing basal on the night.",
+      );
+    }
+  } else if (stats.hadHigh) {
+    if (stats.inRangePercent >= 40 && lateRise(stats, units)) {
+      tips.push(
+        `You were in range for ${stats.inRangePercent}% of the night, then rose to ${fmt(stats.max)} later. If mornings often climb, ask your team about dawn phenomenon vs evening food/insulin timing — don't change basal from this screen alone.`,
+      );
+    } else {
+      tips.push(
+        `Most of the night was above ${fmt(targetHigh)} (peak ${fmt(stats.max)}). Check whether glucose was already high or rising at bedtime; correcting earlier in the evening (safely, per your plan) often helps more than waiting until morning.`,
+      );
+    }
+    if (log?.hoursSinceFood != null && log.hoursSinceFood <= 3) {
+      tips.push(
+        "Evening food was close to sleep. Noting meal size and bolus timing tonight makes the next review much more specific.",
+      );
+    }
+  } else {
+    // Fully in range — still give shape-based, useful next steps
+    if (lateRise(stats, units)) {
+      tips.push(
+        stats.endValue >= targetHigh - thr
+          ? `You finished near the top of your target (${fmt(stats.endValue)}), rising from ${fmt(stats.startValue)}. If mornings often climb further, ask your team about dawn phenomenon vs evening food/insulin timing — don't change basal from this screen alone.`
+          : `Glucose rose about ${fmt(Math.abs(stats.overnightDelta))} overnight while staying in range (${fmt(stats.startValue)} → ${fmt(stats.endValue)}). If that pattern often becomes a morning high, a consistent bedtime check (trend + last food) helps you and your team spot dawn effect.`,
+      );
+    } else if (stats.overnightDelta <= -thr && stats.endValue <= targetLow + thr) {
+      tips.push(
+        `You ended near the low end of target (${fmt(stats.endValue)}). On similar evenings, plan a safe bedtime snack or an early-night check if your clinic has given you that option — especially after exercise or alcohol.`,
+      );
+    } else {
+      tips.push(
+        `Solid overnight control within ${range}. To keep nights like this, note one thing that went well yesterday evening (meal timing, activity, or no late correction) so you can repeat it.`,
+      );
+    }
+    if (!log) {
+      tips.push(
+        "A 30-second bedtime check adds food, insulin, exercise, and alcohol context — that's what turns this chart into personalised overnight insights next time.",
+      );
+    } else if (!log.exercisedToday && !log.hadAlcohol && (log.hoursSinceFood == null || log.hoursSinceFood > 3)) {
+      tips.push(
+        "Your bedtime notes look calm (no late meal flag, no alcohol, no exercise). If nights stay this steady, that evening routine is worth treating as your baseline.",
+      );
+    }
   }
 
-  if (!stats.hadLow && !stats.hadHigh) {
-    tips.push("If this pattern feels typical for you, keep noting what you did the evening before — it helps spot what works.");
-  }
-
-  if (!log) {
-    tips.push("Tonight's bedtime quick check links overnight patterns to food, insulin, and activity for richer reviews.");
-  } else if (log.hadAlcohol && stats.hadLow) {
-    tips.push("You logged alcohol at bedtime — consider how that lined up with insulin on board if lows were unexpected.");
-  }
-
-  return tips.slice(0, 2);
+  return tips.slice(0, 3);
 }
 
 export function analyzeBedtimeOvernight(
@@ -238,19 +348,22 @@ export function analyzeBedtimeOvernight(
         ? `${stats.inRangePercent}% in your target (${fmt(targetLow)}–${fmt(targetHigh)}). Peak ${fmt(stats.max)} around ${formatTime(stats.maxAtMs)}.`
         : `Highest ${fmt(stats.max)} around ${formatTime(stats.maxAtMs)} — mostly above your ${fmt(targetHigh)} ceiling.`;
   } else {
-    headline = "Mostly in range overnight";
-    summary = `${stats.inRangePercent}% of readings were in your target range (${fmt(targetLow)}–${fmt(targetHigh)}).`;
+    // No excursions ⇒ every reading was in range (100%).
+    headline = lateRise(stats, units) ? "In range, rising toward morning" : "In range overnight";
+    summary = lateRise(stats, units)
+      ? `100% of readings in your target (${fmt(targetLow)}–${fmt(targetHigh)}), rising from ${fmt(stats.startValue)} to ${fmt(stats.endValue)}.`
+      : `100% of readings were in your target range (${fmt(targetLow)}–${fmt(targetHigh)}).`;
   }
 
   return {
     headline,
     summary,
-    explanations: buildExplanations(log, stats, targetLow, targetHigh, units),
-    considerations: buildConsiderations(log, stats, targetLow, targetHigh, units),
+    explanations: buildExplanations(log, stats, window, targetLow, targetHigh, units),
+    considerations: buildConsiderations(log, stats, window, targetLow, targetHigh, units),
     stats,
     sleepWindowLabel: formatSleepWindowLabel(window.startMs, window.endMs),
     targetLow,
     targetHigh,
-    readings,
+    readings: [...readings].sort((a, b) => a.timeMs - b.timeMs),
   };
 }

@@ -100,4 +100,42 @@ describe("bedtime overnight analysis", () => {
     expect(insight.summary).toContain("4–10");
     expect(insight.considerations.length).toBeGreaterThan(0);
   });
+
+  it("says fully in range when every reading was in target — not mostly", () => {
+    const window = computeBedtimeSleepWindow(makeLog())!;
+    const readings = [
+      { timeMs: window.startMs, recordedAt: new Date(window.startMs).toISOString(), value: 7.4, units: "mmol/L" as const },
+      {
+        timeMs: window.startMs + 4 * 3600_000,
+        recordedAt: new Date(window.startMs + 4 * 3600_000).toISOString(),
+        value: 8.2,
+        units: "mmol/L" as const,
+      },
+      {
+        timeMs: window.endMs,
+        recordedAt: new Date(window.endMs).toISOString(),
+        value: 7.9,
+        units: "mmol/L" as const,
+      },
+    ];
+    const insight = analyzeBedtimeOvernight(null, readings, window, 4, 10)!;
+    expect(insight.stats.inRangePercent).toBe(100);
+    expect(insight.headline).toBe("In range overnight");
+    expect(insight.summary).toMatch(/^100%/);
+    expect(insight.headline).not.toMatch(/mostly/i);
+  });
+
+  it("mentions overnight rise when in range but climbing toward morning", () => {
+    const window = computeBedtimeSleepWindow(makeLog())!;
+    const readings = Array.from({ length: 8 }, (_, i) => ({
+      timeMs: window.startMs + i * 60 * 60 * 1000,
+      recordedAt: new Date(window.startMs + i * 60 * 60 * 1000).toISOString(),
+      value: 6 + i * 0.4,
+      units: "mmol/L" as const,
+    }));
+    const insight = analyzeBedtimeOvernight(null, readings, window, 4, 10)!;
+    expect(insight.stats.hadHigh).toBe(false);
+    expect(insight.headline).toMatch(/rising/i);
+    expect(insight.considerations.some((c) => /dawn|morning|target/i.test(c))).toBe(true);
+  });
 });
