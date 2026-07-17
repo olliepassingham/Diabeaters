@@ -384,8 +384,18 @@ export function getCarerLinkJustCompletedAt(): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+export const ACTIVE_CARER_PATIENT_CHANGED_EVENT = "diabeater:carer-active-patient";
+
+function notifyActiveCarerPatientChanged(): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(ACTIVE_CARER_PATIENT_CHANGED_EVENT));
+  }
+}
+
 export function setActiveCarerPatientId(patientId: string): void {
+  const prev = sessionStorage.getItem(ACTIVE_CARER_PATIENT_ID_KEY);
   sessionStorage.setItem(ACTIVE_CARER_PATIENT_ID_KEY, patientId);
+  if (prev !== patientId) notifyActiveCarerPatientChanged();
 }
 
 export function getActiveCarerPatientId(): string | null {
@@ -393,7 +403,22 @@ export function getActiveCarerPatientId(): string | null {
 }
 
 export function clearActiveCarerPatientId(): void {
+  const had = sessionStorage.getItem(ACTIVE_CARER_PATIENT_ID_KEY) !== null;
   sessionStorage.removeItem(ACTIVE_CARER_PATIENT_ID_KEY);
+  if (had) notifyActiveCarerPatientChanged();
+}
+
+/**
+ * From a tapped notification that targets supporter mode: make the alerting patient
+ * the active person so carer pages open on the right patient (multi-patient carers).
+ */
+export function applyActiveCarerPatientFromNotification(
+  data: Record<string, unknown> | null | undefined,
+  path: string | null,
+): void {
+  if (!data || !path || !path.startsWith("/carer-view")) return;
+  const pid = typeof data.patient_user_id === "string" ? data.patient_user_id.trim() : "";
+  if (pid) setActiveCarerPatientId(pid);
 }
 
 export function getActiveAppMode(): ActiveAppMode | null {

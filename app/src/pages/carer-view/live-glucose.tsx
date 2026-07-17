@@ -43,10 +43,15 @@ export default function CarerLiveGlucosePage() {
   const alertLimits = resolveSupporterLiveGlucoseAlertLimitsMmol(storage.getNotificationSettings());
   const alertLowDisplay = mmolToDisplayBg(alertLimits.low, bgUnits);
   const alertHighDisplay = mmolToDisplayBg(alertLimits.high, bgUnits);
+  const patientName = linkedPatient?.patient_full_name?.trim() || null;
 
   return (
     <PageShell variant="standard" density="compact" className="space-y-4" data-testid="carer-live-glucose-page">
-      <PageHeader leading={<PageBackButton fallbackHref="/carer-view" />} title="Live glucose" />
+      <PageHeader
+        leading={<PageBackButton fallbackHref="/carer-view" />}
+        title="Live glucose"
+        description={patientName ? `Supporting ${patientName}` : undefined}
+      />
 
       {linkLoading ? (
         <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">

@@ -15,6 +15,7 @@ import {
   isNotificationBellDeepLink,
   requestOpenNotificationBell,
 } from "@/lib/notification-inbox-deep-link";
+import { applyActiveCarerPatientFromNotification } from "@/lib/carer-session";
 
 /** Navigate home and open the hypo log dialog (used when logging a hypo from a check-in). */
 export function requestOpenHypoLogScreen(
@@ -70,6 +71,8 @@ export function navigateForInAppNotification(
 
   const path = getPathForInAppNotification(row);
   if (!path) return;
+
+  applyActiveCarerPatientFromNotification(data, path);
 
   if (isNotificationBellDeepLink(path)) {
     requestOpenNotificationBell();

@@ -98,6 +98,7 @@ import { resolvesAsCommunityMemberAccount } from "@/lib/community-member-session
 import {
   clearCarerClientSessionKeys,
   getActiveAppMode,
+  applyActiveCarerPatientFromNotification,
   getPrimaryAppRole,
   hasCarerIntent,
   hasPendingCarer,
@@ -291,6 +292,7 @@ function useNativeLocalNotificationDeepLinks() {
         const next = raw.trim();
         if (!next) return;
         if (!next.startsWith("/") || next.startsWith("//")) return;
+        applyActiveCarerPatientFromNotification(extra, next);
         applyPushDeepLinkPath(next, setLocation);
       },
     ).then((h: { remove: () => Promise<void> }) => {

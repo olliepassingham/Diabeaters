@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { storage } from "@/lib/storage";
 import {
+  applyActiveCarerPatientFromNotification,
   applySupporterAccountRoleAfterLink,
+  getActiveCarerPatientId,
+  setActiveCarerPatientId,
   cacheCloudPrimaryAppRole,
   canSwitchAppMode,
   clearCarerClientSessionKeys,
@@ -171,5 +174,48 @@ describe("carer-session community-only accounts", () => {
     expect(canSwitchAppMode()).toBe(true);
     expect(isCarerSessionMode(true, "patient")).toBe(false);
     expect(isCarerSessionMode(true, "carer")).toBe(true);
+  });
+});
+
+describe("applyActiveCarerPatientFromNotification", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+
+  it("selects the alerting patient for supporter-mode deep links", () => {
+    setActiveCarerPatientId("patient-a");
+    applyActiveCarerPatientFromNotification(
+      { kind: "live_glucose_check_in", patient_user_id: "patient-b" },
+      "/carer-view/glucose",
+    );
+    expect(getActiveCarerPatientId()).toBe("patient-b");
+  });
+
+  it("ignores notifications without a supporter-mode path", () => {
+    setActiveCarerPatientId("patient-a");
+    applyActiveCarerPatientFromNotification({ patient_user_id: "patient-b" }, "/tools/hypo-history");
+    expect(getActiveCarerPatientId()).toBe("patient-a");
+  });
+
+  it("ignores notifications without a patient id", () => {
+    setActiveCarerPatientId("patient-a");
+    applyActiveCarerPatientFromNotification({ kind: "hypo_logged" }, "/carer-view");
+    expect(getActiveCarerPatientId()).toBe("patient-a");
+  });
+
+  it("dispatches a change event when the active patient changes", () => {
+    let fired = 0;
+    const onChange = () => {
+      fired += 1;
+    };
+    window.addEventListener("diabeater:carer-active-patient", onChange);
+    try {
+      setActiveCarerPatientId("patient-a");
+      setActiveCarerPatientId("patient-a");
+      setActiveCarerPatientId("patient-b");
+      expect(fired).toBe(2);
+    } finally {
+      window.removeEventListener("diabeater:carer-active-patient", onChange);
+    }
   });
 });

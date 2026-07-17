@@ -1503,6 +1503,8 @@ export default function CarerViewPage() {
     const rawScopes = normaliseScopes(activeLink.scopes);
     setPatientBundleLoading(true);
     setLoadError(null);
+    setProfile(null);
+    setSupplies([]);
     setAppointmentRows([]);
     setScenarioRows([]);
     setHypoLogs([]);

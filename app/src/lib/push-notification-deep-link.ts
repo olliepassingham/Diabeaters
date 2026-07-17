@@ -9,6 +9,7 @@ import {
   requestOpenNotificationBell,
   storePendingOpenNotificationBell,
 } from "@/lib/notification-inbox-deep-link";
+import { applyActiveCarerPatientFromNotification } from "@/lib/carer-session";
 
 const PENDING_PUSH_DEEP_LINK_KEY = "diabeaters:pending_push_deep_link";
 export const PUSH_DEEP_LINK_PENDING_EVENT = "diabeater:push-deep-link-pending";
@@ -101,6 +102,8 @@ export function handlePushDeepLinkFromNotification(notification: PushNotificatio
   const path = getPathFromPushNotification(notification);
   if (!path) return;
 
+  applyActiveCarerPatientFromNotification(data, path);
+
   if (data.kind === "hypo_check_in") {
     const checkInId = checkInIdFromNotificationData(data);
     if (checkInId) {
@@ -130,5 +133,6 @@ export function extraForPushNotificationDeepLink(notification: PushNotificationS
   if (typeof data.kind === "string") extra.kind = data.kind;
   if (typeof data.thread_id === "string") extra.thread_id = data.thread_id;
   if (typeof data.message_id === "string") extra.message_id = data.message_id;
+  if (typeof data.patient_user_id === "string") extra.patient_user_id = data.patient_user_id;
   return extra;
 }
