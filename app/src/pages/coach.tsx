@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronRight, Info, Loader2, Send } from "lucide-react";
 
 import { chatThreadScrollClasses } from "@/components/chat-thread-scenery";
-import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { PageBackButton, PageHeader } from "@/components/layout";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -490,9 +490,9 @@ export default function CoachPage() {
 
   if (!supabase || !user) {
     return (
-      <PageShell density="compact" className="pb-4">
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-lg flex-col bg-background px-4 py-3 sm:px-5">
         <PageHeader title={pageTitle} leading={<PageBackButton />} />
-        <Card className="border-border/60">
+        <Card className="mt-3 border-border/60">
           <CardContent className="flex gap-3 pt-6">
             <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
             <p className="text-sm leading-relaxed text-muted-foreground">
@@ -500,36 +500,48 @@ export default function CoachPage() {
             </p>
           </CardContent>
         </Card>
-      </PageShell>
+      </div>
     );
   }
 
   if (consentQuery.isLoading) {
     return (
-      <PageShell density="compact" className="pb-4">
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-lg flex-col bg-background px-4 py-3 sm:px-5">
         <PageHeader title={pageTitle} leading={<PageBackButton />} />
-        <Card className="border-border/60">
+        <Card className="mt-3 border-border/60">
           <CardContent className="flex items-center gap-2 pt-6 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
             Loading…
           </CardContent>
         </Card>
-      </PageShell>
+      </div>
     );
   }
 
   if (!hasConsent) {
+    // /coach uses a fill-height shell with overflow-hidden for the chat UI.
+    // Consent must scroll inside that shell — otherwise long copy clips the
+    // Continue / Agree buttons on phones.
     return (
-      <PageShell density="compact" className="pb-4">
-        <PageHeader title={pageTitle} leading={<PageBackButton />} />
-        <Card className="max-w-lg">
-          <CardHeader>
-            <CardTitle>Before you start</CardTitle>
-            <CardDescription>Consent version {AI_COACH_CONSENT_VERSION}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4 text-sm text-muted-foreground">
-            {consentStep === 0 ? (
-              <>
+      <div
+        className="mx-auto flex h-full min-h-0 w-full max-w-lg flex-col bg-background text-foreground"
+        data-testid="coach-consent-shell"
+      >
+        <div className="shrink-0 border-b border-border/40 px-4 pb-3 pt-2 sm:px-5">
+          <PageHeader title={pageTitle} leading={<PageBackButton />} />
+        </div>
+        <div
+          className={chatThreadScrollClasses(
+            "min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain px-4 py-3 sm:px-5",
+          )}
+        >
+          <Card className="border-border/60 shadow-sm">
+            <CardHeader>
+              <CardTitle>Before you start</CardTitle>
+              <CardDescription>Consent version {AI_COACH_CONSENT_VERSION}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm text-muted-foreground">
+              {consentStep === 0 ? (
                 <ul className="list-disc space-y-2 pl-5">
                   <li>
                     {AI_ASSISTANT_NAME} explains concepts and helps you prepare questions for your care team.
@@ -555,51 +567,57 @@ export default function CoachPage() {
                     </li>
                   ) : null}
                 </ul>
-                <Button type="button" onClick={() => setConsentStep(1)}>
-                  Continue
-                </Button>
-              </>
-            ) : (
-              <>
-                <Alert className="border-border/60 bg-muted/20">
-                  <Info className="h-4 w-4" aria-hidden />
-                  <AlertTitle className="text-foreground">How replies are generated</AlertTitle>
-                  <AlertDescription className="text-muted-foreground">{intro}</AlertDescription>
-                </Alert>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    onClick={() => void acceptMutation.mutateAsync()}
-                    disabled={acceptMutation.isPending}
-                  >
-                    {acceptMutation.isPending ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
-                        Saving…
-                      </>
-                    ) : (
-                      "I understand and agree"
-                    )}
-                  </Button>
-                  <Button type="button" variant="outline" onClick={() => setConsentStep(0)}>
-                    Back
-                  </Button>
-                </div>
-                {acceptMutation.isError ? (
-                  <Alert variant="destructive">
-                    <AlertTitle>Could not save consent</AlertTitle>
-                    <AlertDescription>
-                      {acceptMutation.error instanceof Error
-                        ? acceptMutation.error.message
-                        : "Please try again."}
-                    </AlertDescription>
+              ) : (
+                <>
+                  <Alert className="border-border/60 bg-muted/20">
+                    <Info className="h-4 w-4" aria-hidden />
+                    <AlertTitle className="text-foreground">How replies are generated</AlertTitle>
+                    <AlertDescription className="text-muted-foreground">{intro}</AlertDescription>
                   </Alert>
-                ) : null}
-              </>
-            )}
-          </CardContent>
-        </Card>
-      </PageShell>
+                  {acceptMutation.isError ? (
+                    <Alert variant="destructive">
+                      <AlertTitle>Could not save consent</AlertTitle>
+                      <AlertDescription>
+                        {acceptMutation.error instanceof Error
+                          ? acceptMutation.error.message
+                          : "Please try again."}
+                      </AlertDescription>
+                    </Alert>
+                  ) : null}
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+        <div className="z-10 shrink-0 border-t border-border/50 bg-background/95 px-4 py-3 backdrop-blur-xl sm:px-5">
+          {consentStep === 0 ? (
+            <Button type="button" className="w-full sm:w-auto" onClick={() => setConsentStep(1)}>
+              Continue
+            </Button>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                className="min-w-[10rem] flex-1 sm:flex-none"
+                onClick={() => void acceptMutation.mutateAsync()}
+                disabled={acceptMutation.isPending}
+              >
+                {acceptMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                    Saving…
+                  </>
+                ) : (
+                  "I understand and agree"
+                )}
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setConsentStep(0)}>
+                Back
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
     );
   }
 
