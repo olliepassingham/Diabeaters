@@ -90,7 +90,11 @@ function formatRecheckCountdown(remainingSec: number): string {
 }
 
 function HypoHelpInfoDialog({ bgUnits }: { bgUnits: string }) {
-  const unit = bgUnits === "mg/dL" ? "mg/dL" : "mmol/L";
+  const isMgdl = bgUnits === "mg/dL";
+  const unit = isMgdl ? "mg/dL" : "mmol/L";
+  const mildBand = isMgdl ? "63–70" : "3.5–3.9";
+  const moderateBand = isMgdl ? "50–61" : "2.8–3.4";
+  const severeBand = isMgdl ? "<50" : "<2.8";
   return (
     <PageInfoDialog
       title="About Hypo help"
@@ -105,13 +109,22 @@ function HypoHelpInfoDialog({ bgUnits }: { bgUnits: string }) {
       <InfoSection title="Typical first steps (many teams)">
         <ul className="list-disc space-y-1 pl-4">
           <li>
-            <strong>Mild (3.5–3.9 {unit}):</strong> 10–15g fast carbs
+            <strong>
+              Mild ({mildBand} {unit}):
+            </strong>{" "}
+            10–15g fast carbs
           </li>
           <li>
-            <strong>Moderate (2.8–3.4 {unit}):</strong> 15–20g fast carbs
+            <strong>
+              Moderate ({moderateBand} {unit}):
+            </strong>{" "}
+            15–20g fast carbs
           </li>
           <li>
-            <strong>Severe (&lt;2.8 {unit}):</strong> 20–25g fast carbs; may need help
+            <strong>
+              Severe ({severeBand} {unit}):
+            </strong>{" "}
+            20–25g fast carbs; may need help
           </li>
         </ul>
         <p className="pt-1">Follow up with a slower snack if your next meal is more than 1–2 hours away.</p>
@@ -382,7 +395,7 @@ export default function HypoHelpPage() {
               id="current-bg"
               type="number"
               inputMode="decimal"
-              step="0.1"
+              step={bgUnits === "mg/dL" ? "1" : "0.1"}
               placeholder={bgUnits === "mmol/L" ? "3.2" : "58"}
               value={currentBg}
               onChange={(e) => {
@@ -433,7 +446,7 @@ export default function HypoHelpPage() {
                 id="target-bg"
                 type="number"
                 inputMode="decimal"
-                step="0.1"
+                step={bgUnits === "mg/dL" ? "1" : "0.1"}
                 placeholder={bgUnits === "mmol/L" ? "5.5" : "100"}
                 value={targetBg}
                 onChange={(e) => {

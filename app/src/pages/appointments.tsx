@@ -106,8 +106,14 @@ function getTypeMeta(type: AppointmentType) {
   return APPOINTMENT_TYPES.find((t) => t.value === type) ?? APPOINTMENT_TYPES[APPOINTMENT_TYPES.length - 1];
 }
 
+/** Parse date-only strings as local calendar dates (avoids UTC-midnight timezone skew). */
 function parseAppointmentDate(dateStr: string | undefined): Date | null {
   if (!dateStr) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr.trim());
+  if (m) {
+    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
   const d = new Date(dateStr);
   return Number.isNaN(d.getTime()) ? null : d;
 }
@@ -126,7 +132,14 @@ function statusPill(appointment: Appointment, today: Date) {
   }
   const daysUntil = differenceInCalendarDays(appointmentDate, today);
 
-  if (daysUntil <= 0) {
+  if (daysUntil < 0) {
+    return (
+      <span className="chip border-red-200/70 bg-red-50/80 text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200">
+        Overdue
+      </span>
+    );
+  }
+  if (daysUntil === 0) {
     return (
       <span className="chip border-red-200/70 bg-red-50/80 text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200">
         Today
@@ -407,16 +420,30 @@ export default function Appointments() {
   const upcomingAppointments = useMemo(
     () =>
       appointments
-        .filter((a) => !a.isCompleted && isAfter(new Date(a.date), addDays(today, -1)))
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+        .filter((a) => {
+          if (a.isCompleted) return false;
+          const d = parseAppointmentDate(a.date);
+          return d !== null && isAfter(d, addDays(today, -1));
+        })
+        .sort(
+          (a, b) =>
+            (parseAppointmentDate(a.date)?.getTime() ?? 0) - (parseAppointmentDate(b.date)?.getTime() ?? 0),
+        ),
     [appointments, today],
   );
 
   const pastAppointments = useMemo(
     () =>
       appointments
-        .filter((a) => a.isCompleted || isBefore(new Date(a.date), today))
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+        .filter((a) => {
+          if (a.isCompleted) return true;
+          const d = parseAppointmentDate(a.date);
+          return d !== null && isBefore(d, today);
+        })
+        .sort(
+          (a, b) =>
+            (parseAppointmentDate(b.date)?.getTime() ?? 0) - (parseAppointmentDate(a.date)?.getTime() ?? 0),
+        ),
     [appointments, today],
   );
 

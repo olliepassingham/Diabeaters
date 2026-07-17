@@ -387,7 +387,7 @@ function HeroCard({
 
   const handleTreatedHypoClick = () => {
     if (storage.getNotificationSettings().hypoDashboardQuickNotify === true) {
-      confirmQuickHypo();
+      setQuickHypoConfirmOpen(true);
       return;
     }
     setHypoDialogOpen(true);

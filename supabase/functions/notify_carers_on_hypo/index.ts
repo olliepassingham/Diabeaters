@@ -122,6 +122,23 @@ Deno.serve(async (req: Request) => {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
+    // Atomically claim this hypo: only the first invoke notifies supporters,
+    // so replaying the same hypo_id cannot spam linked carers.
+    const { data: claimed } = await admin
+      .from("hypo_logs")
+      .update({ carers_notified_at: new Date().toISOString() })
+      .eq("id", hypoId)
+      .is("carers_notified_at", null)
+      .select("id")
+      .maybeSingle();
+
+    if (!claimed) {
+      return new Response(
+        JSON.stringify({ success: true, skipped: "already_notified", delivered_push: 0, delivered_inapp: 0 }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const { data: profile } = await admin
       .from("profiles")
       .select("full_name")

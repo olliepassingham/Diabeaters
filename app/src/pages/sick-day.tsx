@@ -60,6 +60,7 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { recordLastInteraction } from "@/lib/last-interaction";
 import { ageInWholeYearsUtc } from "@/lib/user-age";
+import { normalizeBgUnits } from "@/lib/alcohol-night-tool";
 import {
   formatAppDate,
   formatAppDateTime,
@@ -438,7 +439,7 @@ export default function SickDay() {
   const [severity, setSeverity] = useState<string>("");
   const [ketoneLevel, setKetoneLevel] = useState<KetoneLevel | "">("");
   const [results, setResults] = useState<SickDayResults | null>(null);
-  const [bgUnits, setBgUnits] = useState("mg/dL");
+  const [bgUnits, setBgUnits] = useState(() => normalizeBgUnits(storage.getProfile()?.bgUnits));
   const [isSickDayActive, setIsSickDayActive] = useState(false);
   const [sickDayActivatedAt, setSickDayActivatedAt] = useState<string | undefined>();
   const [supplies, setSupplies] = useState<Supply[]>([]);
@@ -533,9 +534,7 @@ export default function SickDay() {
     }
     
     const profile = storage.getProfile();
-    if (profile?.bgUnits) {
-      setBgUnits(profile.bgUnits);
-    }
+    setBgUnits(normalizeBgUnits(profile?.bgUnits));
     setIsPumpUser(isPumpDeliveryMethod(profile?.insulinDeliveryMethod));
 
     setSupplies(storage.getSupplies());

@@ -325,7 +325,7 @@ export default function Ratios() {
   };
 
   const profile = storage.getProfile();
-  const bgUnit = profile?.bgUnits === "mg/dl" ? "mg/dL" : "mmol/L";
+  const bgUnit = profile?.bgUnits === "mg/dL" ? "mg/dL" : "mmol/L";
 
   return (
     <PageShell variant="standard" className="max-w-2xl" data-testid="page-ratios">

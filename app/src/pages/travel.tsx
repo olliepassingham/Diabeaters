@@ -834,9 +834,13 @@ function formatTripDate(
 }
 
 function getDefaultISOTripDates(): { start: string; end: string } {
+  const toLocalIso = (d: Date) => {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  };
   const today = new Date();
-  const start = today.toISOString().split("T")[0];
-  const end = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+  const start = toLocalIso(today);
+  const end = toLocalIso(new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000));
   return { start, end };
 }
 

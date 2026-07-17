@@ -96,6 +96,29 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    if (String(checkIn.status) !== "pending") {
+      return new Response(
+        JSON.stringify({ success: true, delivered_push: 0, skipped: "not_pending" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // Atomically claim push delivery: only the first invoke for this check-in proceeds.
+    const { data: claimed } = await admin
+      .from("hypo_check_ins")
+      .update({ push_sent_at: new Date().toISOString() })
+      .eq("id", checkInId)
+      .is("push_sent_at", null)
+      .select("id")
+      .maybeSingle();
+
+    if (!claimed) {
+      return new Response(
+        JSON.stringify({ success: true, delivered_push: 0, skipped: "already_sent" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const patientId = String(checkIn.patient_id);
 
     const { data: carerProfile } = await admin
