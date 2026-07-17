@@ -1419,7 +1419,7 @@ function AuthenticatedShell() {
           </Alert>
         </div>
       ) : null}
-      {!suppressClinicalPollers && !isDmThreadView ? (
+      {(!suppressClinicalPollers || isCarerMode) && !isDmThreadView ? (
         <div className="relative z-40 mx-auto w-full max-w-3xl px-4 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:max-w-4xl md:px-6">
           <AppStatusStrip />
         </div>

@@ -243,22 +243,27 @@ export function AppStatusStrip() {
   });
   const {
     prefill: supporterBgPrefill,
+    row: supporterBgRow,
     loading: supporterBgLoading,
     refresh: refreshSupporterBg,
   } = useSupporterLiveBg(linkedPatient?.patientId ?? null, inSupporterSession && supporterLiveGlucoseScope);
   const cgmPrefillActive = isCgmPrefillActive();
   const showPatientCgmLiveChip =
     !inSupporterSession && cgmPrefillActive && (bgPrefillLoading || Boolean(bgPrefill?.fromCgm));
+  const pathOnly = pathname.split("?")[0] ?? pathname;
+  const onSupporterGlucosePage = pathOnly === "/carer-view/glucose";
   const showSupporterCgmLiveChip =
-    inSupporterSession &&
-    supporterLiveGlucoseScope &&
-    (supporterBgLoading || Boolean(supporterBgPrefill?.fromCgm));
+    inSupporterSession && supporterLiveGlucoseScope && !onSupporterGlucosePage;
   const showCgmLiveChip = showPatientCgmLiveChip || showSupporterCgmLiveChip;
 
   useEffect(() => {
     if (!showCgmLiveChip) return;
-    void import("@/pages/tools/cgm-live");
-  }, [showCgmLiveChip]);
+    if (showSupporterCgmLiveChip) {
+      void import("@/pages/carer-view/live-glucose");
+    } else {
+      void import("@/pages/tools/cgm-live");
+    }
+  }, [showCgmLiveChip, showSupporterCgmLiveChip]);
 
   const online = useOnline();
   const [sc, setSc] = useState<ScenarioState>(() => storage.getScenarioState());
@@ -763,24 +768,50 @@ export function AppStatusStrip() {
 
   if (!show) return null;
 
+  const cgmChip = showCgmLiveChip ? (
+    <CgmLiveBgChip
+      prefill={
+        showSupporterCgmLiveChip
+          ? supporterBgPrefill?.fromCgm
+            ? supporterBgPrefill
+            : null
+          : bgPrefill?.fromCgm
+            ? bgPrefill
+            : null
+      }
+      loading={showSupporterCgmLiveChip ? supporterBgLoading : bgPrefillLoading}
+      onRefresh={showSupporterCgmLiveChip ? refreshSupporterBg : refreshBgPrefill}
+      onOpen={showSupporterCgmLiveChip ? () => setLocation("/carer-view/glucose") : () => setLocation("/tools/cgm-live")}
+      openLabel={showSupporterCgmLiveChip ? "Open live glucose" : "Open glucose trends"}
+      showWaiting={showSupporterCgmLiveChip}
+      waitingLabel="Waiting for live BG"
+      rangeStatus={showSupporterCgmLiveChip ? supporterBgRow?.range_status ?? null : null}
+    />
+  ) : null;
+
+  // Supporter mode: live BG bar only (same placement as user mode) — not this device's sick/travel/exercise.
+  if (inSupporterSession) {
+    if (!cgmChip && online) return null;
+    return (
+      <div className="relative z-40 -mt-1 mb-0 space-y-1 sm:space-y-1.5" data-testid="app-status-strip">
+        {cgmChip}
+        {!online ? (
+          <div className={rowClass} role="status" aria-live="polite">
+            <div className="flex min-w-0 flex-1 items-center gap-2 text-sm text-muted-foreground">
+              <WifiOff className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              <span className="min-w-0 text-xs leading-snug sm:text-sm" data-testid="offline-banner-message">
+                {OFFLINE_BANNER_BASE}
+              </span>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <div className="relative z-40 -mt-1 mb-0 space-y-1 sm:space-y-1.5" data-testid="app-status-strip">
-      {showCgmLiveChip ? (
-        <CgmLiveBgChip
-          prefill={
-            showSupporterCgmLiveChip
-              ? supporterBgPrefill?.fromCgm
-                ? supporterBgPrefill
-                : null
-              : bgPrefill?.fromCgm
-                ? bgPrefill
-                : null
-          }
-          loading={showSupporterCgmLiveChip ? supporterBgLoading : bgPrefillLoading}
-          onRefresh={showSupporterCgmLiveChip ? refreshSupporterBg : refreshBgPrefill}
-          onOpen={showSupporterCgmLiveChip ? () => setLocation("/carer-view/glucose") : () => setLocation("/tools/cgm-live")}
-        />
-      ) : null}
+      {cgmChip}
 
       {!online ? (
         <div className={rowClass} role="status" aria-live="polite">

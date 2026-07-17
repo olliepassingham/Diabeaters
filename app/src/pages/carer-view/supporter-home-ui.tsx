@@ -174,10 +174,11 @@ export function SupporterQuickActions({
 }) {
   const [, setLocation] = useLocation();
   const showCoach = isAiCoachEnabled;
-  const hasSecondaryRow = showCoach || showActivity;
+  const secondaryCount = [showCoach, showActivity].filter(Boolean).length;
+  const hasSecondaryRow = secondaryCount > 0;
   if (!hasSecondaryRow && !showUserModeSwitch && !showHypoCheckIn) return null;
 
-  const secondaryGridCols = showCoach && showActivity ? "grid-cols-2" : "grid-cols-1";
+  const secondaryGridCols = secondaryCount === 2 ? "grid-cols-2" : "grid-cols-1";
 
   return (
     <div
@@ -228,7 +229,7 @@ export function SupporterQuickActions({
               variant="outline"
               className={cn(
                 "min-h-10 w-full rounded-xl px-2 text-xs font-medium shadow-none sm:text-sm",
-                !showCoach && "col-span-full",
+                secondaryCount === 1 && "col-span-full",
               )}
             >
               <Link href="/carer-view/activity" data-testid="link-carer-activity">
