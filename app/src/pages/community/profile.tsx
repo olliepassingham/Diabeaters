@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { buildCoachHref } from "@/lib/ai-coach/links";
 import { Link, useLocation, useRoute } from "wouter";
-import { ChevronRight, MessageCircle, MoreHorizontal, Plus, UserCheck, UserPlus } from "lucide-react";
+import { MessageCircle, MoreHorizontal, Plus, UserCheck, UserPlus } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,8 +40,8 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { PageBackButton, PageShell } from "@/components/layout";
-import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { FeedPostList } from "@/components/community/feed-post-list";
+import { FollowListDialog, type FollowListPerson } from "@/components/community/follow-list-dialog";
 import { ProfilePostMediaGrid } from "@/components/community/profile-post-media-grid";
 import { StoryAvatarRing } from "@/components/community/story-avatar-ring";
 import { StoryCreateSheet } from "@/components/community/story-create-sheet";
@@ -126,7 +126,7 @@ export default function CommunityProfilePage() {
 
   const [listOpen, setListOpen] = useState(false);
   const [listKind, setListKind] = useState<ListKind>("followers");
-  const [listIds, setListIds] = useState<string[]>([]);
+  const [listRows, setListRows] = useState<FollowListPerson[]>([]);
   const [listLoading, setListLoading] = useState(false);
 
   const [reportOpen, setReportOpen] = useState(false);
@@ -256,14 +256,28 @@ export default function CommunityProfilePage() {
     setListKind(kind);
     setListOpen(true);
     setListLoading(true);
-    setListIds([]);
+    setListRows([]);
     const res = kind === "followers" ? await listFollowers(userId) : await listFollowing(userId);
-    setListLoading(false);
     if (res.error) {
+      setListLoading(false);
       toast({ title: "Could not load list", description: res.error.message, variant: "destructive" });
       return;
     }
-    setListIds(res.ids);
+    const map = await getProfilesByIds(res.ids);
+    const botId = getBeatieFeedBotUserIdFromEnv();
+    setListRows(
+      res.ids.map((id) => {
+        const p = map.get(id);
+        return {
+          id,
+          full_name: p?.full_name?.trim() || shortId(id),
+          public_handle: p?.public_handle?.trim() || null,
+          avatar_url: p?.avatar_url ?? null,
+          fallbackSrc: botId && id === botId ? BEATIE_FEED_AVATAR_FALLBACK_SRC : null,
+        };
+      }),
+    );
+    setListLoading(false);
   }
 
   async function toggleFollow() {
@@ -598,13 +612,18 @@ export default function CommunityProfilePage() {
         )
       ) : null}
 
-      <UserListDialog
+      <FollowListDialog
         open={listOpen}
-        onOpenChange={setListOpen}
+        onOpenChange={(open) => {
+          setListOpen(open);
+          if (!open) {
+            setListRows([]);
+            setListLoading(false);
+          }
+        }}
         kind={listKind}
-        userIds={listIds}
+        people={listRows}
         loading={listLoading}
-        beatieFeedBotUserId={beatieFeedBotUserId}
       />
 
       <Dialog open={reportOpen} onOpenChange={setReportOpen}>
@@ -672,101 +691,5 @@ export default function CommunityProfilePage() {
         onPosted={() => refreshStories()}
       />
     </PageShell>
-  );
-}
-
-function UserListDialog(props: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  kind: ListKind;
-  userIds: string[];
-  loading: boolean;
-  beatieFeedBotUserId: string | null;
-}) {
-  const [profilesById, setProfilesById] = useState<
-    Record<string, { full_name: string; public_handle: string | null; avatar_url: string | null }>
-  >({});
-
-  useEffect(() => {
-    if (!props.open || props.userIds.length === 0) {
-      setProfilesById({});
-      return;
-    }
-    let cancelled = false;
-    void (async () => {
-      const map = await getProfilesByIds(props.userIds);
-      if (cancelled) return;
-      const next: Record<string, { full_name: string; public_handle: string | null; avatar_url: string | null }> = {};
-      for (const id of props.userIds) {
-        const p = map.get(id);
-        next[id] = {
-          full_name: p?.full_name?.trim() || shortId(id),
-          public_handle: p?.public_handle?.trim() || null,
-          avatar_url: p?.avatar_url ?? null,
-        };
-      }
-      setProfilesById(next);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [props.open, props.userIds]);
-
-  const title = props.kind === "followers" ? "Followers" : "Following";
-
-  return (
-    <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent className="sm:max-w-md max-h-[85dvh] !flex flex-col overflow-hidden">
-        <DialogHeader className="shrink-0">
-          <DialogTitle>{title}</DialogTitle>
-        </DialogHeader>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
-          {props.loading ? (
-            <div className="py-2">
-              <p className="text-sm text-muted-foreground">Loading…</p>
-            </div>
-          ) : props.userIds.length === 0 ? (
-            <div className="py-2">
-              <p className="text-sm text-muted-foreground">No one yet.</p>
-            </div>
-          ) : (
-            <ul className="divide-y divide-border/60 rounded-lg border border-border/60 overflow-hidden bg-card m-0 list-none p-0">
-              {props.userIds.map((id) => (
-                <li key={id}>
-                  <Link
-                    href={`/community/profile/${id}`}
-                    className="flex items-center gap-3 px-3 py-3 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
-                    onClick={() => props.onOpenChange(false)}
-                  >
-                    <CommunityAuthorAvatar
-                      displayName={profilesById[id]?.full_name ?? shortId(id)}
-                      avatarPath={profilesById[id]?.avatar_url ?? null}
-                      size="sm"
-                      className="h-9 w-9"
-                      fallbackSrc={
-                        props.beatieFeedBotUserId && id === props.beatieFeedBotUserId
-                          ? BEATIE_FEED_AVATAR_FALLBACK_SRC
-                          : undefined
-                      }
-                    />
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium truncate">
-                        {profilesById[id]?.full_name ?? shortId(id)}
-                      </div>
-                      {profilesById[id]?.public_handle ? (
-                        <div className="text-xs text-muted-foreground truncate">
-                          @{profilesById[id]?.public_handle}
-                        </div>
-                      ) : null}
-                    </div>
-                    <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground/70" aria-hidden />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
   );
 }

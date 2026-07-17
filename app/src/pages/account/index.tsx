@@ -2,7 +2,7 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AccountPublicProfileTab } from "@/pages/account/account-public-tab";
-import { ChevronRight, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { isUserVerified, logout } from "@/lib/auth";
 import { useAuth } from "@/lib/auth-context";
 import { upsertProfile, updateProfile, useProfile } from "@/lib/profile";
@@ -26,14 +26,13 @@ import { useResolvedProfileImageUrl } from "@/hooks/use-resolved-profile-image-u
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader, PageShell } from "@/components/layout";
 import { cn } from "@/lib/utils";
-import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
+import { FollowListDialog, type FollowListPerson } from "@/components/community/follow-list-dialog";
 import { SettingsEmergencySection } from "@/pages/settings/shared";
 import { isCommunityAccountProfile, storage } from "@/lib/storage";
 import { clearCarerClientSessionKeys, getActiveAppMode, getPrimaryAppRole, type ActiveAppMode, canSwitchAppMode } from "@/lib/carer-session";
 import { useSupporterSession } from "@/hooks/use-supporter-session";
 import { isCommunityEnabled } from "@/lib/flags";
 import { getFollowCounts, listFollowers, listFollowing } from "@/lib/community";
-import { Skeleton } from "@/components/ui/skeleton";
 import { AccountCommunityProfileFields } from "@/components/account-community-profile-fields";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import heic2any from "heic2any";
@@ -46,13 +45,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   accountDeletionSubmitUnavailableDescription,
   buildAccountDeletionMailtoHref,
@@ -112,9 +104,7 @@ export default function Account() {
   const [followListKind, setFollowListKind] = useState<"followers" | "following" | null>(null);
   const [followListLoading, setFollowListLoading] = useState(false);
   const [followListError, setFollowListError] = useState<string | null>(null);
-  const [followListRows, setFollowListRows] = useState<
-    { id: string; full_name: string; public_handle: string | null; avatar_url: string | null }[]
-  >([]);
+  const [followListRows, setFollowListRows] = useState<FollowListPerson[]>([]);
   const [activeMode, setActiveMode] = useState<ActiveAppMode | null>(() => {
     try {
       return getActiveAppMode();
@@ -811,7 +801,7 @@ export default function Account() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog
+      <FollowListDialog
         open={followListKind !== null}
         onOpenChange={(open) => {
           if (!open) {
@@ -821,56 +811,11 @@ export default function Account() {
             setFollowListLoading(false);
           }
         }}
-      >
-        <DialogContent className="sm:max-w-md max-h-[85dvh] !flex flex-col overflow-hidden">
-          <DialogHeader className="shrink-0">
-            <DialogTitle>{followListKind === "following" ? "Following" : "Followers"}</DialogTitle>
-            <DialogDescription className="sr-only">
-              {followListKind === "following"
-                ? "Accounts you follow on the Feed."
-                : "Accounts that follow you on the Feed."}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
-            {followListLoading ? (
-              <div className="space-y-2 py-2" role="status" aria-label="Loading list">
-                <Skeleton className="h-10 w-full rounded-md" />
-                <Skeleton className="h-10 w-full rounded-md" />
-                <Skeleton className="h-10 w-full rounded-md" />
-              </div>
-            ) : followListError ? (
-              <p className="text-sm text-destructive">{followListError}</p>
-            ) : followListRows.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-2">No one yet.</p>
-            ) : (
-              <ul className="divide-y divide-border/60 rounded-lg border border-border/60 overflow-hidden bg-card m-0 list-none p-0">
-                {followListRows.map((row) => (
-                  <li key={row.id}>
-                    <Link
-                      href={`/community/profile/${encodeURIComponent(row.id)}`}
-                      className="flex items-center gap-3 px-3 py-3 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
-                    >
-                      <CommunityAuthorAvatar
-                        displayName={row.full_name}
-                        avatarPath={row.avatar_url}
-                        size="sm"
-                        className="h-9 w-9"
-                      />
-                      <div className="min-w-0">
-                        <div className="text-sm font-medium truncate">{row.full_name}</div>
-                        {row.public_handle ? (
-                          <div className="text-xs text-muted-foreground truncate">@{row.public_handle}</div>
-                        ) : null}
-                      </div>
-                      <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground/70" aria-hidden />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+        kind={followListKind ?? "followers"}
+        people={followListRows}
+        loading={followListLoading}
+        error={followListError}
+      />
     </PageShell>
   );
 }
