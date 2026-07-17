@@ -104,6 +104,12 @@ async function sendViaApns(
     badge: opts.badge !== undefined ? Math.max(0, Math.floor(opts.badge)) : 0,
   };
 
+  // The app registers a matching notification category ("I'm OK" action button)
+  // via Capacitor registerActionTypes; setting aps.category surfaces it on the push.
+  if (custom.kind === "hypo_check_in") {
+    aps.category = "hypo_check_in";
+  }
+
   const payload: Record<string, unknown> = {
     aps,
     ...custom,

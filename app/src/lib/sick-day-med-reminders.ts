@@ -1,6 +1,7 @@
 import { Capacitor } from "@capacitor/core";
 import { LocalNotifications } from "@capacitor/local-notifications";
 
+import { registerNotificationActionTypes, SICK_DAY_MED_ACTION_TYPE } from "@/lib/notification-actions";
 import { storage, type SickDayMedicationLogEntry } from "@/lib/storage";
 
 function notificationIdForReminder(id: string): number {
@@ -37,6 +38,8 @@ export async function scheduleSickDayMedReminder(entry: SickDayMedicationLogEntr
   const dose = entry.doseLabel ? ` · ${entry.doseLabel}` : "";
   const body = `${entry.name}${dose} · due ${when}`;
 
+  await registerNotificationActionTypes();
+
   await LocalNotifications.schedule({
     notifications: [
       {
@@ -44,9 +47,11 @@ export async function scheduleSickDayMedReminder(entry: SickDayMedicationLogEntr
         title,
         body,
         schedule: { at },
+        actionTypeId: SICK_DAY_MED_ACTION_TYPE,
         extra: {
           kind: "sick_day_med_reminder",
           reminder_id: entry.id,
+          due_at_iso: entry.nextDueAtIso,
           deep_link: "/sick-day#sickday-checklist",
         },
       },

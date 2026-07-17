@@ -41,6 +41,7 @@ import {
   setPushDeepLinkNavigationHandler,
   setPushDeepLinkNavigationReady,
 } from "@/lib/push-notification-deep-link";
+import { handleNotificationButtonAction } from "@/lib/notification-actions";
 import { ensurePushDeepLinkListenersAttached } from "@/lib/push-tokens";
 import Dashboard from "@/pages/dashboard";
 import ToolsPage from "@/pages/tools/index";
@@ -296,14 +297,26 @@ function useNativeLocalNotificationDeepLinks() {
 
     void LocalNotifications.addListener(
       "localNotificationActionPerformed",
-      (event: { notification?: { extra?: Record<string, unknown> } }) => {
+      (event: { actionId?: string; notification?: { extra?: Record<string, unknown> } }) => {
         const extra = event?.notification?.extra ?? null;
-        const raw = extra && typeof extra.deep_link === "string" ? extra.deep_link : "";
-        const next = raw.trim();
-        if (!next) return;
-        if (!next.startsWith("/") || next.startsWith("//")) return;
-        applyActiveCarerPatientFromNotification(extra, next);
-        applyPushDeepLinkPath(next, setLocation);
+        const actionId = typeof event?.actionId === "string" ? event.actionId : "";
+
+        const followDeepLink = () => {
+          const raw = extra && typeof extra.deep_link === "string" ? extra.deep_link : "";
+          const next = raw.trim();
+          if (!next) return;
+          if (!next.startsWith("/") || next.startsWith("//")) return;
+          applyActiveCarerPatientFromNotification(extra, next);
+          applyPushDeepLinkPath(next, setLocation);
+        };
+
+        if (actionId && actionId !== "tap") {
+          void handleNotificationButtonAction(actionId, extra).then((handled) => {
+            if (!handled) followDeepLink();
+          });
+          return;
+        }
+        followDeepLink();
       },
     ).then((h: { remove: () => Promise<void> }) => {
       if (removed) void h.remove();

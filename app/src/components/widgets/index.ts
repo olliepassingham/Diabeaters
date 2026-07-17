@@ -8,3 +8,4 @@ export { PharmacyWidget } from "@/components/dashboard/widgets/PharmacyWidget";
 export { RoutinesWidget } from "@/components/dashboard/widgets/RoutinesWidget";
 export { QuickExerciseWidget } from "@/components/dashboard/widgets/QuickExerciseWidget";
 export { CommunityQuickPostWidget } from "@/components/dashboard/widgets/CommunityQuickPostWidget";
+export { PatternInsightsWidget } from "@/components/dashboard/widgets/PatternInsightsWidget";

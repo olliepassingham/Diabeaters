@@ -11,6 +11,7 @@ import {
   WelcomeWidget,
   PharmacyWidget,
   CommunityQuickPostWidget,
+  PatternInsightsWidget,
 } from "@/components/widgets";
 
 export type DashboardWidgetComponentProps = { layoutSize?: WidgetSize };
@@ -95,6 +96,14 @@ export const DASHBOARD_WIDGET_REGISTRY: DashboardWidgetDefinition[] = [
     defaultEnabled: true,
     defaultSize: "full",
     component: TipOfDayWidget,
+  },
+  {
+    id: "pattern-insights",
+    label: "Your patterns",
+    description: "Spots patterns in your logged hypos, exercise, and checks.",
+    defaultEnabled: true,
+    defaultSize: "full",
+    component: PatternInsightsWidget,
   },
   {
     id: "settings-completion",

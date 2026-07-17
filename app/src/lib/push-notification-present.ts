@@ -7,6 +7,7 @@ import {
 } from "@/lib/native-local-notifications";
 import { extraForPushNotificationDeepLink } from "@/lib/push-notification-deep-link";
 import { getNativePushPlatform } from "@/lib/native-platform";
+import { HYPO_CHECK_IN_ACTION_TYPE, registerNotificationActionTypes } from "@/lib/notification-actions";
 import { storage } from "@/lib/storage";
 
 function hashToInt32(input: string): number {
@@ -71,8 +72,11 @@ export async function presentAudiblePushNotificationFromRemote(
 
   const { title, body } = titleBodyFromPushNotification(notification);
   const id = hashToInt32(notification.id?.trim() || `${title}|${body}`);
+  const extra = extraForPushNotificationDeepLink(notification);
+  const actionTypeId = extra.kind === "hypo_check_in" ? HYPO_CHECK_IN_ACTION_TYPE : undefined;
 
   try {
+    if (actionTypeId) await registerNotificationActionTypes();
     await LocalNotifications.schedule({
       notifications: [
         {
@@ -81,7 +85,8 @@ export async function presentAudiblePushNotificationFromRemote(
           body,
           sound: "default",
           schedule: { at: new Date(Date.now() + 300) },
-          extra: extraForPushNotificationDeepLink(notification),
+          ...(actionTypeId ? { actionTypeId } : {}),
+          extra,
         },
       ],
     });

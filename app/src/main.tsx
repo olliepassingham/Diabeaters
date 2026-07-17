@@ -13,6 +13,7 @@ import {
 } from "@/hooks/useThemeMode";
 import { applyNativeDocumentClass } from "@/lib/native-chrome";
 import { ensureNativeNotificationChannels } from "@/lib/native-local-notifications";
+import { registerNotificationActionTypes } from "@/lib/notification-actions";
 import { clearNativeAppBadge, scheduleNativeAppBadgeBootClear } from "@/lib/native-app-badge";
 import { isCapacitorNativeShell } from "@/lib/native-platform";
 import { ensurePushDeepLinkListenersAttached } from "@/lib/push-tokens";
@@ -23,6 +24,7 @@ migrateLegacyThemeModeKey();
 applyRootAppearanceClass(getEffectiveAppearance(getStoredThemeMode()));
 applyNativeDocumentClass();
 void ensureNativeNotificationChannels();
+void registerNotificationActionTypes();
 if (isCapacitorNativeShell()) {
   void clearNativeAppBadge();
   scheduleNativeAppBadgeBootClear();

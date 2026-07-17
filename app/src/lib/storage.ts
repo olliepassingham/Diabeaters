@@ -868,6 +868,7 @@ export type WidgetType =
   | "pharmacy"
   | "welcome"
   | "tip-of-day"
+  | "pattern-insights"
   | "appointments"
   | "routines"
   | "quick-exercise"
@@ -1506,6 +1507,7 @@ export const DEFAULT_WIDGET_SIZES: Record<WidgetType, WidgetSize> = {
   "appointments": "half",
   "routines": "half",
   "tip-of-day": "full",
+  "pattern-insights": "full",
   "settings-completion": "half",
   "welcome": "full",
 };
@@ -1519,8 +1521,9 @@ export const DEFAULT_WIDGETS: DashboardWidget[] = [
   { id: "appointments", type: "appointments", enabled: true, order: 5, size: "half" },
   { id: "routines", type: "routines", enabled: true, order: 6, size: "half" },
   { id: "tip-of-day", type: "tip-of-day", enabled: true, order: 7, size: "full" },
-  { id: "settings-completion", type: "settings-completion", enabled: true, order: 8, size: "half" },
-  { id: "welcome", type: "welcome", enabled: false, order: 9, size: "full" },
+  { id: "pattern-insights", type: "pattern-insights", enabled: true, order: 8, size: "full" },
+  { id: "settings-completion", type: "settings-completion", enabled: true, order: 9, size: "half" },
+  { id: "welcome", type: "welcome", enabled: false, order: 10, size: "full" },
 ];
 
 function generateId(): string {

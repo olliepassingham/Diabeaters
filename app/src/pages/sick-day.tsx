@@ -51,6 +51,7 @@ import {
 import { CgmPrefillButton } from "@/components/cgm-prefill-button";
 import { useAutoCgmBgField } from "@/hooks/use-auto-cgm-bg-field";
 import { cancelSickDayMedReminder, scheduleSickDayMedReminder } from "@/lib/sick-day-med-reminders";
+import { SICK_DAY_MEDS_CHANGED_EVENT } from "@/lib/sick-day-med-actions";
 import { createSickDayMedInAppNotification } from "@/lib/sick-day-med-inapp";
 import {
   mergeMedicationDoseLogs,
@@ -569,6 +570,16 @@ export default function SickDay() {
       localStorage.removeItem(SICK_DAY_STORAGE_KEY);
     }
     setPageHydrated(true);
+  }, []);
+
+  // Refresh med state when a dose is logged outside this page (e.g. notification "Taken" button).
+  useEffect(() => {
+    const onMedsChanged = () => {
+      setMedEntries(storage.getSickDayMedicationLog());
+      setMedDoseLog(storage.getSickDayMedicationDoseLog());
+    };
+    window.addEventListener(SICK_DAY_MEDS_CHANGED_EVENT, onMedsChanged);
+    return () => window.removeEventListener(SICK_DAY_MEDS_CHANGED_EVENT, onMedsChanged);
   }, []);
 
   useEffect(() => {

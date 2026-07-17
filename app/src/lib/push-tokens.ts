@@ -274,6 +274,20 @@ function bindPushDeepLinkListeners(): void {
     writePushDiag({ state: "push_action_performed", platform: currentPushPlatform() ?? "ios" });
     void clearNativeAppBadge();
     scheduleNativeAppBadgeSync(0);
+    const actionId = typeof action.actionId === "string" ? action.actionId : "";
+    const data =
+      action.notification?.data && typeof action.notification.data === "object"
+        ? (action.notification.data as Record<string, unknown>)
+        : null;
+    if (actionId && actionId !== "tap") {
+      void import("./notification-actions").then(async ({ handleNotificationButtonAction }) => {
+        const handled = await handleNotificationButtonAction(actionId, data);
+        if (handled) return;
+        const { handlePushDeepLinkFromNotification } = await import("./push-notification-deep-link");
+        handlePushDeepLinkFromNotification(action.notification);
+      });
+      return;
+    }
     void import("./push-notification-deep-link").then(({ handlePushDeepLinkFromNotification }) => {
       handlePushDeepLinkFromNotification(action.notification);
     });

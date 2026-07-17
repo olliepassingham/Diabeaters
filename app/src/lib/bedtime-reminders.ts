@@ -10,6 +10,7 @@ import {
 import { shouldReceiveBedtimeCheckReminders } from "@/lib/bedtime-reminder-eligibility";
 import { ensureNativeLocalNotificationPermission } from "@/lib/native-local-notifications";
 import { androidNotificationChannel, supportsNativeLocalNotifications } from "@/lib/native-platform";
+import { BEDTIME_REMINDER_ACTION_TYPE, registerNotificationActionTypes } from "@/lib/notification-actions";
 import { storage } from "@/lib/storage";
 
 export async function rescheduleBedtimeReminders(
@@ -50,6 +51,7 @@ export async function rescheduleBedtimeReminders(
     title,
     body,
     schedule: { at },
+    actionTypeId: BEDTIME_REMINDER_ACTION_TYPE,
     extra: {
       kind: "bedtime_reminder",
       deep_link: "/scenarios/bedtime",
@@ -60,6 +62,7 @@ export async function rescheduleBedtimeReminders(
 
   if (notifications.length === 0) return;
   try {
+    await registerNotificationActionTypes();
     await LocalNotifications.schedule({ notifications });
   } catch {
     // ignore

@@ -134,5 +134,7 @@ export function extraForPushNotificationDeepLink(notification: PushNotificationS
   if (typeof data.thread_id === "string") extra.thread_id = data.thread_id;
   if (typeof data.message_id === "string") extra.message_id = data.message_id;
   if (typeof data.patient_user_id === "string") extra.patient_user_id = data.patient_user_id;
+  if (typeof data.check_in_id === "string") extra.check_in_id = data.check_in_id;
+  if (typeof data.carer_name === "string") extra.carer_name = data.carer_name;
   return extra;
 }
