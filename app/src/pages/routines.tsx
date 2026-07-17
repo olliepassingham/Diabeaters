@@ -39,10 +39,10 @@ const TIMING_OPTIONS = [
   { value: "after", label: "After eating" },
 ];
 
-function getMealIcon(type: RoutineMealType) {
+function getMealIcon(type: RoutineMealType, className = "h-5 w-5") {
   const found = MEAL_TYPES.find(t => t.value === type);
   const Icon = found ? found.icon : Utensils;
-  return <Icon className="h-4 w-4" />;
+  return <Icon className={className} aria-hidden />;
 }
 
 function getMealLabel(type: RoutineMealType) {
@@ -58,6 +58,17 @@ function getOutcomeStyle(outcome: RoutineOutcome) {
 function getOutcomeLabel(outcome: RoutineOutcome) {
   const found = OUTCOMES.find(o => o.value === outcome);
   return found ? found.label.split(" - ")[0] : "Okay";
+}
+
+function formatRoutineInsulinLine(routine: Routine): string | null {
+  if (!routine.insulinDose) return null;
+  const dose = `${routine.insulinDose}u`;
+  if (routine.insulinTiming === "before" && routine.timingMinutes) {
+    return `${dose} · ${routine.timingMinutes}min before`;
+  }
+  if (routine.insulinTiming === "with") return `${dose} · with meal`;
+  if (routine.insulinTiming === "after") return `${dose} · after meal`;
+  return dose;
 }
 
 const EXERCISE_TYPES: { value: ExerciseType; label: string }[] = [
@@ -661,101 +672,139 @@ export function RoutinesContent() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-3">
-                {displayRoutines.map((routine) => (
-                  <Card key={routine.id} data-testid={`card-routine-${routine.id}`}>
-                    <CardContent className="pt-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-start gap-3 flex-1 min-w-0">
-                          <div className="p-2 rounded-lg bg-muted shrink-0">
-                            {getMealIcon(routine.mealType)}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h3 className="font-medium" data-testid={`text-routine-name-${routine.id}`}>{routine.name}</h3>
-                              <Badge variant="outline" className="text-xs">{getMealLabel(routine.mealType)}</Badge>
-                              <Badge className={`text-xs ${getOutcomeStyle(routine.outcome)}`}>
-                                {getOutcomeLabel(routine.outcome)}
-                              </Badge>
+              <div className="space-y-3.5">
+                {displayRoutines.map((routine) => {
+                  const insulinLine = formatRoutineInsulinLine(routine);
+                  return (
+                  <Card
+                    key={routine.id}
+                    className="overflow-hidden border-border/50 shadow-none ring-1 ring-black/[0.03] dark:ring-white/[0.04]"
+                    data-testid={`card-routine-${routine.id}`}
+                  >
+                    <CardContent className="p-4 sm:p-5">
+                      <div className="flex gap-3.5">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sky-500/10 text-sky-700 dark:bg-sky-400/15 dark:text-sky-300">
+                          {getMealIcon(routine.mealType)}
+                        </div>
+                        <div className="min-w-0 flex-1 space-y-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 space-y-2">
+                              <h3
+                                className="truncate text-[15px] font-semibold leading-snug tracking-tight text-foreground"
+                                data-testid={`text-routine-name-${routine.id}`}
+                              >
+                                {routine.name}
+                              </h3>
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <Badge variant="outline" className="rounded-md px-2 py-0.5 text-[11px] font-medium">
+                                  {getMealLabel(routine.mealType)}
+                                </Badge>
+                                <Badge className={`rounded-md px-2 py-0.5 text-[11px] font-medium shadow-none ${getOutcomeStyle(routine.outcome)}`}>
+                                  {getOutcomeLabel(routine.outcome)}
+                                </Badge>
+                              </div>
                             </div>
-                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2" data-testid={`text-routine-meal-${routine.id}`}>
+                            <div className="flex shrink-0 items-center gap-1">
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                className="h-9 rounded-xl px-3 font-semibold shadow-none"
+                                onClick={() => handleUseRoutine(routine.id)}
+                                data-testid={`button-use-routine-${routine.id}`}
+                              >
+                                <Check className="mr-1.5 h-4 w-4" aria-hidden />
+                                Use
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-9 w-9 rounded-xl text-muted-foreground"
+                                onClick={() => openEditDialog(routine)}
+                                aria-label="Edit routine"
+                                data-testid={`button-edit-routine-${routine.id}`}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-9 w-9 rounded-xl text-destructive/80 hover:text-destructive"
+                                onClick={() => handleDelete(routine.id)}
+                                aria-label="Delete routine"
+                                data-testid={`button-delete-routine-${routine.id}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+
+                          {routine.mealDescription ? (
+                            <p
+                              className="text-sm leading-relaxed text-muted-foreground line-clamp-3"
+                              data-testid={`text-routine-meal-${routine.id}`}
+                            >
                               {routine.mealDescription}
                             </p>
-                            <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground flex-wrap">
-                              {routine.carbEstimate && (
-                                <span className="flex items-center gap-1">
-                                  <Utensils className="h-3 w-3" />
+                          ) : null}
+
+                          {(routine.carbEstimate || insulinLine || routine.timesUsed > 0) ? (
+                            <div className="flex flex-wrap gap-2">
+                              {routine.carbEstimate ? (
+                                <span className="inline-flex items-center gap-1.5 rounded-lg bg-muted/55 px-2.5 py-1.5 text-xs font-medium text-foreground/80">
+                                  <Utensils className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
                                   ~{routine.carbEstimate}g carbs
                                 </span>
-                              )}
-                              {routine.insulinDose && (
-                                <span className="flex items-center gap-1">
-                                  <Syringe className="h-3 w-3" />
-                                  {routine.insulinDose}u {routine.insulinTiming === "before" && routine.timingMinutes ? `(${routine.timingMinutes}min before)` : routine.insulinTiming === "with" ? "(with meal)" : "(after)"}
+                              ) : null}
+                              {insulinLine ? (
+                                <span className="inline-flex items-center gap-1.5 rounded-lg bg-muted/55 px-2.5 py-1.5 text-xs font-medium text-foreground/80">
+                                  <Syringe className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+                                  {insulinLine}
                                 </span>
-                              )}
-                              {routine.timesUsed > 0 && (
-                                <span className="flex items-center gap-1">
-                                  <Star className="h-3 w-3" />
+                              ) : null}
+                              {routine.timesUsed > 0 ? (
+                                <span className="inline-flex items-center gap-1.5 rounded-lg bg-muted/55 px-2.5 py-1.5 text-xs font-medium text-foreground/80">
+                                  <Star className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
                                   Used {routine.timesUsed}x
                                 </span>
-                              )}
+                              ) : null}
                             </div>
-                            {routine.tags.length > 0 && (
-                              <div className="flex items-center gap-1 mt-2 flex-wrap">
-                                {routine.tags.map((tag, i) => (
-                                  <Badge key={i} variant="secondary" className="text-xs" data-testid={`badge-tag-${routine.id}-${i}`}>
-                                    {tag}
-                                  </Badge>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleUseRoutine(routine.id)}
-                            data-testid={`button-use-routine-${routine.id}`}
-                          >
-                            <Check className="h-4 w-4 mr-1" />
-                            Use
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => openEditDialog(routine)}
-                            aria-label="Edit routine"
-                            data-testid={`button-edit-routine-${routine.id}`}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => handleDelete(routine.id)}
-                            className="text-destructive"
-                            aria-label="Delete routine"
-                            data-testid={`button-delete-routine-${routine.id}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          ) : null}
+
+                          {routine.tags.length > 0 ? (
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {routine.tags.map((tag, i) => (
+                                <Badge
+                                  key={i}
+                                  variant="secondary"
+                                  className="rounded-md px-2 py-0.5 text-[11px] font-normal"
+                                  data-testid={`badge-tag-${routine.id}-${i}`}
+                                >
+                                  {tag}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : null}
+
+                          {(routine.context || routine.outcomeNotes) ? (
+                            <div className="space-y-1.5 border-t border-border/50 pt-3 text-sm leading-relaxed text-muted-foreground">
+                              {routine.context ? (
+                                <p>
+                                  <span className="font-medium text-foreground/80">Context:</span> {routine.context}
+                                </p>
+                              ) : null}
+                              {routine.outcomeNotes ? (
+                                <p>
+                                  <span className="font-medium text-foreground/80">Notes:</span> {routine.outcomeNotes}
+                                </p>
+                              ) : null}
+                            </div>
+                          ) : null}
                         </div>
                       </div>
-                      {routine.context && (
-                        <div className="mt-3 pt-3 border-t text-sm text-muted-foreground">
-                          <span className="font-medium">Context:</span> {routine.context}
-                        </div>
-                      )}
-                      {routine.outcomeNotes && (
-                        <div className="mt-2 text-sm text-muted-foreground">
-                          <span className="font-medium">Notes:</span> {routine.outcomeNotes}
-                        </div>
-                      )}
                     </CardContent>
                   </Card>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -972,73 +1021,90 @@ export function RoutinesContent() {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3.5">
             <h3 className="font-medium text-foreground">Saved routines</h3>
             {exerciseRoutines.map((routine) => (
-              <Card key={routine.id} data-testid={`card-exercise-routine-${routine.id}`}>
-                <CardContent className="pt-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3 flex-1 min-w-0">
-                      <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900 shrink-0">
-                        <Dumbbell className="h-4 w-4 text-green-600 dark:text-green-400" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-medium" data-testid={`text-exercise-name-${routine.id}`}>{routine.name}</h3>
-                          <Badge variant="outline" className="text-xs">{EXERCISE_TYPES.find(t => t.value === routine.exerciseType)?.label}</Badge>
-                          <Badge className={`text-xs ${getIntensityStyle(routine.intensity)}`}>
-                            {EXERCISE_INTENSITIES.find(i => i.value === routine.intensity)?.label}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground flex-wrap">
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {routine.durationMinutes} min
-                          </span>
-                          {routine.timesUsed > 0 && (
-                            <span className="flex items-center gap-1">
-                              <Star className="h-3 w-3" />
-                              Used {routine.timesUsed}x
-                            </span>
-                          )}
-                        </div>
-                      </div>
+              <Card
+                key={routine.id}
+                className="overflow-hidden border-border/50 shadow-none ring-1 ring-black/[0.03] dark:ring-white/[0.04]"
+                data-testid={`card-exercise-routine-${routine.id}`}
+              >
+                <CardContent className="p-4 sm:p-5">
+                  <div className="flex gap-3.5">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-300">
+                      <Dumbbell className="h-5 w-5" aria-hidden />
                     </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <Button
-                        size="sm"
-                        onClick={() => handleUseExercise(routine.id)}
-                        data-testid={`button-use-exercise-${routine.id}`}
-                      >
-                        <Play className="h-4 w-4 mr-1" />
-                        Start
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => openExerciseEditDialog(routine)}
-                        aria-label="Edit exercise routine"
-                        data-testid={`button-edit-exercise-${routine.id}`}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => handleExerciseDelete(routine.id)}
-                        className="text-destructive"
-                        aria-label="Delete exercise routine"
-                        data-testid={`button-delete-exercise-${routine.id}`}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                    <div className="min-w-0 flex-1 space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 space-y-2">
+                          <h3
+                            className="truncate text-[15px] font-semibold leading-snug tracking-tight text-foreground"
+                            data-testid={`text-exercise-name-${routine.id}`}
+                          >
+                            {routine.name}
+                          </h3>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <Badge variant="outline" className="rounded-md px-2 py-0.5 text-[11px] font-medium">
+                              {EXERCISE_TYPES.find((t) => t.value === routine.exerciseType)?.label}
+                            </Badge>
+                            <Badge className={`rounded-md px-2 py-0.5 text-[11px] font-medium shadow-none ${getIntensityStyle(routine.intensity)}`}>
+                              {EXERCISE_INTENSITIES.find((i) => i.value === routine.intensity)?.label}
+                            </Badge>
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <Button
+                            size="sm"
+                            className="h-9 rounded-xl px-3 font-semibold shadow-none"
+                            onClick={() => handleUseExercise(routine.id)}
+                            data-testid={`button-use-exercise-${routine.id}`}
+                          >
+                            <Play className="mr-1.5 h-4 w-4" aria-hidden />
+                            Start
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-9 w-9 rounded-xl text-muted-foreground"
+                            onClick={() => openExerciseEditDialog(routine)}
+                            aria-label="Edit exercise routine"
+                            data-testid={`button-edit-exercise-${routine.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-9 w-9 rounded-xl text-destructive/80 hover:text-destructive"
+                            onClick={() => handleExerciseDelete(routine.id)}
+                            aria-label="Delete exercise routine"
+                            data-testid={`button-delete-exercise-${routine.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-muted/55 px-2.5 py-1.5 text-xs font-medium text-foreground/80">
+                          <Clock className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+                          {routine.durationMinutes} min
+                        </span>
+                        {routine.timesUsed > 0 ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-lg bg-muted/55 px-2.5 py-1.5 text-xs font-medium text-foreground/80">
+                            <Star className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+                            Used {routine.timesUsed}x
+                          </span>
+                        ) : null}
+                      </div>
+
+                      {routine.notes ? (
+                        <div className="border-t border-border/50 pt-3 text-sm leading-relaxed text-muted-foreground">
+                          <span className="font-medium text-foreground/80">Notes:</span> {routine.notes}
+                        </div>
+                      ) : null}
                     </div>
                   </div>
-                  {routine.notes && (
-                    <div className="mt-3 pt-3 border-t text-sm text-muted-foreground">
-                      <span className="font-medium">Notes:</span> {routine.notes}
-                    </div>
-                  )}
                 </CardContent>
               </Card>
             ))}
