@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CgmGlucoseChart } from "@/components/cgm-glucose-chart";
 import { CgmSuggestedHypoCard } from "@/components/cgm-suggested-hypo-card";
+import { CgmWindowSummaryStrip } from "@/components/cgm-window-summary-strip";
 import { InfoTooltip } from "@/components/info-tooltip";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
@@ -18,6 +19,7 @@ import {
   resolveSleepChartOverlays,
   type CgmChartOverlay,
 } from "@/lib/cgm/cgm-chart-overlays";
+import { computeGlucoseWindowSummary } from "@/lib/cgm/window-summary";
 import { formatTargetBgInput } from "@/lib/hypo-context";
 import { formatAgeMinutes } from "@/lib/cgm/staleness";
 import { useCgmHistory } from "@/hooks/use-cgm-history";
@@ -26,7 +28,6 @@ import {
   glucoseRangeCardClasses,
   glucoseRangeStatusLabel,
   glucoseRangeValueClasses,
-  percentGlucoseInRange,
 } from "@/lib/live-glucose-range";
 import { resolveUserTargetBgRange } from "@/lib/target-bg-range";
 import { storage } from "@/lib/storage";
@@ -51,10 +52,14 @@ export default function CgmLivePage() {
 
   const latest = points.length > 0 ? points[points.length - 1] : null;
   const latestStatus = latest ? computeGlucoseRangeStatus(latest.value, targetLow, targetHigh) : null;
-  const inRangePercent = percentGlucoseInRange(
-    points.map((p) => p.value),
-    targetLow,
-    targetHigh,
+  const windowSummary = useMemo(
+    () => computeGlucoseWindowSummary(
+      points.map((p) => p.value),
+      targetLow,
+      targetHigh,
+      units,
+    ),
+    [points, targetLow, targetHigh, units],
   );
   const TrendIcon = trendIcon(latest?.trend ?? null);
 
@@ -253,21 +258,13 @@ export default function CgmLivePage() {
                   ) : null}
                 </div>
               ) : null}
-              {inRangePercent != null ? (
-                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                  <p className="text-muted-foreground">
-                    <span className="font-medium text-foreground">{inRangePercent}%</span> in target for this window
-                  </p>
-                  <div className="flex items-center gap-1">
-                    <p className="tabular-nums text-muted-foreground">
-                      Target {formatTargetBgInput(targetLow, units)}–{formatTargetBgInput(targetHigh, units)} {units}
-                    </p>
-                    <InfoTooltip
-                      term="Chart key"
-                      explanation="Green band: your target range. Optional indigo (sleep) and blue (exercise) bands come from bedtime checks and logged workouts on this device. Dots use green (in range), amber (low), or orange (high)."
-                    />
-                  </div>
-                </div>
+              {windowSummary ? (
+                <CgmWindowSummaryStrip
+                  summary={windowSummary}
+                  units={units}
+                  targetLow={targetLow}
+                  targetHigh={targetHigh}
+                />
               ) : (
                 <div className="flex justify-end">
                   <InfoTooltip
