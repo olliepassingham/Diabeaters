@@ -33,6 +33,18 @@ type Factor = {
   detail?: string;
 };
 
+/**
+ * The single, coherent recommendation for tonight. Exactly one of these is ever shown — a
+ * correction and a snack (or a "missing ISF" prompt) can never appear together, since they are
+ * derived from one branch of the same decision tree (see resolveBedtimeAction in bedtime.tsx).
+ */
+export type BedtimeAction =
+  | { kind: "correction"; data: BedtimeCorrectionData }
+  | { kind: "dose_too_small"; currentBg: number; aimBg: number; bgUnits: string; rawDose: number; note: string }
+  | { kind: "missing_isf" }
+  | { kind: "snack"; grams: number; reason: string }
+  | { kind: "none" };
+
 export type BedtimeResultViewData = {
   level: ReadinessLevel;
   headline: string;
@@ -40,10 +52,8 @@ export type BedtimeResultViewData = {
   guidance: string[];
   tips: string[];
   factors: Factor[];
-  correction: BedtimeCorrectionData | null;
-  correctionUnavailable: boolean;
+  action: BedtimeAction;
   bgAboveTarget: boolean;
-  snack: { grams: number; reason: string } | null;
 };
 
 type Props = {
@@ -152,23 +162,24 @@ export function BedtimeResultView({
         </div>
       </div>
 
-      {result.correction ? (
+      {result.action.kind === "correction" ? (
         <BedtimeCorrectionPanel
-          correction={result.correction}
+          correction={result.action.data}
           isPumpUser={isPumpUser}
           hoursUntilSleep={hoursUntilSleep}
           variant="compact"
         />
       ) : null}
 
-      {result.correctionUnavailable ? (
+      {result.action.kind === "missing_isf" ? (
         <div
           className="rounded-2xl border border-amber-500/30 bg-amber-500/[0.06] px-4 py-3.5 text-sm dark:bg-amber-950/30"
           data-testid="card-correction-unavailable"
         >
           <p className="font-medium text-foreground">Above target — dose not calculated</p>
           <p className="mt-1 text-muted-foreground">
-            Add your correction factor in Settings → Ratios, or follow your usual team plan.
+            Add your correction factor in Settings → Ratios so we can suggest a bedtime dose, or follow your usual
+            team plan.
           </p>
           <Button variant="link" size="sm" className="mt-1 h-auto px-0" asChild>
             <Link href="/settings/ratios">Open ratios settings</Link>
@@ -176,14 +187,26 @@ export function BedtimeResultView({
         </div>
       ) : null}
 
-      {!result.correction && result.snack ? (
+      {result.action.kind === "dose_too_small" ? (
+        <div
+          className="rounded-2xl border border-amber-500/30 bg-amber-500/[0.06] px-4 py-3.5 text-sm dark:bg-amber-950/30"
+          data-testid="card-correction-too-small"
+        >
+          <p className="font-medium text-foreground">
+            Correction would be under {"\u00BD"}u — likely too small to dose precisely
+          </p>
+          <p className="mt-1 text-muted-foreground">{result.action.note}</p>
+        </div>
+      ) : null}
+
+      {result.action.kind === "snack" ? (
         <div className="overflow-hidden rounded-2xl border border-amber-500/30 bg-amber-500/[0.08] px-4 py-4 dark:bg-amber-950/35">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Suggested snack</p>
           <p className="mt-1 font-display text-3xl font-bold tabular-nums text-foreground">
-            {result.snack.grams}
+            {result.action.grams}
             <span className="text-lg font-semibold text-muted-foreground">g</span>
           </p>
-          <p className="mt-1 text-sm text-muted-foreground">{result.snack.reason}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{result.action.reason}</p>
         </div>
       ) : null}
 
@@ -240,10 +263,10 @@ export function BedtimeResultView({
               </section>
             ) : null}
 
-            {result.correction ? (
+            {result.action.kind === "correction" ? (
               <section>
                 <BedtimeCorrectionPanel
-                  correction={result.correction}
+                  correction={result.action.data}
                   isPumpUser={isPumpUser}
                   hoursUntilSleep={hoursUntilSleep}
                   variant="details"

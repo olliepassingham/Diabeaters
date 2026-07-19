@@ -87,6 +87,29 @@ describe("bedtime-readiness", () => {
     expect(snack?.reason).toBe("Falling trend overnight");
   });
 
+  it("never suggests a snack when BG is above target, even if falling — a correction is the coherent action instead", () => {
+    const snack = resolveBedtimeSnack({
+      ...baseCtx,
+      bgMmol: 13.4,
+      targetHighMmol: 10,
+      bgTrend: "falling",
+      overnightUsualTrend: "rise",
+    });
+    expect(snack).toBeNull();
+  });
+
+  it("suggests a snack for a user who usually falls overnight and is near the low end of range, even without a falling arrow", () => {
+    const snack = resolveBedtimeSnack({
+      ...baseCtx,
+      bgMmol: 5.5,
+      targetLowMmol: 5,
+      bgTrend: "steady",
+      overnightUsualTrend: "fall",
+    });
+    expect(snack?.grams).toBe(5);
+    expect(snack?.reason).toMatch(/usually drop overnight/i);
+  });
+
   it("above-target BG alone is at least monitor, not steady", () => {
     const level = resolveBedtimeReadinessLevel({
       concernCount: 0,

@@ -15,6 +15,7 @@ export type BedtimeCorrectionData = {
   correctionFactor: number;
   bgUnits: string;
   trendNote: string;
+  overnightTrendNote: string;
   iobWarning: string;
   exerciseWarning: string;
   alcoholWarning: string;
@@ -130,6 +131,11 @@ function CalculationDetails({
           full correction
         </p>
         <p className="text-sm leading-relaxed text-foreground/90">{correction.trendNote}</p>
+        {correction.overnightTrendNote ? (
+          <p className="text-sm leading-relaxed text-foreground/90" data-testid="text-correction-overnight-note">
+            {correction.overnightTrendNote}
+          </p>
+        ) : null}
         <p className="text-sm leading-relaxed text-foreground/90">
           Applied ~{bedtimePct}% for bedtime safety
           {correction.fullDose > correction.suggestedDose
@@ -193,6 +199,14 @@ export function BedtimeCorrectionPanel({
           </span>
         </div>
         <p className="mx-auto mt-2 max-w-sm text-xs leading-relaxed text-muted-foreground">{correction.trendNote}</p>
+        {correction.overnightTrendNote ? (
+          <p
+            className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-muted-foreground"
+            data-testid="text-correction-overnight-note-compact"
+          >
+            {correction.overnightTrendNote}
+          </p>
+        ) : null}
       </ScenarioResultHero>
 
       {topWarning ? (

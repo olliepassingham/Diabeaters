@@ -206,6 +206,11 @@ function buildGuidance(ctx: BedtimePersonalizedCopyInput): string[] {
             ? "Morning long-acting may leave less overnight coverage — many people on MDI correct before bed when levels are already high."
             : "Levels may keep rising overnight — a recheck before sleep is sensible.",
         );
+      } else if (ctx.overnightUsualTrend === "fall") {
+        pushUnique(
+          lines,
+          "You usually drop overnight, so we've kept any correction smaller and aimed a bit higher to protect against a later low.",
+        );
       }
     }
     if (ctx.recentHypos && ctx.exercisedToday) {
@@ -219,7 +224,7 @@ function buildGuidance(ctx: BedtimePersonalizedCopyInput): string[] {
     if (ctx.exercisedToday && !ctx.recentHypos) {
       pushUnique(lines, "Exercise today can keep hypo risk higher for many hours.");
     }
-    if (ctx.bgTrend === "falling") {
+    if (ctx.bgTrend === "falling" && !aboveTarget) {
       pushUnique(lines, "A falling trend may continue overnight — keep treatment close.");
     }
     if (ctx.foodSelected && ctx.foodHours != null && ctx.foodHours < 2 && ctx.foodPhrase) {
@@ -255,6 +260,11 @@ function buildGuidance(ctx: BedtimePersonalizedCopyInput): string[] {
             ? "Morning long-acting can mean less coverage overnight for many people on MDI — a cautious correction may fit your plan."
             : "Your trend or usual overnight pattern suggests levels may climb — recheck before sleep.",
         );
+      } else if (ctx.overnightUsualTrend === "fall") {
+        pushUnique(
+          lines,
+          "You usually drop overnight, so we've kept any correction smaller and aimed a bit higher to protect against a later low.",
+        );
       } else {
         pushUnique(lines, "If you usually correct at bedtime, use your care team's approach — we show a cautious estimate when your settings allow.");
       }
@@ -272,7 +282,7 @@ function buildGuidance(ctx: BedtimePersonalizedCopyInput): string[] {
     if (ctx.hadAlcohol) {
       pushUnique(lines, "Alcohol can delay lows — a gentle overnight check is reasonable.");
     }
-    if (ctx.bgTrend === "falling") {
+    if (ctx.bgTrend === "falling" && !aboveTarget) {
       pushUnique(lines, "Falling glucose now — recheck before sleep or keep carbs handy.");
     }
     if (ctx.foodSelected && ctx.foodHours != null && ctx.foodHours < 2 && ctx.foodPhrase) {
@@ -310,7 +320,17 @@ function buildGuidance(ctx: BedtimePersonalizedCopyInput): string[] {
   return lines.slice(0, 3);
 }
 
+/**
+ * A carb snack is a hypo-prevention tool. It should never be suggested when glucose is already
+ * above the target range — a snack in that situation would push levels higher, which is exactly
+ * the mistake this function used to make when a momentary "falling" arrow was read in isolation.
+ * A bedtime correction (see bedtime-correction-dose.ts) is the coherent alternative when BG is
+ * high, so the two recommendations are mutually exclusive by construction.
+ */
 export function resolveBedtimeSnack(ctx: BedtimePersonalizedCopyInput): { grams: number; reason: string } | null {
+  const aboveTarget = ctx.bgMmol > ctx.targetHighMmol;
+  if (aboveTarget) return null;
+
   if (ctx.bgMmol < ctx.targetLowMmol) {
     return {
       grams: 10,
@@ -321,6 +341,12 @@ export function resolveBedtimeSnack(ctx: BedtimePersonalizedCopyInput): { grams:
     return {
       grams: 5,
       reason: "Falling trend overnight",
+    };
+  }
+  if (ctx.overnightUsualTrend === "fall" && ctx.bgMmol < ctx.targetLowMmol + 1) {
+    return {
+      grams: 5,
+      reason: "You usually drop overnight and are near the low end of range",
     };
   }
   if (ctx.recentHypos && ctx.bgMmol < ctx.targetLowMmol + 1) {

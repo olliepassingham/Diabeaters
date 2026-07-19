@@ -14,7 +14,15 @@ import { useAuth } from "@/lib/auth-context";
 import { useLinkedPatient } from "@/hooks/use-linked-patient";
 import { shouldOfferBedtimeReminderSecondChance } from "@/lib/bedtime-reminder-prompt";
 import { rescheduleBedtimeReminders } from "@/lib/bedtime-reminders";
-import { storage, UserSettings, ScenarioState, BedtimeLog, DIABEATER_PROFILE_CHANGED_EVENT, type UserProfile } from "@/lib/storage";
+import {
+  storage,
+  UserSettings,
+  ScenarioState,
+  BedtimeLog,
+  DIABEATER_PROFILE_CHANGED_EVENT,
+  DIABEATER_SETTINGS_CHANGED_EVENT,
+  type UserProfile,
+} from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import { FieldLabelWithInfo, InlineInfoHint } from "@/components/ui/field-label-with-info";
@@ -23,10 +31,10 @@ import { useToast } from "@/hooks/use-toast";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
-import { BedtimeResultView } from "@/components/scenarios/bedtime-result-view";
+import { BedtimeResultView, type BedtimeAction } from "@/components/scenarios/bedtime-result-view";
 import { BedtimeLastNightCard } from "@/components/scenarios/bedtime-last-night-card";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
-import { calculateBedtimeCorrectionDose, type BedtimeCorrectionSuggestion } from "@/lib/bedtime-correction-dose";
+import { calculateBedtimeCorrectionDose, type BedtimeCorrectionResult } from "@/lib/bedtime-correction-dose";
 import { CgmPrefillButton } from "@/components/cgm-prefill-button";
 import { useAutoCgmBgField } from "@/hooks/use-auto-cgm-bg-field";
 import { cgmTrendForBedtime } from "@/lib/cgm/apply-cgm-trend";
@@ -58,11 +66,42 @@ interface ReadinessResult {
   messageBullets: string[];
   tips: string[];
   factors: { label: string; status: "good" | "caution" | "concern"; note: string; detail?: string }[];
-  correction: BedtimeCorrectionSuggestion | null;
-  /** True when BG is above target but no correction dose could be calculated (e.g. missing ISF). */
-  correctionUnavailable: boolean;
+  /** The single, coherent action for tonight — never both a correction and a snack. */
+  action: BedtimeAction;
   bgAboveTarget: boolean;
-  snack: { grams: number; reason: string } | null;
+}
+
+/**
+ * Turns the correction engine's result plus the (mutually-exclusive-by-construction) snack
+ * suggestion into ONE coherent action to show the user. This is the only place that decides
+ * what to render, so a correction, a "set your correction factor" prompt, and a snack can never
+ * appear side by side and contradict each other.
+ */
+function resolveBedtimeAction(
+  correction: BedtimeCorrectionResult,
+  snack: { grams: number; reason: string } | null,
+): BedtimeAction {
+  if (correction.status === "dose") {
+    const { status: _status, ...data } = correction;
+    return { kind: "correction", data };
+  }
+  if (correction.status === "no_isf") {
+    return { kind: "missing_isf" };
+  }
+  if (correction.status === "dose_too_small") {
+    return {
+      kind: "dose_too_small",
+      currentBg: correction.currentBg,
+      aimBg: correction.aimBg,
+      bgUnits: correction.bgUnits,
+      rawDose: correction.rawDose,
+      note: correction.note,
+    };
+  }
+  if (snack) {
+    return { kind: "snack", grams: snack.grams, reason: snack.reason };
+  }
+  return { kind: "none" };
 }
 
 /** Home-clock hour from settings "HH:mm" (same source as travel MDI). Returns null if invalid. */
@@ -205,6 +244,14 @@ export default function Bedtime() {
     const onProfile = () => setProfile(storage.getProfile());
     window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
     return () => window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
+  }, []);
+
+  useEffect(() => {
+    // Keep the correction factor (and target range) fresh if the user edits Settings → Ratios
+    // without leaving this page — otherwise a just-saved ISF can be missed on the next check.
+    const onSettings = () => setUserSettings(storage.getSettings());
+    window.addEventListener(DIABEATER_SETTINGS_CHANGED_EVENT, onSettings);
+    return () => window.removeEventListener(DIABEATER_SETTINGS_CHANGED_EVENT, onSettings);
   }, []);
 
   const isPumpUser = isPumpDeliveryMethod(profile?.insulinDeliveryMethod);
@@ -659,19 +706,21 @@ export default function Bedtime() {
       tips.push("Consider a temporary basal at 80–90% overnight after exercise if your team uses that approach");
     }
 
-    const correction = calculateBedtimeCorrectionDose({
+    const correctionResult = calculateBedtimeCorrectionDose({
       bgMmol,
+      targetLowMmol,
       targetHighMmol,
       correctionFactor: userSettings?.correctionFactor ?? 0,
       bgUnits,
       insulinHours: insulinHoursForIOB,
       bgTrend,
+      overnightUsualTrend,
       wellAboveTarget: isBedtimeBgWellAboveTarget(bgMmol, targetHighMmol),
       exercisedToday,
       hadAlcohol,
       sickDayActive: scenarioState.sickDayActive,
     });
-    const correctionUnavailable = bgMmol > targetHighMmol && correction == null;
+    const action = resolveBedtimeAction(correctionResult, personalized.snack);
     const bgAboveTarget = bgMmol > targetHighMmol;
     const messageBullets = personalized.messageBullets;
     const message = messageBullets.join(" ");
@@ -686,17 +735,15 @@ export default function Bedtime() {
       messageBullets,
       tips,
       factors,
-      correction,
-      correctionUnavailable,
+      action,
       bgAboveTarget,
-      snack: personalized.snack,
     });
     try {
       localStorage.setItem(BEDTIME_OVERNIGHT_TREND_STORAGE_KEY, overnightUsualTrend);
     } catch {
       // ignore
     }
-    persistBedtimeCheck(level, correction?.suggestedDose ?? null);
+    persistBedtimeCheck(level, correctionResult.status === "dose" ? correctionResult.suggestedDose : null);
     setQuickCheckOpen(false);
 
     // Bring the verdict/status card into view after calculating.
