@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { resolveProfileImageUrlResult } from "@/lib/storage-profile";
+import { getCachedProfileImageUrl, resolveProfileImageUrlResult } from "@/lib/storage-profile";
 
 export type ResolvedProfileImageState = {
   /** URL suitable for `<img src>` (signed URL for private Storage keys, or passthrough http(s)). */
@@ -13,18 +13,29 @@ export type ResolvedProfileImageState = {
 
 /**
  * Resolves `profiles.avatar_url` for display. Surfaces Storage/RLS errors via `resolveError`.
+ * Uses the shared signed-URL cache so feed avatars can paint immediately after prefetch.
  */
 export function useResolvedProfileImageUrl(
   avatarUrl: string | null | undefined,
 ): ResolvedProfileImageState {
-  const [displayUrl, setDisplayUrl] = useState<string | null>(null);
+  const [displayUrl, setDisplayUrl] = useState<string | null>(() => getCachedProfileImageUrl(avatarUrl));
   const [resolveError, setResolveError] = useState<string | null>(null);
-  const [isPending, setIsPending] = useState(false);
+  const [isPending, setIsPending] = useState(
+    () => Boolean(avatarUrl?.trim()) && !getCachedProfileImageUrl(avatarUrl),
+  );
 
   useEffect(() => {
     const raw = avatarUrl?.trim();
     if (!raw) {
       setDisplayUrl(null);
+      setResolveError(null);
+      setIsPending(false);
+      return;
+    }
+
+    const hit = getCachedProfileImageUrl(raw);
+    if (hit) {
+      setDisplayUrl(hit);
       setResolveError(null);
       setIsPending(false);
       return;

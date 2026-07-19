@@ -22,11 +22,13 @@ export function resolveAppGateReady(params: {
   linkQueryFetched: boolean;
   profileQueryFetched: boolean;
   skipProfileForGate: boolean;
+  /** When true, do not wait for the carer-link query (patient/community accounts). */
+  skipLinkForGate?: boolean;
 }): boolean {
   if (params.authLoading) return false;
   if (!params.userId) return true;
   if (!params.online) return true;
-  if (!params.linkQueryFetched) return false;
+  if (!params.skipLinkForGate && !params.linkQueryFetched) return false;
   if (params.skipProfileForGate) return true;
   return params.profileQueryFetched;
 }

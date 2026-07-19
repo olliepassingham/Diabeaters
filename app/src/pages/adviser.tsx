@@ -457,11 +457,10 @@ export default function Adviser() {
   };
 
   return (
-    <PageShell variant="standard" className="relative flex min-h-full flex-col">
+    <PageShell variant="standard" density="compact" className="relative flex min-h-full flex-col">
       <FaceLogoWatermark />
       <PageHeader
         leading={<PageBackButton />}
-        className="mb-4"
         title={showMealResultPage ? "Your dose suggestion" : "Meal & ratios"}
         actions={
           <PageInfoDialog title="About Meal & ratios" description="Meal planning and ratio tools">
@@ -491,108 +490,135 @@ export default function Adviser() {
         }
       />
 
-
       {/**
-       * Keep safety context visible without pushing the tools below the fold on phones.
-       * These banners default to compact summaries with tap-to-expand details.
+       * Compact context chips under the title — keep safety signals visible without
+       * creating a large gap before the Meal / Ratios tabs.
        */}
-      {recentHypoCount48h > 0 && (
-        <details className="group mb-3" data-testid="banner-recent-hypos-adviser">
-          <summary className="list-none">
-            <Alert className="cursor-pointer border-red-200/80 bg-red-50/50 p-3 dark:border-red-900/50 dark:bg-red-950/20 [&>svg]:left-3 [&>svg]:top-3 [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg~*]:pl-6">
-              <AlertCircle className="text-red-600 dark:text-red-400" />
-              <AlertDescription className="text-xs leading-snug text-red-900 dark:text-red-100">
-                <span className="font-semibold">Recent hypo:</span>{" "}
-                {recentHypoCount48h} treatment{recentHypoCount48h === 1 ? "" : "s"} in the last 48h
-                <span className="text-red-900/70 dark:text-red-100/70"> · tap for more</span>
-              </AlertDescription>
-              <div className="mt-2 hidden text-xs text-red-900/80 dark:text-red-100/80 group-open:block">
+      {(recentHypoCount48h > 0 ||
+        showPostExerciseBanner ||
+        scenarioState.sickDayActive ||
+        scenarioState.travelModeActive) && (
+        <div className="flex flex-col gap-1.5">
+          {recentHypoCount48h > 0 && (
+            <details className="group" data-testid="banner-recent-hypos-adviser">
+              <summary className="list-none">
+                <div className="flex cursor-pointer items-center gap-2 rounded-xl border border-red-200/70 bg-red-50/70 px-3 py-2 text-xs leading-snug text-red-900 transition-colors hover:bg-red-50 dark:border-red-900/45 dark:bg-red-950/25 dark:text-red-100 dark:hover:bg-red-950/40">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-600 dark:text-red-400" aria-hidden />
+                  <p className="min-w-0 flex-1">
+                    <span className="font-semibold">Recent hypo:</span>{" "}
+                    {recentHypoCount48h} treatment{recentHypoCount48h === 1 ? "" : "s"} in the last 48h
+                    <span className="text-red-900/65 dark:text-red-100/65"> · tap for more</span>
+                  </p>
+                  <ChevronDown
+                    className="h-3.5 w-3.5 shrink-0 text-red-900/50 transition-transform group-open:rotate-180 dark:text-red-100/50"
+                    aria-hidden
+                  />
+                </div>
+              </summary>
+              <p className="mt-1.5 px-1 text-xs leading-relaxed text-muted-foreground">
                 Take extra care with boluses and corrections, and consider being more conservative until you&apos;re stable again.
-              </div>
-            </Alert>
-          </summary>
-        </details>
-      )}
+              </p>
+            </details>
+          )}
 
-      {showPostExerciseBanner && (
-        <details className="group mb-3" data-testid="banner-recent-exercise-adviser">
-          <summary className="list-none">
-            <Alert className="cursor-pointer border-emerald-300/60 bg-emerald-50/50 p-3 dark:border-emerald-900/40 dark:bg-emerald-950/20">
-              <Dumbbell className="h-4 w-4 text-emerald-700 dark:text-emerald-300" />
-              <AlertDescription className="text-sm text-emerald-900 dark:text-emerald-100">
-                <strong>{postExerciseBannerCopy.adviserLead}:</strong>{" "}
-                <span className="text-emerald-900/80 dark:text-emerald-100/80">tap for details</span>
-              </AlertDescription>
-              <div className="mt-2 hidden text-sm text-emerald-900/80 dark:text-emerald-100/80 group-open:block">
+          {showPostExerciseBanner && (
+            <details className="group" data-testid="banner-recent-exercise-adviser">
+              <summary className="list-none">
+                <div className="flex cursor-pointer items-center gap-2 rounded-xl border border-emerald-300/55 bg-emerald-50/70 px-3 py-2 text-xs leading-snug text-emerald-950 transition-colors hover:bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/25 dark:text-emerald-100 dark:hover:bg-emerald-950/40">
+                  <Dumbbell className="h-3.5 w-3.5 shrink-0 text-emerald-700 dark:text-emerald-300" aria-hidden />
+                  <p className="min-w-0 flex-1">
+                    <span className="font-semibold">{postExerciseBannerCopy.adviserLead}</span>
+                    <span className="text-emerald-950/65 dark:text-emerald-100/65"> · tap for details</span>
+                  </p>
+                  <ChevronDown
+                    className="h-3.5 w-3.5 shrink-0 text-emerald-950/45 transition-transform group-open:rotate-180 dark:text-emerald-100/50"
+                    aria-hidden
+                  />
+                </div>
+              </summary>
+              <p className="mt-1.5 px-1 text-xs leading-relaxed text-muted-foreground">
                 {postExerciseBannerCopy.adviserDetail}
-              </div>
-            </Alert>
-          </summary>
-        </details>
-      )}
+              </p>
+            </details>
+          )}
 
-      {scenarioState.sickDayActive && (
-        <details className="group mb-3" data-testid="banner-sick-day-active">
-          <summary className="list-none">
-            <Alert className="cursor-pointer border-amber-500/50 bg-amber-50/50 p-3 dark:bg-amber-950/20">
-              <Thermometer className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-              <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-sm text-amber-800 dark:text-amber-200">
-                  <strong>Sick day:</strong> active <span className="text-amber-800/70 dark:text-amber-200/70">· tap for more</span>
-                </span>
-                <Link href="/scenarios/sick-day">
-                  <Badge
-                    variant="outline"
-                    className="cursor-pointer border-amber-400 text-amber-700 dark:text-amber-300"
-                    data-testid="link-sick-day-scenarios"
+          {scenarioState.sickDayActive && (
+            <details className="group" data-testid="banner-sick-day-active">
+              <summary className="list-none">
+                <div className="flex cursor-pointer items-center gap-2 rounded-xl border border-amber-400/50 bg-amber-50/70 px-3 py-2 text-xs leading-snug text-amber-950 transition-colors hover:bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/25 dark:text-amber-100 dark:hover:bg-amber-950/40">
+                  <Thermometer className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
+                  <p className="min-w-0 flex-1">
+                    <span className="font-semibold">Sick day:</span> active
+                    <span className="text-amber-950/65 dark:text-amber-100/65"> · tap for more</span>
+                  </p>
+                  <Link
+                    href="/scenarios/sick-day"
+                    className="shrink-0"
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    Settings
-                  </Badge>
-                </Link>
-              </AlertDescription>
-              <div className="mt-2 hidden text-sm text-amber-800/80 dark:text-amber-200/80 group-open:block">
+                    <Badge
+                      variant="outline"
+                      className="h-6 border-amber-400/80 px-2 text-[10px] font-semibold text-amber-800 dark:text-amber-200"
+                      data-testid="link-sick-day-scenarios"
+                    >
+                      Settings
+                    </Badge>
+                  </Link>
+                  <ChevronDown
+                    className="h-3.5 w-3.5 shrink-0 text-amber-950/45 transition-transform group-open:rotate-180 dark:text-amber-100/50"
+                    aria-hidden
+                  />
+                </div>
+              </summary>
+              <p className="mt-1.5 px-1 text-xs leading-relaxed text-muted-foreground">
                 Your insulin needs may be different — ratios are adjusted and exercise should be approached cautiously.
-              </div>
-            </Alert>
-          </summary>
-        </details>
-      )}
+              </p>
+            </details>
+          )}
 
-      {scenarioState.travelModeActive && (
-        <details className="group mb-3" data-testid="banner-travel-mode-active">
-          <summary className="list-none">
-            <Alert className="cursor-pointer border-blue-500/50 bg-blue-50/50 p-3 dark:bg-blue-950/20">
-              <Plane className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-              <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-sm text-blue-800 dark:text-blue-200">
-                  <strong>Travel:</strong>{" "}
-                  active{scenarioState.travelDestination ? ` — ${scenarioState.travelDestination}` : ""}
-                  <span className="text-blue-800/70 dark:text-blue-200/70"> · tap for more</span>
-                </span>
-                <Link href="/scenarios/travel">
-                  <Badge
-                    variant="outline"
-                    className="cursor-pointer border-blue-400 text-blue-700 dark:text-blue-300"
-                    data-testid="link-travel-scenarios"
+          {scenarioState.travelModeActive && (
+            <details className="group" data-testid="banner-travel-mode-active">
+              <summary className="list-none">
+                <div className="flex cursor-pointer items-center gap-2 rounded-xl border border-sky-300/55 bg-sky-50/70 px-3 py-2 text-xs leading-snug text-sky-950 transition-colors hover:bg-sky-50 dark:border-sky-900/40 dark:bg-sky-950/25 dark:text-sky-100 dark:hover:bg-sky-950/40">
+                  <Plane className="h-3.5 w-3.5 shrink-0 text-sky-600 dark:text-sky-400" aria-hidden />
+                  <p className="min-w-0 flex-1">
+                    <span className="font-semibold">Travel:</span>{" "}
+                    active{scenarioState.travelDestination ? ` — ${scenarioState.travelDestination}` : ""}
+                    <span className="text-sky-950/65 dark:text-sky-100/65"> · tap for more</span>
+                  </p>
+                  <Link
+                    href="/scenarios/travel"
+                    className="shrink-0"
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    Settings
-                  </Badge>
-                </Link>
-              </AlertDescription>
-              <div className="mt-2 hidden text-sm text-blue-800/80 dark:text-blue-200/80 group-open:block">
+                    <Badge
+                      variant="outline"
+                      className="h-6 border-sky-400/80 px-2 text-[10px] font-semibold text-sky-800 dark:text-sky-200"
+                      data-testid="link-travel-scenarios"
+                    >
+                      Settings
+                    </Badge>
+                  </Link>
+                  <ChevronDown
+                    className="h-3.5 w-3.5 shrink-0 text-sky-950/45 transition-transform group-open:rotate-180 dark:text-sky-100/50"
+                    aria-hidden
+                  />
+                </div>
+              </summary>
+              <p className="mt-1.5 px-1 text-xs leading-relaxed text-muted-foreground">
                 Be mindful of timezone and routine changes affecting your levels.
-              </div>
-            </Alert>
-          </summary>
-        </details>
+              </p>
+            </details>
+          )}
+        </div>
       )}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-        <TabsList className="grid w-full grid-cols-2 max-w-md">
-          <TabsTrigger value="meal" className="gap-1.5 text-xs sm:text-sm" data-testid="tab-meal">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-1 flex-col">
+        <TabsList className="grid h-11 w-full max-w-md grid-cols-2 rounded-2xl p-1">
+          <TabsTrigger value="meal" className="gap-1.5 rounded-xl text-xs sm:text-sm" data-testid="tab-meal">
             <Utensils className="h-4 w-4" /><span>Meal</span>
           </TabsTrigger>
-          <TabsTrigger value="ratios" className="gap-1.5 text-xs sm:text-sm" data-testid="tab-ratios">
+          <TabsTrigger value="ratios" className="gap-1.5 rounded-xl text-xs sm:text-sm" data-testid="tab-ratios">
             <Search className="h-4 w-4" /><span>Ratios</span>
           </TabsTrigger>
         </TabsList>

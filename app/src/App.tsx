@@ -439,7 +439,15 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
     }
   }, [loading, user, pathname, search, setLocation, pathOnly]);
 
-  const waitingOnCarerLink = isOnline() && linkedPatientLoading && !linkedPatientFetched;
+  const mayNeedCarerLinkGate =
+    hasCarerIntent() ||
+    hasPendingCarer() ||
+    getPrimaryAppRole() === "carer" ||
+    isSupporterOnlyAccount() ||
+    getActiveAppMode() === "carer";
+
+  const waitingOnCarerLink =
+    isOnline() && mayNeedCarerLinkGate && linkedPatientLoading && !linkedPatientFetched;
 
   if (loading || waitingOnCarerLink) {
     return (
@@ -1593,6 +1601,11 @@ function AppContent() {
     (hasCarerIntent() || hasPendingCarer());
 
   const skipProfileForGate = Boolean(linkQuery.data) || carerPendingBlocksOnboarding;
+  const skipLinkForGate =
+    !carerPendingBlocksOnboarding &&
+    getPrimaryAppRole() !== "carer" &&
+    !isSupporterOnlyAccount() &&
+    getActiveAppMode() !== "carer";
 
   const profileQuery = useQuery({
     queryKey: profileQueryKey(userId),
@@ -1644,8 +1657,17 @@ function AppContent() {
         linkQueryFetched: linkQuery.isFetched,
         profileQueryFetched: profileQuery.isFetched,
         skipProfileForGate,
+        skipLinkForGate,
       }),
-    [authLoading, userId, online, linkQuery.isFetched, profileQuery.isFetched, skipProfileForGate],
+    [
+      authLoading,
+      userId,
+      online,
+      linkQuery.isFetched,
+      profileQuery.isFetched,
+      skipProfileForGate,
+      skipLinkForGate,
+    ],
   );
 
   useEffect(() => {

@@ -69,6 +69,20 @@ describe("resolveAppGateReady", () => {
       }),
     ).toBe(true);
   });
+
+  it("can skip waiting for the carer-link query", () => {
+    expect(
+      resolveAppGateReady({
+        authLoading: false,
+        userId: "u1",
+        online: true,
+        linkQueryFetched: false,
+        profileQueryFetched: true,
+        skipProfileForGate: false,
+        skipLinkForGate: true,
+      }),
+    ).toBe(true);
+  });
 });
 
 describe("isPatientOnboardingSatisfied", () => {

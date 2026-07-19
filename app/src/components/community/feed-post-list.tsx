@@ -69,6 +69,7 @@ import {
   fetchAuthorMetaMap,
   type FeedAuthorMeta,
 } from "@/lib/community/feed-author-meta";
+import { prefetchProfileAvatarUrls } from "@/lib/storage-profile";
 import {
   buildCommunityFeedQueryKey,
   COMMUNITY_FEED_STALE_MS,
@@ -451,13 +452,19 @@ export function FeedPostList(props: {
 
   useEffect(() => {
     if (displayPosts.length === 0) return;
-    const paths: string[] = [];
+    const mediaPaths: string[] = [];
+    const avatarPaths: string[] = [];
     for (const post of displayPosts.slice(0, 20)) {
-      paths.push(...post.image_urls);
-      if (post.video_url) paths.push(post.video_url);
+      mediaPaths.push(...post.image_urls);
+      if (post.video_url) mediaPaths.push(post.video_url);
+      const previewAvatar = post.author_preview?.avatar_url;
+      if (previewAvatar) avatarPaths.push(previewAvatar);
+      const metaAvatar = authorMeta[post.author_id]?.avatar_url;
+      if (metaAvatar) avatarPaths.push(metaAvatar);
     }
-    prefetchPostMediaSignedUrls(paths, { preloadImages: 6 });
-  }, [displayPosts]);
+    prefetchPostMediaSignedUrls(mediaPaths, { preloadImages: 6 });
+    prefetchProfileAvatarUrls(avatarPaths, { preloadImages: 12 });
+  }, [displayPosts, authorMeta]);
 
   async function ensureCommentsLoaded(postId: string) {
     if (commentsByPost[postId]) return;

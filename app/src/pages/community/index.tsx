@@ -44,6 +44,7 @@ import { isSupabaseConfigured } from "@/lib/supabase";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getProfilesByIds, searchPublicProfilesForFeedQuery, useProfile, canEngageWithCommunityFeed } from "@/lib/profile";
+import { prefetchProfileAvatarUrls } from "@/lib/storage-profile";
 import { CommunityProfileReminderCard } from "@/components/community-profile-reminder-card";
 import { CommunityProfileSetupPrompt } from "@/components/community-profile-setup-prompt";
 import {
@@ -304,18 +305,21 @@ export default function CommunityHomePage() {
     let cancelled = false;
     void getProfilesByIds(storyFolloweeIdsOnly).then((map) => {
       if (cancelled) return;
-      setStoryPeople(
-        storyFolloweeIdsOnly
-          .map((id) => {
-            const p = map.get(id);
-            if (!p) return null;
-            return {
-              id,
-              name: p.full_name?.trim() || id.slice(0, 8),
-              avatar_url: p.avatar_url ?? null,
-            };
-          })
-          .filter((x): x is { id: string; name: string; avatar_url: string | null } => x != null),
+      const people = storyFolloweeIdsOnly
+        .map((id) => {
+          const p = map.get(id);
+          if (!p) return null;
+          return {
+            id,
+            name: p.full_name?.trim() || id.slice(0, 8),
+            avatar_url: p.avatar_url ?? null,
+          };
+        })
+        .filter((x): x is { id: string; name: string; avatar_url: string | null } => x != null);
+      setStoryPeople(people);
+      prefetchProfileAvatarUrls(
+        people.map((p) => p.avatar_url),
+        { preloadImages: 8 },
       );
     });
     return () => {
