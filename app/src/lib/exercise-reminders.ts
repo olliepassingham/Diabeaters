@@ -66,21 +66,41 @@ async function ensureReminderPermission(): Promise<boolean> {
   return ensureNativeLocalNotificationPermission();
 }
 
-export async function cancelExerciseReminders(sessionId: string): Promise<void> {
+const ALL_REMINDER_KINDS: ExerciseReminderKind[] = [
+  "start_soon",
+  "start_now",
+  "mid_check",
+  "finish_now",
+  "recovery_check_30m",
+];
+
+const ACTIVE_PHASE_REMINDER_KINDS: ExerciseReminderKind[] = ["start_soon", "start_now", "mid_check", "finish_now"];
+
+async function cancelReminderKinds(sessionId: string, kinds: ExerciseReminderKind[]): Promise<void> {
   if (!supportsNativeLocalNotifications()) return;
   try {
     await LocalNotifications.cancel({
-      notifications: [
-        { id: notificationId(sessionId, "start_soon") },
-        { id: notificationId(sessionId, "start_now") },
-        { id: notificationId(sessionId, "mid_check") },
-        { id: notificationId(sessionId, "finish_now") },
-        { id: notificationId(sessionId, "recovery_check_30m") },
-      ],
+      notifications: kinds.map((kind) => ({ id: notificationId(sessionId, kind) })),
     });
   } catch {
     // ignore
   }
+}
+
+/** Cancels every reminder for a session — used when a session ends entirely. */
+export async function cancelExerciseReminders(sessionId: string): Promise<void> {
+  await cancelReminderKinds(sessionId, ALL_REMINDER_KINDS);
+}
+
+/**
+ * Cancels only the pre/active-phase reminders (start, mid-check, finish), leaving the
+ * recovery check alone. Use this on finish/auto-finish, then call
+ * {@link scheduleExerciseRecoveryReminder} to (re)anchor the recovery check to the real
+ * end time — previously `cancelExerciseReminders` wiped out the recovery reminder too,
+ * so it silently never fired for sessions that finished early or late.
+ */
+export async function cancelExerciseActiveReminders(sessionId: string): Promise<void> {
+  await cancelReminderKinds(sessionId, ACTIVE_PHASE_REMINDER_KINDS);
 }
 
 export async function scheduleExercisePreReminders(session: ActiveExerciseSession, minutesUntilStart: number): Promise<void> {
@@ -160,9 +180,59 @@ export async function scheduleExerciseActiveReminders(session: ActiveExerciseSes
       };
     });
 
+  // Cancel-before-schedule keeps this idempotent — calling it twice for the same
+  // session (e.g. a re-render re-triggering the "Start" handler) must not leave stale
+  // reminders anchored to the previous call's timestamps.
+  await cancelReminderKinds(session.id, ["mid_check", "finish_now", "recovery_check_30m"]);
+
   if (notifications.length === 0) return;
   try {
     await LocalNotifications.schedule({ notifications });
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * (Re)anchors the recovery check to the real end time rather than the originally
+ * planned finish time — a workout that ends early or late (or is auto-finished) should
+ * still get a recovery reminder 30 minutes after it *actually* ended. When bedtime is
+ * sooner than that, the reminder is pulled in so it still lands before sleep.
+ */
+export async function scheduleExerciseRecoveryReminder(
+  session: ActiveExerciseSession,
+  endedAtMs: number,
+  bedtimeInHours?: number | null,
+): Promise<void> {
+  const ok = await ensureReminderPermission();
+  if (!ok) return;
+
+  const nowMs = Date.now();
+  const defaultDelayMs = 30 * 60_000;
+  const bedtimeDelayMs =
+    typeof bedtimeInHours === "number" && Number.isFinite(bedtimeInHours) && bedtimeInHours >= 0
+      ? Math.max(5, bedtimeInHours * 60) * 60_000
+      : null;
+  const delayMs = bedtimeDelayMs != null ? Math.min(defaultDelayMs, bedtimeDelayMs) : defaultDelayMs;
+  const atMs = endedAtMs + delayMs;
+
+  await cancelReminderKinds(session.id, ["recovery_check_30m"]);
+  if (atMs <= nowMs + 30_000) return;
+
+  const c = copyFor("recovery_check_30m", session.exerciseName);
+  try {
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id: notificationId(session.id, "recovery_check_30m"),
+          title: c.title,
+          body: c.body,
+          schedule: { at: new Date(atMs) },
+          extra: exerciseReminderExtra(session.id, "recovery_check_30m"),
+          ...exerciseAndroidChannel(),
+        },
+      ],
+    });
   } catch {
     // ignore
   }

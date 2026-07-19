@@ -10,9 +10,6 @@ import { isAiCoachEnabled } from "@/lib/flags";
 import { cn } from "@/lib/utils";
 import { storage, DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT } from "@/lib/storage";
 import { recordLastInteraction } from "@/lib/last-interaction";
-import { ScenarioActiveCard } from "@/components/scenarios/ScenarioActiveCard";
-import { ExerciseWorkoutProgressBar } from "@/components/exercise-active-session-extras";
-import { Activity } from "lucide-react";
 
 export default function ScenarioExercisePage() {
   const [tick, setTick] = useState(0);
@@ -68,28 +65,8 @@ export default function ScenarioExercisePage() {
         }
       />
 
-      {active ? (
-        <ScenarioActiveCard
-          title={active.exerciseName || "Exercise"}
-          subtitle="Active session"
-          badgeText="Active"
-          tone="blue"
-          icon={<Activity className="h-4 w-4 text-primary" aria-hidden />}
-          facts={[
-            { label: "Intensity", value: (active.intensity || "unknown").replace(/_/g, " ") },
-            { label: "Duration", value: active.durationMinutes ? `${active.durationMinutes} min` : "—" },
-            { label: "Phase", value: (active.phase || "active").replace(/_/g, " ") },
-          ]}
-        >
-          <ExerciseWorkoutProgressBar
-            phase={active.phase}
-            exerciseStartedAt={active.exerciseStartedAt}
-            durationMinutes={active.durationMinutes}
-            nowMs={Date.now()}
-          />
-        </ScenarioActiveCard>
-      ) : null}
-
+      {/* The guided coach below already shows the active session's name, phase, and
+          progress in its own header — a second summary card here duplicated that. */}
       {!active ? <ExerciseFuelCalculator /> : null}
       <ExerciseGuidedCoach />
       <ScenarioToolDisclaimer className="mt-2" />

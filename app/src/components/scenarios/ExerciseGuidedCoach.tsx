@@ -10,8 +10,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import {
   Activity,
-  AlertTriangle,
   ArrowRight,
+  Check,
   ChevronDown,
   CircleCheck,
   Coffee,
@@ -21,7 +21,6 @@ import {
   Moon,
   Pill,
   Play,
-  Power,
   History,
   RotateCcw,
   Snowflake,
@@ -38,7 +37,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
@@ -60,6 +70,7 @@ import {
   type ExerciseBgTrend,
   type ExerciseEnvironmentChoice,
   type ExerciseIntensity,
+  type ExercisePhase,
   type ExerciseRoutine,
   type ExerciseSymptomFlag,
   type ExerciseType,
@@ -79,11 +90,8 @@ import {
   getReadinessToneClasses,
   type ExerciseReadinessResult,
 } from "@/lib/exercise-readiness";
-import {
-  cancelExerciseReminders,
-  scheduleExerciseActiveReminders,
-  scheduleExercisePreReminders,
-} from "@/lib/exercise-reminders";
+import { reconcileExerciseFuelLines } from "@/lib/exercise-recommendation";
+import { useExerciseSessionActions } from "@/hooks/use-exercise-session-actions";
 import { computeExerciseHypoSuggestion, resolveExerciseBgForHypo } from "@/lib/exercise-hypo-auto";
 import { format } from "date-fns";
 import {
@@ -194,6 +202,45 @@ function deriveHistoryBias(session: ActiveExerciseSession | null): ExerciseHisto
 }
 
 // ----- Component -----
+
+const PHASE_STEPS: Array<{ id: ExercisePhase; label: string }> = [
+  { id: "pre", label: "Pre" },
+  { id: "active", label: "During" },
+  { id: "recovery", label: "Recovery" },
+];
+
+/** Live progress indicator — replaces a row of always-disabled tabs with a clearer at-a-glance stepper. */
+function ExercisePhaseStepper({ phase }: { phase: ExercisePhase }) {
+  const currentIndex = PHASE_STEPS.findIndex((s) => s.id === phase);
+  return (
+    <div className="flex items-center gap-1.5" data-testid="coach-phase-stepper" aria-hidden>
+      {PHASE_STEPS.map((step, i) => {
+        const done = i < currentIndex;
+        const active = i === currentIndex;
+        return (
+          <div key={step.id} className="flex flex-1 items-center gap-1.5">
+            <div
+              className={cn(
+                "flex h-6 min-w-0 flex-1 items-center justify-center gap-1 rounded-full text-[11px] font-medium transition-colors",
+                active
+                  ? "bg-emerald-500/15 text-emerald-800 ring-1 ring-emerald-500/40 dark:text-emerald-200"
+                  : done
+                    ? "bg-muted/50 text-muted-foreground"
+                    : "bg-muted/25 text-muted-foreground/60",
+              )}
+            >
+              {done ? <Check className="h-3 w-3 shrink-0" /> : null}
+              <span className="truncate">{step.label}</span>
+            </div>
+            {i < PHASE_STEPS.length - 1 ? (
+              <div className={cn("h-px w-2 shrink-0 rounded-full", done ? "bg-emerald-500/40" : "bg-border")} />
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 function scrollToActiveGuidedCoach(): void {
   requestAnimationFrame(() => {
@@ -376,7 +423,6 @@ export function ExerciseGuidedCoach() {
     setActiveSession(result.session);
     setRoutines(storage.getRecentExercises?.(8) ?? []);
     storage.recordExerciseToolUse("guided_start");
-    void scheduleExercisePreReminders(result.session, 0);
     scrollToActiveGuidedCoach();
 
     params.delete("start");
@@ -442,11 +488,31 @@ export function ExerciseGuidedCoach() {
     });
   }, [activeSession, bgInput, bgUnits, exercisePlan, historyBias, trendForReadiness]);
 
+  const hypoCoachSuggestion = useMemo(() => {
+    if (!activeSession) return null;
+    const bg = resolveExerciseBgForHypo(activeSession, bgInput);
+    if (bg == null) return null;
+    const settings = storage.getSettings();
+    const lowThreshold = exercisePlan ? parseFloat(exercisePlan.pre.lowThreshold) : undefined;
+    const symptomSeverity =
+      activeSession.phase === "active" &&
+      (activeSession.midSymptoms ?? []).some((s) => s !== "fine")
+        ? activeSession.midSymptomSeverity
+        : undefined;
+    return computeExerciseHypoSuggestion(bg, settings, bgUnits, profile, {
+      trend: trendForReadiness,
+      phase: activeSession.phase,
+      exerciseLowThreshold: Number.isFinite(lowThreshold) ? lowThreshold : undefined,
+      carbsIfLow: exercisePlan?.pre.carbsIfLow,
+      symptomSeverity,
+    });
+  }, [activeSession, bgInput, bgUnits, profile.dateOfBirth, profile.bgUnits, exercisePlan, trendForReadiness]);
+
   const fuelPlanLines = useMemo(() => {
     if (!activeSession || !exercisePlan || !readiness) return [];
     const bg = parseFloatOrNull(bgInput);
     if (bg == null) return [];
-    return getExerciseFuelPlanLines(exercisePlan, readiness.verdict, profile, {
+    const rawLines = getExerciseFuelPlanLines(exercisePlan, readiness.verdict, profile, {
       phase: activeSession.phase,
       exerciseType: activeSession.exerciseType,
       currentBg: bg,
@@ -454,7 +520,11 @@ export function ExerciseGuidedCoach() {
       intensity: activeSession.intensity,
       trend: trendForReadiness,
     });
-  }, [activeSession, bgInput, bgUnits, exercisePlan, profile, readiness, trendForReadiness]);
+    // The hypo suggestion (rendered separately, just above) is the single source of
+    // truth for "take now" grams whenever it's present — drop the fuel plan's own
+    // "Take now" line so the two never show two different numbers for the same moment.
+    return reconcileExerciseFuelLines(rawLines, hypoCoachSuggestion);
+  }, [activeSession, bgInput, bgUnits, exercisePlan, hypoCoachSuggestion, profile, readiness, trendForReadiness]);
 
   const fuelPlanVariant =
     activeSession?.phase === "pre"
@@ -462,20 +532,6 @@ export function ExerciseGuidedCoach() {
       : activeSession?.phase === "active"
         ? "active"
         : "recovery";
-
-  const hypoCoachSuggestion = useMemo(() => {
-    if (!activeSession) return null;
-    const bg = resolveExerciseBgForHypo(activeSession, bgInput);
-    if (bg == null) return null;
-    const settings = storage.getSettings();
-    const lowThreshold = exercisePlan ? parseFloat(exercisePlan.pre.lowThreshold) : undefined;
-    return computeExerciseHypoSuggestion(bg, settings, bgUnits, profile, {
-      trend: trendForReadiness,
-      phase: activeSession.phase,
-      exerciseLowThreshold: Number.isFinite(lowThreshold) ? lowThreshold : undefined,
-      carbsIfLow: exercisePlan?.pre.carbsIfLow,
-    });
-  }, [activeSession, bgInput, bgUnits, profile.dateOfBirth, profile.bgUnits, exercisePlan, trendForReadiness]);
 
   // ----- Mutators -----
   const update = (updates: Parameters<typeof storage.updateActiveExercise>[0]) => {
@@ -579,7 +635,6 @@ export function ExerciseGuidedCoach() {
     setPlanWorkoutOpen(false);
     setRoutines(storage.getRecentExercises?.(8) ?? []);
     storage.recordExerciseToolUse("guided_start");
-    void scheduleExercisePreReminders(result.session, 0);
     scrollToActiveGuidedCoach();
 
     if (options?.toastLabel) {
@@ -630,29 +685,25 @@ export function ExerciseGuidedCoach() {
     });
   };
 
+  const sessionActions = useExerciseSessionActions();
+
   const onStartWorkout = () => {
     if (!activeSession || activeSession.phase !== "pre") return;
-    storage.startExercisePhase();
-    const updated = storage.getActiveExercise();
-    if (updated) {
-      setActiveSession(updated);
-      void scheduleExerciseActiveReminders(updated);
-    }
+    const updated = sessionActions.startWorkout();
+    setActiveSession(updated);
   };
 
   const onFinishWorkout = () => {
     if (!activeSession || activeSession.phase !== "active") return;
-    void cancelExerciseReminders(activeSession.id);
-    storage.finishExercisePhase();
-    const updated = storage.getActiveExercise();
-    if (updated) setActiveSession(updated);
+    const updated = sessionActions.finishWorkout();
+    setActiveSession(updated);
   };
 
   const onEndSession = () => {
     if (!activeSession) return;
-    void cancelExerciseReminders(activeSession.id);
-    storage.endExerciseSession();
+    sessionActions.endSession();
     setActiveSession(null);
+    toast({ title: "Exercise ended", description: "Session cleared." });
   };
 
   // ----- Phase timer -----
@@ -858,7 +909,36 @@ export function ExerciseGuidedCoach() {
                   </span>
                 </div>
               </div>
-              <div className="shrink-0">
+              <div className="flex shrink-0 items-center gap-1.5">
+                {phase === "pre" || phase === "active" ? (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="whitespace-nowrap text-muted-foreground hover:text-destructive"
+                        data-testid="button-coach-end-session"
+                      >
+                        End
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>End this session?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This clears the current {phase === "pre" ? "planned" : "in-progress"} workout and cancels
+                          any scheduled check-in reminders for it.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Keep going</AlertDialogCancel>
+                        <AlertDialogAction onClick={onEndSession} data-testid="button-coach-end-session-confirm">
+                          End session
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                ) : null}
                 {phase === "pre" ? (
                   <Button
                     size="sm"
@@ -895,22 +975,11 @@ export function ExerciseGuidedCoach() {
                 ) : null}
               </div>
             </div>
+            <ExercisePhaseStepper phase={phase} />
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <Tabs value={phase} className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="pre" disabled={phase !== "pre"}>
-                Pre
-              </TabsTrigger>
-              <TabsTrigger value="active" disabled={phase !== "active"}>
-                During
-              </TabsTrigger>
-              <TabsTrigger value="recovery" disabled={phase !== "recovery"}>
-                Recovery
-              </TabsTrigger>
-            </TabsList>
-
             {/* ----- HERO RECOMMENDATION ----- */}
             <div className="pt-3 space-y-3">
               {readiness ? (
@@ -1053,32 +1122,28 @@ export function ExerciseGuidedCoach() {
 
 
           {phase === "recovery" && exercisePlan ? (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Info className="h-4 w-4 text-muted-foreground" />
-                  Recovery notes
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-1.5 text-sm text-muted-foreground">
-                  {exercisePlan.recovery.tips.slice(0, 5).map((tip, i) => (
-                    <li key={i} className="flex gap-2">
-                      <span className="text-primary">•</span>
-                      <span>{tip}</span>
-                    </li>
-                  ))}
-                </ul>
-                {isPump && exercisePlan.pumpTips.recovery.length > 0 ? (
-                  <div className="pt-3 mt-3 border-t border-border/40">
-                    <ExercisePumpTipsCard
-                      tips={exercisePlan.pumpTips.recovery}
-                      data-testid="coach-pump-tips-recovery-notes"
-                    />
-                  </div>
-                ) : null}
-              </CardContent>
-            </Card>
+            <div className="rounded-2xl border border-border/60 bg-muted/15 px-3.5 py-3.5 space-y-2.5">
+              <p className="text-sm font-medium text-foreground flex items-center gap-2">
+                <Info className="h-4 w-4 text-muted-foreground shrink-0" />
+                Recovery notes
+              </p>
+              <ul className="space-y-1.5 text-sm text-muted-foreground">
+                {exercisePlan.recovery.tips.slice(0, 5).map((tip, i) => (
+                  <li key={i} className="flex gap-2">
+                    <span className="text-primary">•</span>
+                    <span>{tip}</span>
+                  </li>
+                ))}
+              </ul>
+              {isPump && exercisePlan.pumpTips.recovery.length > 0 ? (
+                <div className="pt-3 mt-1 border-t border-border/40">
+                  <ExercisePumpTipsCard
+                    tips={exercisePlan.pumpTips.recovery}
+                    data-testid="coach-pump-tips-recovery-notes"
+                  />
+                </div>
+              ) : null}
+            </div>
           ) : null}
         </CardContent>
       </Card>
@@ -1349,6 +1414,18 @@ function PreQuestions({
           checked={!!session.preAlcoholLastNight}
           onChange={(v) => update({ preAlcoholLastNight: v })}
           testId="toggle-coach-alcohol-last-night"
+        />
+        <ToggleField
+          label="GLP-1 medicine in last 24h"
+          checked={!!session.preGlp1Last24h}
+          onChange={(v) => update({ preGlp1Last24h: v })}
+          testId="toggle-coach-glp1"
+        />
+        <ToggleField
+          label="Beta-blocker today"
+          checked={!!session.preBetaBlockerToday}
+          onChange={(v) => update({ preBetaBlockerToday: v })}
+          testId="toggle-coach-beta-blocker"
         />
         <Field label="Insulin on board (units, optional)">
           <Input

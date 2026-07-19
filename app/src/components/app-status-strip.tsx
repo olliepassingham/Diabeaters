@@ -52,7 +52,8 @@ import {
   getExerciseFuelPlanLines,
   type ExerciseReadinessResult,
 } from "@/lib/exercise-readiness";
-import { cancelExerciseReminders, scheduleExerciseActiveReminders } from "@/lib/exercise-reminders";
+import { useExerciseSessionActions } from "@/hooks/use-exercise-session-actions";
+import { reconcileExerciseFuelLines } from "@/lib/exercise-recommendation";
 import { CgmLiveBgChip } from "@/components/cgm-live-bg-chip";
 import { CgmPrefillButton } from "@/components/cgm-prefill-button";
 import { cgmTrendForExercise } from "@/lib/cgm/apply-cgm-trend";
@@ -236,6 +237,7 @@ function postExerciseTipPresentation(text: string, index: number): { Icon: Lucid
 export function AppStatusStrip() {
   const { toast } = useToast();
   const [pathname, setLocation] = useLocation();
+  const exerciseSessionActions = useExerciseSessionActions();
   const { data: linkedPatient } = useLinkedPatient();
   const inSupporterSession = Boolean(linkedPatient);
   const supporterLiveGlucoseScope = linkedPatient?.scopes.live_glucose !== false;
@@ -372,9 +374,8 @@ export function AppStatusStrip() {
     const key = `auto-finish:${ex.id}`;
     if (exerciseAutoFinishKey.current === key) return;
     exerciseAutoFinishKey.current = key;
-    void cancelExerciseReminders(ex.id);
-    storage.finishExercisePhase();
-    setEx(storage.getActiveExercise());
+    const updated = exerciseSessionActions.finishWorkout();
+    setEx(updated);
     if (!sc.travelModeActive) {
       setExerciseExpanded(true);
     }
@@ -451,7 +452,7 @@ export function AppStatusStrip() {
   };
 
   const handleEndExercise = () => {
-    storage.endExerciseSession();
+    exerciseSessionActions.endSession();
     setEx(null);
     toast({ title: "Exercise ended", description: "Session cleared." });
   };
@@ -478,10 +479,8 @@ export function AppStatusStrip() {
     } else {
       storage.updateActiveExercise({ preBgSkipped: true });
     }
-    storage.startExercisePhase();
-    const updated = storage.getActiveExercise();
-    if (updated) void scheduleExerciseActiveReminders(updated);
-    setEx(storage.getActiveExercise());
+    const updated = exerciseSessionActions.startWorkout();
+    setEx(updated);
     if (!sc.travelModeActive) {
       setExerciseExpanded(true);
     }
@@ -496,9 +495,8 @@ export function AppStatusStrip() {
   const handleFinishWorkoutFromActive = () => {
     const s = storage.getActiveExercise();
     if (!s || s.phase !== "active") return;
-    void cancelExerciseReminders(s.id);
-    storage.finishExercisePhase();
-    setEx(storage.getActiveExercise());
+    const updated = exerciseSessionActions.finishWorkout();
+    setEx(updated);
     if (!sc.travelModeActive) {
       setExerciseExpanded(true);
     }
@@ -592,10 +590,25 @@ export function AppStatusStrip() {
     return { verdict: v, plan: exercisePlan, bg };
   }, [bgUnits, ex, exerciseBgInput, exercisePlan, sc.sickDayActive, sc.sickDaySeverity, trendForReadiness]);
 
+  const exerciseHypoStrip = useMemo(() => {
+    if (!ex) return null;
+    const u = (bgUnits === "mmol/L" ? "mmol/L" : "mg/dL") as "mmol/L" | "mg/dL";
+    const bg = resolveExerciseBgForHypo(ex, exerciseBgInput);
+    if (bg == null) return null;
+    const lowThreshold = exercisePlan ? parseFloat(exercisePlan.pre.lowThreshold) : undefined;
+    return computeExerciseHypoSuggestion(bg, storage.getSettings(), u, storage.getProfile() ?? {}, {
+      trend: trendForReadiness,
+      phase: ex.phase,
+      exerciseLowThreshold: Number.isFinite(lowThreshold) ? lowThreshold : undefined,
+      carbsIfLow: exercisePlan?.pre.carbsIfLow,
+      symptomSeverity: ex.phase === "active" && (ex.midSymptoms ?? []).some((s) => s !== "fine") ? ex.midSymptomSeverity : undefined,
+    });
+  }, [ex, exerciseBgInput, bgUnits, exercisePlan, trendForReadiness]);
+
   const preFuelPlanLines = useMemo(() => {
     if (ex?.phase !== "pre" || !exercisePlan || !readiness?.verdict) return [];
     if (readiness.bg == null) return [];
-    return getExerciseFuelPlanLines(exercisePlan, readiness.verdict.verdict, stripProfile, {
+    const lines = getExerciseFuelPlanLines(exercisePlan, readiness.verdict.verdict, stripProfile, {
       phase: "pre",
       exerciseType: ex.exerciseType,
       currentBg: readiness.bg,
@@ -603,12 +616,14 @@ export function AppStatusStrip() {
       intensity: ex.intensity,
       trend: trendForReadiness,
     });
-  }, [bgUnits, ex?.exerciseType, ex?.intensity, ex?.phase, exercisePlan, readiness?.bg, readiness?.verdict, stripProfile, trendForReadiness]);
+    // Avoid showing a second, different "take now" number alongside the hypo hint below.
+    return reconcileExerciseFuelLines(lines, exerciseHypoStrip);
+  }, [bgUnits, ex?.exerciseType, ex?.intensity, ex?.phase, exerciseHypoStrip, exercisePlan, readiness?.bg, readiness?.verdict, stripProfile, trendForReadiness]);
 
   const activeFuelPlanLines = useMemo(() => {
     if (ex?.phase !== "active" || !exercisePlan || !readiness?.verdict) return [];
     if (readiness.bg == null) return [];
-    return getExerciseFuelPlanLines(exercisePlan, readiness.verdict.verdict, stripProfile, {
+    const lines = getExerciseFuelPlanLines(exercisePlan, readiness.verdict.verdict, stripProfile, {
       phase: "active",
       exerciseType: ex.exerciseType,
       intensity: ex.intensity,
@@ -616,19 +631,21 @@ export function AppStatusStrip() {
       bgUnits,
       trend: trendForReadiness,
     });
-  }, [bgUnits, ex?.exerciseType, ex?.intensity, ex?.phase, exercisePlan, readiness?.bg, readiness?.verdict, stripProfile, trendForReadiness]);
+    return reconcileExerciseFuelLines(lines, exerciseHypoStrip);
+  }, [bgUnits, ex?.exerciseType, ex?.intensity, ex?.phase, exerciseHypoStrip, exercisePlan, readiness?.bg, readiness?.verdict, stripProfile, trendForReadiness]);
 
   const recoveryFuelPlanLines = useMemo(() => {
     if (ex?.phase !== "recovery" || !exercisePlan || !readiness?.verdict) return [];
     if (readiness.bg == null) return [];
-    return getExerciseFuelPlanLines(exercisePlan, readiness.verdict.verdict, stripProfile, {
+    const lines = getExerciseFuelPlanLines(exercisePlan, readiness.verdict.verdict, stripProfile, {
       phase: "recovery",
       exerciseType: ex.exerciseType,
       currentBg: readiness.bg,
       bgUnits,
       trend: trendForReadiness,
     });
-  }, [bgUnits, ex?.exerciseType, ex?.phase, exercisePlan, readiness?.bg, readiness?.verdict, stripProfile, trendForReadiness]);
+    return reconcileExerciseFuelLines(lines, exerciseHypoStrip);
+  }, [bgUnits, ex?.exerciseType, ex?.phase, exerciseHypoStrip, exercisePlan, readiness?.bg, readiness?.verdict, stripProfile, trendForReadiness]);
 
   const recoveryInsulinLine = useMemo(() => {
     if (!exercisePlan || ex?.phase !== "recovery") return null;
@@ -685,20 +702,6 @@ export function AppStatusStrip() {
 
     return lines;
   }, [ex, exercisePlan, preFuelPlanLines, readiness?.verdict, recoveryInsulinLine, recoveryMinutesLeft, stripProfile]);
-
-  const exerciseHypoStrip = useMemo(() => {
-    if (!ex) return null;
-    const u = (bgUnits === "mmol/L" ? "mmol/L" : "mg/dL") as "mmol/L" | "mg/dL";
-    const bg = resolveExerciseBgForHypo(ex, exerciseBgInput);
-    if (bg == null) return null;
-    const lowThreshold = exercisePlan ? parseFloat(exercisePlan.pre.lowThreshold) : undefined;
-    return computeExerciseHypoSuggestion(bg, storage.getSettings(), u, storage.getProfile() ?? {}, {
-      trend: trendForReadiness,
-      phase: ex.phase,
-      exerciseLowThreshold: Number.isFinite(lowThreshold) ? lowThreshold : undefined,
-      carbsIfLow: exercisePlan?.pre.carbsIfLow,
-    });
-  }, [ex, exerciseBgInput, bgUnits, exercisePlan, trendForReadiness]);
 
   const onExerciseBgInputChange = (value: string) => {
     setExerciseBgInput(value);

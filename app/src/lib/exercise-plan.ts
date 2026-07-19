@@ -235,6 +235,13 @@ function deeperContextCarbMultipliers(context: ExercisePlanContext): { pre: numb
     post *= 1.05;
   }
 
+  // GLP-1 meds slow gastric emptying and appetite — fast carbs act more slowly and less
+  // predictably, so keep a bit more in reach during and after the session.
+  if (context.glp1Last24h) {
+    during *= 1.1;
+    post *= 1.05;
+  }
+
   const hist = context.historyBias;
   if (hist && hist.totalSessions >= 2) {
     if (hist.typicalResponse === "dropped" || hist.hypoProne) {
@@ -650,6 +657,18 @@ export function calculateExercisePlan(
     preTips.push("Alcohol last night — delayed lows risk is higher today, especially after harder effort. Plan extra checks.");
   }
 
+  if (context.glp1Last24h) {
+    preTips.push(
+      "GLP-1 medicine in the last 24h — digestion is slower, so fast carbs may act later than usual; lean on more frequent checks rather than repeat dosing right away.",
+    );
+  }
+
+  if (context.betaBlockerToday) {
+    preTips.push(
+      "Beta-blocker today — adrenaline symptoms (shakiness, racing heart) can be masked. Trust your meter or CGM over how you feel and check a little more often.",
+    );
+  }
+
   if (context.iobUnits != null && context.iobUnits > 0) {
     preTips.push(`~${context.iobUnits}u insulin on board — activity can amplify its effect; keep treatment carbs within reach.`);
   }
@@ -685,6 +704,10 @@ export function calculateExercisePlan(
     );
   }
 
+  if (context.betaBlockerToday) {
+    duringTips.push("Beta-blocker on board — schedule a glucose check rather than waiting to feel low.");
+  }
+
   let postTiming = "Within 30-60 min after";
   let postSnack = ["Chocolate milk", "Greek yoghurt", "Sandwich"];
   if (
@@ -713,6 +736,14 @@ export function calculateExercisePlan(
 
   if (context.alcoholLastNight) {
     recoveryTips.push("Alcohol last night already increases delayed-low risk — pair with exercise recovery, plan a snack and an alarm if you feel unsure.");
+  }
+
+  if (context.glp1Last24h) {
+    recoveryTips.push("GLP-1 medicine can delay how food and fast carbs act — favour scheduled checks over waiting for symptoms during recovery too.");
+  }
+
+  if (context.betaBlockerToday) {
+    recoveryTips.push("Beta-blocker still on board — keep checking by meter or CGM through recovery rather than relying on how you feel.");
   }
 
   const envsRecovery = normalizeExercisePlanEnvironments(context);

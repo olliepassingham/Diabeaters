@@ -44,7 +44,32 @@ type CooldownState = {
   reason: ExerciseCgmAlertReason;
 };
 
-const cooldownBySession = new Map<string, CooldownState>();
+/**
+ * Persisted (not just in-memory) so a killed/restarted app doesn't forget it just
+ * showed an alert a few seconds ago and immediately re-fire a duplicate.
+ */
+const COOLDOWN_STORAGE_KEY = "diabeater_exercise_cgm_alert_cooldown";
+
+function readCooldownStore(): Record<string, CooldownState> {
+  try {
+    const raw = localStorage.getItem(COOLDOWN_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeCooldownStore(store: Record<string, CooldownState>): void {
+  try {
+    localStorage.setItem(COOLDOWN_STORAGE_KEY, JSON.stringify(store));
+  } catch {
+    // ignore (private mode / storage full)
+  }
+}
+
+const cooldownBySession = new Map<string, CooldownState>(Object.entries(readCooldownStore()));
 
 function parsePlanNumber(value: string | number | null | undefined): number | null {
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
@@ -135,6 +160,7 @@ export function shouldSkipExerciseCgmAlertDueToCooldown(
   const clearMargin = bgUnits === "mmol/L" ? 0.4 : 7;
   if (bg >= threshold + clearMargin) {
     cooldownBySession.delete(sessionId);
+    writeCooldownStore(Object.fromEntries(cooldownBySession));
     return false;
   }
   return Date.now() - prev.atMs < EXERCISE_CGM_ALERT_COOLDOWN_MS;
@@ -146,11 +172,13 @@ export function markExerciseCgmAlertShown(
   reason: ExerciseCgmAlertReason,
 ): void {
   cooldownBySession.set(sessionId, { atMs: Date.now(), bg, reason });
+  writeCooldownStore(Object.fromEntries(cooldownBySession));
 }
 
 export function resetExerciseCgmAlertCooldown(sessionId?: string): void {
   if (sessionId) cooldownBySession.delete(sessionId);
   else cooldownBySession.clear();
+  writeCooldownStore(Object.fromEntries(cooldownBySession));
 }
 
 export function buildExerciseCgmAlertCopy(input: {

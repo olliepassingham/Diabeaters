@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   buildExerciseCgmAlertCopy,
@@ -99,6 +99,17 @@ describe("exercise CGM alert cooldown", () => {
     expect(shouldSkipExerciseCgmAlertDueToCooldown("sess-1", 5.1, 5.6, "mmol/L")).toBe(true);
     resetExerciseCgmAlertCooldown("sess-1");
     expect(shouldSkipExerciseCgmAlertDueToCooldown("sess-1", 5.1, 5.6, "mmol/L")).toBe(false);
+  });
+
+  it("persists across a simulated app restart (module re-import) so a killed app doesn't re-fire a duplicate alert", async () => {
+    resetExerciseCgmAlertCooldown();
+    markExerciseCgmAlertShown("sess-restart", 5.0, "below_threshold");
+
+    vi.resetModules();
+    const restarted = await import("./exercise-cgm-alerts");
+    expect(restarted.shouldSkipExerciseCgmAlertDueToCooldown("sess-restart", 5.1, 5.6, "mmol/L")).toBe(true);
+
+    restarted.resetExerciseCgmAlertCooldown("sess-restart");
   });
 });
 

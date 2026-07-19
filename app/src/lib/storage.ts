@@ -1443,6 +1443,8 @@ export type LastExerciseSummary = {
     feltSymptomsDuring?: boolean;
     recoveryCarbsGrams?: number;
     alcoholTonight?: boolean;
+    /** Hours until planned bedtime, logged during recovery — sharpens the post-exercise nudge's overnight framing. */
+    bedtimeInHours?: number;
     /** Fingerstick trend when a pre-workout BG was logged (educational nudges only). */
     preExerciseTrend?: ExerciseBgTrend;
     /** Trend when a during-workout BG was logged. */
@@ -1554,6 +1556,7 @@ function buildLastExerciseContextFromSession(session: ActiveExerciseSession): No
   }
   if (session.recoveryCarbsGrams != null) ctx.recoveryCarbsGrams = session.recoveryCarbsGrams;
   if (session.alcoholTonight != null) ctx.alcoholTonight = session.alcoholTonight;
+  if (session.bedtimeInHours != null) ctx.bedtimeInHours = session.bedtimeInHours;
   if (session.preBg != null && session.preTrend && session.preTrend !== "not_sure") {
     ctx.preExerciseTrend = session.preTrend;
   }

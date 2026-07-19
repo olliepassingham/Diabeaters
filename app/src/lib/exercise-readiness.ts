@@ -6,6 +6,11 @@
 import { formatCarbsForScenario, formatFastCarbsForScenario } from "@/lib/carb-source-preferences";
 import type { ExercisePlanResult } from "@/lib/exercise-plan";
 import { exerciseApproachLowCeiling } from "@/lib/exercise-hypo-auto";
+import {
+  exerciseHighThreshold,
+  exerciseIdealStartMinimum as centralExerciseIdealStartMinimum,
+  exerciseIdealStartMinimumLabel as centralExerciseIdealStartMinimumLabel,
+} from "@/lib/exercise-thresholds";
 import type { ExerciseBgTrend, ExerciseIntensity, PreRapidInsulin2h, UserProfile } from "@/lib/storage";
 
 export type ExerciseReadinessVerdict = "ready" | "caution" | "not_recommended";
@@ -30,11 +35,11 @@ function exerciseApproachLowCeilingForUnits(bgUnits: string, lowThreshold: numbe
 
 /** Matches {@link ExercisePlanResult.pre.targetBg} lower bound — tip-of-the-day “snack first” band. */
 export function exerciseIdealStartMinimum(bgUnits: string): number {
-  return bgUnits === "mmol/L" ? 7 : 126;
+  return centralExerciseIdealStartMinimum(bgUnits);
 }
 
 export function exerciseIdealStartMinimumLabel(bgUnits: string): string {
-  return bgUnits === "mmol/L" ? "~7 mmol/L" : "~126 mg/dL";
+  return centralExerciseIdealStartMinimumLabel(bgUnits);
 }
 
 export function isCardioLikeExerciseType(exerciseType: string): boolean {
@@ -119,7 +124,7 @@ function baseVerdict(input: ExerciseReadinessInput): ExerciseReadinessResult {
     };
   }
 
-  const highThreshold = bgUnits === "mmol/L" ? 13.9 : 250;
+  const highThreshold = exerciseHighThreshold(bgUnits);
   if (bg < lowThreshold) {
     const grams = exercisePlanResult.pre.carbsIfLow;
     return {
@@ -323,11 +328,10 @@ export function getRecoveryReadinessVerdict(input: ExerciseReadinessInput): Exer
     };
   }
 
-  const highThreshold = bgUnits === "mmol/L" ? 13.9 : 250;
+  const highThreshold = exerciseHighThreshold(bgUnits);
   const trend = input.bgTrend ?? "not_sure";
   /** Below range but not yet under formal low threshold — still falling → treat like a high-risk window. */
-  const approachMargin = bgUnits === "mmol/L" ? 0.9 : 16;
-  const approachLowCeiling = lowThreshold + approachMargin;
+  const approachLowCeiling = exerciseApproachLowCeilingForUnits(bgUnits, lowThreshold);
 
   if (bg < lowThreshold) {
     const grams = exercisePlanResult.pre.carbsIfLow;

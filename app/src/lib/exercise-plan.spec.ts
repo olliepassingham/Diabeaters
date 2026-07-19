@@ -232,6 +232,25 @@ describe("calculateExercisePlan deeper context modifiers", () => {
     expect(r.pre.contextualNotes?.some((n) => n.toLowerCase().includes("alcohol last night"))).toBe(true);
     expect(r.recovery.tips.some((t) => t.toLowerCase().includes("alcohol"))).toBe(true);
   });
+
+  it("bumps during/post carbs and adds digestion-timing notes for GLP-1 use", () => {
+    const ctx = { ...baseCtx, durationMinutes: 60 };
+    const baseline = calculateExercisePlan(ctx);
+    const glp1 = calculateExercisePlan({ ...ctx, glp1Last24h: true });
+    expect(glp1.during.carbsNeeded).toBeGreaterThanOrEqual(baseline.during.carbsNeeded);
+    expect(glp1.pre.contextualNotes?.some((n) => n.toLowerCase().includes("glp-1"))).toBe(true);
+    expect(glp1.recovery.tips.some((t) => t.toLowerCase().includes("glp-1"))).toBe(true);
+  });
+
+  it("adds masked-symptom caution copy for beta-blocker use without changing carb targets", () => {
+    const ctx = { ...baseCtx, durationMinutes: 60 };
+    const baseline = calculateExercisePlan(ctx);
+    const betaBlocker = calculateExercisePlan({ ...ctx, betaBlockerToday: true });
+    expect(betaBlocker.pre.carbsIfLow).toBe(baseline.pre.carbsIfLow);
+    expect(betaBlocker.pre.contextualNotes?.some((n) => n.toLowerCase().includes("beta-blocker"))).toBe(true);
+    expect(betaBlocker.during.tips.some((t) => t.toLowerCase().includes("beta-blocker"))).toBe(true);
+    expect(betaBlocker.recovery.tips.some((t) => t.toLowerCase().includes("beta-blocker"))).toBe(true);
+  });
 });
 
 describe("calculateExercisePlanFromMessage", () => {

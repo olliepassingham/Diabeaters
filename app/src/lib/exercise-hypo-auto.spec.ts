@@ -93,4 +93,43 @@ describe("exercise-hypo-auto", () => {
     expect(r).not.toBeNull();
     expect(r!.carbsGrams).toBeGreaterThanOrEqual(15);
   });
+
+  it("needsImmediateExerciseBgTreatment escalates for severe symptoms even without a falling trend", () => {
+    const settings: UserSettings = { targetBgLow: 4, targetBgHigh: 7 };
+    // Borderline reading (above the exercise-low threshold, flat trend) — would not
+    // otherwise trigger treat-now guidance.
+    expect(
+      needsImmediateExerciseBgTreatment(6.0, settings, "mmol/L", {
+        trend: "flat",
+        exerciseLowThreshold: 5.6,
+      }),
+    ).toBe(false);
+    expect(
+      needsImmediateExerciseBgTreatment(6.0, settings, "mmol/L", {
+        trend: "flat",
+        exerciseLowThreshold: 5.6,
+        symptomSeverity: "severe",
+      }),
+    ).toBe(true);
+  });
+
+  it("computeExerciseHypoSuggestion nudges carbs up when severe symptoms are logged", () => {
+    // A deep clinical-hypo BG so the weight-based carbsNeeded comfortably clears both the
+    // 10g display floor and the 12g clinical-hypo floor, letting the severity multiplier's
+    // effect show through in the final rounded grams.
+    const plain = computeExerciseHypoSuggestion(2.0, undefined, "mmol/L", { dateOfBirth: "1990-01-01" }, {
+      trend: "flat",
+      phase: "active",
+      exerciseLowThreshold: 5.6,
+    });
+    const severe = computeExerciseHypoSuggestion(2.0, undefined, "mmol/L", { dateOfBirth: "1990-01-01" }, {
+      trend: "flat",
+      phase: "active",
+      exerciseLowThreshold: 5.6,
+      symptomSeverity: "severe",
+    });
+    expect(plain).not.toBeNull();
+    expect(severe).not.toBeNull();
+    expect(severe!.carbsGrams).toBeGreaterThan(plain!.carbsGrams);
+  });
 });

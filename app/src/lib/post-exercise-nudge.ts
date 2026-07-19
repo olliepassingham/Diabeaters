@@ -54,6 +54,14 @@ export function buildSessionContextTipExtras(summary: LastExerciseSummary | null
       "You flagged a GLP-1 medicine recently — appetite and stomach emptying can shift; align boluses with your clinician’s plan.",
     );
   }
+  const bedtimeHours = c.bedtimeInHours;
+  if (typeof bedtimeHours === "number" && Number.isFinite(bedtimeHours) && bedtimeHours <= 4) {
+    candidates.push(
+      bedtimeHours <= 1
+        ? "You logged bedtime very soon — this is a good moment to run the Bedtime check tool for a trend-aware correction or snack recommendation."
+        : `You logged bedtime in about ${Math.round(bedtimeHours)}h — worth running the Bedtime check tool before you turn in tonight.`,
+    );
+  }
   const carbsDuring = c.midCarbsGramsTotal;
   if (typeof carbsDuring === "number" && carbsDuring >= 20) {
     candidates.push(

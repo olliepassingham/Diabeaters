@@ -1,9 +1,14 @@
 import { getBodyWeightKgFromProfile } from "@/lib/body-weight";
 import { formatCarbsForScenario } from "@/lib/carb-source-preferences";
 import { computeHypoCarbEquivalents } from "@/lib/hypo-treatment-display";
-import type { ActiveExerciseSession, ExerciseBgTrend, UserProfile, UserSettings } from "@/lib/storage";
+import type { ActiveExerciseSession, ExerciseBgTrend, ExerciseSymptomSeverity, UserProfile, UserSettings } from "@/lib/storage";
 import { suggestedRecoveryTargetBg } from "@/lib/hypo-context";
 import { hypoCalculatorRequiresExplicitWeight } from "@/lib/user-age";
+import {
+  defaultExerciseLowThreshold as centralDefaultExerciseLowThreshold,
+  defaultHypoThreshold,
+  exerciseApproachLowCeiling as centralExerciseApproachLowCeiling,
+} from "@/lib/exercise-thresholds";
 
 /** BG value to use for hypo check: draft input wins when valid, else last logged for phase. */
 export function resolveExerciseBgForHypo(session: ActiveExerciseSession, bgInputDraft?: string): number | null {
@@ -21,17 +26,16 @@ export function resolveExerciseBgForHypo(session: ActiveExerciseSession, bgInput
 export function hypoRangeThreshold(settings: UserSettings | undefined, bgUnits: "mmol/L" | "mg/dL"): number {
   const low = settings?.targetBgLow;
   if (typeof low === "number" && low > 0) return low;
-  return bgUnits === "mg/dL" ? 70 : 3.9;
+  return defaultHypoThreshold(bgUnits);
 }
 
 export function defaultExerciseLowThreshold(bgUnits: "mmol/L" | "mg/dL"): number {
-  return bgUnits === "mg/dL" ? 100 : 5.6;
+  return centralDefaultExerciseLowThreshold(bgUnits);
 }
 
 /** Upper band where falling BG during exercise still needs treat-now guidance (matches readiness logic). */
 export function exerciseApproachLowCeiling(lowThreshold: number, bgUnits: "mmol/L" | "mg/dL"): number {
-  const margin = bgUnits === "mmol/L" ? 0.9 : 16;
-  return lowThreshold + margin;
+  return centralExerciseApproachLowCeiling(lowThreshold, bgUnits);
 }
 
 export function isBgBelowHypoThreshold(
@@ -61,6 +65,13 @@ export type ExerciseHypoContext = {
   exerciseLowThreshold?: number;
   /** Plan pre.carbsIfLow — floor for treat-now grams. */
   carbsIfLow?: number;
+  /**
+   * Subjective symptom severity logged mid-session. "severe" escalates treat-now
+   * guidance even when the reading itself is only borderline, and moderate/severe
+   * nudge the carb estimate up slightly — symptoms plus a borderline number is a
+   * stronger signal than either alone.
+   */
+  symptomSeverity?: ExerciseSymptomSeverity;
 };
 
 function toMmol(bg: number, bgUnits: "mmol/L" | "mg/dL"): number {
@@ -111,6 +122,9 @@ export function needsImmediateExerciseBgTreatment(
   const low = context?.exerciseLowThreshold ?? defaultExerciseLowThreshold(bgUnits);
   if (bg < low) return true;
   if (context?.trend === "falling" && bg < exerciseApproachLowCeiling(low, bgUnits)) return true;
+  // Severe symptoms (shaky, sweaty, etc.) plus a borderline-low reading is a stronger
+  // signal than the number alone — escalate even without a confirmed falling trend.
+  if (context?.symptomSeverity === "severe" && bg < exerciseApproachLowCeiling(low, bgUnits)) return true;
   return false;
 }
 
@@ -155,6 +169,14 @@ export function computeExerciseHypoSuggestion(
     if (context?.trend === "falling") {
       carbsNeeded = Math.max(carbsNeeded, Math.ceil(floorGrams * 0.75) || 12);
     }
+  }
+
+  // Symptoms reported alongside a low/borderline reading — nudge the estimate up a little
+  // rather than leaving the user to guess whether "feeling off" should change the amount.
+  if (context?.symptomSeverity === "severe") {
+    carbsNeeded = Math.ceil(carbsNeeded * 1.2);
+  } else if (context?.symptomSeverity === "moderate") {
+    carbsNeeded = Math.ceil(carbsNeeded * 1.1);
   }
 
   carbsNeeded = Math.max(carbsNeeded, floorGrams > 0 ? floorGrams : clinicalHypo ? 12 : 15);
