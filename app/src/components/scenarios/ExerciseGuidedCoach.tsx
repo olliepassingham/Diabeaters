@@ -534,6 +534,7 @@ export function ExerciseGuidedCoach() {
   } = useExerciseCgmBg({
     bgValue: bgInput,
     onApplyBg: applyCgmBg,
+    onChange: onBgChange,
     onApplyTrend: onTrendChange,
     autoApplyKey: cgmAutoApplyKey,
   });

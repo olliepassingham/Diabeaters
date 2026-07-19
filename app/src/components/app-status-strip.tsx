@@ -58,6 +58,7 @@ import { CgmPrefillButton } from "@/components/cgm-prefill-button";
 import { cgmTrendForExercise } from "@/lib/cgm/apply-cgm-trend";
 import { isCgmPrefillActive } from "@/lib/cgm/preferences";
 import { useBgPrefill } from "@/hooks/use-bg-prefill";
+import { useExerciseCgmBg } from "@/hooks/use-exercise-cgm-bg";
 import { useLinkedPatient } from "@/hooks/use-linked-patient";
 import { useSupporterLiveBg } from "@/hooks/use-supporter-live-bg";
 import { syncSickDayDeactivatedToCloud } from "@/lib/scenarios-supabase";
@@ -762,6 +763,49 @@ export function AppStatusStrip() {
     if (mapped) onExerciseTrendPick(mapped);
   };
 
+  const {
+    prefill: exerciseCgmPrefill,
+    loading: exerciseCgmLoading,
+    refresh: refreshExerciseCgm,
+    emptyHint: exerciseCgmEmptyHint,
+    onBgChange: onExerciseCgmTrackedChange,
+  } = useExerciseCgmBg({
+    bgValue: exerciseBgInput,
+    onApplyBg: applyExerciseCgmPrefill,
+    onChange: onExerciseBgInputChange,
+    onApplyTrend: applyExerciseCgmTrend,
+    autoApplyKey: ex ? `${ex.id}-${ex.phase}` : undefined,
+  });
+
+  // Keep the visible field aligned when background CGM sync updates the session.
+  useEffect(() => {
+    if (!ex) return;
+    if (ex.phase === "active" && ex.midBgSource === "cgm" && typeof ex.midBg === "number") {
+      const next = String(ex.midBg);
+      setExerciseBgInput((prev) => (prev === next ? prev : next));
+      return;
+    }
+    if (ex.phase === "pre" && typeof ex.preBg === "number" && typeof ex.preBgAt === "string") {
+      const next = String(ex.preBg);
+      setExerciseBgInput((prev) => (prev === next ? prev : next));
+      return;
+    }
+    if (ex.phase === "recovery" && typeof ex.recoveryBg === "number" && typeof ex.recoveryBgAt === "string") {
+      const next = String(ex.recoveryBg);
+      setExerciseBgInput((prev) => (prev === next ? prev : next));
+    }
+  }, [
+    ex?.id,
+    ex?.phase,
+    ex?.midBg,
+    ex?.midBgAt,
+    ex?.midBgSource,
+    ex?.preBg,
+    ex?.preBgAt,
+    ex?.recoveryBg,
+    ex?.recoveryBgAt,
+  ]);
+
   const trendButtonSelected = (t: "flat" | "rising" | "falling") => {
     if (!ex) return false;
     const current =
@@ -1094,7 +1138,7 @@ export function AppStatusStrip() {
                       inputMode="decimal"
                       placeholder={bgUnits === "mmol/L" ? "e.g. 7.2" : "e.g. 130"}
                       value={exerciseBgInput}
-                      onChange={(e) => onExerciseBgInputChange(e.target.value)}
+                      onChange={(e) => onExerciseCgmTrackedChange(e.target.value)}
                       className="h-9 min-w-[10rem] flex-1"
                       data-testid="status-exercise-bg"
                     />
@@ -1115,13 +1159,15 @@ export function AppStatusStrip() {
                     </div>
                   </div>
                   <CgmPrefillButton
-                    prefill={bgPrefill}
-                    loading={bgPrefillLoading}
+                    prefill={exerciseCgmPrefill}
+                    loading={exerciseCgmLoading}
                     bgUnits={bgUnits}
                     currentValue={exerciseBgInput}
                     onApply={applyExerciseCgmPrefill}
                     onApplyTrend={applyExerciseCgmTrend}
-                    onRefresh={refreshBgPrefill}
+                    onRefresh={refreshExerciseCgm}
+                    emptyHint={exerciseCgmEmptyHint}
+                    allowSync
                     testId="button-exercise-cgm-prefill"
                   />
                 </div>
@@ -1136,7 +1182,7 @@ export function AppStatusStrip() {
                       inputMode="decimal"
                       placeholder={bgUnits === "mmol/L" ? "e.g. 7.2" : "e.g. 130"}
                       value={exerciseBgInput}
-                      onChange={(e) => onExerciseBgInputChange(e.target.value)}
+                      onChange={(e) => onExerciseCgmTrackedChange(e.target.value)}
                       className="h-9 min-w-[10rem] flex-1"
                       data-testid="status-exercise-bg"
                     />
@@ -1157,13 +1203,15 @@ export function AppStatusStrip() {
                     </div>
                   </div>
                   <CgmPrefillButton
-                    prefill={bgPrefill}
-                    loading={bgPrefillLoading}
+                    prefill={exerciseCgmPrefill}
+                    loading={exerciseCgmLoading}
                     bgUnits={bgUnits}
                     currentValue={exerciseBgInput}
                     onApply={applyExerciseCgmPrefill}
                     onApplyTrend={applyExerciseCgmTrend}
-                    onRefresh={refreshBgPrefill}
+                    onRefresh={refreshExerciseCgm}
+                    emptyHint={exerciseCgmEmptyHint}
+                    allowSync
                     testId="button-exercise-cgm-prefill"
                   />
                 </div>

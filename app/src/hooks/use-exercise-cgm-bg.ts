@@ -11,9 +11,12 @@ export { EXERCISE_LIVE_CGM_POLL_MS as EXERCISE_CGM_POLL_MS } from "@/lib/exercis
 
 type UseExerciseCgmBgOptions = {
   bgValue: string;
+  /** Called when CGM auto-fills or the user taps Use/Update from CGM. */
   onApplyBg: (value: string) => void;
+  /** Called when the user types in the BG field (manual). Defaults to onApplyBg if omitted. */
+  onChange?: (value: string) => void;
   onApplyTrend?: (trend: ExerciseBgTrend) => void;
-  /** When this key changes (e.g. session id + phase), try auto-fill from CGM once. */
+  /** When this key changes (e.g. session id + phase), prefer fresh CGM for the new phase. */
   autoApplyKey?: string;
   /** Re-apply when a newer CGM poll arrives (unless the user edited the field). */
   syncOnPoll?: boolean;
@@ -22,6 +25,7 @@ type UseExerciseCgmBgOptions = {
 export function useExerciseCgmBg({
   bgValue,
   onApplyBg,
+  onChange,
   onApplyTrend,
   autoApplyKey,
   syncOnPoll = true,
@@ -63,9 +67,9 @@ export function useExerciseCgmBg({
         userEditedRef.current = true;
       }
       if (!trimmed) userEditedRef.current = false;
-      onApplyBg(value);
+      (onChange ?? onApplyBg)(value);
     },
-    [onApplyBg],
+    [onApplyBg, onChange],
   );
 
   useEffect(() => {
@@ -75,13 +79,14 @@ export function useExerciseCgmBg({
     userEditedRef.current = false;
   }, [autoApplyKey]);
 
+  // Each phase should use live CGM when linked — not keep a prior-phase carryover.
   useEffect(() => {
     if (!autoApplyKey || !isFreshCgmPrefill(prefill)) return;
-    if (bgValue.trim()) return;
     if (lastAutoKey.current === autoApplyKey) return;
+    if (userEditedRef.current) return;
     lastAutoKey.current = autoApplyKey;
     applyFromCgm(prefill!);
-  }, [autoApplyKey, applyFromCgm, bgValue, prefill]);
+  }, [autoApplyKey, applyFromCgm, prefill]);
 
   useEffect(() => {
     if (!syncOnPoll || !isFreshCgmPrefill(prefill)) return;

@@ -67,8 +67,9 @@ describe("shouldSyncLiveCgmToSession", () => {
     expect(shouldSyncLiveCgmToSession(activeSession({ midBgSource: "manual", midBg: 5.5 }))).toBe(false);
   });
 
-  it("returns false outside active phase", () => {
-    expect(shouldSyncLiveCgmToSession(activeSession({ phase: "pre" }))).toBe(false);
+  it("returns true for pre and recovery when CGM is enabled", () => {
+    expect(shouldSyncLiveCgmToSession(activeSession({ phase: "pre", exerciseStartedAt: undefined }))).toBe(true);
+    expect(shouldSyncLiveCgmToSession(activeSession({ phase: "recovery" }))).toBe(true);
   });
 });
 
@@ -106,13 +107,17 @@ describe("syncLiveCgmToActiveExerciseSession", () => {
     expect(updateActiveExercise).not.toHaveBeenCalled();
   });
 
-  it("does not sync when mid BG was logged manually", async () => {
-    getActiveExercise.mockReturnValue(activeSession({ midBgSource: "manual", midBg: 6.2 }));
-    getBgPrefill.mockResolvedValue(freshPrefill(5.1, "2026-07-09T10:00:00.000Z"));
+  it("writes fresh CGM into recovery fields", async () => {
+    const at = "2026-07-09T10:30:00.000Z";
+    getActiveExercise.mockReturnValue(activeSession({ phase: "recovery" }));
+    getBgPrefill.mockResolvedValue(freshPrefill(6.1, at));
 
-    const result = await syncLiveCgmToActiveExerciseSession();
+    await syncLiveCgmToActiveExerciseSession();
 
-    expect(result).toBeNull();
-    expect(updateActiveExercise).not.toHaveBeenCalled();
+    expect(updateActiveExercise).toHaveBeenCalledWith({
+      recoveryBg: 6.1,
+      recoveryTrend: "flat",
+      recoveryBgAt: at,
+    });
   });
 });
