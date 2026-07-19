@@ -671,7 +671,10 @@ export default function CommunityHomePage() {
       <div
         className={cn(
           "space-y-2 rounded-2xl border border-border/45 bg-card/90 p-2 shadow-sm backdrop-blur-xl supports-[backdrop-filter]:bg-card/80",
-          "sticky top-0 z-20 md:static md:z-auto md:border-0 md:bg-transparent md:p-0 md:shadow-none md:backdrop-blur-none",
+          // Stay in normal document flow (not sticky). Sticky top-0 used to pin this
+          // over the feed once `#app-scroll-main` became a real scrollport — e.g. when
+          // an active exercise session locks the shell to h-dvh — covering posts as you scroll.
+          "md:border-0 md:bg-transparent md:p-0 md:shadow-none md:backdrop-blur-none",
         )}
       >
         {feedHeaderActions ? (
