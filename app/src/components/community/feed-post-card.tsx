@@ -798,7 +798,7 @@ export function FeedPostCard({
               )}
             </div>
           )}
-          <div className="flex items-center gap-1.5 rounded-full border border-border/40 bg-muted/15 py-1 pl-3 pr-1">
+          <div className="flex items-end gap-2 rounded-[1.35rem] border border-border/50 bg-muted/30 p-1.5 pl-3 shadow-sm ring-1 ring-black/[0.03] dark:ring-white/[0.04]">
             <div className="min-w-0 flex-1">
               <MentionTextarea
                 textareaRef={commentInputRef}
@@ -808,16 +808,18 @@ export function FeedPostCard({
                 rows={1}
                 maxLength={4000}
                 hideHint
+                autoGrow
+                maxGrowPx={148}
                 placeholder={mayEngage ? "Add a comment…" : "Set up your @handle to comment"}
                 disabled={!mayEngage}
-                className="min-h-8 resize-none border-0 bg-transparent px-0 py-1.5 text-base shadow-none focus-visible:ring-0"
+                className="min-h-10 resize-none border-0 bg-transparent px-0 py-2.5 text-[15px] leading-snug shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
               />
             </div>
             <Button
               type="button"
               size="sm"
-              className="h-8 shrink-0 rounded-full px-3 text-xs"
-              disabled={!mayEngage}
+              className="mb-0.5 h-9 shrink-0 rounded-full px-4 text-sm font-semibold shadow-none"
+              disabled={!mayEngage || !commentDraft.trim()}
               onClick={onSubmitComment}
             >
               Post

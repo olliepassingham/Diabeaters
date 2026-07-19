@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type Ref } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Ref } from "react";
 
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,6 +27,10 @@ type MentionTextareaProps = {
   textareaRef?: Ref<HTMLTextAreaElement | null>;
   /** Hide the helper line under the field (e.g. compact comment box). */
   hideHint?: boolean;
+  /** Grow height with content (capped by maxGrowPx). */
+  autoGrow?: boolean;
+  /** Max height in px when autoGrow is on. Default 160. */
+  maxGrowPx?: number;
 };
 
 export function MentionTextarea({
@@ -41,11 +45,27 @@ export function MentionTextarea({
   id,
   textareaRef: externalTextareaRef,
   hideHint = false,
+  autoGrow = false,
+  maxGrowPx = 160,
 }: MentionTextareaProps) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [suggestions, setSuggestions] = useState<MentionSuggestion[]>([]);
   const [suggestLoading, setSuggestLoading] = useState(false);
   const [mentionStart, setMentionStart] = useState<number | null>(null);
+
+  const syncAutoGrow = useCallback(() => {
+    if (!autoGrow) return;
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    const contentHeight = el.scrollHeight;
+    el.style.height = `${Math.min(contentHeight, maxGrowPx)}px`;
+    el.style.overflowY = contentHeight > maxGrowPx ? "auto" : "hidden";
+  }, [autoGrow, maxGrowPx]);
+
+  useLayoutEffect(() => {
+    syncAutoGrow();
+  }, [value, syncAutoGrow]);
 
   const refreshSuggestions = useCallback(
     (text: string, cursor: number) => {
@@ -99,9 +119,10 @@ export function MentionTextarea({
         if (!ta) return;
         ta.focus();
         ta.setSelectionRange(next.cursor, next.cursor);
+        syncAutoGrow();
       });
     },
-    [mentionStart, onChange, value],
+    [mentionStart, onChange, syncAutoGrow, value],
   );
 
   useEffect(() => {
@@ -126,6 +147,9 @@ export function MentionTextarea({
           else if (externalTextareaRef && "current" in externalTextareaRef) {
             (externalTextareaRef as { current: HTMLTextAreaElement | null }).current = el;
           }
+          if (el && autoGrow) {
+            window.requestAnimationFrame(syncAutoGrow);
+          }
         }}
         id={id}
         value={value}
@@ -142,7 +166,11 @@ export function MentionTextarea({
         autoCapitalize="off"
         autoCorrect="off"
         spellCheck={false}
-        className={cn("surface-field min-h-[5.5rem] rounded-xl text-base", className)}
+        className={cn(
+          "surface-field w-full rounded-xl text-base",
+          autoGrow ? "min-h-0 overflow-hidden" : "min-h-[5.5rem]",
+          className,
+        )}
         aria-autocomplete="list"
         aria-controls={mentionStart != null ? "mention-suggestions" : undefined}
       />
