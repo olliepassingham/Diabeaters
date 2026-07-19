@@ -30,7 +30,7 @@ import {
   Wind,
 } from "lucide-react";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -731,20 +731,17 @@ export function ExerciseGuidedCoach() {
             className="overflow-hidden rounded-2xl border-border/50 shadow-sm ring-1 ring-border/40 dark:ring-border/30"
             data-testid="exercise-recent-workouts"
           >
-            <CardHeader className="pb-3">
-              <CardTitle className="text-h3 flex items-center gap-2">
-                <History className="h-5 w-5 text-muted-foreground" aria-hidden />
-                Recent workouts
+            <CardHeader className="px-4 py-3 sm:px-5">
+              <CardTitle className="text-base font-semibold tracking-tight flex items-center gap-2">
+                <History className="h-4 w-4 text-muted-foreground" aria-hidden />
+                Recent
               </CardTitle>
-              <CardDescription>
-                Restart a completed session — update today&apos;s BG and meal details before you start.
-              </CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-2 pt-0">
+            <CardContent className="grid gap-2 px-4 pb-3 pt-0 sm:px-5">
               {recentWorkouts.map((session) => (
                 <div
                   key={session.id}
-                  className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-border/60 bg-muted/10 px-3 py-3"
+                  className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-border/60 bg-muted/10 px-3 py-2.5"
                   data-testid={`exercise-recent-workout-${session.id}`}
                 >
                   <div className="min-w-0">
@@ -777,31 +774,24 @@ export function ExerciseGuidedCoach() {
             <CollapsibleTrigger asChild>
               <button
                 type="button"
-                className="flex w-full items-start justify-between gap-3 px-6 py-4 text-left hover:bg-muted/30 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted/30 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset sm:px-5"
                 data-testid="coach-plan-workout-trigger"
                 aria-expanded={planWorkoutOpen}
               >
-                <div className="min-w-0 space-y-1">
-                  <CardTitle className="text-h3 flex items-center gap-2">
-                    <Sparkles className="h-5 w-5 text-primary shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <CardTitle className="text-base font-semibold tracking-tight flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-primary shrink-0" />
                     Plan a workout
                   </CardTitle>
-                  <CardDescription>
-                    {planWorkoutOpen
-                      ? closedLoop
-                        ? "Guided pre / during / recovery — check IOB and loop settings before you go."
-                        : "Start a guided pre / during / recovery session."
-                      : `${startDuration || "—"} min · ${startIntensity} · ${startType.replace(/_/g, " ")}`}
-                  </CardDescription>
                 </div>
                 <ChevronDown
-                  className="h-5 w-5 shrink-0 text-muted-foreground mt-0.5 transition-transform group-data-[state=open]:rotate-180"
+                  className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180"
                   aria-hidden
                 />
               </button>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <CardContent className="space-y-4 pt-0">
+              <CardContent className="space-y-4 border-t border-border/50 px-4 pb-4 pt-3 sm:px-5">
             <div className="grid gap-3 md:grid-cols-3">
               <div className="space-y-1.5">
                 <Label htmlFor="start-type">Type</Label>
@@ -855,14 +845,13 @@ export function ExerciseGuidedCoach() {
 
         {routines.length > 0 ? (
           <Card className="overflow-hidden rounded-2xl border-border/50 shadow-sm ring-1 ring-border/40 dark:ring-border/30">
-            <CardHeader>
-              <CardTitle className="text-h3 flex items-center gap-2">
-                <Dumbbell className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                Saved routines
+            <CardHeader className="px-4 py-3 sm:px-5">
+              <CardTitle className="text-base font-semibold tracking-tight flex items-center gap-2">
+                <Dumbbell className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                Routines
               </CardTitle>
-              <CardDescription>Tap to start with the same questions filled in.</CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-2 sm:grid-cols-2">
+            <CardContent className="grid gap-2 px-4 pb-3 pt-0 sm:grid-cols-2 sm:px-5">
               {routines.map((r) => (
                 <button
                   key={r.id}

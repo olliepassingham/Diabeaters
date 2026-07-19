@@ -549,8 +549,9 @@ export function ExerciseFuelCalculator() {
   }, [exerciseType, intensity, duration, minutesUntilStart]);
 
   const collapsedSummary = useMemo(() => {
-    if (!result || formOpen) return null;
-    return `${sessionLine} — tap to edit`;
+    if (formOpen) return null;
+    if (result) return sessionLine;
+    return null;
   }, [result, formOpen, sessionLine]);
 
   return (
@@ -560,27 +561,27 @@ export function ExerciseFuelCalculator() {
           <CollapsibleTrigger asChild>
             <button
               type="button"
-              className="flex w-full items-start justify-between gap-3 px-6 py-4 text-left hover:bg-muted/30 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+              className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted/30 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset sm:px-5"
               data-testid="efc-collapsible-trigger"
               aria-expanded={formOpen}
             >
-              <div className="min-w-0 space-y-1">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Calculator className="h-5 w-5 text-primary shrink-0" aria-hidden />
-                  Pre-exercise fuel &amp; insulin
+              <div className="min-w-0 flex-1">
+                <CardTitle className="text-base font-semibold tracking-tight flex items-center gap-2">
+                  <Calculator className="h-4 w-4 text-primary shrink-0" aria-hidden />
+                  Fuel &amp; insulin
                 </CardTitle>
-                <CardDescription>
-                  {collapsedSummary ?? "Carb and insulin numbers for your session and food plan."}
-                </CardDescription>
+                {collapsedSummary ? (
+                  <CardDescription className="mt-0.5 truncate">{collapsedSummary}</CardDescription>
+                ) : null}
               </div>
               <ChevronDown
-                className="h-5 w-5 shrink-0 text-muted-foreground mt-0.5 transition-transform group-data-[state=open]:rotate-180"
+                className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180"
                 aria-hidden
               />
             </button>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <CardContent className="space-y-5 pt-0">
+            <CardContent className="space-y-5 border-t border-border/50 px-4 pb-4 pt-3 sm:px-5">
           <div className="space-y-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your session</p>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -776,10 +777,6 @@ export function ExerciseFuelCalculator() {
                     </SelectContent>
                   </Select>
                 </div>
-                <p className="sm:col-span-2 text-xs text-muted-foreground leading-relaxed">
-                  Enter current BG above — we estimate insulin for your carbs, exercise type, and target range (with
-                  exercise reduction applied).
-                </p>
               </div>
             ) : null}
           </div>
