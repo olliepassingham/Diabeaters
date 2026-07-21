@@ -44,6 +44,7 @@ import {
   DexcomLoginAssist,
   formatDexcomStoredLoginLabel,
   normalizeDexcomUsernameInput,
+  shouldEmphasizeDexcomAccountIdAssist,
 } from "@/components/cgm-dexcom-login-assist";
 import { isDexcomAccountId } from "@/lib/cgm/dexcom-share-client";
 
@@ -171,7 +172,7 @@ function getCgmStatus({
   if (prefs.dexcomShareEnabled) {
     return {
       label: "Needs setup",
-      detail: "Enter your Dexcom login and tap Connect Dexcom Share.",
+      detail: "Paste your Dexcom account ID (or try email), then tap Connect Dexcom Share.",
       tone: "amber",
     };
   }
@@ -220,6 +221,7 @@ export function SettingsCgmRoute() {
   const [libreRegion, setLibreRegion] = useState<LibreLinkUpRegion>(
     () => readCgmPreferences().libreLinkUpRegion ?? "eu",
   );
+  const [dexcomAssistEmphasize, setDexcomAssistEmphasize] = useState(false);
 
   useEffect(() => {
     if (!isCapacitorNativeShell()) return;
@@ -352,10 +354,14 @@ export function SettingsCgmRoute() {
       if (!res.ok) {
         const message = res.error ?? "Could not connect to Dexcom Share.";
         setDexcomError(message);
+        if (shouldEmphasizeDexcomAccountIdAssist(message) && !isDexcomAccountId(dexcomUsername)) {
+          setDexcomAssistEmphasize(true);
+        }
         toast({ title: "Dexcom Share failed", description: message, variant: "destructive" });
         return;
       }
       setDexcomError(null);
+      setDexcomAssistEmphasize(false);
       const next = readCgmPreferences();
       setPrefs(next);
       setDexcomUsername(next.dexcomShareUsername ?? "");
@@ -369,6 +375,9 @@ export function SettingsCgmRoute() {
     } catch (e) {
       const message = e instanceof Error ? e.message : "Dexcom Share connection failed.";
       setDexcomError(message);
+      if (shouldEmphasizeDexcomAccountIdAssist(message) && !isDexcomAccountId(dexcomUsername)) {
+        setDexcomAssistEmphasize(true);
+      }
       toast({ title: "Dexcom Share failed", description: message, variant: "destructive" });
     } finally {
       setDexcomConnecting(false);
@@ -379,6 +388,7 @@ export function SettingsCgmRoute() {
     await disconnectDexcomShareCgm();
     setDexcomPassword("");
     setDexcomError(null);
+    setDexcomAssistEmphasize(false);
     setPrefs(readCgmPreferences());
     toast({ title: "Dexcom Share disconnected" });
   }
@@ -523,23 +533,82 @@ export function SettingsCgmRoute() {
 
       {isNative && prefs.prefillEnabled ? (
         <SettingsPanel>
-          <SettingsPanelBody className="space-y-2.5" data-testid="panel-cgm-source-guide">
-            <p className="text-sm font-medium text-foreground">Which connection should I use?</p>
-            <ul className="list-none space-y-2 text-xs leading-relaxed text-muted-foreground">
-              <li>
-                <span className="font-medium text-foreground">Dexcom Share or LibreLink Up</span> — best for near-live
-                BG, trends, glucose charts, overnight review, and supporter sharing. Your login stays on this device
-                only.
-              </li>
-              <li>
-                <span className="font-medium text-foreground">{healthLabel}</span> — optional fallback with no extra
-                login (OS permission only). Readings are often delayed by hours. Good if you only share from your CGM app
-                to {healthLabel}, or prefer not to store Share/Libre credentials here.
-              </li>
-            </ul>
-            <p className="text-[11px] leading-relaxed text-muted-foreground">
-              If both are on, Diabeaters uses whichever reading is freshest.
+          <SettingsPanelBody className="space-y-3" data-testid="panel-cgm-source-guide">
+            <p className="text-sm font-medium text-foreground">Which CGM do you use?</p>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Pick one to open the right setup. You can change this later.
             </p>
+            <div className="grid gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-auto min-h-11 w-full justify-start gap-3 px-3 py-2.5 text-left"
+                onClick={() =>
+                  updatePrefs({
+                    ...prefs,
+                    dexcomShareEnabled: true,
+                    libreLinkUpEnabled: false,
+                    healthPlatformEnabled: false,
+                  })
+                }
+                data-testid="button-cgm-choose-dexcom"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium text-foreground">Dexcom</span>
+                  <span className="block text-[11px] leading-snug text-muted-foreground">
+                    Near-live Share — best for charts, overnight review, and supporter live BG. Account ID usually
+                    works better than email.
+                  </span>
+                </span>
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-auto min-h-11 w-full justify-start gap-3 px-3 py-2.5 text-left"
+                onClick={() =>
+                  updatePrefs({
+                    ...prefs,
+                    libreLinkUpEnabled: true,
+                    dexcomShareEnabled: false,
+                    healthPlatformEnabled: false,
+                  })
+                }
+                data-testid="button-cgm-choose-libre"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium text-foreground">Libre</span>
+                  <span className="block text-[11px] leading-snug text-muted-foreground">
+                    Near-live via LibreLink Up (follower / care-partner login — not the patient LibreLink app alone).
+                  </span>
+                </span>
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-auto min-h-11 w-full justify-start gap-3 px-3 py-2.5 text-left"
+                onClick={() =>
+                  updatePrefs({
+                    ...prefs,
+                    healthPlatformEnabled: true,
+                    dexcomShareEnabled: false,
+                    libreLinkUpEnabled: false,
+                  })
+                }
+                data-testid="button-cgm-choose-health"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium text-foreground">Just {healthLabel} for now</span>
+                  <span className="block text-[11px] leading-snug text-muted-foreground">
+                    Easiest — one OS permission, no Share login. Readings are often delayed; not ideal for live charts.
+                  </span>
+                </span>
+              </Button>
+            </div>
+            {(dexcomConnected || libreConnected || accessGranted) ? (
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                Already connected. If both Share/Libre and {healthLabel} are on, Diabeaters uses the freshest reading.
+              </p>
+            ) : null}
           </SettingsPanelBody>
         </SettingsPanel>
       ) : null}
@@ -611,13 +680,30 @@ export function SettingsCgmRoute() {
           <SettingsPanel>
             <SettingsPanelBody className="space-y-3">
               <p className="text-xs leading-relaxed text-muted-foreground">
-                Enter the email or phone for your <span className="font-medium text-foreground">Dexcom G7/G6</span> or{" "}
-                <span className="font-medium text-foreground">Clarity</span> account — not Dexcom Follow. Share must be on
-                in the Dexcom app (add at least one follower if prompted). UK/EU: region Europe.
+                Use your <span className="font-medium text-foreground">Dexcom G7/G6 or Clarity</span> account — not
+                Dexcom Follow. Share must be on in the Dexcom app. UK/EU: region Europe.
               </p>
+
+              {!dexcomConnected ? (
+                <DexcomLoginAssist
+                  server={dexcomServer}
+                  emphasize={dexcomAssistEmphasize}
+                  onAccountIdPasted={(id) => {
+                    setDexcomUsername(id);
+                    setDexcomError(null);
+                    setDexcomAssistEmphasize(false);
+                  }}
+                  onAssistError={(message) => setDexcomError(message)}
+                />
+              ) : null}
+
               <div className="space-y-1.5">
                 <Label htmlFor="dexcom-username" className="text-xs text-muted-foreground">
-                  Dexcom email, phone, or account ID
+                  {dexcomConnected
+                    ? "Linked account"
+                    : isDexcomAccountId(dexcomUsername)
+                      ? "Account ID"
+                      : "Account ID, portal link, or email"}
                 </Label>
                 <Input
                   id="dexcom-username"
@@ -629,29 +715,24 @@ export function SettingsCgmRoute() {
                   onChange={(e) => {
                     setDexcomUsername(normalizeDexcomUsernameInput(e.target.value));
                     setDexcomError(null);
+                    setDexcomAssistEmphasize(false);
                   }}
                   autoComplete="username"
                   className="h-10"
                   disabled={dexcomConnected}
-                  placeholder="you@email.com"
+                  placeholder="Paste portal link or account ID"
                   data-testid="input-dexcom-username"
                 />
                 {dexcomConnected && isDexcomAccountId(dexcomUsername) ? (
                   <p className="text-[11px] text-muted-foreground">
                     Your Dexcom account ID is saved — you won&apos;t need to look it up again.
                   </p>
+                ) : !dexcomConnected ? (
+                  <p className="text-[11px] text-muted-foreground">
+                    Email or phone sometimes works — if Connect fails, use the account ID steps above.
+                  </p>
                 ) : null}
               </div>
-              {!dexcomConnected ? (
-                <DexcomLoginAssist
-                  server={dexcomServer}
-                  onAccountIdPasted={(id) => {
-                    setDexcomUsername(id);
-                    setDexcomError(null);
-                  }}
-                  onAssistError={(message) => setDexcomError(message)}
-                />
-              ) : null}
               <div className="space-y-1.5">
                 <Label htmlFor="dexcom-password" className="text-xs text-muted-foreground">
                   Dexcom app / Clarity password
@@ -724,8 +805,8 @@ export function SettingsCgmRoute() {
             <SettingsPanelBody className="space-y-3">
               <p className="text-xs leading-relaxed text-muted-foreground">
                 Use your <span className="font-medium text-foreground">LibreLink Up</span> email and password — the
-                account that follows their sensor. In LibreLink Up, follow the person you support (or ask them to invite
-                you) before connecting. UK/EU: region Europe.
+                care-partner / follower app that follows their sensor, not the LibreLink patient app login on its own.
+                Ask them to invite you (or follow them) in LibreLink Up first. UK/EU: region Europe.
               </p>
               <div className="space-y-1.5">
                 <Label htmlFor="libre-email" className="text-xs text-muted-foreground">

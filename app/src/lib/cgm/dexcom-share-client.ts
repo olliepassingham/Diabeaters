@@ -363,14 +363,21 @@ export async function testDexcomShareConnection(
       return {
         ok: false,
         error:
-          "Dexcom rejected the password for Share. Enable Share in the Dexcom G7 app (add at least one follower). Then try your email and password here — or use “Find account ID” below and paste the ID from the Dexcom account portal.",
+          "Dexcom rejected that login for Share. Turn on Share in the Dexcom G7 app (add a follower if asked), then connect with your account ID from the portal — email/phone often fails even when the password is right.",
+      };
+    }
+    if (/login failed|authenticate|AccountNotFound|InvalidArgument/i.test(message)) {
+      return {
+        ok: false,
+        error:
+          "Could not sign in with that email or phone. Use “Open account portal”, copy the web address after signing in, and paste your account ID below.",
       };
     }
     if (/500/.test(message)) {
       return {
         ok: false,
         error:
-          `${message} If your password is correct, confirm Share is enabled in the Dexcom app and try region Europe/UK. Wrong region can also cause server errors.`,
+          `${message} Check Share is on in the Dexcom app and region is correct (UK/EU → Europe). If email still fails, paste your account ID from the Dexcom portal.`,
       };
     }
     return { ok: false, error: message };
