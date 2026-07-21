@@ -974,6 +974,23 @@ export interface PumpFailureSession {
   endedAtIso?: string;
 }
 
+/** What action (if any) was suggested to the user at the time of a bedtime check. */
+export type BedtimeActionSuggested = "correction" | "snack" | "dose_too_small" | "missing_isf" | "none";
+
+/**
+ * Optional manual follow-up the user can add after a bedtime check, once the estimated sleep
+ * window has passed — lets them report what actually happened overnight. Used only to shape
+ * educational tips/pattern insights, never to change dose maths.
+ */
+export interface BedtimeOutcome {
+  reportedAt: string;
+  overnightFeel: "steady" | "went_low" | "went_high" | "not_sure";
+  morningBg?: number | null;
+  morningBgUnits?: "mmol/L" | "mg/dL";
+  followedAction?: "yes" | "no" | "partially" | "n_a";
+  note?: string;
+}
+
 export interface BedtimeLog {
   id: string;
   date: string;
@@ -997,6 +1014,10 @@ export interface BedtimeLog {
   travelModeActive: boolean;
   correctionGiven: number | null;
   notes: string;
+  /** What action was suggested at the time of this check (correction/snack/none/etc). */
+  actionSuggested?: BedtimeActionSuggested;
+  /** Manual "how did last night go?" follow-up, added later once the sleep window has passed. */
+  outcome?: BedtimeOutcome;
 }
 
 export interface SickDayJournalEntry {
@@ -3373,6 +3394,13 @@ export const storage = {
     logs.unshift(log);
     const trimmed = logs.slice(0, 90);
     localStorage.setItem(STORAGE_KEYS.BEDTIME_LOGS, JSON.stringify(trimmed));
+  },
+
+  /** Merge a partial update (e.g. a manually-logged outcome) into an existing bedtime log by id. */
+  updateBedtimeLog(id: string, patch: Partial<BedtimeLog>): void {
+    const logs = this.getBedtimeLogs();
+    const next = logs.map((log) => (log.id === id ? { ...log, ...patch } : log));
+    localStorage.setItem(STORAGE_KEYS.BEDTIME_LOGS, JSON.stringify(next));
   },
 
   getSickDayJournal(): SickDayJournalEntry[] {

@@ -10,15 +10,19 @@ import { Moon, Utensils, Activity, Wine, AlertTriangle, Sparkles, Plane, Thermom
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 import { BedtimeReminderPromptDialog } from "@/components/bedtime-reminder-prompt-dialog";
+import { BedtimeOutcomeCheckinDialog } from "@/components/bedtime-outcome-checkin-dialog";
 import { useAuth } from "@/lib/auth-context";
 import { useLinkedPatient } from "@/hooks/use-linked-patient";
 import { shouldOfferBedtimeReminderSecondChance } from "@/lib/bedtime-reminder-prompt";
+import { findLogNeedingOutcome } from "@/lib/bedtime-outcome-prompt";
+import { buildOutcomePatternTip, summarizeOutcomeAccuracy } from "@/lib/bedtime-outcome-insights";
 import { rescheduleBedtimeReminders } from "@/lib/bedtime-reminders";
 import {
   storage,
   UserSettings,
   ScenarioState,
   BedtimeLog,
+  type BedtimeActionSuggested,
   DIABEATER_PROFILE_CHANGED_EVENT,
   DIABEATER_SETTINGS_CHANGED_EVENT,
   type UserProfile,
@@ -218,6 +222,8 @@ export default function Bedtime() {
   const { data: linkedPatient } = useLinkedPatient();
   const hasCarerLink = !!linkedPatient;
   const [secondChancePromptOpen, setSecondChancePromptOpen] = useState(false);
+  const [outcomeCheckinLog, setOutcomeCheckinLog] = useState<BedtimeLog | null>(null);
+  const [outcomeCheckinOpen, setOutcomeCheckinOpen] = useState(false);
 
   useEffect(() => {
     const settings = storage.getSettings();
@@ -228,7 +234,8 @@ export default function Bedtime() {
     }
     setProfile(storage.getProfile());
     setScenarioState(storage.getScenarioState());
-    setBedtimeLogs(storage.getBedtimeLogs());
+    const logs = storage.getBedtimeLogs();
+    setBedtimeLogs(logs);
     // Auto-nudge based on recent exercise sessions (within last 24h).
     const did = storage.didExerciseRecently(24);
     setExercisedToday(did);
@@ -238,7 +245,17 @@ export default function Bedtime() {
     } else {
       setLastExerciseLabel(null);
     }
+    // Next time they open this page after a check whose sleep window has passed, ask what happened.
+    const needsOutcome = findLogNeedingOutcome(logs);
+    if (needsOutcome) {
+      setOutcomeCheckinLog(needsOutcome);
+      setOutcomeCheckinOpen(true);
+    }
   }, []);
+
+  const refreshBedtimeLogs = () => {
+    setBedtimeLogs(storage.getBedtimeLogs());
+  };
 
   useEffect(() => {
     const onProfile = () => setProfile(storage.getProfile());
@@ -267,7 +284,11 @@ export default function Bedtime() {
     refresh: refreshLastNight,
   } = useBedtimeLastNight(bedtimeLogs, bgUnits);
 
-  const persistBedtimeCheck = (level: ReadinessLevel, correctionDose: number | null) => {
+  const persistBedtimeCheck = (
+    level: ReadinessLevel,
+    correctionDose: number | null,
+    actionSuggested: BedtimeActionSuggested,
+  ) => {
     const isFirstBedtimeCheck = storage.getBedtimeLogs().length === 0;
     const log: BedtimeLog = {
       id: crypto.randomUUID(),
@@ -287,6 +308,7 @@ export default function Bedtime() {
       travelModeActive: scenarioState.travelModeActive,
       correctionGiven: correctionDose,
       notes: "",
+      actionSuggested,
     };
     storage.saveBedtimeLog(log);
     setBedtimeLogs(storage.getBedtimeLogs());
@@ -721,6 +743,29 @@ export default function Bedtime() {
       sickDayActive: scenarioState.sickDayActive,
     });
     const action = resolveBedtimeAction(correctionResult, personalized.snack);
+    const actionSuggested: BedtimeActionSuggested =
+      action.kind === "correction"
+        ? "correction"
+        : action.kind === "snack"
+          ? "snack"
+          : action.kind === "dose_too_small"
+            ? "dose_too_small"
+            : action.kind === "missing_isf"
+              ? "missing_isf"
+              : "none";
+
+    // Educational only — reflects the user's own logged outcomes, never changes the dose above.
+    const outcomeTip = buildOutcomePatternTip(bedtimeLogs, {
+      exercisedToday,
+      hadAlcohol,
+      recentHypos,
+      actionSuggested,
+      bgTrend,
+    });
+    if (outcomeTip) {
+      tips.push(outcomeTip);
+    }
+
     const bgAboveTarget = bgMmol > targetHighMmol;
     const messageBullets = personalized.messageBullets;
     const message = messageBullets.join(" ");
@@ -743,7 +788,11 @@ export default function Bedtime() {
     } catch {
       // ignore
     }
-    persistBedtimeCheck(level, correctionResult.status === "dose" ? correctionResult.suggestedDose : null);
+    persistBedtimeCheck(
+      level,
+      correctionResult.status === "dose" ? correctionResult.suggestedDose : null,
+      actionSuggested,
+    );
     setQuickCheckOpen(false);
 
     // Bring the verdict/status card into view after calculating.
@@ -806,7 +855,10 @@ export default function Bedtime() {
     if (counts.steady > 0) parts.push(`${counts.steady} steady night${counts.steady !== 1 ? "s" : ""}`);
     if (counts.monitor > 0) parts.push(`${counts.monitor} monitor night${counts.monitor !== 1 ? "s" : ""}`);
     if (counts.alert > 0) parts.push(`${counts.alert} alert night${counts.alert !== 1 ? "s" : ""}`);
-    return `You've had ${parts.join(" and ")} in the last week`;
+    let insight = `You've had ${parts.join(" and ")} in the last week`;
+    const accuracy = summarizeOutcomeAccuracy(bedtimeLogs);
+    if (accuracy) insight += `. ${accuracy}`;
+    return insight;
   };
 
   const getLevelBadge = (level: ReadinessLevel) => {
@@ -1299,6 +1351,24 @@ export default function Bedtime() {
                             Alcohol
                           </Badge>
                         )}
+                        {log.outcome && (
+                          <Badge variant="outline" className="text-xs" data-testid={`badge-log-outcome-${log.id}`}>
+                            {log.outcome.overnightFeel === "went_low" ? (
+                              <TrendingDown className="h-3 w-3 mr-1" />
+                            ) : log.outcome.overnightFeel === "went_high" ? (
+                              <TrendingUp className="h-3 w-3 mr-1" />
+                            ) : (
+                              <Minus className="h-3 w-3 mr-1" />
+                            )}
+                            {log.outcome.overnightFeel === "went_low"
+                              ? "Went low"
+                              : log.outcome.overnightFeel === "went_high"
+                                ? "Went high"
+                                : log.outcome.overnightFeel === "steady"
+                                  ? "Steady"
+                                  : "Outcome logged"}
+                          </Badge>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -1312,6 +1382,12 @@ export default function Bedtime() {
         open={secondChancePromptOpen}
         onOpenChange={setSecondChancePromptOpen}
         variant="second_chance"
+      />
+      <BedtimeOutcomeCheckinDialog
+        open={outcomeCheckinOpen}
+        onOpenChange={setOutcomeCheckinOpen}
+        log={outcomeCheckinLog}
+        onSaved={refreshBedtimeLogs}
       />
     </PageShell>
   );
