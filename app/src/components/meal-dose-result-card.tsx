@@ -1,26 +1,35 @@
-import { BookOpen, Calculator, ChevronDown, ChevronUp, Plane, Thermometer, Utensils, X } from "lucide-react";
+import { useMemo } from "react";
+import { BookOpen, ChevronDown, ChevronUp, Plane, Split, Thermometer, Utensils, X } from "lucide-react";
 
-import { MealCarbAbsorptionPreview } from "@/components/meal-carb-absorption-preview";
+import { MealImpactCard } from "@/components/meal-impact-card";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
+import { RatiosEditPanel } from "@/components/ratios-edit-panel";
 import { ScenarioResultHero, ScenarioResultHeroSuffix } from "@/components/scenarios/scenario-result-hero";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import type { MealAbsorptionVisual } from "@/lib/meal-planner-food-categories";
-import type { MealDoseResult } from "@/lib/meal-dose";
-import type { ScenarioState } from "@/lib/storage";
+import { calculateSplitDose, type MealDoseResult, type SplitFatTier } from "@/lib/meal-dose";
+import type { MealImpactProfile } from "@/lib/meal-impact";
+import type { RatioFormat, ScenarioState, UserSettings } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 
 export type MealDoseResultCardProps = {
   mealResult: MealDoseResult;
-  mealAbsorptionVisual: MealAbsorptionVisual;
-  mealFoodShortLabel: string;
+  mealImpact: MealImpactProfile | null;
   isPumpUser: boolean;
   showDetails: boolean;
   onShowDetailsChange: (open: boolean) => void;
   scenarioState: ScenarioState;
   onClose: () => void;
   onGoToRatios: () => void;
+  /** Opens the standalone split-dose calculator, prefilled from this result. */
+  onOpenSplitCalculator?: () => void;
+  /** Needed to offer an inline ratio setup right where the "no ratios" dead-end happens. */
+  settings: UserSettings;
+  bgUnit: string;
+  ratioFormat: RatioFormat;
+  carbPortionSize?: number;
+  onRatiosSaved: (settings: UserSettings) => void;
   /** Full-screen result view uses larger dose typography. */
   variant?: "inline" | "page";
 };
@@ -117,17 +126,28 @@ function MealDoseHero({
 
 export function MealDoseResultCard({
   mealResult,
-  mealAbsorptionVisual,
-  mealFoodShortLabel,
+  mealImpact,
   isPumpUser,
   showDetails,
   onShowDetailsChange,
   scenarioState,
   onClose,
   onGoToRatios,
+  onOpenSplitCalculator,
+  settings,
+  bgUnit,
+  ratioFormat,
+  carbPortionSize,
+  onRatiosSaved,
   variant = "inline",
 }: MealDoseResultCardProps) {
   const isPage = variant === "page";
+
+  const splitPreview = useMemo(() => {
+    if (!mealImpact?.tailRisk || mealResult.error || !mealResult.exactDose || mealResult.exactDose <= 0) return null;
+    const tier: SplitFatTier = mealImpact.composition.hasFat && mealImpact.composition.hasProtein ? "high" : "medium";
+    return calculateSplitDose(mealResult.exactDose, tier);
+  }, [mealImpact, mealResult.error, mealResult.exactDose]);
 
   return (
     <Card
@@ -146,29 +166,63 @@ export function MealDoseResultCard({
         </div>
 
         {mealResult.error === "no_ratios" ? (
-          <div className="rounded-xl border border-border/60 bg-muted/20 p-4 text-center space-y-2">
-            <p className="text-sm text-muted-foreground">
-              You need insulin-to-carb ratios before the meal planner can suggest doses.
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={onGoToRatios}
-              data-testid="button-no-ratios-go-adviser"
-            >
-              <Calculator className="h-3.5 w-3.5" />
-              Go to Ratio Adviser
-            </Button>
+          <div className="space-y-3" data-testid="meal-result-no-ratios">
+            <div className="rounded-xl border border-border/60 bg-muted/20 p-3 text-sm text-muted-foreground">
+              You need insulin-to-carb ratios before the meal planner can suggest doses — add them below and
+              we&apos;ll work out your dose right away.
+            </div>
+            <RatiosEditPanel
+              settings={settings}
+              bgUnit={bgUnit}
+              ratioFormat={ratioFormat}
+              carbPortionSize={carbPortionSize}
+              onSaved={onRatiosSaved}
+              onCancel={onGoToRatios}
+              idPrefix="meal-result-ratios-setup"
+            />
+          </div>
+        ) : mealResult.error === "invalid_carbs" ? (
+          <div className="rounded-xl border border-border/60 bg-muted/20 p-4 text-center text-sm text-muted-foreground">
+            Enter a carb amount greater than 0 to get a dose suggestion.
           </div>
         ) : (
           <>
             <MealDoseHero mealResult={mealResult} isPumpUser={isPumpUser} isPage={isPage} />
-            <MealCarbAbsorptionPreview
-              carbsGrams={mealResult.carbs}
-              visual={mealAbsorptionVisual}
-              foodChoiceLabel={mealFoodShortLabel}
-            />
+            {mealImpact ? <MealImpactCard impact={mealImpact} /> : null}
+            {splitPreview ? (
+              <div
+                className="space-y-2 rounded-xl border border-border/60 bg-background/60 p-3"
+                data-testid="meal-result-split-preview"
+              >
+                <p className="flex items-center gap-1.5 text-sm font-medium">
+                  <Split className="h-4 w-4 text-primary" aria-hidden />
+                  Consider splitting this dose
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Fat/protein in this meal can cause a delayed rise — spreading the dose may help it match.
+                </p>
+                <div className="flex items-center justify-between gap-2 rounded-lg bg-muted/30 px-3 py-2 text-sm">
+                  <span>
+                    Now: <strong className="tabular-nums">{splitPreview.firstDose}u</strong>
+                  </span>
+                  <span>
+                    In {splitPreview.secondDoseDelay}h: <strong className="tabular-nums">{splitPreview.secondDose}u</strong>
+                  </span>
+                </div>
+                {onOpenSplitCalculator ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={onOpenSplitCalculator}
+                    data-testid="button-open-split-from-result"
+                  >
+                    Open full split calculator
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
             {mealResult.exerciseContext === "during" && mealResult.tips ? (
               <ul className="text-sm text-muted-foreground space-y-1">
                 {mealResult.tips.map((tip, i) => (

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   calculateMealDose,
+  calculateSplitDose,
   comparePlannedBolusToPreview,
   getExerciseMealBolusPreview,
   getMealDoseRoundingGuide,
@@ -64,6 +65,76 @@ describe("calculateMealDose before exercise", () => {
     );
     expect(r.error).toBeUndefined();
     expect(r.dose).toBe(4);
+  });
+});
+
+describe("calculateMealDose input validation", () => {
+  it("returns invalid_carbs for zero carbs, even with ratios set", () => {
+    const r = calculateMealDose(0, "snack", settingsWithSnackRatio, "mmol/L");
+    expect(r.error).toBe("invalid_carbs");
+    expect(r.dose).toBe(0);
+  });
+
+  it("returns invalid_carbs for negative carbs", () => {
+    const r = calculateMealDose(-10, "snack", settingsWithSnackRatio, "mmol/L");
+    expect(r.error).toBe("invalid_carbs");
+  });
+
+  it("returns invalid_carbs for non-finite carbs", () => {
+    const r = calculateMealDose(NaN, "snack", settingsWithSnackRatio, "mmol/L");
+    expect(r.error).toBe("invalid_carbs");
+  });
+
+  it("returns no_ratios (not invalid_carbs) when carbs are valid but no ratio/TDD exists", () => {
+    const r = calculateMealDose(40, "snack", {}, "mmol/L");
+    expect(r.error).toBe("no_ratios");
+  });
+
+  it("uses explicit tdd as a fallback when no meal ratio is set", () => {
+    const r = calculateMealDose(50, "snack", { tdd: 50 }, "mmol/L");
+    expect(r.error).toBeUndefined();
+    // 500 rule: 500 / 50 = 10g per unit -> 50g / 10 = 5u
+    expect(r.dose).toBe(5);
+  });
+
+  it("computes a normal dose from a saved ratio with no exercise context", () => {
+    const r = calculateMealDose(50, "snack", settingsWithSnackRatio, "mmol/L");
+    expect(r.error).toBeUndefined();
+    expect(r.dose).toBe(5);
+    expect(r.exerciseContext).toBeUndefined();
+  });
+});
+
+describe("calculateSplitDose", () => {
+  it("splits 70/30 for low fat with a 1.5h delay", () => {
+    const r = calculateSplitDose(10, "low");
+    expect(r.totalUnits).toBe(10);
+    expect(r.firstDose).toBe(7);
+    expect(r.secondDose).toBe(3);
+    expect(r.secondDoseDelay).toBe(1.5);
+    expect(r.splitRatio).toBe("70/30");
+  });
+
+  it("splits 60/40 for medium fat with a 2h delay", () => {
+    const r = calculateSplitDose(10, "medium");
+    expect(r.firstDose).toBe(6);
+    expect(r.secondDose).toBe(4);
+    expect(r.secondDoseDelay).toBe(2);
+    expect(r.splitRatio).toBe("60/40");
+  });
+
+  it("splits 50/50 for high fat with a 3h delay", () => {
+    const r = calculateSplitDose(9, "high");
+    expect(r.firstDose).toBe(5);
+    expect(r.secondDose).toBe(4);
+    expect(r.secondDoseDelay).toBe(3);
+    expect(r.splitRatio).toBe("50/50");
+  });
+
+  it("rounds the exact total before splitting so first+second matches the whole-unit total", () => {
+    const r = calculateSplitDose(8.6, "high");
+    expect(r.totalUnits).toBe(9);
+    expect(r.firstDose + r.secondDose).toBe(9);
   });
 });
 

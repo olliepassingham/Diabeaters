@@ -13,7 +13,6 @@ import {
   Calculator,
   ChevronDown,
   ChevronUp,
-  Pizza,
   ArrowRight,
   ArrowLeft,
   Search,
@@ -28,17 +27,17 @@ import { Switch } from "@/components/ui/switch";
 import { storage, UserSettings, UserProfile, ScenarioState, RatioFormat, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { parseRatioToGramsPerUnit, calculateDoseFromCarbs, formatRatioForDisplay } from "@/lib/ratio-utils";
-import { calculateMealDose, roundInsulinUnits, type MealDoseResult } from "@/lib/meal-dose";
+import { calculateMealDose, calculateSplitDose, type MealDoseResult, type SplitFatTier } from "@/lib/meal-dose";
 import { getEffectiveTdd } from "@/lib/tdd";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
 import { MealCarbAbsorptionPreview } from "@/components/meal-carb-absorption-preview";
+import { MealCompositionBuilder } from "@/components/meal-composition-builder";
 import { MealDoseResultCard } from "@/components/meal-dose-result-card";
 import { ScenarioResultHero, ScenarioResultHeroSuffix } from "@/components/scenarios/scenario-result-hero";
 
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
@@ -51,12 +50,15 @@ import {
   inferPostExerciseLoadTier,
 } from "@/lib/post-exercise-nudge";
 import {
-  getMealAbsorptionVisual,
+  computeMealImpact,
+  DEFAULT_MEAL_COMPOSITION,
+  mealCompositionSummaryLabel,
+  type MealComposition,
+  type MealImpactProfile,
+} from "@/lib/meal-impact";
+import {
   getSplitFatAbsorptionVisual,
-  MEAL_FOOD_TYPE_OPTIONS,
-  mealFoodTypeLabel,
   splitFatLevelShortLabel,
-  type MealFoodType,
 } from "@/lib/meal-planner-food-categories";
 
 
@@ -79,26 +81,16 @@ function getInitialMealTime(): string {
   return "lunch";
 }
 
-function adviserSearchParams(location: string): URLSearchParams {
-  const qs = location.includes("?") ? location.slice(location.indexOf("?") + 1) : "";
-  return new URLSearchParams(qs);
-}
-
-function buildMealPlannerHref(params: URLSearchParams, opts?: { result?: boolean }): string {
-  const next = new URLSearchParams(params);
-  next.set("tab", "meal");
-  if (opts?.result) {
-    next.set("result", "1");
-  } else {
-    next.delete("result");
-  }
-  const qs = next.toString();
-  return qs ? `/adviser?${qs}` : "/adviser?tab=meal";
+function adviserSearchParams(search: string): URLSearchParams {
+  // wouter's useLocation() only returns the pathname (no query string), so callers
+  // must pass the search string from useSearch() here, not the location itself.
+  return new URLSearchParams(search);
 }
 
 export default function Adviser() {
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
+  const search = useSearch();
   const [settings, setSettings] = useState<UserSettings>({});
   const [profile, setProfile] = useState<Partial<UserProfile>>({});
   const [activeTab, setActiveTab] = useState(getInitialTab);
@@ -118,8 +110,7 @@ export default function Adviser() {
   useEffect(() => {
     const path = location.split("?")[0] ?? location;
     if (path !== "/adviser") return;
-    const qs = location.includes("?") ? location.slice(location.indexOf("?") + 1) : "";
-    const params = new URLSearchParams(qs);
+    const params = adviserSearchParams(search);
     const tab = params.get("tab");
     const split = params.get("split");
     if (split === "1" || split === "true") {
@@ -138,7 +129,7 @@ export default function Adviser() {
     if (mtParam === "breakfast" || mtParam === "lunch" || mtParam === "dinner" || mtParam === "snack") {
       setMealTime(mtParam);
     }
-  }, [location]);
+  }, [location, search]);
 
   useEffect(() => {
     const params = new URLSearchParams(
@@ -153,32 +144,29 @@ export default function Adviser() {
 
   const [mealResult, setMealResult] = useState<MealDoseResult | null>(null);
   const [showMealResultDetails, setShowMealResultDetails] = useState(false);
+  // Plain local state rather than a URL query flag — keeps this view resilient to any
+  // transient re-renders of the search string (wouter's history-driven `useSearch()` can
+  // update out of step with local `setState` batches) and avoids a stale/removed dose
+  // result flashing back to the entry form right after it was computed.
+  const [showMealResultPage, setShowMealResultPage] = useState(false);
 
-  const showMealResultPage =
-    activeTab === "meal" &&
-    adviserSearchParams(location).get("result") === "1" &&
-    mealResult != null;
-
-  useEffect(() => {
-    const params = adviserSearchParams(location);
-    if (params.get("result") === "1" && !mealResult) {
-      setLocation(buildMealPlannerHref(params, { result: false }));
-    }
-  }, [location, mealResult, setLocation]);
-
-  const openMealResultPage = (result: MealDoseResult) => {
+  const openMealResultPage = (result: MealDoseResult, impact: MealImpactProfile) => {
     setMealResult(result);
+    setMealResultImpact(impact);
     setShowMealResultDetails(false);
     setActiveTab("meal");
-    setLocation(buildMealPlannerHref(adviserSearchParams(location), { result: true }));
+    setShowMealResultPage(true);
     window.requestAnimationFrame(() => {
       window.scrollTo({ top: 0, behavior: "smooth" });
     });
   };
 
   const closeMealResultPage = (clearResult = false) => {
-    if (clearResult) setMealResult(null);
-    setLocation(buildMealPlannerHref(adviserSearchParams(location), { result: false }));
+    setShowMealResultPage(false);
+    if (clearResult) {
+      setMealResult(null);
+      setMealResultImpact(null);
+    }
     window.requestAnimationFrame(() => {
       window.scrollTo({ top: 0, behavior: "smooth" });
     });
@@ -187,18 +175,13 @@ export default function Adviser() {
   const [mealCarbs, setMealCarbs] = useState("");
   const [carbUnit, setCarbUnit] = useState<"grams" | "cp">("grams");
   const [mealTime, setMealTime] = useState<string>(getInitialMealTime);
-  const [mealFoodType, setMealFoodType] = useState<MealFoodType>("balanced");
-  const mealAbsorptionVisual = useMemo(() => getMealAbsorptionVisual(mealFoodType), [mealFoodType]);
-  const mealFoodShortLabel = useMemo(() => {
-    const full = mealFoodTypeLabel(mealFoodType);
-    return full.includes(" (") ? full.slice(0, full.indexOf(" (")) : full;
-  }, [mealFoodType]);
+  const [mealComposition, setMealComposition] = useState<MealComposition>(DEFAULT_MEAL_COMPOSITION);
+  const mealImpact = useMemo(() => computeMealImpact(mealComposition), [mealComposition]);
+  const [mealResultImpact, setMealResultImpact] = useState<MealImpactProfile | null>(null);
 
   const [planningAroundExercise, setPlanningAroundExercise] = useState(false);
   const [exerciseTiming, setExerciseTiming] = useState<"before" | "after" | "during">("before");
   const [exerciseWithin, setExerciseWithin] = useState("2");
-
-  const [showCurrentRatios, setShowCurrentRatios] = useState(false);
 
   useEffect(() => {
     // Deep-link prefill from Exercise planner:
@@ -376,48 +359,30 @@ export default function Adviser() {
       setSplitResult(null);
       return;
     }
-    
-    // Split ratios and timing based on fat content
-    let firstPercent: number;
-    let secondDoseDelay: number;
-    let splitRatio: string;
-    
-    switch (splitFatLevel) {
-      case "low":
-        firstPercent = 70;
-        secondDoseDelay = 1.5;
-        splitRatio = "70/30";
-        break;
-      case "medium":
-        firstPercent = 60;
-        secondDoseDelay = 2;
-        splitRatio = "60/40";
-        break;
-      case "high":
-        firstPercent = 50;
-        secondDoseDelay = 3;
-        splitRatio = "50/50";
-        break;
-    }
-    
-    const totalRounded = roundInsulinUnits(totalUnits);
-    const firstDose = roundInsulinUnits(totalRounded * (firstPercent / 100));
-    const secondDose = roundInsulinUnits(totalRounded - firstDose);
-    
+
+    const split = calculateSplitDose(totalUnits, splitFatLevel);
+
     setSplitResult({
-      totalUnits: totalRounded,
-      firstDose,
-      secondDose,
-      secondDoseDelay,
-      splitRatio,
+      totalUnits: split.totalUnits,
+      firstDose: split.firstDose,
+      secondDose: split.secondDose,
+      secondDoseDelay: split.secondDoseDelay,
+      splitRatio: split.splitRatio,
       ratioUsed,
     });
     setShowSplitResultDetails(false);
   };
 
   const handleQuickMealPlan = () => {
-    if (!mealCarbs) return;
     const carbValue = carbUnit === "cp" ? parseInt(mealCarbs) * 10 : parseInt(mealCarbs);
+    if (!mealCarbs || !Number.isFinite(carbValue) || carbValue <= 0) {
+      toast({
+        title: "Enter carbs first",
+        description: "Add how many carbs you're about to eat before getting a dose suggestion.",
+        variant: "destructive",
+      });
+      return;
+    }
     const freshSettings = storage.getSettings();
     const exerciseContext = planningAroundExercise ? exerciseTiming : undefined;
     const hoursAway = planningAroundExercise ? parseInt(exerciseWithin) : undefined;
@@ -433,12 +398,40 @@ export default function Adviser() {
     try {
       storage.addActivityLog({
         activityType: "meal_planning",
-        activityDetails: `${carbValue}g carbs for ${mealTime} (${mealFoodTypeLabel(mealFoodType)})`,
+        activityDetails: `${carbValue}g carbs for ${mealTime} (${mealCompositionSummaryLabel(mealComposition)})`,
         recommendation: `${result.dose} units`,
       });
     } catch {}
 
-    openMealResultPage(result);
+    openMealResultPage(result, mealImpact);
+  };
+
+  /** Re-runs the calculation once ratios are saved from the inline "no ratios" setup panel. */
+  const handleMealRatiosSaved = (updated: UserSettings) => {
+    setSettings(updated);
+    handleQuickMealPlan();
+  };
+
+  /** Opens the standalone split calculator prefilled from the just-calculated result. */
+  const openSplitCalculatorFromResult = () => {
+    if (!mealResult) return;
+    setSplitCarbs(String(mealResult.carbs));
+    if (
+      mealResult.mealType === "breakfast" ||
+      mealResult.mealType === "lunch" ||
+      mealResult.mealType === "dinner" ||
+      mealResult.mealType === "snack"
+    ) {
+      setSplitMealTime(mealResult.mealType);
+    }
+    const tier: SplitFatTier =
+      mealResultImpact?.composition.hasFat && mealResultImpact?.composition.hasProtein ? "high" : "medium";
+    setSplitFatLevel(tier);
+    closeMealResultPage(false);
+    setShowSplitCalculator(true);
+    window.requestAnimationFrame(() => {
+      splitCalculatorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   };
 
   const getRatioForMeal = (meal: string): string => {
@@ -639,8 +632,7 @@ export default function Adviser() {
               </Button>
               <MealDoseResultCard
                 mealResult={mealResult}
-                mealAbsorptionVisual={mealAbsorptionVisual}
-                mealFoodShortLabel={mealFoodShortLabel}
+                mealImpact={mealResultImpact}
                 isPumpUser={isPumpUser}
                 showDetails={showMealResultDetails}
                 onShowDetailsChange={setShowMealResultDetails}
@@ -650,6 +642,12 @@ export default function Adviser() {
                   closeMealResultPage(true);
                   setActiveTab("ratios");
                 }}
+                onOpenSplitCalculator={openSplitCalculatorFromResult}
+                settings={settings}
+                bgUnit={bgUnits}
+                ratioFormat={profile.ratioFormat || "per10g"}
+                carbPortionSize={profile?.carbPortionSize}
+                onRatiosSaved={handleMealRatiosSaved}
                 variant="page"
               />
             </div>
@@ -728,21 +726,7 @@ export default function Adviser() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="meal-food-type">What sort of food?</Label>
-                <Select value={mealFoodType} onValueChange={(v) => setMealFoodType(v as MealFoodType)}>
-                  <SelectTrigger id="meal-food-type" data-testid="select-meal-food-type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {MEAL_FOOD_TYPE_OPTIONS.map((o) => (
-                      <SelectItem key={o.value} value={o.value}>
-                        {o.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <MealCompositionBuilder value={mealComposition} onChange={setMealComposition} />
 
               <div className="flex items-center justify-between p-3 bg-primary/5 rounded-lg">
                 <div className="flex items-center gap-2">
@@ -793,66 +777,40 @@ export default function Adviser() {
                 </div>
               )}
 
-              <div className="bg-muted/50 rounded-lg">
-                <Collapsible open={showCurrentRatios} onOpenChange={setShowCurrentRatios}>
-                  <CollapsibleTrigger asChild>
-                    <button
-                      type="button"
-                      className="w-full flex items-center justify-between gap-3 p-3 text-left"
-                      data-testid="button-toggle-current-ratios"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium">Your current ratios</p>
-                        <p className="text-xs text-muted-foreground">
-                          Breakfast {getRatioForMeal("breakfast")} · Lunch {getRatioForMeal("lunch")}
-                        </p>
-                      </div>
-                      {showCurrentRatios ? (
-                        <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                      )}
-                    </button>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <div className="px-3 pb-3">
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-                        <div className="flex justify-between gap-1 flex-wrap">
-                          <span className="text-muted-foreground">Breakfast:</span>
-                          <span className={getRatioForMeal("breakfast") === "Not set" ? "text-muted-foreground" : "font-medium"}>{getRatioForMeal("breakfast")}</span>
-                        </div>
-                        <div className="flex justify-between gap-1 flex-wrap">
-                          <span className="text-muted-foreground">Lunch:</span>
-                          <span className={getRatioForMeal("lunch") === "Not set" ? "text-muted-foreground" : "font-medium"}>{getRatioForMeal("lunch")}</span>
-                        </div>
-                        <div className="flex justify-between gap-1 flex-wrap">
-                          <span className="text-muted-foreground">Dinner:</span>
-                          <span className={getRatioForMeal("dinner") === "Not set" ? "text-muted-foreground" : "font-medium"}>{getRatioForMeal("dinner")}</span>
-                        </div>
-                        <div className="flex justify-between gap-1 flex-wrap">
-                          <span className="text-muted-foreground">Snack:</span>
-                          <span className={getRatioForMeal("snack") === "Not set" ? "text-muted-foreground" : "font-medium"}>{getRatioForMeal("snack")}</span>
-                        </div>
-                      </div>
-                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-3">
-                        <p className="text-xs text-muted-foreground">
-                          Estimate or update ratios in the <span className="font-medium text-foreground">Ratios</span> tab above.
-                        </p>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-8 shrink-0"
-                          onClick={() => setActiveTab("ratios")}
-                          data-testid="button-ratios-from-current-ratios"
-                        >
-                          Open Ratios tab
-                          <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-                        </Button>
-                      </div>
+              <div
+                className="rounded-xl border border-border/70 bg-muted/20 p-3 dark:bg-muted/10"
+                data-testid="meal-ratios-strip"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your ratios</p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 gap-1 px-2 text-xs"
+                    onClick={() => setActiveTab("ratios")}
+                    data-testid="button-ratios-from-strip"
+                  >
+                    Edit
+                    <ArrowRight className="h-3 w-3" />
+                  </Button>
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {(["breakfast", "lunch", "dinner", "snack"] as const).map((m) => (
+                    <div key={m} className="rounded-lg border border-border/60 bg-background/60 px-2 py-1.5">
+                      <p className="text-[11px] capitalize text-muted-foreground">{m}</p>
+                      <p
+                        className={cn(
+                          "text-sm font-semibold tabular-nums",
+                          getRatioForMeal(m) === "Not set" && "font-normal text-muted-foreground",
+                        )}
+                        data-testid={`meal-ratios-strip-${m}`}
+                      >
+                        {getRatioForMeal(m)}
+                      </p>
                     </div>
-                  </CollapsibleContent>
-                </Collapsible>
+                  ))}
+                </div>
               </div>
 
               <Button
@@ -865,33 +823,6 @@ export default function Adviser() {
               </Button>
             </CardContent>
           </Card>
-
-          {mealFoodType === "high_fat_protein" && !showSplitCalculator ? (
-            <Alert
-              className="border-amber-500/40 bg-amber-500/5 dark:bg-amber-950/25"
-              data-testid="alert-high-fat-split-nudge"
-            >
-              <Pizza className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-              <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <span className="text-sm text-foreground">Try the split dose calculator below.</span>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  className="shrink-0 border-amber-500/30 bg-background/80"
-                  data-testid="button-open-split-from-nudge"
-                  onClick={() => {
-                    setShowSplitCalculator(true);
-                    window.requestAnimationFrame(() => {
-                      splitCalculatorRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-                    });
-                  }}
-                >
-                  Open split calculator
-                </Button>
-              </AlertDescription>
-            </Alert>
-          ) : null}
 
           <div ref={splitCalculatorRef}>
           <Card

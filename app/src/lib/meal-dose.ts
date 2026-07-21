@@ -86,7 +86,7 @@ export type MealDoseResult = {
   exerciseReduction?: number;
   standardDose?: number;
   tips?: string[];
-  error?: string;
+  error?: "no_ratios" | "invalid_carbs";
 };
 
 export type MealExerciseMeta = {
@@ -123,6 +123,10 @@ export function calculateMealDose(
   hoursAway?: number,
   exerciseMeta?: MealExerciseMeta,
 ): MealDoseResult {
+  if (!Number.isFinite(carbs) || carbs <= 0) {
+    return { carbs, mealType, dose: 0, exactDose: 0, roundingAdvice: "", error: "invalid_carbs" };
+  }
+
   const ratioMap: Record<string, string | undefined> = {
     breakfast: settings.breakfastRatio,
     lunch: settings.lunchRatio,
@@ -305,4 +309,40 @@ export function parseOptionalBolusUnits(input: string): number | null {
   const n = parseFloat(trimmed.replace(",", "."));
   if (Number.isNaN(n) || n < 0) return null;
   return n;
+}
+
+/** Fat tier driving how a dose is split across two deliveries for slow-digesting meals. */
+export type SplitFatTier = "low" | "medium" | "high";
+
+export type SplitDoseResult = {
+  totalUnits: number;
+  firstDose: number;
+  secondDose: number;
+  secondDoseDelay: number;
+  splitRatio: string;
+};
+
+const SPLIT_FAT_TIERS: Record<SplitFatTier, { firstPercent: number; secondDoseDelay: number; splitRatio: string }> = {
+  low: { firstPercent: 70, secondDoseDelay: 1.5, splitRatio: "70/30" },
+  medium: { firstPercent: 60, secondDoseDelay: 2, splitRatio: "60/40" },
+  high: { firstPercent: 50, secondDoseDelay: 3, splitRatio: "50/50" },
+};
+
+/**
+ * Splits an exact (unrounded) dose into a now/later pair for slower-digesting meals.
+ * Shared by the standalone Split dose calculator and the auto-surfaced result-screen preview
+ * so both use identical math from a single carbs entry.
+ */
+export function calculateSplitDose(exactTotalUnits: number, fatTier: SplitFatTier): SplitDoseResult {
+  const tier = SPLIT_FAT_TIERS[fatTier];
+  const totalRounded = roundInsulinUnits(exactTotalUnits);
+  const firstDose = roundInsulinUnits(totalRounded * (tier.firstPercent / 100));
+  const secondDose = roundInsulinUnits(totalRounded - firstDose);
+  return {
+    totalUnits: totalRounded,
+    firstDose,
+    secondDose,
+    secondDoseDelay: tier.secondDoseDelay,
+    splitRatio: tier.splitRatio,
+  };
 }
