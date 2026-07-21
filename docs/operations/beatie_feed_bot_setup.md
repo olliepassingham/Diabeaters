@@ -3,7 +3,7 @@
 This feature covers:
 
 1. **Ask Beatie (educational)** on a community post — only the **post author** can trigger it.
-2. **Scheduled educational posts** — Beatie publishes one conversation-starter post per day via cron.
+2. **Scheduled educational posts** — Beatie publishes at most one conversation-starter about every **3 days** (cron may still run daily; the function skips if she posted recently).
 
 Beatie’s replies and scheduled posts are stored as normal `community_post_comments` / `community_posts` rows attributed to a **dedicated Auth user** (the “feed bot”), because Row Level Security requires human inserts to use `author_id = auth.uid()`.
 
@@ -31,7 +31,8 @@ Without a profile, the feed will still work but names/avatars may fall back to a
 | `OPENAI_API_KEY` | Same as `ai_coach` |
 | `AI_FEED_MAX_PER_DAY` | Optional; default **10** Ask Beatie calls per user per UTC day |
 | `BEATIE_FEED_POST_CRON_SECRET` | Optional; cron auth header `x-beatie-feed-post-cron-secret` (recommended for Dashboard Cron) |
-| `BEATIE_FEED_POST_CRON_MAX_PER_DAY` | Optional; default **1** scheduled Beatie post per UTC day |
+| `BEATIE_FEED_POST_MIN_INTERVAL_HOURS` | Optional; default **72** (one scheduled post every ~3 days) |
+| `BEATIE_FEED_POST_CRON_MAX_PER_WINDOW` | Optional; default **1** Beatie post per min-interval window (`BEATIE_FEED_POST_CRON_MAX_PER_DAY` still accepted as an alias) |
 
 Standard project secrets still apply: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
 
@@ -52,9 +53,9 @@ supabase functions deploy beatie_feed_post_cron --no-verify-jwt
 
 `supabase/config.toml` sets `verify_jwt = true` for `ai_feed_reply` (same pattern as `ai_coach`). `beatie_feed_post_cron` uses service-role / cron-secret auth (`verify_jwt = false`).
 
-## 6. Schedule daily Beatie posts
+## 6. Schedule Beatie posts
 
-In **Supabase Dashboard → Integrations → Cron**, add a daily job (e.g. **09:00 UTC**):
+In **Supabase Dashboard → Integrations → Cron**, keep a daily (or less frequent) job (e.g. **09:00 UTC**). The function enforces the min interval, so a daily schedule is fine:
 
 - **POST** `https://<project-ref>.supabase.co/functions/v1/beatie_feed_post_cron`
 - Headers: `Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>`, `apikey: <same>`
@@ -69,9 +70,29 @@ curl -X POST "https://<project-ref>.supabase.co/functions/v1/beatie_feed_post_cr
   -H "apikey: $SUPABASE_SERVICE_ROLE_KEY"
 ```
 
-A second run within ~20 hours returns `{ "skipped": true, "reason": "already_posted_today" }`. No push notifications are sent for Beatie's own posts.
+A second run within the min interval (default ~72 hours) returns `{ "skipped": true, "reason": "posted_within_min_interval" }`. No push notifications are sent for Beatie's own posts.
 
-## 7. Frontend (Vite)
+## 7. Deleting Beatie posts
+
+Authors can only delete their own posts in the app, so your normal account cannot remove Beatie’s posts from the UI yet.
+
+**Today (ops):** Supabase Dashboard → **Table Editor** → `community_posts` → filter `author_id` = `BEATIE_FEED_BOT_USER_ID` → delete the rows you want (comments/likes cascade where FKs are set).
+
+Or in **SQL Editor**:
+
+```sql
+-- List recent Beatie posts (replace the UUID)
+SELECT id, created_at, left(body, 80)
+FROM community_posts
+WHERE author_id = 'BEATIE_FEED_BOT_USER_ID'
+ORDER BY created_at DESC
+LIMIT 50;
+
+-- Delete specific ones
+DELETE FROM community_posts WHERE id IN ('post-uuid-1', 'post-uuid-2');
+```
+
+## 8. Frontend (Vite)
 
 Optional but recommended for the **Ask Beatie** button and **Beatie** badge on comments:
 
@@ -81,7 +102,7 @@ VITE_BEATIE_FEED_BOT_USER_ID=<same UUID as BEATIE_FEED_BOT_USER_ID>
 
 If unset, the app hides the entry point even when the backend is configured (avoids a broken UX).
 
-## 8. QA checklist
+## 9. QA checklist
 
 ### Ask Beatie (on user posts)
 
@@ -92,8 +113,8 @@ If unset, the app hides the entry point even when the backend is configured (avo
 - Reporting/deleting flows behave like any other comment row.
 
 ### Scheduled Beatie posts
-- Cron creates one post per day on the **Everyone** feed with Beatie name/avatar and **AI guide** badge.
-- Second cron run same day is a no-op (`already_posted_today`).
+- Cron creates at most one post per min-interval window on the **Everyone** feed with Beatie name/avatar and **AI guide** badge.
+- Extra cron runs inside the window are no-ops (`posted_within_min_interval`).
 - Post uses a valid `topic` from `COMMUNITY_TOPICS`.
 - No `notify_feed_push` fired for Beatie self-posts.
 - Beatie's own posts do not show **Ask Beatie** on the thread.

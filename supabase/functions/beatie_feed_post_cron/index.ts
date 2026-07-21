@@ -1,5 +1,6 @@
 /**
- * Scheduled Edge Function: publish one educational community post per day as Beatie.
+ * Scheduled Edge Function: publish educational community posts as Beatie.
+ * Default cadence: at most one post every **3 days** (cron may still run daily and skip).
  *
  * Invoke with **service role** Authorization — e.g. schedule an HTTP POST from
  * **Integrations → Cron** (or `pg_cron` + `pg_net`), or manually with service role bearer.
@@ -10,7 +11,8 @@
  *
  * Secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, BEATIE_FEED_BOT_USER_ID,
  * ENABLE_AI_COACH=true, OPENAI_API_KEY, optional BEATIE_FEED_POST_CRON_SECRET,
- * optional BEATIE_FEED_POST_CRON_MAX_PER_DAY (default 1).
+ * optional BEATIE_FEED_POST_MIN_INTERVAL_HOURS (default 72),
+ * optional BEATIE_FEED_POST_CRON_MAX_PER_WINDOW (default 1; formerly MAX_PER_DAY).
  *
  * @see docs/operations/beatie_feed_bot_setup.md
  */
@@ -37,8 +39,14 @@ const corsHeaders: Record<string, string> = {
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-/** Skip posting if Beatie published within this window (UTC). */
-const IDEMPOTENCY_WINDOW_MS = 20 * 60 * 60 * 1000;
+/** Default: skip if Beatie already published within the last 3 days (UTC). */
+const DEFAULT_MIN_INTERVAL_HOURS = 72;
+
+function minIntervalMs(): number {
+  const raw = Number.parseInt(Deno.env.get("BEATIE_FEED_POST_MIN_INTERVAL_HOURS") ?? "", 10);
+  const hours = Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_MIN_INTERVAL_HOURS;
+  return hours * 60 * 60 * 1000;
+}
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -124,10 +132,16 @@ Deno.serve(async (req: Request) => {
 
     console.log("[beatie_feed_post_cron] authorized; checking recent posts");
 
-    const maxPerDay = Number.parseInt(Deno.env.get("BEATIE_FEED_POST_CRON_MAX_PER_DAY") ?? "1", 10);
-    const maxSafe = Number.isFinite(maxPerDay) && maxPerDay > 0 ? maxPerDay : 1;
+    const maxRaw = Number.parseInt(
+      Deno.env.get("BEATIE_FEED_POST_CRON_MAX_PER_WINDOW") ??
+        Deno.env.get("BEATIE_FEED_POST_CRON_MAX_PER_DAY") ??
+        "1",
+      10,
+    );
+    const maxSafe = Number.isFinite(maxRaw) && maxRaw > 0 ? maxRaw : 1;
+    const windowMs = minIntervalMs();
 
-    const sinceIso = new Date(Date.now() - IDEMPOTENCY_WINDOW_MS).toISOString();
+    const sinceIso = new Date(Date.now() - windowMs).toISOString();
     const { count: recentCount, error: recentErr } = await admin
       .from("community_posts")
       .select("id", { count: "exact", head: true })
@@ -142,8 +156,9 @@ Deno.serve(async (req: Request) => {
       const payload = {
         success: true,
         skipped: true,
-        reason: "already_posted_today",
+        reason: "posted_within_min_interval",
         recent_count: recentCount ?? 0,
+        min_interval_hours: Math.round(windowMs / (60 * 60 * 1000)),
       };
       console.log("[beatie_feed_post_cron]", JSON.stringify(payload));
       return jsonResponse(200, payload);
