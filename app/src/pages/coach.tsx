@@ -271,9 +271,24 @@ export default function CoachPage() {
   const [messages, setMessages] = useState<CoachTurn[]>(() => loadInitialMessages());
   const [draft, setDraft] = useState("");
   const qSeededRef = useRef(false);
+  const draftTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [lastReply, setLastReply] = useState<CoachResponse | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
   const [consentStep, setConsentStep] = useState<0 | 1>(0);
+
+  const syncDraftTextareaHeight = useCallback(() => {
+    const el = draftTextareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    const maxPx = 160;
+    const next = Math.min(el.scrollHeight, maxPx);
+    el.style.height = `${Math.max(next, 40)}px`;
+    el.style.overflowY = el.scrollHeight > maxPx ? "auto" : "hidden";
+  }, []);
+
+  useLayoutEffect(() => {
+    syncDraftTextareaHeight();
+  }, [draft, syncDraftTextareaHeight]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -756,11 +771,12 @@ export default function CoachPage() {
         <div className="px-3 py-2.5 pb-[calc(max(0.5rem,env(safe-area-inset-bottom,0px))+var(--keyboard-inset-bottom,0px))]">
           <div className="flex items-end gap-2 rounded-[1.75rem] border border-border/50 bg-muted/35 p-1.5 pl-3 shadow-sm ring-1 ring-black/[0.03] dark:ring-white/[0.04]">
             <Textarea
+              ref={draftTextareaRef}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               placeholder="Type your question…"
               rows={1}
-              className="min-h-10 max-h-32 flex-1 resize-none border-0 bg-transparent px-0 py-2.5 text-[16px] leading-snug shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+              className="min-h-10 max-h-40 flex-1 resize-none overflow-hidden border-0 bg-transparent px-0 py-2.5 text-[16px] leading-snug shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
               disabled={sendMutation.isPending}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
