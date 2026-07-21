@@ -43,23 +43,20 @@ function toneForHeadline(headline: string) {
   return "border-emerald-500/25 bg-gradient-to-br from-emerald-500/8 via-card to-card dark:from-emerald-950/30";
 }
 
+function tirToneClass(insight: BedtimeOvernightInsight): string {
+  if (insight.stats.hadLow) return "text-amber-700 dark:text-amber-400";
+  if (insight.stats.hadHigh) return "text-orange-700 dark:text-orange-400";
+  return "text-emerald-700 dark:text-emerald-400";
+}
+
 function collapsedPreview(
   insight: BedtimeOvernightInsight | null,
   status: BedtimeLastNightStatus,
   message: string | null | undefined,
-  targetLow: number | undefined,
-  targetHigh: number | undefined,
-  units: BgUnits,
 ): string {
   if (status === "loading") return "Loading overnight CGM…";
   if (message) return message;
-  if (insight) {
-    const range =
-      targetLow != null && targetHigh != null
-        ? `${formatTargetBgInput(targetLow, units)}–${formatTargetBgInput(targetHigh, units)}`
-        : `${formatTargetBgInput(insight.targetLow, units)}–${formatTargetBgInput(insight.targetHigh, units)}`;
-    return `${insight.headline} · ${insight.stats.inRangePercent}% in target (${range})`;
-  }
+  if (insight) return insight.headline;
   return "Tap to review overnight glucose";
 }
 
@@ -121,11 +118,19 @@ function InsightBody({
 }) {
   return (
     <>
-      <div className="space-y-1">
-        <p className="text-sm font-semibold text-foreground" data-testid="text-bedtime-last-night-headline">
-          {insight.headline}
-        </p>
-        <p className="text-sm leading-snug text-foreground/90">{insight.summary}</p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1 space-y-1">
+          <p className="text-sm font-semibold text-foreground" data-testid="text-bedtime-last-night-headline">
+            {insight.headline}
+          </p>
+          <p className="text-sm leading-snug text-foreground/90">{insight.summary}</p>
+        </div>
+        <div className="shrink-0 text-right" data-testid="text-bedtime-last-night-tir">
+          <p className={cn("text-3xl font-semibold tabular-nums tracking-tight", tirToneClass(insight))}>
+            {insight.stats.inRangePercent}%
+          </p>
+          <p className="text-[11px] font-medium text-muted-foreground">in target</p>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
@@ -137,9 +142,6 @@ function InsightBody({
         </span>
         <span className="rounded-full bg-muted/60 px-2 py-0.5 tabular-nums">
           Highest {formatTargetBgInput(insight.stats.max, units)}
-        </span>
-        <span className="rounded-full bg-muted/60 px-2 py-0.5 tabular-nums">
-          {insight.stats.inRangePercent}% in target
         </span>
       </div>
 
@@ -202,7 +204,7 @@ export function BedtimeLastNightCard({
   const loading = status === "loading";
   const chartTargetLow = insight?.targetLow ?? targetLow;
   const chartTargetHigh = insight?.targetHigh ?? targetHigh;
-  const preview = collapsedPreview(insight, status, message, chartTargetLow, chartTargetHigh, units);
+  const preview = collapsedPreview(insight, status, message);
   // Expand for insights, or for a finished empty/error state so the full message is readable.
   const canExpand = insight != null || (status !== "loading" && status !== "no_cgm" && Boolean(message));
   const showRefresh = Boolean(onRefresh) && status !== "no_cgm";
@@ -237,6 +239,17 @@ export function BedtimeLastNightCard({
           </span>
         )}
       </div>
+      {insight && !open ? (
+        <div className="shrink-0 text-right" aria-label={`${insight.stats.inRangePercent}% in target`}>
+          <span
+            className={cn("block text-xl font-semibold tabular-nums tracking-tight", tirToneClass(insight))}
+            data-testid="text-bedtime-last-night-tir-collapsed"
+          >
+            {insight.stats.inRangePercent}%
+          </span>
+          <span className="block text-[10px] font-medium text-muted-foreground">in target</span>
+        </div>
+      ) : null}
     </>
   );
 

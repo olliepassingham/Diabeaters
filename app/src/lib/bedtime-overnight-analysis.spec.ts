@@ -121,7 +121,7 @@ describe("bedtime overnight analysis", () => {
     const insight = analyzeBedtimeOvernight(null, readings, window, 4, 10)!;
     expect(insight.stats.inRangePercent).toBe(100);
     expect(insight.headline).toBe("In range overnight");
-    expect(insight.summary).toMatch(/^100%/);
+    expect(insight.summary).toMatch(/every reading stayed within/i);
     expect(insight.headline).not.toMatch(/mostly/i);
   });
 

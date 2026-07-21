@@ -335,24 +335,26 @@ export function analyzeBedtimeOvernight(
   let headline: string;
   let summary: string;
 
+  const range = `${fmt(targetLow)}–${fmt(targetHigh)}`;
+
   if (stats.hadLow && stats.hadHigh) {
     headline = "A mixed night";
-    summary = `${stats.inRangePercent}% in your target (${fmt(targetLow)}–${fmt(targetHigh)}). Glucose ranged from ${fmt(stats.min)} to ${fmt(stats.max)}.`;
+    summary = `Glucose ranged from ${fmt(stats.min)} to ${fmt(stats.max)} against your ${range} target.`;
   } else if (stats.hadLow) {
     headline = "Overnight low detected";
-    summary = `${stats.inRangePercent}% in your target (${fmt(targetLow)}–${fmt(targetHigh)}). Lowest ${fmt(stats.min)} around ${formatTime(stats.minAtMs)}.`;
+    summary = `Lowest ${fmt(stats.min)} around ${formatTime(stats.minAtMs)}. Target ${range}.`;
   } else if (stats.hadHigh) {
     headline = stats.inRangePercent >= 30 ? "Rose above target overnight" : "Ran high overnight";
     summary =
       stats.inRangePercent >= 30
-        ? `${stats.inRangePercent}% in your target (${fmt(targetLow)}–${fmt(targetHigh)}). Peak ${fmt(stats.max)} around ${formatTime(stats.maxAtMs)}.`
+        ? `Peak ${fmt(stats.max)} around ${formatTime(stats.maxAtMs)}. Target ${range}.`
         : `Highest ${fmt(stats.max)} around ${formatTime(stats.maxAtMs)} — mostly above your ${fmt(targetHigh)} ceiling.`;
   } else {
     // No excursions ⇒ every reading was in range (100%).
     headline = lateRise(stats, units) ? "In range, rising toward morning" : "In range overnight";
     summary = lateRise(stats, units)
-      ? `100% of readings in your target (${fmt(targetLow)}–${fmt(targetHigh)}), rising from ${fmt(stats.startValue)} to ${fmt(stats.endValue)}.`
-      : `100% of readings were in your target range (${fmt(targetLow)}–${fmt(targetHigh)}).`;
+      ? `Rising from ${fmt(stats.startValue)} to ${fmt(stats.endValue)} within your ${range} target.`
+      : `Every reading stayed within your ${range} target.`;
   }
 
   return {

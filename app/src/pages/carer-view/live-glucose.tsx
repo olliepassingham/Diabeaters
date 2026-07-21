@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { SupporterHypoCheckInButton } from "@/components/supporter-hypo-check-in-section";
 import { useLinkedPatient } from "@/hooks/use-linked-patient";
 import { useSupporterLiveBg } from "@/hooks/use-supporter-live-bg";
 import { formatAgeMinutes } from "@/lib/cgm/staleness";
@@ -141,6 +142,14 @@ export default function CarerLiveGlucosePage() {
                   : "Target range not included with this reading"}
                 {reading.stalenessNote ? ` · ${reading.stalenessNote}` : ""}
               </p>
+            ) : null}
+
+            {patientId ? (
+              <SupporterHypoCheckInButton
+                patientId={patientId}
+                patientName={patientName ?? "them"}
+                prominence="primary"
+              />
             ) : null}
 
             {isLow ? (
