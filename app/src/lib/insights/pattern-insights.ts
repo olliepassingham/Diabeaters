@@ -214,9 +214,10 @@ function detectHypoFrequencyTrend(hypoDates: Date[], now: Date): PatternInsight 
 /**
  * Deterministic, rules-based pattern detection over locally logged hypos and
  * exercise sessions. Attention insights first, then positive, then neutral;
- * capped at 3.
+ * capped at `limit` (default 3, used by the compact home widget — the full
+ * patterns page passes a higher limit to show everything detected).
  */
-export function computePatternInsights(input: PatternInsightsInput): PatternInsight[] {
+export function computePatternInsights(input: PatternInsightsInput, limit = 3): PatternInsight[] {
   const now = input.now ?? new Date();
   const hypoDates = parseValidDates(input.hypos.map((h) => h.timestamp));
   const exerciseDates = parseValidDates(input.exerciseOutcomes.map((e) => e.completedAt));
@@ -230,5 +231,5 @@ export function computePatternInsights(input: PatternInsightsInput): PatternInsi
   ].filter((x): x is PatternInsight => x != null);
 
   // Array.prototype.sort is stable, so rule order is preserved within a tone.
-  return insights.sort((a, b) => TONE_ORDER[a.tone] - TONE_ORDER[b.tone]).slice(0, 3);
+  return insights.sort((a, b) => TONE_ORDER[a.tone] - TONE_ORDER[b.tone]).slice(0, limit);
 }

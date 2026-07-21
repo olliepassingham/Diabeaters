@@ -20,10 +20,13 @@ export function PatternInsightsWidget(_props: DashboardWidgetLayoutProps) {
 
   const insights = useMemo(
     () =>
-      computePatternInsights({
-        hypos: storage.getHypoTreatments(),
-        exerciseOutcomes: storage.getExerciseOutcomes(),
-      }),
+      computePatternInsights(
+        {
+          hypos: storage.getHypoTreatments(),
+          exerciseOutcomes: storage.getExerciseOutcomes(),
+        },
+        2,
+      ),
     [],
   );
 
@@ -81,9 +84,13 @@ export function PatternInsightsWidget(_props: DashboardWidgetLayoutProps) {
             </Button>
           </div>
         ))}
-        <p className="text-xs text-muted-foreground pt-1">
-          Patterns from your own logs — educational only, not medical advice.
-        </p>
+        <Link
+          href="/tools/patterns"
+          className="inline-flex items-center gap-1 pt-1 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
+          data-testid="link-view-all-patterns"
+        >
+          View all patterns
+        </Link>
       </CardContent>
     </WidgetCard>
   );

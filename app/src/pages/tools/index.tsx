@@ -17,6 +17,7 @@ import {
   Sparkles,
   Users,
   Activity,
+  LineChart,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -83,6 +84,13 @@ const PATIENT_TOOLS: ToolDef[] = [
     icon: ScrollText,
     title: "Activity log",
     description: "Calendar of hypos, guides, checks, and other things you have recorded.",
+  },
+  {
+    id: "patterns",
+    href: "/tools/patterns",
+    icon: LineChart,
+    title: "Your patterns",
+    description: "Charts of when your lows happen, by time of day, weekday, and week-on-week trend.",
   },
   {
     id: "routines",

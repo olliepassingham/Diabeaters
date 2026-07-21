@@ -156,6 +156,7 @@ const CommunityHandleResolve = lazy(() => import("@/pages/community/handle-resol
 const CoachPage = lazy(() => import("@/pages/coach"));
 const HypoHelpPage = lazy(() => import("@/pages/tools/hypo-help"));
 const HypoHistoryPage = lazy(() => import("@/pages/tools/hypo-history"));
+const PatternsPage = lazy(() => import("@/pages/tools/patterns"));
 const ActivityLogPage = lazy(() => import("@/pages/tools/activity-log"));
 const AchievementsPage = lazy(() => import("@/pages/tools/achievements"));
 const CorrectionHelpPage = lazy(() => import("@/pages/tools/correction-help"));
@@ -850,6 +851,13 @@ function InnerRouter() {
         <PatientRouteGuard>
           <Suspense fallback={<RouteFallback />}>
             <HypoHistoryPage />
+          </Suspense>
+        </PatientRouteGuard>
+      </Route>
+      <Route path="/tools/patterns">
+        <PatientRouteGuard>
+          <Suspense fallback={<RouteFallback />}>
+            <PatternsPage />
           </Suspense>
         </PatientRouteGuard>
       </Route>

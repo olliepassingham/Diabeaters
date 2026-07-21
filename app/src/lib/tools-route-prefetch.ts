@@ -20,6 +20,10 @@ export function prefetchToolsDestinationHref(href: string): void {
     void import("@/pages/tools/activity-log");
     return;
   }
+  if (path === "/tools/patterns") {
+    void import("@/pages/tools/patterns");
+    return;
+  }
   if (path === "/tools/correction") {
     void import("@/pages/tools/correction-help");
     return;
@@ -62,6 +66,7 @@ export function prefetchToolsHubLinkedChunks(): void {
   void import("@/pages/tools/hypo-help");
   void import("@/pages/tools/hypo-history");
   void import("@/pages/tools/activity-log");
+  void import("@/pages/tools/patterns");
   void import("@/pages/tools/correction-help");
   void import("@/pages/tools/tips");
   void import("@/pages/adviser");
