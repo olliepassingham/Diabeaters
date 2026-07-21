@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<style>
+  :root {
+    --teal: #148276;
+    --mint: #54c4ba;
+    --mint-bright: #6ee7d9;
+    --bg-deep: #051614;
+    --bg-mid: #081f1c;
+    --bg-base: #0a2824;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  /* Open Graph / WhatsApp / iMessage — 1200×630 (1.91:1). */
+  html, body { width: 1200px; height: 630px; }
+
+  body {
+    font-family: -apple-system, "SF Pro Display", "Helvetica Neue", "Segoe UI", Arial, sans-serif;
+    overflow: hidden;
+    position: relative;
+    color: #fff;
+  }
+
+  .bg {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 50% 80% at 12% 90%, rgba(84, 196, 186, 0.28) 0%, rgba(84, 196, 186, 0) 70%),
+      radial-gradient(ellipse 60% 70% at 78% 20%, rgba(20, 130, 118, 0.4) 0%, rgba(20, 130, 118, 0) 65%),
+      radial-gradient(ellipse 40% 55% at 95% 75%, rgba(110, 231, 217, 0.14) 0%, rgba(110, 231, 217, 0) 70%),
+      linear-gradient(118deg, var(--bg-deep) 0%, var(--bg-mid) 45%, var(--bg-base) 78%, #06201c 100%);
+  }
+
+  .grain {
+    position: absolute;
+    inset: 0;
+    opacity: 0.05;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  }
+
+  .content {
+    position: relative;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    gap: 56px;
+    padding: 64px 72px;
+  }
+
+  .mark-wrap {
+    flex-shrink: 0;
+    width: 220px;
+    height: 220px;
+    border-radius: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background:
+      linear-gradient(145deg, rgba(110, 231, 217, 0.22), rgba(20, 130, 118, 0.12));
+    border: 1.5px solid rgba(110, 231, 217, 0.35);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  }
+
+  .mark-wrap img {
+    width: 148px;
+    height: 148px;
+    object-fit: contain;
+    /* Invert black line art → light mint on dark card */
+    filter: invert(1) sepia(1) saturate(3) hue-rotate(130deg) brightness(1.15);
+  }
+
+  .copy {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 22px;
+    padding: 10px 20px;
+    border-radius: 999px;
+    border: 1.5px solid rgba(110, 231, 217, 0.45);
+    background: rgba(20, 130, 118, 0.18);
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 2.2px;
+    text-transform: uppercase;
+    color: var(--mint-bright);
+  }
+
+  .eyebrow .dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--mint);
+    box-shadow: 0 0 12px rgba(84, 196, 186, 0.9);
+  }
+
+  .headline {
+    font-size: 64px;
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+    text-shadow: 0 2px 28px rgba(0, 0, 0, 0.35);
+  }
+
+  .headline em {
+    font-style: normal;
+    color: var(--mint-bright);
+  }
+
+  .subline {
+    margin-top: 22px;
+    font-size: 28px;
+    font-weight: 500;
+    line-height: 1.35;
+    color: rgba(255, 255, 255, 0.82);
+    max-width: 640px;
+  }
+
+  .footer {
+    margin-top: 28px;
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.42);
+  }
+</style>
+</head>
+<body>
+  <div class="bg"></div>
+  <div class="grain"></div>
+  <div class="content">
+    <div class="mark-wrap">
+      <img src="diabeaters-mark.png" alt="" />
+    </div>
+    <div class="copy">
+      <div class="eyebrow"><span class="dot" aria-hidden="true"></span> Type 1 companion</div>
+      <h1 class="headline">Diabeaters</h1>
+      <p class="subline">Supplies, routines, education, and community — for living with Type 1.</p>
+      <p class="footer">Not a medical device · diabeaters.vercel.app</p>
+    </div>
+  </div>
+</body>
+</html>
