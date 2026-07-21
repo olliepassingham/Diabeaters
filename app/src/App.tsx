@@ -162,6 +162,7 @@ const AchievementsPage = lazy(() => import("@/pages/tools/achievements"));
 const CorrectionHelpPage = lazy(() => import("@/pages/tools/correction-help"));
 const CgmLivePage = lazy(() => import("@/pages/tools/cgm-live"));
 const TipsPage = lazy(() => import("@/pages/tools/tips"));
+const GlucoseConverterPage = lazy(() => import("@/pages/tools/glucose-converter"));
 const GlossaryIndex = lazy(() => import("@/pages/education/index"));
 const GlossaryDetail = lazy(() => import("@/pages/education/[slug]"));
 
@@ -845,6 +846,11 @@ function InnerRouter() {
       <Route path="/tools/hypo-help">
         <Suspense fallback={<RouteFallback />}>
           <HypoHelpPage />
+        </Suspense>
+      </Route>
+      <Route path="/tools/glucose-converter">
+        <Suspense fallback={<RouteFallback />}>
+          <GlucoseConverterPage />
         </Suspense>
       </Route>
       <Route path="/tools/hypo-history">

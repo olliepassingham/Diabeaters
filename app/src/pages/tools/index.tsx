@@ -18,6 +18,7 @@ import {
   Users,
   Activity,
   LineChart,
+  ArrowLeftRight,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -91,6 +92,13 @@ const PATIENT_TOOLS: ToolDef[] = [
     icon: LineChart,
     title: "Your patterns",
     description: "Charts of when your lows happen, by time of day, weekday, and week-on-week trend.",
+  },
+  {
+    id: "glucose-converter",
+    href: "/tools/glucose-converter",
+    icon: ArrowLeftRight,
+    title: "Glucose units",
+    description: "Convert mmol/L (UK) ↔ mg/dL (US) when you see a reading in the other unit.",
   },
   {
     id: "routines",
@@ -169,6 +177,13 @@ export const CARER_TOOLS: ToolDef[] = [
     description: "Fast-acting carbs guidance from current and target BG. Educational only.",
   },
   {
+    id: "glucose-converter",
+    href: "/tools/glucose-converter",
+    icon: ArrowLeftRight,
+    title: "Glucose units",
+    description: "Convert mmol/L (UK) ↔ mg/dL (US) when you see a reading in the other unit.",
+  },
+  {
     id: "education",
     href: "/education",
     icon: BookOpen,
@@ -201,6 +216,13 @@ const COMMUNITY_TOOLS: ToolDef[] = [
     icon: Droplet,
     title: "What is a hypo?",
     description: "Educational overview of low blood glucose — when to treat urgently vs when to read and learn.",
+  },
+  {
+    id: "glucose-converter",
+    href: "/tools/glucose-converter",
+    icon: ArrowLeftRight,
+    title: "Glucose units",
+    description: "Convert mmol/L (UK) ↔ mg/dL (US) when you see a reading in the other unit.",
   },
   {
     id: "education",
@@ -364,8 +386,8 @@ export function ToolsHubPage({
   // exists in `tools` but never renders.
   const patientActNowIds: readonly string[] =
     byId.has("ai-coach")
-      ? ["ai-coach", "insulin-calculator", "hypo-help", "correction-helper"]
-      : ["insulin-calculator", "hypo-help", "correction-helper"];
+      ? ["ai-coach", "cgm-live", "insulin-calculator", "hypo-help", "correction-helper"]
+      : ["cgm-live", "insulin-calculator", "hypo-help", "correction-helper"];
 
   const actNowIds: readonly string[] =
     hubVariant === "carer" || hubVariant === "community"
@@ -375,11 +397,13 @@ export function ToolsHubPage({
       : patientActNowIds;
   const actNow = actNowIds.map((id) => byId.get(id)).filter(Boolean) as ToolDef[];
 
-  const plan = (["routines", "appointments", "supply-tracker", "activity-log"] as const)
+  const plan = (["patterns", "routines", "appointments", "supply-tracker", "activity-log"] as const)
     .map((id) => byId.get(id))
     .filter(Boolean) as ToolDef[];
 
-  const learn = (["education", "tips", "achievements"] as const).map((id) => byId.get(id)).filter(Boolean) as ToolDef[];
+  const learn = (["glucose-converter", "education", "tips", "achievements"] as const)
+    .map((id) => byId.get(id))
+    .filter(Boolean) as ToolDef[];
 
   const supporterTools =
     hubVariant === "carer" || hubVariant === "community" ? ([...actNow, ...learn] as ToolDef[]) : [];
