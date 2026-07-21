@@ -30,6 +30,16 @@
                 <data android:scheme="diabeaters" />
             </intent-filter>
 
+            <!-- HTTPS App Links (verified via /.well-known/assetlinks.json once SHA-256 fingerprints are set) -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="diabeaters.vercel.app" />
+            </intent-filter>
+
         </activity>
 
         <provider

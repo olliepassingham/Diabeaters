@@ -2,6 +2,7 @@
  * Direct messages: dm_threads, dm_thread_members, dm_messages (Supabase + RLS).
  * Optional images use bucket `community_post_images` (paths `{uid}/dm/{thread_id}/…`).
  */
+import { buildPublicAppUrl } from "@/lib/auth-app-url";
 import { logEdgeInvokeFailure } from "@/lib/dev-log";
 import { notifyInAppNotificationsChanged } from "@/lib/in-app-notifications-events";
 import { markDmInAppNotificationsReadForThread } from "@/lib/in-app-notifications-supabase";
@@ -589,11 +590,7 @@ export async function countUnreadDmThreadsForCurrentUser(): Promise<{
 
 /** Absolute URL when running in the browser so the link opens from notifications / copy-paste. */
 export function buildShareFeedPostMessageBody(postId: string): string {
-  const path = `/community/post/${postId}`;
-  if (typeof window !== "undefined" && window.location?.origin) {
-    return `Shared from the feed:\n${window.location.origin}${path}`;
-  }
-  return `Shared from the feed:\n${path}`;
+  return `Shared from the feed:\n${buildPublicAppUrl(`/community/post/${postId}`)}`;
 }
 
 const FEED_POST_PATH =
@@ -709,11 +706,7 @@ export async function sendFeedPostToDmThread(
 
 /** Absolute URL when running in the browser so the link opens from notifications / copy-paste. */
 export function buildShareStoryMessageBody(storyId: string): string {
-  const path = `/community?story=${storyId}`;
-  if (typeof window !== "undefined" && window.location?.origin) {
-    return `Replied to your story:\n${window.location.origin}${path}`;
-  }
-  return `Replied to your story:\n${path}`;
+  return `Replied to your story:\n${buildPublicAppUrl(`/community?story=${storyId}`)}`;
 }
 
 /**

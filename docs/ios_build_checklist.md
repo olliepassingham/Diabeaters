@@ -68,6 +68,8 @@ Use `npm run version:patch`, `version:minor`, or `version:major` to bump `packag
 
 - [ ] **Email verification deep link**: `Info.plist` registers the `diabeaters` URL scheme so “confirm email” can reopen the app. In **Supabase → Authentication → URL Configuration → Redirect URLs**, allow `diabeaters://auth/email-verify` (and your production `https://…/auth/email-verify`) alongside `/auth/callback`.
 
+- [ ] **Universal Links (shared https URLs open the app)**: See [universal_links.md](./universal_links.md). Enable **Associated Domains** on the App ID, confirm entitlements include `applinks:diabeaters.vercel.app`, deploy AASA, then ship a new build.
+
 - [ ] **Remote notifications**: In Xcode → Target → **Signing & Capabilities**, add **Push Notifications** if it is not already present (the project uses `AppDebug.entitlements` / `AppRelease.entitlements` with `aps-environment`). `Info.plist` includes `UIBackgroundModes` → `remote-notification` for background delivery.
 
 - [ ] **HealthKit (CGM prefill)**: Required for Apple Health blood glucose reads.

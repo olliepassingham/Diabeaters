@@ -1,15 +1,18 @@
+import { buildPublicAppUrl } from "@/lib/auth-app-url";
+
 export function buildPublicProfileShareUrl(opts: {
   userId: string;
   publicHandle?: string | null;
   origin?: string;
 }): string {
-  const origin =
-    opts.origin ?? (typeof window !== "undefined" ? window.location.origin : "https://diabeaters.vercel.app");
   const handle = opts.publicHandle?.replace(/^@/, "").trim();
   const path = handle
     ? `/community/u/${encodeURIComponent(handle)}`
     : `/community/profile/${encodeURIComponent(opts.userId)}`;
-  return `${origin}${path}`;
+  if (opts.origin) {
+    return `${opts.origin.replace(/\/$/, "")}${path}`;
+  }
+  return buildPublicAppUrl(path);
 }
 
 export type SharePublicProfileResult = "shared" | "copied" | "failed";

@@ -54,6 +54,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { FieldLabelWithInfo } from "@/components/ui/field-label-with-info";
 import { useToast } from "@/hooks/use-toast";
+import { buildPublicAppUrl } from "@/lib/auth-app-url";
 import { getProfileIdByPublicHandle, getProfilesByIds, normalizePublicHandleInput } from "@/lib/profile";
 import { cn } from "@/lib/utils";
 import { BEATIE_FEED_AVATAR_FALLBACK_SRC } from "@/lib/ai-feed-reply/config";
@@ -408,7 +409,7 @@ export function FeedPostCard({
   }
 
   async function sharePostLinkExternally() {
-    const url = `${window.location.origin}/community/post/${post.id}`;
+    const url = buildPublicAppUrl(`/community/post/${post.id}`);
     try {
       if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
         await navigator.share({

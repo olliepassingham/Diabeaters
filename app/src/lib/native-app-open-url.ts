@@ -1,4 +1,28 @@
-import { NATIVE_AUTH_URL_SCHEME } from "@/lib/auth-app-url";
+import { getPublicAppOrigin, NATIVE_AUTH_URL_SCHEME } from "@/lib/auth-app-url";
+
+/** Hosts whose https links may open into the Capacitor shell (Universal / App Links). */
+const FALLBACK_HTTPS_HOSTS = ["diabeaters.vercel.app"] as const;
+
+function allowedHttpsHosts(): Set<string> {
+  const hosts = new Set<string>(FALLBACK_HTTPS_HOSTS);
+  try {
+    const origin = getPublicAppOrigin();
+    if (origin) hosts.add(new URL(origin).hostname.toLowerCase());
+  } catch {
+    // ignore
+  }
+  if (typeof window !== "undefined") {
+    try {
+      const host = window.location.hostname.toLowerCase();
+      if (host && host !== "localhost" && !host.endsWith(".local")) {
+        hosts.add(host);
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return hosts;
+}
 
 /**
  * Map a URL opened from outside the WebView (custom scheme or universal link) to a
@@ -12,6 +36,7 @@ export function pathFromOpenedAppUrl(rawUrl: string): string | null {
     const hostLower = (url.hostname || "").toLowerCase();
 
     if (url.protocol === "https:" || url.protocol === "http:") {
+      if (!allowedHttpsHosts().has(hostLower)) return null;
       const nextPath = tail || "/";
       return nextPath.startsWith("/") && !nextPath.startsWith("//") ? nextPath : "/";
     }

@@ -12,6 +12,16 @@ describe("pathFromOpenedAppUrl", () => {
     );
   });
 
+  it("maps shared community post universal links into the SPA route", () => {
+    expect(pathFromOpenedAppUrl("https://diabeaters.vercel.app/community/post/abc-123")).toBe(
+      "/community/post/abc-123",
+    );
+  });
+
+  it("rejects https hosts that are not the public Diabeaters site", () => {
+    expect(pathFromOpenedAppUrl("https://evil.example/community/post/abc")).toBeNull();
+  });
+
   it("supports diabeaters:///auth/email-verify (empty host)", () => {
     expect(pathFromOpenedAppUrl("diabeaters:///auth/email-verify")).toBe("/auth/email-verify");
   });

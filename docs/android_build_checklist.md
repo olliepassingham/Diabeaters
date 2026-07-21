@@ -69,11 +69,13 @@ Verified in repo:
 
 - `INTERNET`, `POST_NOTIFICATIONS`, `CAMERA`, `VIBRATE`, `RECEIVE_BOOT_COMPLETED` in [`AndroidManifest.xml`](../android/app/src/main/AndroidManifest.xml). **No** `USE_EXACT_ALARM` / `SCHEDULE_EXACT_ALARM` (Play policy — reminders use inexact scheduling).
 - Deep link intent filter for **`diabeaters://`** (auth email verify + in-app navigation)
+- HTTPS App Links intent filter for **`https://diabeaters.vercel.app`** (`android:autoVerify="true"`). Fill SHA-256 fingerprints in [`assetlinks.json`](../app/public/.well-known/assetlinks.json) — see [universal_links.md](./universal_links.md).
 
 Manual QA:
 
 - [ ] OAuth sign-in (Google) completes and returns to app
 - [ ] Email verification link opens app via `diabeaters://auth/email-verify`
+- [ ] Shared `https://diabeaters.vercel.app/community/post/…` opens the app (after assetlinks fingerprints + verification)
 - [ ] Camera / photo picker works on community posts and profile
 - [ ] Local reminders (exercise, appointments, scenarios) fire on Android 13+
 - [ ] Remote push (DM, feed, carers, supply) with app backgrounded
