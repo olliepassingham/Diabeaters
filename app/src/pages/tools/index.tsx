@@ -63,84 +63,84 @@ const PATIENT_TOOLS: ToolDef[] = [
     href: "/adviser?tab=meal",
     icon: Calculator,
     title: "Meal & ratios",
-    description: "Meal insulin from your saved carb ratios — same screen has split doses and ratio review.",
+    description: "Meal insulin from your saved carb ratios",
   },
   {
     id: "correction-helper",
     href: "/tools/correction",
     icon: TrendingUp,
     title: "Correction helper",
-    description: "A correction dose estimate from the insulin sensitivity you save in Settings.",
+    description: "Correction dose from your sensitivity factor",
   },
   {
     id: "hypo-help",
     href: "/tools/hypo-help",
     icon: Droplet,
     title: "Hypo help",
-    description: "Rough fast-carb amounts for a low, from your current and target glucose.",
+    description: "Fast-carb amounts for a low",
   },
   {
     id: "activity-log",
     href: "/tools/activity",
     icon: ScrollText,
     title: "Activity log",
-    description: "Calendar of hypos, guides, checks, and other things you have recorded.",
+    description: "Calendar of everything you've logged",
   },
   {
     id: "patterns",
     href: "/tools/patterns",
     icon: LineChart,
     title: "Your patterns",
-    description: "Charts of when your lows happen, by time of day, weekday, and week-on-week trend.",
+    description: "Charts of your lows over time",
   },
   {
     id: "glucose-converter",
     href: "/tools/glucose-converter",
     icon: ArrowLeftRight,
     title: "Glucose units",
-    description: "Convert mmol/L (UK) ↔ mg/dL (US) when you see a reading in the other unit.",
+    description: "Convert mmol/L ↔ mg/dL",
   },
   {
     id: "routines",
     href: "/tools/routines",
     icon: Repeat,
     title: "Routines",
-    description: "Saved workouts and meals you use often — open them in one tap.",
+    description: "Saved workouts and meals, one tap away",
   },
   {
     id: "appointments",
     href: "/appointments",
     icon: Calendar,
     title: "Appointments",
-    description: "Clinic visits and check-ups in one list.",
+    description: "Clinic visits and check-ups",
   },
   {
     id: "supply-tracker",
     href: "/supplies",
     icon: Package,
     title: "Supply tracker",
-    description: "Stock levels and rough days-left when you add how much you use each day.",
+    description: "Stock levels and days-left estimate",
   },
   {
     id: "education",
     href: "/education",
     icon: BookOpen,
     title: "Education",
-    description: "Plain-language articles and definitions when a term is new to you.",
+    description: "Plain-language articles and definitions",
   },
   {
     id: "tips",
     href: "/tools/tips",
     icon: Lightbulb,
     title: "Tips",
-    description: "A daily tip plus more short ideas you can dip into anytime.",
+    description: "Daily tip plus more ideas",
   },
   {
     id: "achievements",
     href: "/tools/achievements",
     icon: Sparkles,
     title: "Achievements",
-    description: "Streak badges for bedtime checks, exercise, and guides — pin favourites to your public profile.",
+    description: "Streak badges you can pin to your profile",
   },
 ];
 
@@ -151,8 +151,7 @@ function patientToolsForHub(): ToolDef[] {
         href: "/coach",
         icon: MessageCircle,
         title: AI_ASSISTANT_NAME,
-        description:
-          `${AI_ASSISTANT_NAME} is an educational guide for type 1 diabetes in the UK. Not medical advice.`,
+        description: "Educational chat about type 1 diabetes",
       }
     : undefined;
   const cgmLive: ToolDef | undefined = hasLiveCgmCredentials(readCgmPreferences())
@@ -161,7 +160,7 @@ function patientToolsForHub(): ToolDef[] {
         href: "/tools/cgm-live",
         icon: Activity,
         title: "Glucose trends",
-        description: "Near-live CGM chart — 3h, 12h, and 24h on this device only.",
+        description: "Near-live CGM chart, this device only",
       }
     : undefined;
   const tools = coach ? [coach, ...PATIENT_TOOLS] : [...PATIENT_TOOLS];
@@ -174,21 +173,21 @@ export const CARER_TOOLS: ToolDef[] = [
     href: "/tools/hypo-help",
     icon: Droplet,
     title: "Hypo help",
-    description: "Fast-acting carbs guidance from current and target BG. Educational only.",
+    description: "Fast-carb guidance. Educational only",
   },
   {
     id: "glucose-converter",
     href: "/tools/glucose-converter",
     icon: ArrowLeftRight,
     title: "Glucose units",
-    description: "Convert mmol/L (UK) ↔ mg/dL (US) when you see a reading in the other unit.",
+    description: "Convert mmol/L ↔ mg/dL",
   },
   {
     id: "education",
     href: "/education",
     icon: BookOpen,
     title: "Education",
-    description: "Plain-language articles and definitions when a term is new to you.",
+    description: "Plain-language articles and definitions",
   },
 ];
 
@@ -203,8 +202,7 @@ export function carerToolsForHub(): ToolDef[] {
     href: "/coach?audience=supporter",
     icon: MessageCircle,
     title: AI_ASSISTANT_NAME,
-    description:
-      `${AI_ASSISTANT_NAME} is an educational guide for partners, family, friends, or carers of someone with type 1 diabetes in the UK. Not medical advice.`,
+    description: "Educational chat for carers and family",
   };
   return [coach, ...CARER_TOOLS];
 }
@@ -215,28 +213,28 @@ const COMMUNITY_TOOLS: ToolDef[] = [
     href: "/tools/hypo-help",
     icon: Droplet,
     title: "What is a hypo?",
-    description: "Educational overview of low blood glucose — when to treat urgently vs when to read and learn.",
+    description: "What to know about low blood glucose",
   },
   {
     id: "glucose-converter",
     href: "/tools/glucose-converter",
     icon: ArrowLeftRight,
     title: "Glucose units",
-    description: "Convert mmol/L (UK) ↔ mg/dL (US) when you see a reading in the other unit.",
+    description: "Convert mmol/L ↔ mg/dL",
   },
   {
     id: "education",
     href: "/education",
     icon: BookOpen,
     title: "Education",
-    description: "Plain-language articles and definitions when a term is new to you.",
+    description: "Plain-language articles and definitions",
   },
   {
     id: "tips",
     href: "/tools/tips",
     icon: Lightbulb,
     title: "Tips",
-    description: "Tip of the day and a bigger library of practical reminders.",
+    description: "Tip of the day plus more",
   },
 ];
 
@@ -247,7 +245,7 @@ export function communityToolsForHub(): ToolDef[] {
     href: buildCoachHref({ topic: "community" }),
     icon: MessageCircle,
     title: AI_ASSISTANT_NAME,
-    description: `${AI_ASSISTANT_NAME} is an educational guide for type 1 diabetes in the UK. Not medical advice.`,
+    description: "Educational chat about type 1 diabetes",
   };
   return [coach, ...COMMUNITY_TOOLS];
 }
@@ -262,9 +260,9 @@ function ToolCard({
   const warm = useCallback(() => prefetchToolsDestinationHref(href), [href]);
   const cardClass =
     layout === "compact"
-      ? "pressable card-interactive flex h-full min-h-[9.5rem] w-full cursor-pointer flex-col gap-2 rounded-2xl sm:min-h-[10.5rem]"
-      : "pressable card-interactive flex h-full min-h-[10.5rem] w-full cursor-pointer flex-col gap-3 rounded-2xl md:min-h-[11.75rem]";
-  const pad = layout === "compact" ? "p-5 sm:p-6" : "p-6 sm:p-7";
+      ? "pressable card-interactive flex h-full min-h-[6rem] w-full cursor-pointer flex-col rounded-2xl"
+      : "pressable card-interactive flex h-full min-h-[6.5rem] w-full cursor-pointer flex-col rounded-2xl";
+  const pad = layout === "compact" ? "p-5" : "p-5 sm:p-6";
   return (
     <Link
       href={href}
@@ -274,16 +272,18 @@ function ToolCard({
       onTouchStart={warm}
     >
       <Card variant="glass" className={cardClass}>
-        <CardContent className={cn("flex h-full flex-col gap-3", pad)}>
-          <div className="flex flex-1 items-start gap-3 sm:gap-4">
-            <Icon className="mt-0.5 h-7 w-7 shrink-0 text-primary sm:h-8 sm:w-8" aria-hidden />
+        <CardContent className={cn("flex h-full items-center", pad)}>
+          <div className="flex flex-1 items-center gap-3 sm:gap-4">
+            <Icon className="h-7 w-7 shrink-0 text-primary sm:h-8 sm:w-8" aria-hidden />
             <div className="min-w-0 flex-1">
               <h3 className="font-display text-h3 font-semibold text-foreground">{title}</h3>
-              <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground sm:text-[0.9375rem]">
-                {description}
-              </p>
+              <p className="mt-0.5 truncate text-sm text-muted-foreground">{description}</p>
             </div>
           </div>
+          <ChevronRight
+            className="h-5 w-5 shrink-0 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5"
+            aria-hidden
+          />
         </CardContent>
       </Card>
     </Link>
@@ -302,18 +302,14 @@ function LearnToolRow({ href, icon: Icon, title, description }: Omit<ToolDef, "i
       onTouchStart={warm}
     >
       <Card variant="glass" className="pressable card-interactive cursor-pointer rounded-2xl">
-        <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:gap-6 sm:p-6">
-          <div className="flex items-start gap-4 sm:items-center">
-            <Icon className="h-9 w-9 shrink-0 text-primary sm:h-10 sm:w-10" aria-hidden />
-            <div className="min-w-0 flex-1">
-              <h3 className="font-display text-h3 font-semibold text-foreground">{title}</h3>
-              <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground sm:text-[0.9375rem]">
-                {description}
-              </p>
-            </div>
+        <CardContent className="flex items-center gap-3 p-4 sm:gap-4 sm:p-5">
+          <Icon className="h-8 w-8 shrink-0 text-primary sm:h-9 sm:w-9" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <h3 className="font-display text-h3 font-semibold text-foreground">{title}</h3>
+            <p className="mt-0.5 truncate text-sm text-muted-foreground">{description}</p>
           </div>
           <ChevronRight
-            className="hidden h-6 w-6 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 sm:block"
+            className="h-5 w-5 shrink-0 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5"
             aria-hidden
           />
         </CardContent>

@@ -3,7 +3,7 @@ import { Link, useLocation, useSearch } from "wouter";
 import type { LucideIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { trackFeatureEngagement } from "@/components/discovery-prompts";
-import { Moon, Thermometer, Plane, Dumbbell, Syringe, Wine, Car } from "lucide-react";
+import { Moon, Thermometer, Plane, Dumbbell, Syringe, Wine, Car, ChevronRight } from "lucide-react";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { storage, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
@@ -25,37 +25,37 @@ const SCENARIO_CARDS: ScenarioCardDef[] = [
     href: "/scenarios/exercise",
     icon: Dumbbell,
     title: "Exercise",
-    description: "Pre-workout fuel and insulin, plus active session tracking. CGM can prefill BG and trend.",
+    description: "Pre-workout fuel and insulin planning",
   },
   {
     href: "/scenarios/bedtime",
     icon: Moon,
     title: "Bedtime",
-    description: "Evening readiness with correction, snack, and reminder options.",
+    description: "Evening readiness and correction check",
   },
   {
     href: "/scenarios/sick-day",
     icon: Thermometer,
     title: "Sick day",
-    description: "Illness mode with dose guidance, logs, ketones, and med reminders.",
+    description: "Illness-adjusted dose guidance and logs",
   },
   {
     href: "/scenarios/travel",
     icon: Plane,
     title: "Travel",
-    description: "Trip checklist, timezone tips, and guidance while you're away.",
+    description: "Trip checklist and timezone tips",
   },
   {
     href: "/scenarios/alcohol",
     icon: Wine,
     title: "Alcohol",
-    description: "Situation prep, meal carb estimates, and delayed-low awareness.",
+    description: "Situation prep and delayed-low awareness",
   },
   {
     href: "/scenarios/driving",
     icon: Car,
     title: "Driving",
-    description: "Readiness from glucose, trend, and recent hypos — with CGM prefill when connected.",
+    description: "Readiness from glucose and trend",
   },
 ];
 
@@ -75,14 +75,18 @@ function ScenarioCard({ href, icon: Icon, title, description }: ScenarioCardDef)
     >
       <Card
         variant="glass"
-        className="pressable card-interactive flex h-full min-h-[7.25rem] w-full cursor-pointer flex-col gap-3 rounded-2xl px-5 py-5 sm:min-h-[7.75rem] sm:px-6 sm:py-6"
+        className="pressable card-interactive flex h-full min-h-[5.5rem] w-full cursor-pointer flex-col rounded-2xl px-5 py-4 sm:min-h-[6rem] sm:px-6 sm:py-5"
       >
-        <div className="flex items-start gap-3 sm:gap-4">
-          <Icon className="mt-0.5 h-7 w-7 shrink-0 text-primary sm:h-8 sm:w-8" aria-hidden />
+        <div className="flex h-full items-center gap-3 sm:gap-4">
+          <Icon className="h-7 w-7 shrink-0 text-primary sm:h-8 sm:w-8" aria-hidden />
           <div className="min-w-0 flex-1">
             <h3 className="font-display text-h3 font-semibold text-foreground">{title}</h3>
-            <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground sm:text-[0.9375rem]">{description}</p>
+            <p className="mt-0.5 truncate text-sm text-muted-foreground">{description}</p>
           </div>
+          <ChevronRight
+            className="h-5 w-5 shrink-0 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5"
+            aria-hidden
+          />
         </div>
       </Card>
     </Link>
@@ -102,7 +106,7 @@ export default function Scenarios() {
 
   const [showPumpFailureCard, setShowPumpFailureCard] = useState(false);
   const [pumpFailureCardDescription, setPumpFailureCardDescription] = useState(
-    "Triage, recheck timers, backup pens, and ketone-aware steps.",
+    "Triage steps if delivery stops",
   );
   useEffect(() => {
     const profile = storage.getProfile();
@@ -110,9 +114,7 @@ export default function Scenarios() {
     setVisibleScenarioCards(scenarioCardsForProfile(profile?.dateOfBirth));
     const pumpReady = pumpSetupCompletion(profile, storage.getSupplies()).tracksBackup;
     setPumpFailureCardDescription(
-      pumpReady
-        ? "Triage, recheck timers, backup pens, and ketone-aware steps."
-        : "Set up backup pens in Supplies first — then use this if delivery stops.",
+      pumpReady ? "Triage steps if delivery stops" : "Set up backup pens first",
     );
   }, [location]);
 
@@ -123,9 +125,7 @@ export default function Scenarios() {
       setVisibleScenarioCards(scenarioCardsForProfile(profile?.dateOfBirth));
       const pumpReady = pumpSetupCompletion(profile, storage.getSupplies()).tracksBackup;
       setPumpFailureCardDescription(
-        pumpReady
-          ? "Triage, recheck timers, backup pens, and ketone-aware steps."
-          : "Set up backup pens in Supplies first — then use this if delivery stops.",
+        pumpReady ? "Triage steps if delivery stops" : "Set up backup pens first",
       );
     };
     window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
