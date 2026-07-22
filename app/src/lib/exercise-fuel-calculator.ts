@@ -511,11 +511,24 @@ function tryMealInsulinForBg(
 }
 
 /**
+ * How much faster a session burns through glucose, scaling the low-BG top-up so the same
+ * BG deficit gets a bigger cushion for harder effort (which drops BG faster) and a smaller
+ * one for gentle sessions (yoga/light) where the same deficit is less urgent to fully close
+ * before starting. Conservative — never below 0.8x or above 1.25x.
+ */
+function lowBgTopUpIntensityFactor(intensity: ExerciseIntensity): number {
+  if (intensity === "intense") return 1.25;
+  if (intensity === "light") return 0.8;
+  return 1;
+}
+
+/**
  * Extra carbs to add on top of the session's baseline pre-exercise buffer when current BG is
  * below the comfortable starting band (7 mmol/L · 126 mg/dL) — so the "suggest carbs for me"
- * amount actually scales with *how* low BG is, rather than jumping straight to the same flat
- * session buffer for any reading below the line. Added to (not maxed with) the buffer, since
- * the buffer alone assumes a normal starting BG; a low reading needs that plus a top-up.
+ * amount actually scales with *how* low BG is (and how hard the session will be), rather than
+ * jumping straight to the same flat session buffer for any reading below the line. Added to
+ * (not maxed with) the buffer, since the buffer alone assumes a normal starting BG; a low
+ * reading needs that plus a top-up.
  *
  * Uses the same weight-scaled "1g raises ~0.25 mmol/L at 70kg" assumption as the exercise hypo
  * carb calculator, for consistency across the app. Capped for sanity; falls back to a flat,
@@ -525,6 +538,7 @@ function computeLowBgCarbTopUp(
   currentBg: number,
   bgUnits: "mmol/L" | "mg/dL",
   profile: Partial<UserProfile> | undefined,
+  intensity: ExerciseIntensity,
 ): number {
   const idealLow = preExerciseIdealLowBg(bgUnits);
   if (currentBg >= idealLow) return 0;
@@ -534,15 +548,17 @@ function computeLowBgCarbTopUp(
   const bgDifference = targetMmol - bgMmol;
   if (bgDifference <= 0) return 0;
 
+  const intensityFactor = lowBgTopUpIntensityFactor(intensity);
+
   if (hypoCalculatorRequiresExplicitWeight(profile?.dateOfBirth)) {
-    return 10;
+    return Math.round((10 * intensityFactor) / 5) * 5;
   }
 
   const weightKg = getBodyWeightKgFromProfile(profile) ?? 70;
   const sensitivityFactor = 70 / weightKg;
   const effectiveRise = 0.25 * sensitivityFactor;
-  const grams = bgDifference / effectiveRise;
-  return Math.min(30, Math.ceil(grams / 5) * 5);
+  const grams = (bgDifference / effectiveRise) * intensityFactor;
+  return Math.min(35, Math.ceil(grams / 5) * 5);
 }
 
 function planTargetBand(bgUnits: string): string {
@@ -755,7 +771,7 @@ export function computeExerciseFuelPlan(input: ExerciseFuelCalculatorInput): Exe
     });
     if (carbsDecision.suggest) {
       if (input.currentBg != null && Number.isFinite(input.currentBg)) {
-        lowBgCarbTopUpGrams = computeLowBgCarbTopUp(input.currentBg, bgUnitsNormalized, input.profile);
+        lowBgCarbTopUpGrams = computeLowBgCarbTopUp(input.currentBg, bgUnitsNormalized, input.profile, input.intensity);
       }
       mealCarbs = preBufferGrams + lowBgCarbTopUpGrams;
     } else if (carbsDecision.skipReason) {

@@ -332,35 +332,79 @@ function applyExerciseTypeCarbAdjustments(
   return { pre: outPre, during: outDuring, post: outPost };
 }
 
+type ExerciseIntensityKey = "light" | "moderate" | "intense";
+
+/**
+ * Duration-scaling curve: ramps linearly from `base` once the session passes
+ * `thresholdMin`, at `ratePerMin` grams per minute beyond that, capped at `cap`.
+ * Replaces old fixed step-thresholds (e.g. "20g for anything 20-300 min") so duration
+ * keeps influencing the number across the whole range instead of flattening out after
+ * one breakpoint. Grams are rounded to the nearest 5g for practical dosing.
+ */
+type CarbRampCurve = { thresholdMin: number; base: number; ratePerMin: number; cap: number };
+
+function rampGrams(duration: number, curve: CarbRampCurve): number {
+  if (duration < curve.thresholdMin) return 0;
+  const raw = curve.base + curve.ratePerMin * (duration - curve.thresholdMin);
+  return roundCarbsGrams(Math.min(curve.cap, Math.max(0, raw)), 1);
+}
+
+/** Post-exercise: a floor that matches typical short/default sessions, ramping up only for longer ones. */
+function rampGramsWithFloor(duration: number, curve: CarbRampCurve): number {
+  if (duration <= curve.thresholdMin) return roundCarbsGrams(curve.base, 1);
+  const raw = curve.base + curve.ratePerMin * (duration - curve.thresholdMin);
+  return roundCarbsGrams(Math.min(curve.cap, Math.max(curve.base, raw)), 1);
+}
+
+/** Carbs to eat now if BG is low, sized as a pre-exercise buffer — scales with duration and intensity. */
+const PRE_EXERCISE_CARB_CURVE: Record<ExerciseIntensityKey, CarbRampCurve> = {
+  light: { thresholdMin: 20, base: 10, ratePerMin: 0.12, cap: 25 },
+  moderate: { thresholdMin: 15, base: 10, ratePerMin: 0.3, cap: 35 },
+  intense: { thresholdMin: 10, base: 15, ratePerMin: 0.4, cap: 40 },
+};
+
+/** Fast carbs to have ready during the session — starts once a session is long enough to matter. */
+const DURING_EXERCISE_CARB_CURVE: Record<ExerciseIntensityKey, CarbRampCurve> = {
+  light: { thresholdMin: 45, base: 0, ratePerMin: 0.3, cap: 60 },
+  moderate: { thresholdMin: 20, base: 0, ratePerMin: 0.7, cap: 70 },
+  intense: { thresholdMin: 15, base: 0, ratePerMin: 1.0, cap: 80 },
+};
+
+/** Recovery carbs — flat floor for typical sessions, ramping up for longer ones (more glycogen used). */
+const POST_EXERCISE_CARB_CURVE: Record<ExerciseIntensityKey, CarbRampCurve> = {
+  light: { thresholdMin: 45, base: 15, ratePerMin: 0.12, cap: 30 },
+  moderate: { thresholdMin: 45, base: 20, ratePerMin: 0.18, cap: 40 },
+  intense: { thresholdMin: 45, base: 30, ratePerMin: 0.2, cap: 50 },
+};
+
+const BASE_BOLUS_REDUCTION: Record<ExerciseIntensityKey, string> = {
+  light: "15-25%",
+  moderate: "25-35%",
+  intense: "35-50%",
+};
+
+/**
+ * Duration shift for the bolus-reduction band, anchored at 45 min (0 shift) so the
+ * default session length matches prior guidance exactly. Longer sessions increase
+ * insulin sensitivity more (bias the range higher); short sessions bias it lower.
+ * Capped so duration alone can't push the band to an extreme.
+ */
+function bolusReductionDurationShift(duration: number): number {
+  const raw = (duration - 45) * 0.15;
+  return Math.round(Math.min(15, Math.max(-10, raw)));
+}
+
 function baseCarbsAndBolus(
-  intensity: "light" | "moderate" | "intense",
+  intensity: ExerciseIntensityKey,
   duration: number,
 ): { preExerciseCarbs: number; duringCarbs: number; postExerciseCarbs: number; bolusReduction: string } {
-  let preExerciseCarbs = 0;
-  let duringCarbs = 0;
-  let postExerciseCarbs = 0;
-  let bolusReduction = "";
+  const preExerciseCarbs = rampGrams(duration, PRE_EXERCISE_CARB_CURVE[intensity]);
+  const duringCarbs = rampGrams(duration, DURING_EXERCISE_CARB_CURVE[intensity]);
+  const postExerciseCarbs = rampGramsWithFloor(duration, POST_EXERCISE_CARB_CURVE[intensity]);
 
-  switch (intensity) {
-    case "light":
-      preExerciseCarbs = duration < 30 ? 0 : 15;
-      duringCarbs = duration > 60 ? 15 : 0;
-      postExerciseCarbs = 15;
-      bolusReduction = "15-25%";
-      break;
-    case "moderate":
-      preExerciseCarbs = duration < 20 ? 10 : 20;
-      duringCarbs = duration >= 45 ? Math.round(duration / 30) * 15 : 0;
-      postExerciseCarbs = 20;
-      bolusReduction = "25-35%";
-      break;
-    case "intense":
-      preExerciseCarbs = duration < 30 ? 15 : duration <= 60 ? 25 : 30;
-      duringCarbs = duration > 30 ? Math.round(duration / 30) * 20 : 0;
-      postExerciseCarbs = 30;
-      bolusReduction = "35-50%";
-      break;
-  }
+  const shift = bolusReductionDurationShift(duration);
+  const bolusReduction = shift === 0 ? BASE_BOLUS_REDUCTION[intensity] : shiftBolusReductionRange(BASE_BOLUS_REDUCTION[intensity], shift, shift);
+
   return { preExerciseCarbs, duringCarbs, postExerciseCarbs, bolusReduction };
 }
 

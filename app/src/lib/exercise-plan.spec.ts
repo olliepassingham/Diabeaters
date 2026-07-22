@@ -95,9 +95,45 @@ describe("calculateExercisePlan", () => {
     const short = calculateExercisePlan({ ...baseCtx, intensity: "intense", durationMinutes: 25 });
     const mid = calculateExercisePlan({ ...baseCtx, intensity: "intense", durationMinutes: 45 });
     const long = calculateExercisePlan({ ...baseCtx, intensity: "intense", durationMinutes: 120 });
-    expect(short.pre.carbsIfLow).toBe(15);
-    expect(mid.pre.carbsIfLow).toBe(25);
-    expect(long.pre.carbsIfLow).toBe(30);
+    expect(short.pre.carbsIfLow).toBe(20);
+    expect(mid.pre.carbsIfLow).toBe(30);
+    expect(long.pre.carbsIfLow).toBe(40);
+  });
+
+  it("keeps scaling carbs and bolus reduction continuously with duration — no flat plateau across a wide range", () => {
+    // Old behaviour: any intense session from 61-300 min got an identical flat 30g pre-buffer
+    // and any moderate session from 45-300 min got the same during-carbs formula collapsing to
+    // a handful of repeated values. Duration should keep mattering the whole way through.
+    const durations = [10, 20, 30, 45, 60, 90, 120, 180, 240, 300];
+    for (const intensity of ["light", "moderate", "intense"] as const) {
+      const plans = durations.map((durationMinutes) =>
+        calculateExercisePlan({ ...baseCtx, intensity, durationMinutes }),
+      );
+      for (let i = 1; i < plans.length; i++) {
+        expect(plans[i]!.pre.carbsIfLow).toBeGreaterThanOrEqual(plans[i - 1]!.pre.carbsIfLow);
+        expect(plans[i]!.during.carbsNeeded).toBeGreaterThanOrEqual(plans[i - 1]!.during.carbsNeeded);
+        expect(plans[i]!.post.carbs).toBeGreaterThanOrEqual(plans[i - 1]!.post.carbs);
+      }
+      // At least one of pre/during/post should differ between a 60 min and a 240 min session —
+      // i.e. the old "flat after one breakpoint" behaviour is gone.
+      const at60 = plans[durations.indexOf(60)]!;
+      const at240 = plans[durations.indexOf(240)]!;
+      const anyDifference =
+        at60.pre.carbsIfLow !== at240.pre.carbsIfLow ||
+        at60.during.carbsNeeded !== at240.during.carbsNeeded ||
+        at60.post.carbs !== at240.post.carbs;
+      expect(anyDifference).toBe(true);
+    }
+  });
+
+  it("shifts the bolus-reduction band with duration, anchored at 45 min", () => {
+    const anchor = calculateExercisePlan({ ...baseCtx, intensity: "moderate", durationMinutes: 45 });
+    const short = calculateExercisePlan({ ...baseCtx, intensity: "moderate", durationMinutes: 15 });
+    const long = calculateExercisePlan({ ...baseCtx, intensity: "moderate", durationMinutes: 150 });
+    const lo = (r: typeof anchor) => parseInt(r.pre.bolusReduction.match(/^(\d+)/)?.[1] ?? "0", 10);
+    expect(anchor.pre.bolusReduction).toBe("25-35%");
+    expect(lo(short)).toBeLessThan(lo(anchor));
+    expect(lo(long)).toBeGreaterThan(lo(anchor));
   });
 
   it("nudges carb targets by exercise type (same intensity and duration)", () => {

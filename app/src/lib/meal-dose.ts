@@ -99,6 +99,17 @@ function clamp(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n));
 }
 
+/**
+ * Continuous duration modifier (replaces old 3-bucket step: <=30 → -5, >=90 → +5, else flat 0,
+ * which meant *any* session from 31-89 min got the exact same adjustment). Anchored at 60 min
+ * (0 shift) and interpolated through the old boundary points (-5 at 30, +5 at 90), extending a
+ * little further for very short/long sessions. Capped so duration alone can't swing the dose far.
+ */
+function exerciseReductionDurationModifier(durationMinutes: number): number {
+  const raw = (durationMinutes - 60) / 6;
+  return Math.round(Math.min(8, Math.max(-8, raw)));
+}
+
 function exerciseReductionModifier(meta: MealExerciseMeta | undefined): number {
   if (!meta) return 0;
   const byIntensity = meta.intensity === "intense" ? 5 : meta.intensity === "light" ? -5 : 0;
@@ -110,7 +121,7 @@ function exerciseReductionModifier(meta: MealExerciseMeta | undefined): number {
         : meta.exerciseType === "walking" || meta.exerciseType === "yoga"
           ? -5
           : 0;
-  const byDuration = meta.durationMinutes >= 90 ? 5 : meta.durationMinutes <= 30 ? -5 : 0;
+  const byDuration = exerciseReductionDurationModifier(meta.durationMinutes);
   return byIntensity + byType + byDuration;
 }
 

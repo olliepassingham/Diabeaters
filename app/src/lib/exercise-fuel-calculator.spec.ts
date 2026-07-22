@@ -114,9 +114,33 @@ describe("computeExerciseFuelPlan", () => {
       settings,
       isPump: false,
     });
-    expect(short.breakdown.preBufferGrams).toBe(15);
-    expect(long.breakdown.preBufferGrams).toBe(30);
+    expect(short.breakdown.preBufferGrams).toBe(20);
+    expect(long.breakdown.preBufferGrams).toBe(40);
+    // Court sports carry a +10% "during" nudge on top of the capped 80g intensity/duration base.
     expect(long.breakdown.duringGrams).toBe(90);
+    expect(long.breakdown.preBufferGrams).toBeGreaterThan(short.breakdown.preBufferGrams);
+  });
+
+  it("scales the low-BG carb top-up by exercise intensity (harder effort burns through BG faster)", () => {
+    const build = (intensity: "light" | "moderate" | "intense") =>
+      computeExerciseFuelPlan({
+        exerciseType: "cardio",
+        intensity,
+        durationMinutes: 45,
+        minutesUntilStart: 30,
+        fasted: false,
+        mealType: "snack",
+        currentBg: 4.8,
+        bgUnits: "mmol/L",
+        settings,
+        isPump: false,
+        profile: { dateOfBirth: "1990-01-01", bodyWeightKg: 70 },
+      });
+    const light = build("light");
+    const moderate = build("moderate");
+    const intense = build("intense");
+    expect(light.breakdown.lowBgCarbTopUpGrams ?? 0).toBeLessThanOrEqual(moderate.breakdown.lowBgCarbTopUpGrams ?? 0);
+    expect(intense.breakdown.lowBgCarbTopUpGrams ?? 0).toBeGreaterThan(moderate.breakdown.lowBgCarbTopUpGrams ?? 0);
   });
 
   it("adds note when rapid insulin was recent", () => {
