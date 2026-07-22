@@ -8,6 +8,7 @@ import {
 } from "@/lib/cgm/preferences";
 import { resolveLiveCgmHistorySource } from "@/lib/cgm/live-cgm-source";
 import type { CgmSourceId } from "@/lib/cgm/types";
+import { appendCgmReadings } from "@/lib/cgm/cgm-history-store";
 
 export type LiveCgmGlucoseEntry = {
   valueMgDl: number;
@@ -27,6 +28,16 @@ export function liveCgmSourceLabel(source: CgmSourceId | null): string {
   return "CGM";
 }
 
+/** Best-effort trickle-into-history for local multi-day patterns; never blocks the caller. */
+function recordHistoryBatch(entries: LiveCgmGlucoseEntry[]): void {
+  if (entries.length === 0) return;
+  try {
+    appendCgmReadings(entries.map((e) => ({ recordedAt: e.recordedAt, valueMgDl: e.valueMgDl })));
+  } catch {
+    // Ignore — history bookkeeping should never affect the fetch result.
+  }
+}
+
 export async function fetchLiveCgmHistory(options: {
   minutes: number;
   maxCount: number;
@@ -43,11 +54,9 @@ export async function fetchLiveCgmHistory(options: {
       { username, password, server: dexcomServerFromPrefs(prefs.dexcomShareServer) },
       options,
     );
-    return {
-      source,
-      sourceLabel: liveCgmSourceLabel(source),
-      entries: entries.map((e) => ({ valueMgDl: e.valueMgDl, recordedAt: e.recordedAt, trend: e.trend })),
-    };
+    const mapped = entries.map((e) => ({ valueMgDl: e.valueMgDl, recordedAt: e.recordedAt, trend: e.trend }));
+    recordHistoryBatch(mapped);
+    return { source, sourceLabel: liveCgmSourceLabel(source), entries: mapped };
   }
 
   if (source === "libre_link_up" && hasLibreLinkUpCredentials(prefs)) {
@@ -56,11 +65,9 @@ export async function fetchLiveCgmHistory(options: {
     if (!email || !password) return null;
     const region = (prefs.libreLinkUpRegion ?? "eu") as LibreLinkUpRegion;
     const entries = await fetchLibreLinkUpHistory({ email, password, region }, options);
-    return {
-      source,
-      sourceLabel: liveCgmSourceLabel(source),
-      entries: entries.map((e) => ({ valueMgDl: e.valueMgDl, recordedAt: e.recordedAt, trend: e.trend })),
-    };
+    const mapped = entries.map((e) => ({ valueMgDl: e.valueMgDl, recordedAt: e.recordedAt, trend: e.trend }));
+    recordHistoryBatch(mapped);
+    return { source, sourceLabel: liveCgmSourceLabel(source), entries: mapped };
   }
 
   return null;

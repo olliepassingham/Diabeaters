@@ -22,6 +22,8 @@ import {
   type LibreLinkUpRegion as LibreRegion,
 } from "@/lib/cgm/libre-link-up-client";
 import { isIosDevice } from "@/lib/native-platform";
+import { appendCgmReadings } from "@/lib/cgm/cgm-history-store";
+import { convertGlucoseValue } from "@/lib/cgm/units";
 
 function shouldSkipCapgoAvailability(id: CgmSourceId): boolean {
   if (id !== "health_platform") return false;
@@ -72,6 +74,20 @@ export async function fetchLatestCgmReading(userUnits: BgUnits): Promise<Glucose
     const reading = await adapter.getLatestReading(userUnits);
     if (!reading) continue;
     if (!best || reading.ageMinutes < best.ageMinutes) best = reading;
+  }
+
+  // Best-effort trickle into local multi-day history for the Patterns page —
+  // every BG auto-fill anywhere in the app (dashboard, exercise, bedtime, the
+  // status strip's 5-min poll, etc.) contributes a sample, across all sources
+  // including HealthKit/Health Connect (which have no separate history API here).
+  if (best) {
+    try {
+      appendCgmReadings([
+        { recordedAt: best.recordedAt, valueMgDl: convertGlucoseValue(best.value, best.units, "mg/dL") },
+      ]);
+    } catch {
+      // Never let history bookkeeping affect the prefill result.
+    }
   }
 
   return best;
