@@ -47,3 +47,21 @@ export function exerciseApproachLowMargin(bgUnits: string): number {
 export function exerciseApproachLowCeiling(lowThreshold: number, bgUnits: string): number {
   return lowThreshold + exerciseApproachLowMargin(bgUnits);
 }
+
+/**
+ * Recovery-aware variant of {@link exerciseApproachLowCeiling}. Delayed-onset lows are
+ * common for hours after activity as muscles keep pulling in glucose to refill glycogen —
+ * widen the "still worth treating" band during recovery rather than requiring the same
+ * confirmed-falling signal pre/active phases need.
+ */
+export function exerciseApproachLowCeilingForPhase(
+  lowThreshold: number,
+  bgUnits: string,
+  phase?: "pre" | "active" | "recovery",
+): number {
+  const base = exerciseApproachLowCeiling(lowThreshold, bgUnits);
+  if (phase === "recovery") {
+    return base + (units(bgUnits) === "mg/dL" ? 9 : 0.5);
+  }
+  return base;
+}

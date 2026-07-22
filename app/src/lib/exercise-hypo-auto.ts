@@ -8,6 +8,7 @@ import {
   defaultExerciseLowThreshold as centralDefaultExerciseLowThreshold,
   defaultHypoThreshold,
   exerciseApproachLowCeiling as centralExerciseApproachLowCeiling,
+  exerciseApproachLowCeilingForPhase,
 } from "@/lib/exercise-thresholds";
 
 /** BG value to use for hypo check: draft input wins when valid, else last logged for phase. */
@@ -121,10 +122,14 @@ export function needsImmediateExerciseBgTreatment(
   if (isBgBelowHypoThreshold(bg, settings, bgUnits)) return true;
   const low = context?.exerciseLowThreshold ?? defaultExerciseLowThreshold(bgUnits);
   if (bg < low) return true;
-  if (context?.trend === "falling" && bg < exerciseApproachLowCeiling(low, bgUnits)) return true;
+  // Recovery gets a wider ceiling than pre/active — delayed-onset lows after activity
+  // don't always show up as a confirmed falling trend on the next single reading.
+  const approachCeiling = exerciseApproachLowCeilingForPhase(low, bgUnits, context?.phase);
+  if (context?.trend === "falling" && bg < approachCeiling) return true;
+  if (context?.phase === "recovery" && bg < approachCeiling) return true;
   // Severe symptoms (shaky, sweaty, etc.) plus a borderline-low reading is a stronger
   // signal than the number alone — escalate even without a confirmed falling trend.
-  if (context?.symptomSeverity === "severe" && bg < exerciseApproachLowCeiling(low, bgUnits)) return true;
+  if (context?.symptomSeverity === "severe" && bg < approachCeiling) return true;
   return false;
 }
 

@@ -1,6 +1,20 @@
 import type { ActiveExerciseSession, ExerciseBgTrend } from "@/lib/storage";
 import type { ExercisePlanContext, ExerciseHistoryBias } from "@/lib/exercise-plan";
 
+/**
+ * Guided coach has no explicit "starting in…" question — the pre phase itself is the lead
+ * time. Assume a ~30 minute prep window from when the session was created and count down as
+ * the user lingers on the pre screen, rather than reporting a flat 30 minutes indefinitely.
+ */
+const ASSUMED_PRE_PHASE_PREP_WINDOW_MINUTES = 30;
+
+function minutesUntilStartFromSessionAge(session: ActiveExerciseSession): number {
+  const startedAtMs = new Date(session.startedAt).getTime();
+  if (!Number.isFinite(startedAtMs)) return ASSUMED_PRE_PHASE_PREP_WINDOW_MINUTES;
+  const elapsedMinutes = Math.max(0, (Date.now() - startedAtMs) / 60_000);
+  return Math.max(0, Math.round(ASSUMED_PRE_PHASE_PREP_WINDOW_MINUTES - elapsedMinutes));
+}
+
 /** Build {@link ExercisePlanContext} from guided coach session inputs. */
 export function buildExercisePlanContextFromCoachSession(input: {
   session: ActiveExerciseSession;
@@ -14,7 +28,7 @@ export function buildExercisePlanContextFromCoachSession(input: {
     exerciseType: session.exerciseType,
     durationMinutes: session.durationMinutes,
     intensity: session.intensity,
-    minutesUntilStart: 30,
+    minutesUntilStart: minutesUntilStartFromSessionAge(session),
     bgUnits: input.bgUnits,
     hourOfDay: new Date().getHours(),
   };

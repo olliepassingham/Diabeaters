@@ -7,11 +7,19 @@ import { formatCarbsForScenario, formatFastCarbsForScenario } from "@/lib/carb-s
 import type { ExercisePlanResult } from "@/lib/exercise-plan";
 import { exerciseApproachLowCeiling } from "@/lib/exercise-hypo-auto";
 import {
+  exerciseApproachLowCeilingForPhase,
   exerciseHighThreshold,
   exerciseIdealStartMinimum as centralExerciseIdealStartMinimum,
   exerciseIdealStartMinimumLabel as centralExerciseIdealStartMinimumLabel,
 } from "@/lib/exercise-thresholds";
-import type { ExerciseBgTrend, ExerciseIntensity, PreRapidInsulin2h, UserProfile } from "@/lib/storage";
+import type {
+  ExerciseBgTrend,
+  ExerciseEnvironmentChoice,
+  ExerciseIntensity,
+  ExerciseSymptomSeverity,
+  PreRapidInsulin2h,
+  UserProfile,
+} from "@/lib/storage";
 
 export type ExerciseReadinessVerdict = "ready" | "caution" | "not_recommended";
 
@@ -19,6 +27,13 @@ export interface ExerciseReadinessResult {
   verdict: ExerciseReadinessVerdict;
   title: string;
   detail: string;
+  /**
+   * True when there isn't enough BG data yet to give a real verdict (verdict is a "caution"
+   * placeholder purely because the field is empty). UI layers should use this to render a
+   * neutral "waiting for input" prompt instead of amber caution chrome — showing a warning
+   * before the user has typed anything reads as a false alarm, not guidance.
+   */
+  awaitingInput?: boolean;
 }
 
 function parseNumericMaybe(value: string | null | undefined): number | null {
@@ -93,13 +108,29 @@ export interface ExerciseReadinessInput {
   feelingOff?: boolean;
   alcoholLastNight?: boolean;
   hypoProneHistory?: boolean;
+  /** Pre: venue/altitude choices — heat and altitude both raise exercise risk. */
+  environments?: ExerciseEnvironmentChoice[] | null;
+  /** Pre: training without having eaten first. */
+  fasted?: boolean;
+  /** Pre: self-reported hydration. */
+  hydration?: "ok" | "low" | null;
+  /** Pre: caffeine in the last ~2h can amplify adrenaline-driven swings. */
+  caffeineLast2h?: boolean;
+  /** Pre: GLP-1 medicines slow digestion and can blunt hunger/hypo cues. */
+  glp1Last24h?: boolean;
+  /** Pre: beta-blockers can mask classic hypo warning signs (fast heartbeat, tremor). */
+  betaBlockerToday?: boolean;
+  /** Pre: competitive/group sessions are paced less predictably than planned. */
+  competitive?: boolean;
+  /** Active only: subjective symptom severity logged mid-session — can escalate the verdict. */
+  symptomSeverity?: ExerciseSymptomSeverity | null;
 }
 
 function baseVerdict(input: ExerciseReadinessInput): ExerciseReadinessResult {
   const { exercisePlanResult, bgUnits, sickDayActive, sickDaySeverity } = input;
 
   if (!exercisePlanResult) {
-    return { verdict: "caution", title: "Caution", detail: "Plan a workout to see guidance." };
+    return { verdict: "caution", title: "Caution", detail: "Plan a workout to see guidance.", awaitingInput: true };
   }
 
   if (sickDayActive && sickDaySeverity === "severe") {
@@ -119,8 +150,9 @@ function baseVerdict(input: ExerciseReadinessInput): ExerciseReadinessResult {
   if (bg == null || lowThreshold == null) {
     return {
       verdict: "caution",
-      title: "Caution",
-      detail: "Add your current BG to refine this.",
+      title: "Add your BG",
+      detail: "Enter your current reading to get a tailored verdict for this session.",
+      awaitingInput: true,
     };
   }
 
@@ -303,7 +335,12 @@ export function getRecoveryReadinessVerdict(input: ExerciseReadinessInput): Exer
   const { exercisePlanResult, bgUnits, sickDayActive, sickDaySeverity } = input;
 
   if (!exercisePlanResult) {
-    return { verdict: "caution", title: "Caution", detail: "Plan data missing — add BG for clearer recovery guidance." };
+    return {
+      verdict: "caution",
+      title: "Caution",
+      detail: "Plan data missing — add BG for clearer recovery guidance.",
+      awaitingInput: true,
+    };
   }
 
   if (sickDayActive && sickDaySeverity === "severe") {
@@ -323,15 +360,20 @@ export function getRecoveryReadinessVerdict(input: ExerciseReadinessInput): Exer
   if (bg == null || lowThreshold == null) {
     return {
       verdict: "caution",
-      title: "Caution",
-      detail: "Add your current BG — recovery colours and tips depend on level and trend.",
+      title: "Add your BG",
+      detail: "Recovery guidance depends on your level and trend — add a reading to tailor this.",
+      awaitingInput: true,
     };
   }
 
   const highThreshold = exerciseHighThreshold(bgUnits);
   const trend = input.bgTrend ?? "not_sure";
-  /** Below range but not yet under formal low threshold — still falling → treat like a high-risk window. */
-  const approachLowCeiling = exerciseApproachLowCeilingForUnits(bgUnits, lowThreshold);
+  /**
+   * Below range but not yet under formal low threshold — still falling → treat like a
+   * high-risk window. Wider than pre/active: delayed-onset lows are common for hours
+   * after activity even without a confirmed falling trend on a single reading.
+   */
+  const approachLowCeiling = exerciseApproachLowCeilingForPhase(lowThreshold, bgUnits, "recovery");
 
   if (bg < lowThreshold) {
     const grams = exercisePlanResult.pre.carbsIfLow;
@@ -345,15 +387,22 @@ export function getRecoveryReadinessVerdict(input: ExerciseReadinessInput): Exer
     };
   }
 
-  if (trend === "falling" && bg < approachLowCeiling) {
+  // A clearly rising trend is a genuine reassuring signal here — don't override it. Flat,
+  // falling, or unclear (not_sure) direction all warrant the wider recovery-only caution band,
+  // since delayed-onset lows after activity often aren't caught by a single "falling" reading —
+  // this must stay in sync with needsImmediateExerciseBgTreatment's recovery-phase check, which
+  // also flags flat readings in this band, so the hero verdict and the hypo "treat now" banner
+  // never contradict each other on screen.
+  if (trend !== "rising" && bg < approachLowCeiling) {
     const grams = exercisePlanResult.pre.carbsIfLow;
+    const fallingNote = trend === "falling" ? "and dropping" : "for this soon after activity";
     return {
       verdict: "not_recommended",
-      title: "Not recommended (low + falling)",
+      title: trend === "falling" ? "Not recommended (low + falling)" : "Not recommended (borderline low)",
       detail:
         grams > 0
-          ? `BG is borderline low and dropping — treat now with about ${grams}g fast carbs, then re-check. Delayed lows after activity are common.`
-          : "BG is borderline low and dropping — treat per your hypo plan if your team uses these bands; delayed lows after activity are common.",
+          ? `BG is borderline low ${fallingNote} — treat now with about ${grams}g fast carbs, then re-check. Delayed lows after activity are common.`
+          : `BG is borderline low ${fallingNote} — treat per your hypo plan if your team uses these bands; delayed lows after activity are common.`,
     };
   }
 
@@ -463,36 +512,116 @@ function refineWithPreRapidInsulin(result: ExerciseReadinessResult, input: Exerc
   return result;
 }
 
+type DeeperContextTrigger = { text: string; weight: 1 | 2 };
+
 /**
- * Layered "deeper context" caution refiners (sleep, feeling off, alcohol, beta-blocker, GLP-1, history).
- * Never upgrades a verdict — only escalates ready→caution where the combined risk warrants it.
- * Preserves not_recommended verdicts unchanged.
+ * Layered "deeper context" caution refiners — sleep, feeling off, alcohol, beta-blocker, GLP-1,
+ * fasted status, heat/altitude, hydration, caffeine, competitive pacing, and history. Each factor
+ * is weighted: a single strong factor (weight 2) escalates ready→caution on its own, while mild
+ * factors (weight 1, e.g. caffeine alone) are only surfaced as a note unless they stack with
+ * another. Never upgrades a verdict beyond caution — preserves not_recommended verdicts unchanged.
  */
 function refineWithDeeperContext(result: ExerciseReadinessResult, input: ExerciseReadinessInput): ExerciseReadinessResult {
   if (result.verdict === "not_recommended") return result;
+  // Nothing to weigh against yet — keep the "add your BG" prompt focused rather than
+  // appending caution language the user hasn't earned a verdict for yet.
+  if (result.awaitingInput) return result;
 
-  const triggers: string[] = [];
-  if (input.feelingOff) triggers.push("you noted feeling off");
+  const hardEffort = input.intensity === "moderate" || input.intensity === "intense";
+  const triggers: DeeperContextTrigger[] = [];
+
+  if (input.feelingOff) triggers.push({ text: "you noted feeling off", weight: 2 });
   if (input.sleepHoursLastNight != null && input.sleepHoursLastNight < 6) {
-    triggers.push("low sleep last night");
+    triggers.push({ text: "low sleep last night", weight: 2 });
   }
-  if (input.alcoholLastNight) triggers.push("alcohol last night raises delayed-low risk");
-  if (input.hypoProneHistory) triggers.push("your history shows hypos for this routine");
+  if (input.alcoholLastNight) triggers.push({ text: "alcohol last night raises delayed-low risk", weight: 2 });
+  if (input.hypoProneHistory) triggers.push({ text: "your history shows hypos for this routine", weight: 2 });
+  if (input.betaBlockerToday) {
+    triggers.push({ text: "beta-blockers can mask common hypo warning signs", weight: 2 });
+  }
+  if (input.glp1Last24h) {
+    triggers.push({ text: "GLP-1 medicine can slow digestion and blunt hunger/hypo cues", weight: 2 });
+  }
+  if (input.fasted) {
+    triggers.push({
+      text: "training fasted raises hypo risk without carbs on board",
+      weight: hardEffort ? 2 : 1,
+    });
+  }
+  const heatOrAltitude = (input.environments ?? []).some((e) => e === "outdoor_hot" || e === "altitude");
+  if (heatOrAltitude) {
+    triggers.push({
+      text: "heat/altitude add extra strain on top of this effort",
+      weight: hardEffort ? 2 : 1,
+    });
+  }
+  if (input.hydration === "low") {
+    triggers.push({ text: "low hydration can blur early hypo symptoms", weight: 1 });
+  }
+  if (input.caffeineLast2h) {
+    triggers.push({ text: "recent caffeine can amplify adrenaline-driven swings", weight: 1 });
+  }
+  if (input.competitive) {
+    triggers.push({ text: "competitive/group sessions are often paced harder than planned", weight: 1 });
+  }
 
   if (triggers.length === 0) return result;
+
+  const totalWeight = triggers.reduce((sum, t) => sum + t.weight, 0);
+  const strongestFirst = [...triggers].sort((a, b) => b.weight - a.weight);
+  const summary = `${strongestFirst[0]!.text}${
+    triggers.length > 1 ? ` (+${triggers.length - 1} more factor${triggers.length - 1 === 1 ? "" : "s"})` : ""
+  }`;
+
+  if (result.verdict === "ready") {
+    if (totalWeight >= 2) {
+      return {
+        verdict: "caution",
+        title: "Caution",
+        detail: `${result.detail} Also: ${summary}. Plan extra checks and keep fast carbs nearby.`,
+      };
+    }
+    // A single mild factor alone isn't enough to leave "Ready" — still worth surfacing.
+    return { ...result, detail: `${result.detail} Worth noting: ${summary}.` };
+  }
+
+  return {
+    ...result,
+    detail: `${result.detail} Plus: ${summary}.`,
+  };
+}
+
+/**
+ * Mid-exercise symptom severity can escalate the verdict, not just the hypo carb estimate —
+ * a "Ready" card while shaky/sweaty/lightheaded symptoms are logged would be a confusing and
+ * unsafe signal. Runs last so it has the final say for the active phase.
+ */
+function refineWithActiveSymptoms(result: ExerciseReadinessResult, input: ExerciseReadinessInput): ExerciseReadinessResult {
+  if (input.phase !== "active") return result;
+  const severity = input.symptomSeverity;
+  if (!severity || severity === "mild") return result;
+
+  // An existing not_recommended (e.g. confirmed low BG) already carries the strongest, most
+  // specific message — don't overwrite its title/detail, just don't soften it either.
+  if (result.verdict === "not_recommended") return result;
+
+  if (severity === "severe") {
+    return {
+      verdict: "not_recommended",
+      title: "Stop and check now",
+      detail:
+        "Severe symptoms logged during exercise — stop, treat if BG is low or borderline, and re-check before continuing.",
+    };
+  }
 
   if (result.verdict === "ready") {
     return {
       verdict: "caution",
       title: "Caution",
-      detail: `${result.detail} Also: ${triggers[0]}${triggers.length > 1 ? ` (+${triggers.length - 1} more factor${triggers.length - 1 === 1 ? "" : "s"})` : ""}. Plan extra checks and keep fast carbs nearby.`,
+      detail: `${result.detail} You've also logged symptoms — ease off and re-check soon.`,
     };
   }
-
-  return {
-    ...result,
-    detail: `${result.detail} Plus: ${triggers[0]}${triggers.length > 1 ? ` (+${triggers.length - 1} more)` : ""}.`,
-  };
+  return result;
 }
 
 /** Planner and active banner: shared go / caution / not recommended copy. */
@@ -504,7 +633,8 @@ export function getExerciseReadinessVerdict(input: ExerciseReadinessInput): Exer
   const withTrends = refineWithExerciseTypeAndTrend(base, input);
   const withStartBand = refineWithPreExerciseStartBand(withTrends, input);
   const withInsulin = refineWithPreRapidInsulin(withStartBand, input);
-  return refineWithDeeperContext(withInsulin, input);
+  const withContext = refineWithDeeperContext(withInsulin, input);
+  return refineWithActiveSymptoms(withContext, input);
 }
 
 export function getReadinessToneClasses(verdict: ExerciseReadinessVerdict): string {

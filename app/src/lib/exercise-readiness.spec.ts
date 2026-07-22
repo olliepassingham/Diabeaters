@@ -45,6 +45,63 @@ describe("getExerciseReadinessVerdict recovery phase", () => {
   });
 });
 
+describe("getExerciseReadinessVerdict awaitingInput flag (no BG entered yet)", () => {
+  it("flags awaitingInput and uses a neutral 'Add your BG' prompt instead of a false caution", () => {
+    const r = getExerciseReadinessVerdict({
+      exercisePlanResult: plan,
+      currentBg: null,
+      bgUnits: "mmol/L",
+      exerciseType: "cardio",
+      intensity: "moderate",
+      phase: "pre",
+    });
+    expect(r.awaitingInput).toBe(true);
+    expect(r.title.toLowerCase()).toContain("add your bg");
+    expect(r.title.toLowerCase()).not.toBe("caution");
+  });
+
+  it("does not set awaitingInput once a real BG is provided", () => {
+    const r = getExerciseReadinessVerdict({
+      exercisePlanResult: plan,
+      currentBg: 7,
+      bgUnits: "mmol/L",
+      exerciseType: "cardio",
+      intensity: "moderate",
+      bgTrend: "flat",
+      phase: "pre",
+    });
+    expect(r.awaitingInput).toBeFalsy();
+  });
+
+  it("is also flagged for the recovery phase when BG is missing", () => {
+    const r = getRecoveryReadinessVerdict({
+      exercisePlanResult: plan,
+      currentBg: null,
+      bgUnits: "mmol/L",
+      exerciseType: "cardio",
+      intensity: "moderate",
+      phase: "recovery",
+    });
+    expect(r.awaitingInput).toBe(true);
+  });
+
+  it("skips deeper-context caution text while awaiting input, keeping the prompt focused", () => {
+    const r = getExerciseReadinessVerdict({
+      exercisePlanResult: plan,
+      currentBg: null,
+      bgUnits: "mmol/L",
+      exerciseType: "cardio",
+      intensity: "intense",
+      phase: "pre",
+      fasted: true,
+      feelingOff: true,
+    });
+    expect(r.awaitingInput).toBe(true);
+    expect(r.detail.toLowerCase()).not.toContain("fasted");
+    expect(r.detail.toLowerCase()).not.toContain("feeling off");
+  });
+});
+
 describe("getRecoveryReadinessVerdict", () => {
   it("is ready (green tone) when in range and flat", () => {
     const r = getRecoveryReadinessVerdict({
@@ -430,6 +487,219 @@ describe("getExerciseFuelPlanLines", () => {
     expect(lines).toHaveLength(1);
     expect(lines[0]?.label).toBe("Take now");
     expect(lines[0]?.text).toContain("Glucose tabs");
+  });
+});
+
+describe("getRecoveryReadinessVerdict phase-aware delayed-low band", () => {
+  it("flags a borderline-low reading as not_recommended in recovery even without a confirmed falling trend", () => {
+    const r = getRecoveryReadinessVerdict({
+      exercisePlanResult: plan,
+      currentBg: 5.9, // within the recovery-widened band (5.6 + 0.9 margin + 0.5 recovery extra = 7.0), trend unknown
+      bgUnits: "mmol/L",
+      exerciseType: "cardio",
+      intensity: "moderate",
+      bgTrend: "not_sure",
+      phase: "recovery",
+    });
+    expect(r.verdict).toBe("not_recommended");
+  });
+
+  it("still treats a clearly rising reading in that same band as ready", () => {
+    const r = getRecoveryReadinessVerdict({
+      exercisePlanResult: plan,
+      currentBg: 5.9,
+      bgUnits: "mmol/L",
+      exerciseType: "cardio",
+      intensity: "moderate",
+      bgTrend: "rising",
+      phase: "recovery",
+    });
+    expect(r.verdict).toBe("ready");
+  });
+
+  it("also flags a flat reading in the widened band — must match needsImmediateExerciseBgTreatment so the hero verdict and the hypo 'treat now' banner never contradict each other", () => {
+    const r = getRecoveryReadinessVerdict({
+      exercisePlanResult: plan,
+      currentBg: 5.9,
+      bgUnits: "mmol/L",
+      exerciseType: "cardio",
+      intensity: "moderate",
+      bgTrend: "flat",
+      phase: "recovery",
+    });
+    expect(r.verdict).toBe("not_recommended");
+  });
+});
+
+describe("getExerciseReadinessVerdict deeper context — full factor set", () => {
+  it("escalates ready to caution for a single strong factor alone (beta-blocker)", () => {
+    const r = getExerciseReadinessVerdict({
+      exercisePlanResult: plan,
+      currentBg: 7,
+      bgUnits: "mmol/L",
+      exerciseType: "cardio",
+      intensity: "moderate",
+      bgTrend: "flat",
+      phase: "pre",
+      betaBlockerToday: true,
+    });
+    expect(r.verdict).toBe("caution");
+    expect(r.detail.toLowerCase()).toContain("beta-blocker");
+  });
+
+  it("escalates ready to caution for a single strong factor alone (GLP-1)", () => {
+    const r = getExerciseReadinessVerdict({
+      exercisePlanResult: plan,
+      currentBg: 7,
+      bgUnits: "mmol/L",
+      exerciseType: "cardio",
+      intensity: "moderate",
+      bgTrend: "flat",
+      phase: "pre",
+      glp1Last24h: true,
+    });
+    expect(r.verdict).toBe("caution");
+    expect(r.detail.toLowerCase()).toContain("glp-1");
+  });
+
+  it("escalates ready to caution when heat/altitude combines with moderate-or-harder effort", () => {
+    const r = getExerciseReadinessVerdict({
+      exercisePlanResult: plan,
+      currentBg: 7,
+      bgUnits: "mmol/L",
+      exerciseType: "cardio",
+      intensity: "intense",
+      bgTrend: "flat",
+      phase: "pre",
+      environments: ["outdoor_hot"],
+    });
+    expect(r.verdict).toBe("caution");
+    expect(r.detail.toLowerCase()).toContain("heat");
+  });
+
+  it("does not escalate a single mild factor alone (caffeine) — just notes it", () => {
+    const r = getExerciseReadinessVerdict({
+      exercisePlanResult: plan,
+      currentBg: 7,
+      bgUnits: "mmol/L",
+      exerciseType: "cardio",
+      intensity: "moderate",
+      bgTrend: "flat",
+      phase: "pre",
+      caffeineLast2h: true,
+    });
+    expect(r.verdict).toBe("ready");
+    expect(r.detail.toLowerCase()).toContain("caffeine");
+  });
+
+  it("stacks two mild factors (caffeine + competitive) into an escalation", () => {
+    const r = getExerciseReadinessVerdict({
+      exercisePlanResult: plan,
+      currentBg: 7,
+      bgUnits: "mmol/L",
+      exerciseType: "cardio",
+      intensity: "moderate",
+      bgTrend: "flat",
+      phase: "pre",
+      caffeineLast2h: true,
+      competitive: true,
+    });
+    expect(r.verdict).toBe("caution");
+  });
+
+  it("treats fasted as only a mild note for light intensity", () => {
+    const r = getExerciseReadinessVerdict({
+      exercisePlanResult: plan,
+      currentBg: 7,
+      bgUnits: "mmol/L",
+      exerciseType: "walking",
+      intensity: "light",
+      bgTrend: "flat",
+      phase: "pre",
+      fasted: true,
+    });
+    expect(r.verdict).toBe("ready");
+  });
+
+  it("treats fasted as a strong factor for intense effort", () => {
+    const r = getExerciseReadinessVerdict({
+      exercisePlanResult: plan,
+      currentBg: 7,
+      bgUnits: "mmol/L",
+      exerciseType: "cardio",
+      intensity: "intense",
+      bgTrend: "flat",
+      phase: "pre",
+      fasted: true,
+    });
+    expect(r.verdict).toBe("caution");
+  });
+});
+
+describe("getExerciseReadinessVerdict active-phase symptom escalation", () => {
+  it("escalates ready to caution when moderate symptoms are logged mid-session", () => {
+    const r = getExerciseReadinessVerdict({
+      exercisePlanResult: plan,
+      currentBg: 7,
+      bgUnits: "mmol/L",
+      exerciseType: "cardio",
+      intensity: "moderate",
+      bgTrend: "flat",
+      phase: "active",
+      symptomSeverity: "moderate",
+    });
+    expect(r.verdict).toBe("caution");
+  });
+
+  it("escalates to not_recommended (stop and check) when severe symptoms are logged, even if BG looks fine", () => {
+    const r = getExerciseReadinessVerdict({
+      exercisePlanResult: plan,
+      currentBg: 7,
+      bgUnits: "mmol/L",
+      exerciseType: "cardio",
+      intensity: "moderate",
+      bgTrend: "flat",
+      phase: "active",
+      symptomSeverity: "severe",
+    });
+    expect(r.verdict).toBe("not_recommended");
+    expect(r.title.toLowerCase()).toContain("stop");
+  });
+
+  it("ignores mild symptoms for the verdict (still tracked for the hypo carb estimate elsewhere)", () => {
+    const r = getExerciseReadinessVerdict({
+      exercisePlanResult: plan,
+      currentBg: 7,
+      bgUnits: "mmol/L",
+      exerciseType: "cardio",
+      intensity: "moderate",
+      bgTrend: "flat",
+      phase: "active",
+      symptomSeverity: "mild",
+    });
+    expect(r.verdict).toBe("ready");
+  });
+
+  it("does not soften an already not_recommended low-BG verdict's title", () => {
+    const lowPlan = calculateExercisePlan({
+      exerciseType: "cardio",
+      durationMinutes: 45,
+      intensity: "moderate",
+      minutesUntilStart: 0,
+      bgUnits: "mmol/L",
+      currentBg: 4,
+    });
+    const r = getExerciseReadinessVerdict({
+      exercisePlanResult: lowPlan,
+      currentBg: 4,
+      bgUnits: "mmol/L",
+      exerciseType: "cardio",
+      intensity: "moderate",
+      phase: "active",
+      symptomSeverity: "severe",
+    });
+    expect(r.verdict).toBe("not_recommended");
+    expect(r.title.toLowerCase()).toContain("low bg");
   });
 });
 

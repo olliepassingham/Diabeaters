@@ -10,14 +10,19 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import {
   Activity,
+  AlertOctagon,
+  AlertTriangle,
   ArrowRight,
   Check,
+  CheckCircle2,
   ChevronDown,
   CircleCheck,
+  CircleHelp,
   Coffee,
   Dumbbell,
+  Flower2,
+  Footprints,
   Info,
-  MapPin,
   Moon,
   Pill,
   Play,
@@ -26,8 +31,12 @@ import {
   Snowflake,
   Sparkles,
   Sun,
+  Swords,
   Thermometer,
+  Waves,
   Wind,
+  X,
+  Zap,
 } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -87,12 +96,12 @@ import {
 import {
   getExerciseFuelPlanLines,
   getExerciseReadinessVerdict,
-  getReadinessToneClasses,
   type ExerciseReadinessResult,
 } from "@/lib/exercise-readiness";
 import { reconcileExerciseFuelLines } from "@/lib/exercise-recommendation";
 import { useExerciseSessionActions } from "@/hooks/use-exercise-session-actions";
 import { computeExerciseHypoSuggestion, resolveExerciseBgForHypo } from "@/lib/exercise-hypo-auto";
+import { buildExercisePersonalizationLines } from "@/lib/exercise-personalization";
 import { format } from "date-fns";
 import {
   ExerciseFuelPlanSummary,
@@ -117,6 +126,36 @@ const EXERCISE_TYPE_OPTIONS: Array<{ value: ExerciseType; label: string }> = [
   { value: "field", label: "Field & team sports" },
   { value: "swimming", label: "Swimming" },
 ];
+
+/** Per-activity icon so the session header reads at a glance instead of always showing the same dumbbell. */
+const EXERCISE_TYPE_ICONS: Record<ExerciseType, typeof Dumbbell> = {
+  cardio: Activity,
+  strength: Dumbbell,
+  hiit: Zap,
+  yoga: Flower2,
+  walking: Footprints,
+  court: Swords,
+  field: Swords,
+  swimming: Waves,
+};
+
+function ExerciseTypeIcon({ type, className }: { type: ExerciseType; className?: string }) {
+  const Icon = EXERCISE_TYPE_ICONS[type] ?? Dumbbell;
+  return <Icon className={className} aria-hidden />;
+}
+
+/**
+ * Duration/intensity/type summary line — drops the type label when it just repeats the
+ * exercise name (the common case for sessions started from the quick-start form, e.g. name
+ * "Cardio" + type "cardio"), so the header doesn't say "Cardio" twice back to back.
+ */
+function sessionMetaLine(session: ActiveExerciseSession): string {
+  const typeLabel = EXERCISE_TYPE_OPTIONS.find((o) => o.value === session.exerciseType)?.label ?? session.exerciseType;
+  const nameMatchesType = session.exerciseName.trim().toLowerCase() === typeLabel.toLowerCase();
+  return nameMatchesType
+    ? `${session.durationMinutes} min · ${session.intensity}`
+    : `${session.durationMinutes} min · ${session.intensity} · ${session.exerciseType}`;
+}
 
 const INTENSITY_OPTIONS: ExerciseIntensity[] = ["light", "moderate", "intense"];
 
@@ -240,6 +279,44 @@ function ExercisePhaseStepper({ phase }: { phase: ExercisePhase }) {
       })}
     </div>
   );
+}
+
+/**
+ * Verdict → icon + colour chip for the hero. Awaiting-input renders as a neutral "?" prompt
+ * rather than the amber caution look, since no BG has been entered yet — a warning colour
+ * before the user has typed anything reads as a false alarm rather than guidance.
+ */
+function getVerdictVisuals(readiness: ExerciseReadinessResult | null): {
+  icon: typeof CheckCircle2;
+  chipClass: string;
+  cardClass: string;
+} {
+  if (!readiness || readiness.awaitingInput) {
+    return {
+      icon: CircleHelp,
+      chipClass: "bg-muted text-muted-foreground",
+      cardClass: "border-border/50 bg-muted/25 dark:bg-muted/10",
+    };
+  }
+  if (readiness.verdict === "ready") {
+    return {
+      icon: CheckCircle2,
+      chipClass: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+      cardClass: "border-emerald-200/80 bg-emerald-50/60 dark:border-emerald-800/50 dark:bg-emerald-950/25",
+    };
+  }
+  if (readiness.verdict === "not_recommended") {
+    return {
+      icon: AlertOctagon,
+      chipClass: "bg-red-500/15 text-red-700 dark:text-red-300",
+      cardClass: "border-red-200/80 bg-red-50/60 dark:border-red-800/50 dark:bg-red-950/25",
+    };
+  }
+  return {
+    icon: AlertTriangle,
+    chipClass: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+    cardClass: "border-amber-200/80 bg-amber-50/60 dark:border-amber-800/50 dark:bg-amber-950/25",
+  };
 }
 
 function scrollToActiveGuidedCoach(): void {
@@ -440,6 +517,27 @@ export function ExerciseGuidedCoach() {
 
   const historyBias = useMemo(() => deriveHistoryBias(activeSession), [activeSession]);
 
+  /**
+   * Richer, explainable history footnote (pattern direction, hypo clustering, last-planned
+   * mismatch) — replaces the older one-line historyBias summary so the same past-session
+   * data is put to fuller use instead of two thinner, parallel systems.
+   */
+  const personalizationLines = useMemo(() => {
+    if (!activeSession) return [];
+    try {
+      return buildExercisePersonalizationLines({
+        exerciseType: activeSession.exerciseType,
+        intensity: activeSession.intensity,
+        durationMinutes: activeSession.durationMinutes,
+        outcomes: storage.getExerciseOutcomes(),
+        hypoTreatments: storage.getHypoTreatments(),
+        activityLogs: storage.getActivityLogs(),
+      });
+    } catch {
+      return [];
+    }
+  }, [activeSession]);
+
   const exercisePlan: ExercisePlanResult | null = useMemo(() => {
     if (!activeSession) return null;
     const bgParsed = parseFloatOrNull(bgInput);
@@ -470,6 +568,10 @@ export function ExerciseGuidedCoach() {
   const readiness: ExerciseReadinessResult | null = useMemo(() => {
     if (!activeSession || !exercisePlan) return null;
     const sc = storage.getScenarioState();
+    const activeSymptomSeverity =
+      activeSession.phase === "active" && (activeSession.midSymptoms ?? []).some((s) => s !== "fine")
+        ? activeSession.midSymptomSeverity ?? "moderate"
+        : null;
     return getExerciseReadinessVerdict({
       exercisePlanResult: exercisePlan,
       currentBg: parseFloatOrNull(bgInput),
@@ -485,6 +587,14 @@ export function ExerciseGuidedCoach() {
       feelingOff: activeSession.preFeelingOff,
       alcoholLastNight: activeSession.preAlcoholLastNight,
       hypoProneHistory: historyBias?.hypoProne === true,
+      environments: activeSession.preEnvironments ?? null,
+      fasted: activeSession.preFasted,
+      hydration: activeSession.preHydration ?? null,
+      caffeineLast2h: activeSession.preCaffeine2h,
+      glp1Last24h: activeSession.preGlp1Last24h,
+      betaBlockerToday: activeSession.preBetaBlockerToday,
+      competitive: activeSession.preCompetitive,
+      symptomSeverity: activeSymptomSeverity,
     });
   }, [activeSession, bgInput, bgUnits, exercisePlan, historyBias, trendForReadiness]);
 
@@ -874,41 +984,41 @@ export function ExerciseGuidedCoach() {
   }
 
   const phase = activeSession.phase;
+  const verdictVisuals = getVerdictVisuals(readiness);
+  const VerdictIcon = verdictVisuals.icon;
 
   return (
     <div className="space-y-4 max-sm:space-y-3" data-testid="exercise-guided-coach">
       <Card className="overflow-hidden rounded-2xl border-border/50 shadow-sm ring-1 ring-border/40 dark:ring-border/30">
         <CardHeader className="pb-2">
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 space-y-1">
-                <CardTitle className="text-h3 flex items-center gap-2">
-                <Dumbbell className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                {activeSession.exerciseName}
-                </CardTitle>
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/20 px-2 py-0.5">
-                    {activeSession.durationMinutes} min
-                  </span>
-                  <span className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/20 px-2 py-0.5">
-                    {activeSession.intensity}
-                  </span>
-                  <span className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/20 px-2 py-0.5">
-                    {activeSession.exerciseType}
-                  </span>
+              <div className="flex min-w-0 items-center gap-3">
+                <div
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500/12 text-emerald-600 dark:text-emerald-400"
+                  aria-hidden
+                >
+                  <ExerciseTypeIcon type={activeSession.exerciseType} className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 space-y-0.5">
+                  <CardTitle className="text-h3 truncate">{activeSession.exerciseName}</CardTitle>
+                  <p className="text-xs text-muted-foreground capitalize" data-testid="text-coach-session-meta">
+                    {sessionMetaLine(activeSession)}
+                  </p>
                 </div>
               </div>
-              <div className="flex shrink-0 items-center gap-1.5">
+              <div className="flex shrink-0 items-center gap-1">
                 {phase === "pre" || phase === "active" ? (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button
-                        size="sm"
+                        size="icon"
                         variant="ghost"
-                        className="whitespace-nowrap text-muted-foreground hover:text-destructive"
+                        className="h-8 w-8 shrink-0 rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                         data-testid="button-coach-end-session"
+                        aria-label="End session"
                       >
-                        End
+                        <X className="h-4 w-4" />
                       </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
@@ -968,149 +1078,130 @@ export function ExerciseGuidedCoach() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Tabs value={phase} className="w-full">
-            {/* ----- HERO RECOMMENDATION ----- */}
-            <div className="pt-3 space-y-3">
-              {readiness ? (
-                <div
-                  className={cn(
-                    "rounded-2xl border px-3 py-3 space-y-1.5 bg-background/75",
-                    getReadinessToneClasses(readiness.verdict),
-                  )}
-                  data-testid="coach-readiness-card"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-base font-semibold leading-tight text-foreground">{readiness.title}</p>
-                    {phaseTimerLabel ? (
-                      <span
-                        className="text-xs tabular-nums text-muted-foreground"
-                        data-testid="coach-phase-timer"
-                        title={phase === "active" ? "Workout elapsed" : "Time since workout ended"}
-                      >
-                        {phaseTimerLabel}
-                      </span>
-                    ) : null}
+          {/* ----- ONE unified card: recommendation on top, this phase's inputs below a divider.
+              Previously the readiness hero and the phase panel were two separately-tinted
+              nested boxes — merging them removes that "double chrome" and the extra border
+              layer around every phase's questions. ----- */}
+          <div
+            className={cn("rounded-2xl border p-3.5 sm:p-4 space-y-3.5", verdictVisuals.cardClass)}
+            data-testid="coach-phase-card"
+          >
+            {readiness ? (
+              <div className="space-y-1.5" data-testid="coach-readiness-card">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span
+                      className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full", verdictVisuals.chipClass)}
+                      aria-hidden
+                    >
+                      <VerdictIcon className="h-4 w-4" />
+                    </span>
+                    <p className="text-base font-semibold leading-tight text-foreground truncate">{readiness.title}</p>
                   </div>
-                  <p className="text-sm leading-snug text-foreground/90">{readiness.detail}</p>
-                  <CgmReadingSourceNote prefill={cgmPrefill} bgValue={bgInput} className="pt-0.5" />
-                  {fuelPlanLines.length > 0 ? (
-                    <ExerciseFuelPlanSummary
-                      lines={fuelPlanLines}
-                      variant={fuelPlanVariant}
-                      className="mt-2"
-                    />
-                  ) : null}
-                  {historyBias && historyBias.totalSessions >= 2 ? (
-                    <p className="text-xs text-muted-foreground pt-1 border-t border-border/40 mt-1">
-                      Based on {historyBias.totalSessions} past {activeSession.exerciseType} sessions: BG typically{" "}
-                      {historyBias.typicalResponse}{historyBias.hypoProne ? ", and hypos have been common" : ""}.
-                    </p>
+                  {phaseTimerLabel ? (
+                    <span
+                      className="text-xs tabular-nums text-muted-foreground shrink-0 pt-1"
+                      data-testid="coach-phase-timer"
+                      title={phase === "active" ? "Workout elapsed" : "Time since workout ended"}
+                    >
+                      {phaseTimerLabel}
+                    </span>
                   ) : null}
                 </div>
-              ) : null}
-
-              {phase === "active" && activeSession.exerciseStartedAt ? (
-                <ExerciseWorkoutProgressBar
-                  phase={phase}
-                  exerciseStartedAt={activeSession.exerciseStartedAt}
-                  durationMinutes={activeSession.durationMinutes}
-                  nowMs={now}
-                />
-              ) : null}
-
-              {hypoCoachSuggestion ? <ExerciseHypoTreatmentHint suggestion={hypoCoachSuggestion} /> : null}
-
-              {isPump && phasePumpTips.length > 0 ? (
-                <ExercisePumpTipsCard
-                  tips={phasePumpTips}
-                  data-testid={`coach-pump-tips-${phase}`}
-                />
-              ) : null}
-
-              {closedLoop && phase === "pre" && closedLoopExercisePrePrompt(true) ? (
-                <p className="text-xs text-muted-foreground leading-relaxed" data-testid="coach-closed-loop-pre-prompt">
-                  {closedLoopExercisePrePrompt(true)}
-                </p>
-              ) : null}
-            </div>
-
-            <TabsContent value="pre" className="space-y-4 pt-2">
-              <div
-                className={cn(
-                  "rounded-2xl border border-border/60 bg-background/55 px-3 py-3 backdrop-blur space-y-4",
-                  readiness ? getReadinessToneClasses(readiness.verdict) : null,
-                )}
-                data-testid="coach-input-panel-pre"
-              >
-                <PreQuestions
-                  session={activeSession}
-                  bgUnits={bgUnits}
-                  bgInput={bgInput}
-                  onBgChange={onBgFieldChange}
-                  onTrendChange={onTrendChange}
-                  update={update}
-                  {...cgmPhaseProps}
-                />
-              </div>
-            </TabsContent>
-
-            <TabsContent value="active" className="space-y-4 pt-2">
-              <div
-                className={cn(
-                  "rounded-2xl border border-border/60 bg-background/55 px-3 py-3 backdrop-blur space-y-4",
-                  readiness ? getReadinessToneClasses(readiness.verdict) : null,
-                )}
-                data-testid="coach-input-panel-active"
-              >
-                <DuringQuestions
-                  session={activeSession}
-                  bgUnits={bgUnits}
-                  bgInput={bgInput}
-                  onBgChange={onBgFieldChange}
-                  onTrendChange={onTrendChange}
-                  update={update}
-                  {...cgmPhaseProps}
-                />
-              </div>
-            </TabsContent>
-
-            <TabsContent value="recovery" className="space-y-4 pt-2">
-              <div
-                className={cn(
-                  "rounded-2xl border border-border/60 bg-background/55 px-3 py-3 backdrop-blur space-y-4",
-                  readiness ? getReadinessToneClasses(readiness.verdict) : null,
-                )}
-                data-testid="coach-input-panel-recovery"
-              >
-                <RecoveryQuestions
-                  session={activeSession}
-                  bgUnits={bgUnits}
-                  bgInput={bgInput}
-                  onBgChange={onBgFieldChange}
-                  onTrendChange={onTrendChange}
-                  update={update}
-                  {...cgmPhaseProps}
-                />
-                {exercisePlan ? (
-                  <p className="text-xs text-muted-foreground leading-snug">
-                    Recovery window (~{exercisePlan.recovery.monitorHours}): delayed lows still happen — keep snacks and your hypo plan close.
+                <p className="text-sm leading-snug text-foreground/90 pl-9">{readiness.detail}</p>
+                <CgmReadingSourceNote prefill={cgmPrefill} bgValue={bgInput} className="pt-0.5" />
+                {fuelPlanLines.length > 0 ? (
+                  <ExerciseFuelPlanSummary lines={fuelPlanLines} variant={fuelPlanVariant} className="mt-2" />
+                ) : null}
+                {personalizationLines[0] ? (
+                  <p
+                    className="text-xs text-muted-foreground pt-1 border-t border-border/40 mt-1"
+                    data-testid="coach-personalization-note"
+                  >
+                    {personalizationLines[0].text}
                   </p>
                 ) : null}
-                {(activeSession.intensity === "intense" || activeSession.intensity === "moderate") ? (
-                  <Link href="/scenarios/bedtime">
-                    <Button variant="outline" size="sm" className="w-full" data-testid="button-coach-recovery-bedtime">
-                      <Moon className="h-3.5 w-3.5 mr-2" />
-                      Open Bedtime tool
-                      <ArrowRight className="h-3.5 w-3.5 ml-auto" />
-                    </Button>
-                  </Link>
-                ) : null}
               </div>
-            </TabsContent>
-          </Tabs>
+            ) : null}
 
+            {phase === "active" && activeSession.exerciseStartedAt ? (
+              <ExerciseWorkoutProgressBar
+                phase={phase}
+                exerciseStartedAt={activeSession.exerciseStartedAt}
+                durationMinutes={activeSession.durationMinutes}
+                nowMs={now}
+              />
+            ) : null}
 
-          {phase === "recovery" && exercisePlan ? (
+            {hypoCoachSuggestion ? <ExerciseHypoTreatmentHint suggestion={hypoCoachSuggestion} /> : null}
+
+            {isPump && phasePumpTips.length > 0 ? (
+              <ExercisePumpTipsCard tips={phasePumpTips} data-testid={`coach-pump-tips-${phase}`} />
+            ) : null}
+
+            {closedLoop && phase === "pre" && closedLoopExercisePrePrompt(true) ? (
+              <p className="text-xs text-muted-foreground leading-relaxed" data-testid="coach-closed-loop-pre-prompt">
+                {closedLoopExercisePrePrompt(true)}
+              </p>
+            ) : null}
+
+            <div className="border-t border-border/50 pt-3.5">
+              <Tabs value={phase} className="w-full">
+                <TabsContent value="pre" className="space-y-4 mt-0" data-testid="coach-input-panel-pre">
+                  <PreQuestions
+                    session={activeSession}
+                    bgUnits={bgUnits}
+                    bgInput={bgInput}
+                    onBgChange={onBgFieldChange}
+                    onTrendChange={onTrendChange}
+                    update={update}
+                    {...cgmPhaseProps}
+                  />
+                </TabsContent>
+
+                <TabsContent value="active" className="space-y-4 mt-0" data-testid="coach-input-panel-active">
+                  <DuringQuestions
+                    session={activeSession}
+                    bgUnits={bgUnits}
+                    bgInput={bgInput}
+                    onBgChange={onBgFieldChange}
+                    onTrendChange={onTrendChange}
+                    update={update}
+                    {...cgmPhaseProps}
+                  />
+                </TabsContent>
+
+                <TabsContent value="recovery" className="space-y-4 mt-0" data-testid="coach-input-panel-recovery">
+                  <RecoveryQuestions
+                    session={activeSession}
+                    bgUnits={bgUnits}
+                    bgInput={bgInput}
+                    onBgChange={onBgFieldChange}
+                    onTrendChange={onTrendChange}
+                    update={update}
+                    {...cgmPhaseProps}
+                  />
+                  {exercisePlan ? (
+                    <p className="text-xs text-muted-foreground leading-snug">
+                      Recovery window (~{exercisePlan.recovery.monitorHours}): delayed lows still happen — keep
+                      snacks and your hypo plan close.
+                    </p>
+                  ) : null}
+                  {activeSession.intensity === "intense" || activeSession.intensity === "moderate" ? (
+                    <Link href="/scenarios/bedtime">
+                      <Button variant="outline" size="sm" className="w-full" data-testid="button-coach-recovery-bedtime">
+                        <Moon className="h-3.5 w-3.5 mr-2" />
+                        Open Bedtime tool
+                        <ArrowRight className="h-3.5 w-3.5 ml-auto" />
+                      </Button>
+                    </Link>
+                  ) : null}
+                </TabsContent>
+              </Tabs>
+            </div>
+          </div>
+
+          {phase === "recovery" && exercisePlan && exercisePlan.recovery.tips.length > 0 ? (
             <div className="rounded-2xl border border-border/60 bg-muted/15 px-3.5 py-3.5 space-y-2.5">
               <p className="text-sm font-medium text-foreground flex items-center gap-2">
                 <Info className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -1124,14 +1215,6 @@ export function ExerciseGuidedCoach() {
                   </li>
                 ))}
               </ul>
-              {isPump && exercisePlan.pumpTips.recovery.length > 0 ? (
-                <div className="pt-3 mt-1 border-t border-border/40">
-                  <ExercisePumpTipsCard
-                    tips={exercisePlan.pumpTips.recovery}
-                    data-testid="coach-pump-tips-recovery-notes"
-                  />
-                </div>
-              ) : null}
             </div>
           ) : null}
         </CardContent>
@@ -1155,6 +1238,24 @@ type PhaseProps = {
   onCgmRefresh: () => void;
   onBgFieldChange: (v: string) => void;
 };
+
+/** How many "More context" fields the user has already filled in — shown as a quiet badge. */
+function countMoreContextSelections(session: ActiveExerciseSession): number {
+  let n = 0;
+  if (session.preFasted) n++;
+  if (session.preFeelingOff) n++;
+  if (session.preCompetitive) n++;
+  if (session.preCaffeine2h) n++;
+  if (session.preAlcoholLastNight) n++;
+  if (session.preGlp1Last24h) n++;
+  if (session.preBetaBlockerToday) n++;
+  if (session.preSleepHours != null) n++;
+  if (session.preHydration != null) n++;
+  if (session.preEnvironments && session.preEnvironments.length > 0) n++;
+  if (session.preIobUnits != null) n++;
+  if (!session.preFasted && (session.prefuelMinutesAgo != null || session.prefuelGrams != null)) n++;
+  return n;
+}
 
 function sessionTrend(session: ActiveExerciseSession): ExerciseBgTrend | null | undefined {
   return session.phase === "pre"
@@ -1214,7 +1315,55 @@ function PreQuestions({
         />
       </FieldRow>
 
-      <DeeperContextSection title="Personal context" icon={Sparkles}>
+      <DeeperContextSection title="More context" icon={Sparkles} badgeCount={countMoreContextSelections(session)}>
+        <Field label="Anything else going on?">
+          <div className="flex flex-wrap gap-2">
+            <PillToggle
+              label="Fasted"
+              checked={!!session.preFasted}
+              onChange={(v) => update({ preFasted: v })}
+              testId="toggle-coach-fasted"
+            />
+            <PillToggle
+              label="Feeling off"
+              checked={!!session.preFeelingOff}
+              onChange={(v) => update({ preFeelingOff: v })}
+              testId="toggle-coach-feeling-off"
+            />
+            <PillToggle
+              label="Competitive"
+              checked={!!session.preCompetitive}
+              onChange={(v) => update({ preCompetitive: v })}
+              testId="toggle-coach-competitive"
+            />
+            <PillToggle
+              label="Caffeine (2h)"
+              icon={Coffee}
+              checked={!!session.preCaffeine2h}
+              onChange={(v) => update({ preCaffeine2h: v })}
+              testId="toggle-coach-caffeine"
+            />
+            <PillToggle
+              label="Alcohol last night"
+              checked={!!session.preAlcoholLastNight}
+              onChange={(v) => update({ preAlcoholLastNight: v })}
+              testId="toggle-coach-alcohol-last-night"
+            />
+            <PillToggle
+              label="GLP-1 (24h)"
+              checked={!!session.preGlp1Last24h}
+              onChange={(v) => update({ preGlp1Last24h: v })}
+              testId="toggle-coach-glp1"
+            />
+            <PillToggle
+              label="Beta-blocker today"
+              checked={!!session.preBetaBlockerToday}
+              onChange={(v) => update({ preBetaBlockerToday: v })}
+              testId="toggle-coach-beta-blocker"
+            />
+          </div>
+        </Field>
+
         <Field label="Sleep last night">
           <div className="flex flex-wrap items-center gap-2">
             {sleepPresets.map((h) => (
@@ -1262,12 +1411,7 @@ function PreQuestions({
             </div>
           ) : null}
         </Field>
-        <ToggleField
-          label="Training fasted"
-          checked={!!session.preFasted}
-          onChange={(v) => update({ preFasted: v })}
-          testId="toggle-coach-fasted"
-        />
+
         <Field label="Last meal">
           <div className="flex flex-wrap items-center gap-2">
             {mealPresets.map((m) => (
@@ -1319,19 +1463,22 @@ function PreQuestions({
           ) : null}
           {session.preFasted ? <p className="text-xs text-muted-foreground pt-2">Fasted selected — last meal not needed.</p> : null}
         </Field>
-        <Field label="Approx carbs in last meal (g)">
-          <Input
-            inputMode="numeric"
-            value={session.prefuelGrams != null ? String(session.prefuelGrams) : ""}
-            onChange={(e) => {
-              const n = parseInt(e.target.value, 10);
-              update({ prefuelGrams: Number.isFinite(n) ? Math.min(300, Math.max(0, n)) : undefined });
-            }}
-            className="h-9"
-            disabled={!!session.preFasted}
-            data-testid="input-coach-prefuel-carbs"
-          />
-        </Field>
+
+        {!session.preFasted ? (
+          <Field label="Approx carbs in last meal (g)">
+            <Input
+              inputMode="numeric"
+              value={session.prefuelGrams != null ? String(session.prefuelGrams) : ""}
+              onChange={(e) => {
+                const n = parseInt(e.target.value, 10);
+                update({ prefuelGrams: Number.isFinite(n) ? Math.min(300, Math.max(0, n)) : undefined });
+              }}
+              className="h-9"
+              data-testid="input-coach-prefuel-carbs"
+            />
+          </Field>
+        ) : null}
+
         <Field label="Hydration">
           <div className="flex gap-2">
             {(["ok", "low"] as const).map((v) => (
@@ -1349,15 +1496,7 @@ function PreQuestions({
             ))}
           </div>
         </Field>
-        <ToggleField
-          label="Feeling off / stressed"
-          checked={!!session.preFeelingOff}
-          onChange={(v) => update({ preFeelingOff: v })}
-          testId="toggle-coach-feeling-off"
-        />
-      </DeeperContextSection>
 
-      <DeeperContextSection title="Environment & timing" icon={MapPin}>
         <Field label="Where">
           <div className="flex flex-wrap gap-2">
             {ENVIRONMENT_OPTIONS.map((o) => {
@@ -1382,40 +1521,7 @@ function PreQuestions({
             })}
           </div>
         </Field>
-        <ToggleField
-          label="Group / competitive session"
-          checked={!!session.preCompetitive}
-          onChange={(v) => update({ preCompetitive: v })}
-          testId="toggle-coach-competitive"
-        />
-      </DeeperContextSection>
 
-      <DeeperContextSection title="Medication context" icon={Pill}>
-        <ToggleField
-          label="Caffeine in the last 2h"
-          checked={!!session.preCaffeine2h}
-          onChange={(v) => update({ preCaffeine2h: v })}
-          testId="toggle-coach-caffeine"
-          icon={Coffee}
-        />
-        <ToggleField
-          label="Alcohol last night"
-          checked={!!session.preAlcoholLastNight}
-          onChange={(v) => update({ preAlcoholLastNight: v })}
-          testId="toggle-coach-alcohol-last-night"
-        />
-        <ToggleField
-          label="GLP-1 medicine in last 24h"
-          checked={!!session.preGlp1Last24h}
-          onChange={(v) => update({ preGlp1Last24h: v })}
-          testId="toggle-coach-glp1"
-        />
-        <ToggleField
-          label="Beta-blocker today"
-          checked={!!session.preBetaBlockerToday}
-          onChange={(v) => update({ preBetaBlockerToday: v })}
-          testId="toggle-coach-beta-blocker"
-        />
         <Field label="Insulin on board (units, optional)">
           <Input
             inputMode="decimal"
@@ -1502,35 +1608,6 @@ function DuringQuestions({
 
   return (
     <div className="space-y-4">
-      {hypoRecheckEndsAt != null ? (
-        <div
-          className="rounded-xl border border-amber-300/70 bg-amber-50/50 dark:border-amber-800/50 dark:bg-amber-950/20 px-3 py-2.5 text-sm"
-          data-testid="panel-coach-hypo-recheck"
-        >
-          <div className="flex items-center justify-between gap-2">
-            <p className="font-medium text-amber-900 dark:text-amber-100">Treat & re-check</p>
-            <span className="text-xs tabular-nums text-amber-900/80 dark:text-amber-100/80">
-              {hypoRemainingLabel}
-            </span>
-          </div>
-          <p className="text-xs text-amber-900/80 dark:text-amber-100/80 leading-snug pt-1">
-            If your plan uses it: take fast carbs now, then re-check when the timer ends.
-          </p>
-          <div className="pt-2 flex justify-end gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="h-8 px-3 text-xs"
-              onClick={() => setHypoRecheckEndsAt(null)}
-              data-testid="button-coach-hypo-clear"
-            >
-              Dismiss
-            </Button>
-          </div>
-        </div>
-      ) : null}
-
       <ExerciseCgmBgField
         bgUnits={bgUnits}
         bgValue={bgInput}
@@ -1546,253 +1623,277 @@ function DuringQuestions({
         inputRef={bgRef}
       />
 
-      <div className="rounded-xl border border-border/50 bg-muted/15 px-3 py-3 space-y-2.5" data-testid="panel-coach-carbs">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-sm font-medium text-foreground">Log carbs taken</p>
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-semibold tabular-nums text-muted-foreground" data-testid="text-coach-carbs-total">
-              {carbsSoFar > 0 ? `${carbsSoFar}g logged` : "None yet"}
-            </p>
-            {carbsSoFar > 0 ? (
+      {/* ----- ONE card for everything logged mid-session — was previously up to four
+          separately-bordered surfaces (recheck timer, carbs, symptoms, symptom action)
+          stacking on top of each other. ----- */}
+      <div className="rounded-xl border border-border/50 bg-muted/15 px-3 py-3 space-y-3.5" data-testid="panel-coach-carbs">
+        {hypoRecheckEndsAt != null ? (
+          <div
+            className="rounded-lg border border-amber-300/70 bg-amber-50/60 dark:border-amber-800/50 dark:bg-amber-950/25 px-2.5 py-2 text-sm"
+            data-testid="panel-coach-hypo-recheck"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-medium text-amber-900 dark:text-amber-100">Treat & re-check</p>
+              <span className="text-xs tabular-nums text-amber-900/80 dark:text-amber-100/80">{hypoRemainingLabel}</span>
+            </div>
+            <div className="flex items-center justify-between gap-2 pt-1">
+              <p className="text-xs text-amber-900/80 dark:text-amber-100/80 leading-snug">
+                Take fast carbs now if your plan uses this, then re-check when the timer ends.
+              </p>
               <Button
                 type="button"
                 size="sm"
                 variant="ghost"
-                className="h-7 px-2 text-xs"
-                onClick={() => update({ midCarbsGramsSoFar: 0 })}
-                data-testid="button-coach-carbs-reset"
+                className="h-7 shrink-0 px-2 text-xs"
+                onClick={() => setHypoRecheckEndsAt(null)}
+                data-testid="button-coach-hypo-clear"
               >
-                Reset
+                Dismiss
               </Button>
-            ) : null}
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {[15, 25].map((g) => (
-            <Button
-              key={g}
-              type="button"
-              size="sm"
-              variant={g === 15 ? "default" : "secondary"}
-              className="h-9 px-3 text-xs"
-              onClick={() => addCarbs(g)}
-              data-testid={g === 15 ? "button-coach-quick-addcarbs-15" : `button-coach-addcarbs-${g}`}
-            >
-              +{g}g
-            </Button>
-          ))}
-          <Button
-            type="button"
-            size="sm"
-            variant={customCarbsOpen ? "default" : "outline"}
-            className="h-9 px-3 text-xs"
-            onClick={() => setCustomCarbsOpen((v) => !v)}
-            data-testid="button-coach-addcarbs-custom"
-          >
-            Custom
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="h-9 px-3 text-xs"
-            onClick={startHypoRecheckTimer}
-            data-testid="button-coach-feel-low"
-          >
-            I feel low
-          </Button>
-        </div>
-        {customCarbsOpen ? (
-          <div className="flex items-center gap-2">
-            <Input
-              inputMode="numeric"
-              value={customCarbs}
-              onChange={(e) => setCustomCarbs(e.target.value.replace(/\D/g, ""))}
-              placeholder="e.g. 12"
-              className="h-9"
-              data-testid="input-coach-addcarbs-custom"
-            />
-            <Button
-              type="button"
-              size="sm"
-              className="h-9"
-              onClick={() => {
-                const n = parseInt(customCarbs, 10);
-                if (Number.isFinite(n) && n > 0) addCarbs(n);
-                setCustomCarbs("");
-                setCustomCarbsOpen(false);
-              }}
-              data-testid="button-coach-addcarbs-apply"
-            >
-              Add
-            </Button>
-          </div>
-        ) : null}
-        {lastIsSimilar && typeof lastCarbs === "number" && Number.isFinite(lastCarbs) && lastCarbs > 0 && carbsSoFar === 0 ? (
-          <p className="text-xs text-muted-foreground">
-            Last similar session: {Math.round(lastCarbs)}g —{" "}
-            <button
-              type="button"
-              className="font-medium text-foreground underline-offset-2 hover:underline"
-              onClick={() => update({ midCarbsGramsSoFar: Math.max(0, Math.min(400, Math.round(lastCarbs))) })}
-              data-testid="button-coach-carbs-use-last"
-            >
-              use that
-            </button>
-          </p>
-        ) : null}
-      </div>
-
-      <Field label="How hard does it feel?">
-        <div className="grid grid-cols-4 rounded-xl border border-border/60 overflow-hidden">
-          {(
-            [
-              { id: "easy", label: "Easy", value: 3 },
-              { id: "moderate", label: "Moderate", value: 5 },
-              { id: "hard", label: "Hard", value: 7 },
-              { id: "max", label: "Max", value: 9 },
-            ] as const
-          ).map((o) => (
-            <Button
-              key={o.id}
-              type="button"
-              size="sm"
-              variant={session.midRpe === o.value ? "default" : "ghost"}
-              className={cn(
-                "h-9 rounded-none px-2 text-xs",
-                o.id !== "max" ? "border-r border-border/60" : null,
-              )}
-              onClick={() => update({ midRpe: session.midRpe === o.value ? undefined : o.value })}
-              data-testid={`button-coach-rpe-${o.id}`}
-            >
-              {o.label}
-            </Button>
-          ))}
-        </div>
-      </Field>
-
-      <Field label="Symptoms">
-        <div className="flex flex-wrap gap-2">
-          {SYMPTOM_OPTIONS.map((o) => {
-            const selected = session.midSymptoms?.includes(o.value) ?? false;
-            return (
-              <Button
-                key={o.value}
-                type="button"
-                size="sm"
-                variant={selected ? "default" : "outline"}
-                className="h-8 px-2.5 text-xs"
-                onClick={() => {
-                  const current = new Set(session.midSymptoms ?? []);
-                  if (o.value === "fine") {
-                    if (selected) current.delete("fine");
-                    else {
-                      current.clear();
-                      current.add("fine");
-                    }
-                  } else {
-                    current.delete("fine");
-                    if (selected) current.delete(o.value);
-                    else current.add(o.value);
-                  }
-                  const next = current.size === 0 ? undefined : (Array.from(current) as ExerciseSymptomFlag[]);
-                  update({
-                    midSymptoms: next,
-                    midSymptomSeverity: next && next.some((s) => s !== "fine") ? (session.midSymptomSeverity ?? "moderate") : undefined,
-                  });
-                }}
-                data-testid={`button-coach-symptom-${o.value}`}
-              >
-                {o.label}
-              </Button>
-            );
-          })}
-        </div>
-      </Field>
-
-      {hasSymptoms ? (
-        <div
-          className="rounded-xl border border-amber-300/70 bg-amber-50/45 dark:border-amber-800/50 dark:bg-amber-950/20 px-2.5 py-2.5 space-y-2"
-          data-testid="panel-coach-symptoms-action"
-        >
-          <div className="space-y-2">
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">Hypo symptoms</p>
-              <p className="text-[11px] text-amber-900/80 dark:text-amber-100/80 leading-snug">
-                {symptomSelected.slice(0, 3).join(", ")}
-                {symptomSelected.length > 3 ? ` +${symptomSelected.length - 3} more` : ""}
-              </p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {(["mild", "moderate", "severe"] as const).map((s) => (
+          </div>
+        ) : null}
+
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-medium text-foreground">Carbs taken</p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-semibold tabular-nums text-muted-foreground" data-testid="text-coach-carbs-total">
+                {carbsSoFar > 0 ? `${carbsSoFar}g logged` : "None yet"}
+              </p>
+              {carbsSoFar > 0 ? (
                 <Button
-                  key={s}
                   type="button"
                   size="sm"
-                  variant={severity === s ? "default" : "outline"}
-                  className="h-7 px-2 text-[11px] rounded-full"
-                  onClick={() => update({ midSymptomSeverity: s })}
-                  data-testid={`button-coach-symptom-severity-${s}`}
+                  variant="ghost"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => update({ midCarbsGramsSoFar: 0 })}
+                  data-testid="button-coach-carbs-reset"
                 >
-                  {s}
+                  Reset
                 </Button>
-              ))}
+              ) : null}
             </div>
           </div>
-
-          <div className="text-[11px] text-amber-900/85 dark:text-amber-100/85 leading-snug">
-            {recommendTreatNow ? (
-              <p>
-                <span className="font-medium">Do now:</span> treat with fast carbs, then re-check in 15 min.
-              </p>
-            ) : recommendPauseAndCheckNow ? (
-              <p>
-                <span className="font-medium">Do now:</span> pause + check BG. Treat if low or falling.
-              </p>
-            ) : (
-              <p>
-                <span className="font-medium">Do now:</span> slow down, keep carbs within reach, re-check if it persists.
-              </p>
-            )}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 pt-1">
+          <div className="flex flex-wrap gap-2">
+            {[15, 25].map((g) => (
+              <Button
+                key={g}
+                type="button"
+                size="sm"
+                variant={g === 15 ? "default" : "secondary"}
+                className="h-9 px-3 text-xs"
+                onClick={() => addCarbs(g)}
+                data-testid={g === 15 ? "button-coach-quick-addcarbs-15" : `button-coach-addcarbs-${g}`}
+              >
+                +{g}g
+              </Button>
+            ))}
             <Button
               type="button"
               size="sm"
-              variant="secondary"
-              className="h-8 px-3 text-xs flex-1"
-              onClick={() => {
-                addCarbs(15);
-                startHypoRecheckTimer();
-              }}
-              data-testid="button-coach-symptom-treat-15"
+              variant={customCarbsOpen ? "default" : "outline"}
+              className="h-9 px-3 text-xs"
+              onClick={() => setCustomCarbsOpen((v) => !v)}
+              data-testid="button-coach-addcarbs-custom"
             >
-              +15g & start timer
+              Custom
             </Button>
             <Button
               type="button"
               size="sm"
               variant="outline"
-              className="h-8 px-3 text-xs"
+              className="h-9 px-3 text-xs"
               onClick={startHypoRecheckTimer}
-              data-testid="button-coach-symptom-start-timer"
+              data-testid="button-coach-feel-low"
             >
-              15‑min timer
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="h-8 px-2 text-xs"
-              onClick={() => update({ midSymptoms: undefined, midSymptomSeverity: undefined })}
-              data-testid="button-coach-symptom-clear"
-            >
-              Clear
+              I feel low
             </Button>
           </div>
+          {customCarbsOpen ? (
+            <div className="flex items-center gap-2">
+              <Input
+                inputMode="numeric"
+                value={customCarbs}
+                onChange={(e) => setCustomCarbs(e.target.value.replace(/\D/g, ""))}
+                placeholder="e.g. 12"
+                className="h-9"
+                data-testid="input-coach-addcarbs-custom"
+              />
+              <Button
+                type="button"
+                size="sm"
+                className="h-9"
+                onClick={() => {
+                  const n = parseInt(customCarbs, 10);
+                  if (Number.isFinite(n) && n > 0) addCarbs(n);
+                  setCustomCarbs("");
+                  setCustomCarbsOpen(false);
+                }}
+                data-testid="button-coach-addcarbs-apply"
+              >
+                Add
+              </Button>
+            </div>
+          ) : null}
+          {lastIsSimilar && typeof lastCarbs === "number" && Number.isFinite(lastCarbs) && lastCarbs > 0 && carbsSoFar === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              Last similar session: {Math.round(lastCarbs)}g —{" "}
+              <button
+                type="button"
+                className="font-medium text-foreground underline-offset-2 hover:underline"
+                onClick={() => update({ midCarbsGramsSoFar: Math.max(0, Math.min(400, Math.round(lastCarbs))) })}
+                data-testid="button-coach-carbs-use-last"
+              >
+                use that
+              </button>
+            </p>
+          ) : null}
         </div>
-      ) : null}
+
+        <div className="border-t border-border/40 pt-3.5">
+          <Field label="How hard does it feel?">
+            <div className="grid grid-cols-4 rounded-xl border border-border/60 overflow-hidden">
+              {(
+                [
+                  { id: "easy", label: "Easy", value: 3 },
+                  { id: "moderate", label: "Moderate", value: 5 },
+                  { id: "hard", label: "Hard", value: 7 },
+                  { id: "max", label: "Max", value: 9 },
+                ] as const
+              ).map((o) => (
+                <Button
+                  key={o.id}
+                  type="button"
+                  size="sm"
+                  variant={session.midRpe === o.value ? "default" : "ghost"}
+                  className={cn("h-9 rounded-none px-2 text-xs", o.id !== "max" ? "border-r border-border/60" : null)}
+                  onClick={() => update({ midRpe: session.midRpe === o.value ? undefined : o.value })}
+                  data-testid={`button-coach-rpe-${o.id}`}
+                >
+                  {o.label}
+                </Button>
+              ))}
+            </div>
+          </Field>
+        </div>
+
+        <div className="border-t border-border/40 pt-3.5 space-y-2.5">
+          <Field label="Symptoms">
+            <div className="flex flex-wrap gap-2">
+              {SYMPTOM_OPTIONS.map((o) => {
+                const selected = session.midSymptoms?.includes(o.value) ?? false;
+                return (
+                  <Button
+                    key={o.value}
+                    type="button"
+                    size="sm"
+                    variant={selected ? "default" : "outline"}
+                    className="h-8 px-2.5 text-xs"
+                    onClick={() => {
+                      const current = new Set(session.midSymptoms ?? []);
+                      if (o.value === "fine") {
+                        if (selected) current.delete("fine");
+                        else {
+                          current.clear();
+                          current.add("fine");
+                        }
+                      } else {
+                        current.delete("fine");
+                        if (selected) current.delete(o.value);
+                        else current.add(o.value);
+                      }
+                      const next = current.size === 0 ? undefined : (Array.from(current) as ExerciseSymptomFlag[]);
+                      update({
+                        midSymptoms: next,
+                        midSymptomSeverity:
+                          next && next.some((s) => s !== "fine") ? (session.midSymptomSeverity ?? "moderate") : undefined,
+                      });
+                    }}
+                    data-testid={`button-coach-symptom-${o.value}`}
+                  >
+                    {o.label}
+                  </Button>
+                );
+              })}
+            </div>
+          </Field>
+
+          {hasSymptoms ? (
+            <div
+              className="rounded-lg border border-amber-300/60 bg-amber-50/45 dark:border-amber-800/50 dark:bg-amber-950/20 px-2.5 py-2.5 space-y-2"
+              data-testid="panel-coach-symptoms-action"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[11px] text-amber-900/80 dark:text-amber-100/80 leading-snug">
+                  {symptomSelected.slice(0, 3).join(", ")}
+                  {symptomSelected.length > 3 ? ` +${symptomSelected.length - 3} more` : ""} — how bad?
+                </p>
+                <div className="flex items-center gap-1.5">
+                  {(["mild", "moderate", "severe"] as const).map((s) => (
+                    <Button
+                      key={s}
+                      type="button"
+                      size="sm"
+                      variant={severity === s ? "default" : "outline"}
+                      className="h-7 px-2 text-[11px] rounded-full"
+                      onClick={() => update({ midSymptomSeverity: s })}
+                      data-testid={`button-coach-symptom-severity-${s}`}
+                    >
+                      {s}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <p className="text-[11px] text-amber-900/85 dark:text-amber-100/85 leading-snug">
+                <span className="font-medium">Do now:</span>{" "}
+                {recommendTreatNow
+                  ? "treat with fast carbs, then re-check in 15 min."
+                  : recommendPauseAndCheckNow
+                    ? "pause + check BG. Treat if low or falling."
+                    : "slow down, keep carbs within reach, re-check if it persists."}
+              </p>
+
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  className="h-8 px-3 text-xs flex-1"
+                  onClick={() => {
+                    addCarbs(15);
+                    startHypoRecheckTimer();
+                  }}
+                  data-testid="button-coach-symptom-treat-15"
+                >
+                  +15g & start timer
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-8 px-3 text-xs"
+                  onClick={startHypoRecheckTimer}
+                  data-testid="button-coach-symptom-start-timer"
+                >
+                  15‑min timer
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 px-2 text-xs"
+                  onClick={() => update({ midSymptoms: undefined, midSymptomSeverity: undefined })}
+                  data-testid="button-coach-symptom-clear"
+                >
+                  Clear
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }
@@ -1924,6 +2025,36 @@ function YesNoToggle({
   );
 }
 
+/** Compact tap-pill for a boolean flag — used where a full-width switch row would waste space. */
+function PillToggle({
+  label,
+  checked,
+  onChange,
+  testId,
+  icon: Icon,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  testId: string;
+  icon?: typeof Sparkles;
+}) {
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant={checked ? "default" : "outline"}
+      className="h-8 px-2.5 text-xs"
+      onClick={() => onChange(!checked)}
+      data-testid={testId}
+      aria-pressed={checked}
+    >
+      {Icon ? <Icon className="h-3.5 w-3.5 mr-1" /> : null}
+      {label}
+    </Button>
+  );
+}
+
 function ToggleField({
   label,
   checked,
@@ -1951,28 +2082,42 @@ function ToggleField({
 function DeeperContextSection({
   title,
   icon: Icon,
+  badgeCount,
   children,
 }: {
   title: string;
   icon: typeof Sparkles;
+  /** Count of fields already filled in this section — shown as a quiet badge when collapsed. */
+  badgeCount?: number;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const headerRef = useRef<HTMLButtonElement | null>(null);
   return (
-    <div className="rounded-xl border border-border/60 bg-muted/20">
+    <div className="rounded-xl border border-border/60 bg-muted/20 overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         ref={headerRef}
-        className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left"
+        className="w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left transition-colors hover:bg-muted/30"
         data-testid={`button-coach-section-${title.toLowerCase().replace(/[^a-z]+/g, "-")}`}
+        aria-expanded={open}
       >
         <span className="text-sm font-medium flex items-center gap-2">
-          <Icon className="h-4 w-4 text-muted-foreground" />
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-background/80 ring-1 ring-border/50">
+            <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+          </span>
           {title}
+          {!open && badgeCount ? (
+            <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium leading-none text-primary">
+              {badgeCount} added
+            </span>
+          ) : null}
         </span>
-        <span className="text-xs text-muted-foreground">{open ? "Hide" : "Add"}</span>
+        <ChevronDown
+          className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", open ? "rotate-180" : null)}
+          aria-hidden
+        />
       </button>
       {open ? (
         <div className="px-3 pb-3 space-y-2 border-t border-border/40 pt-3">

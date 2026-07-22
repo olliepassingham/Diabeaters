@@ -107,13 +107,13 @@ describe("ExerciseGuidedCoach", () => {
     const { queryByTestId, getByText } = renderWithRouter(<ExerciseGuidedCoach />);
     expect(queryByTestId("exercise-guided-coach")).not.toBeNull();
     expect(queryByTestId("button-coach-start-workout")).not.toBeNull();
-    expect(getByText("Personal context")).toBeTruthy();
-    expect(getByText("Environment & timing")).toBeTruthy();
-    expect(getByText("Medication context")).toBeTruthy();
+    expect(getByText("More context")).toBeTruthy();
 
-    fireEvent.click(queryByTestId("button-coach-section-personal-context")!);
+    fireEvent.click(queryByTestId("button-coach-section-more-context")!);
     expect(queryByTestId("button-coach-sleep-6")).not.toBeNull();
     expect(queryByTestId("button-coach-lastmeal-60")).not.toBeNull();
+    expect(queryByTestId("toggle-coach-fasted")).not.toBeNull();
+    expect(queryByTestId("button-coach-env-outdoor_hot")).not.toBeNull();
   });
 
   it("renders during phase with recovery CTA and RPE buttons", () => {

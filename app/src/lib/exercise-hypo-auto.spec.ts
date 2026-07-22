@@ -113,6 +113,27 @@ describe("exercise-hypo-auto", () => {
     ).toBe(true);
   });
 
+  it("needsImmediateExerciseBgTreatment widens the approach band during recovery, without requiring a falling trend", () => {
+    const settings: UserSettings = { targetBgLow: 4, targetBgHigh: 7 };
+    // Same borderline reading as the active-phase test above (flat trend, 6.0 mmol/L,
+    // 5.6 threshold) — active phase does not flag it, but recovery's wider, delayed-low-aware
+    // band does, since post-exercise drops don't always show up as a confirmed falling trend.
+    expect(
+      needsImmediateExerciseBgTreatment(6.0, settings, "mmol/L", {
+        trend: "flat",
+        phase: "active",
+        exerciseLowThreshold: 5.6,
+      }),
+    ).toBe(false);
+    expect(
+      needsImmediateExerciseBgTreatment(6.0, settings, "mmol/L", {
+        trend: "flat",
+        phase: "recovery",
+        exerciseLowThreshold: 5.6,
+      }),
+    ).toBe(true);
+  });
+
   it("computeExerciseHypoSuggestion nudges carbs up when severe symptoms are logged", () => {
     // A deep clinical-hypo BG so the weight-based carbsNeeded comfortably clears both the
     // 10g display floor and the 12g clinical-hypo floor, letting the severity multiplier's

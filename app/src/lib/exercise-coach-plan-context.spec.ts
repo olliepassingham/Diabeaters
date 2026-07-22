@@ -41,4 +41,23 @@ describe("buildExercisePlanContextFromCoachSession", () => {
     });
     expect(ctx.nutritionContext).toBe("fasted");
   });
+
+  it("counts minutesUntilStart down as the user lingers on the pre screen, instead of a flat 30", () => {
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60_000).toISOString();
+    const ctx = buildExercisePlanContextFromCoachSession({
+      session: baseSession({ startedAt: tenMinutesAgo }),
+      bgUnits: "mmol/L",
+    });
+    expect(ctx.minutesUntilStart).toBeLessThan(30);
+    expect(ctx.minutesUntilStart).toBeGreaterThanOrEqual(18);
+  });
+
+  it("floors minutesUntilStart at 0 once the assumed prep window has fully elapsed", () => {
+    const anHourAgo = new Date(Date.now() - 60 * 60_000).toISOString();
+    const ctx = buildExercisePlanContextFromCoachSession({
+      session: baseSession({ startedAt: anHourAgo }),
+      bgUnits: "mmol/L",
+    });
+    expect(ctx.minutesUntilStart).toBe(0);
+  });
 });
