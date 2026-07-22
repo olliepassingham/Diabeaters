@@ -1432,10 +1432,6 @@ export interface ActiveExerciseSession {
   /** Active: subjective severity of symptom episode (optional). */
   midSymptomSeverity?: ExerciseSymptomSeverity;
 
-  /** Recovery: carbs eaten since stopping. */
-  recoveryCarbsGrams?: number;
-  /** Recovery: bolus units already given for recovery meal/snack. */
-  recoveryBolusUnits?: number;
   /** Recovery: hours until planned bedtime. */
   bedtimeInHours?: number;
   /** Recovery: alcohol planned tonight. */
@@ -1462,7 +1458,6 @@ export type LastExerciseSummary = {
     /** Total carbs logged during the workout (active phase). */
     midCarbsGramsTotal?: number;
     feltSymptomsDuring?: boolean;
-    recoveryCarbsGrams?: number;
     alcoholTonight?: boolean;
     /** Hours until planned bedtime, logged during recovery — sharpens the post-exercise nudge's overnight framing. */
     bedtimeInHours?: number;
@@ -1575,7 +1570,6 @@ function buildLastExerciseContextFromSession(session: ActiveExerciseSession): No
   if (symptoms.length > 0 && symptoms.some((s) => s !== "fine")) {
     ctx.feltSymptomsDuring = true;
   }
-  if (session.recoveryCarbsGrams != null) ctx.recoveryCarbsGrams = session.recoveryCarbsGrams;
   if (session.alcoholTonight != null) ctx.alcoholTonight = session.alcoholTonight;
   if (session.bedtimeInHours != null) ctx.bedtimeInHours = session.bedtimeInHours;
   if (session.preBg != null && session.preTrend && session.preTrend !== "not_sure") {

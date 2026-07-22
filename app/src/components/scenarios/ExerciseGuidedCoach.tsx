@@ -35,6 +35,7 @@ import {
   Thermometer,
   Waves,
   Wind,
+  Wine,
   X,
   Zap,
 } from "lucide-react";
@@ -557,6 +558,11 @@ export function ExerciseGuidedCoach() {
       return null;
     }
   }, [activeSession, bgInput, bgUnits, historyBias, trendForReadiness, settings]);
+
+  const recoveryBedtimeCtaInfo = useMemo(
+    () => (activeSession ? recoveryBedtimeCta(activeSession) : null),
+    [activeSession],
+  );
 
   const phasePumpTips = useMemo(() => {
     if (!exercisePlan || !isPump || !activeSession) return [];
@@ -1181,20 +1187,42 @@ export function ExerciseGuidedCoach() {
                     update={update}
                     {...cgmPhaseProps}
                   />
-                  {exercisePlan ? (
-                    <p className="text-xs text-muted-foreground leading-snug">
-                      Recovery window (~{exercisePlan.recovery.monitorHours}): delayed lows still happen — keep
-                      snacks and your hypo plan close.
-                    </p>
-                  ) : null}
-                  {activeSession.intensity === "intense" || activeSession.intensity === "moderate" ? (
-                    <Link href="/scenarios/bedtime">
-                      <Button variant="outline" size="sm" className="w-full" data-testid="button-coach-recovery-bedtime">
-                        <Moon className="h-3.5 w-3.5 mr-2" />
-                        Open Bedtime tool
-                        <ArrowRight className="h-3.5 w-3.5 ml-auto" />
-                      </Button>
-                    </Link>
+                  {exercisePlan || recoveryBedtimeCtaInfo ? (
+                    <div
+                      className={cn(
+                        "rounded-xl border px-3.5 py-3.5 space-y-2",
+                        recoveryBedtimeCtaInfo?.urgent
+                          ? "border-primary/40 bg-primary/5"
+                          : "border-border/60 bg-muted/15",
+                      )}
+                    >
+                      {exercisePlan ? (
+                        <p className="text-xs text-muted-foreground leading-snug">
+                          Recovery window (~{exercisePlan.recovery.monitorHours}): delayed lows still happen — keep
+                          snacks and your hypo plan close.
+                        </p>
+                      ) : null}
+                      {recoveryBedtimeCtaInfo ? (
+                        <>
+                          <p className="text-sm font-medium text-foreground flex items-center gap-2">
+                            <Moon className="h-4 w-4 shrink-0" aria-hidden />
+                            {recoveryBedtimeCtaInfo.title}
+                          </p>
+                          <p className="text-xs text-muted-foreground leading-snug">{recoveryBedtimeCtaInfo.caption}</p>
+                          <Link href="/scenarios/bedtime">
+                            <Button
+                              variant={recoveryBedtimeCtaInfo.urgent ? "default" : "outline"}
+                              size="sm"
+                              className="w-full mt-1"
+                              data-testid="button-coach-recovery-bedtime"
+                            >
+                              Open Bedtime tool
+                              <ArrowRight className="h-3.5 w-3.5 ml-auto" />
+                            </Button>
+                          </Link>
+                        </>
+                      ) : null}
+                    </div>
                   ) : null}
                 </TabsContent>
               </Tabs>
@@ -1555,8 +1583,6 @@ function DuringQuestions({
   const bgRef = useRef<HTMLInputElement | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [hypoRecheckEndsAt, setHypoRecheckEndsAt] = useState<number | null>(null);
-  const [customCarbsOpen, setCustomCarbsOpen] = useState(false);
-  const [customCarbs, setCustomCarbs] = useState("");
 
   useEffect(() => {
     if (hypoRecheckEndsAt == null) return;
@@ -1565,20 +1591,9 @@ function DuringQuestions({
   }, [hypoRecheckEndsAt]);
 
   useEffect(() => {
-    // Reset in-panel timers when session id changes
     setHypoRecheckEndsAt(null);
-    setCustomCarbsOpen(false);
-    setCustomCarbs("");
   }, [session.id]);
 
-  const carbsSoFar = session.midCarbsGramsSoFar ?? 0;
-  const last = storage.getLastExerciseSummary?.();
-  const lastCarbs = last?.context?.midCarbsGramsTotal;
-  const lastIsSimilar =
-    !!last &&
-    last.exerciseType === session.exerciseType &&
-    last.intensity === session.intensity &&
-    Math.abs(last.durationMinutes - session.durationMinutes) <= 15;
   const trend =
     session.phase === "active"
       ? (session.midTrend ?? session.preTrend ?? "not_sure")
@@ -1586,10 +1601,6 @@ function DuringQuestions({
   const symptomSelected = (session.midSymptoms ?? []).filter((s) => s !== "fine");
   const hasSymptoms = symptomSelected.length > 0;
   const severity = session.midSymptomSeverity ?? "moderate";
-  const addCarbs = (g: number) => {
-    const next = Math.min(400, Math.max(0, carbsSoFar + g));
-    update({ midCarbsGramsSoFar: next });
-  };
 
   const startHypoRecheckTimer = () => {
     setHypoRecheckEndsAt(Date.now() + 15 * 60_000);
@@ -1623,10 +1634,9 @@ function DuringQuestions({
         inputRef={bgRef}
       />
 
-      {/* ----- ONE card for everything logged mid-session — was previously up to four
-          separately-bordered surfaces (recheck timer, carbs, symptoms, symptom action)
-          stacking on top of each other. ----- */}
-      <div className="rounded-xl border border-border/50 bg-muted/15 px-3 py-3 space-y-3.5" data-testid="panel-coach-carbs">
+      {/* Mid-session check-in only — no live carb tally. Most people won't tap the phone
+          mid-workout to log grams; keep glanceable feel-low / effort / symptoms instead. */}
+      <div className="rounded-xl border border-border/50 bg-muted/15 px-3 py-3 space-y-3.5" data-testid="panel-coach-during">
         {hypoRecheckEndsAt != null ? (
           <div
             className="rounded-lg border border-amber-300/70 bg-amber-50/60 dark:border-amber-800/50 dark:bg-amber-950/25 px-2.5 py-2 text-sm"
@@ -1652,104 +1662,18 @@ function DuringQuestions({
               </Button>
             </div>
           </div>
-        ) : null}
-
-        <div className="space-y-2.5">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-medium text-foreground">Carbs taken</p>
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-semibold tabular-nums text-muted-foreground" data-testid="text-coach-carbs-total">
-                {carbsSoFar > 0 ? `${carbsSoFar}g logged` : "None yet"}
-              </p>
-              {carbsSoFar > 0 ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  className="h-7 px-2 text-xs"
-                  onClick={() => update({ midCarbsGramsSoFar: 0 })}
-                  data-testid="button-coach-carbs-reset"
-                >
-                  Reset
-                </Button>
-              ) : null}
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {[15, 25].map((g) => (
-              <Button
-                key={g}
-                type="button"
-                size="sm"
-                variant={g === 15 ? "default" : "secondary"}
-                className="h-9 px-3 text-xs"
-                onClick={() => addCarbs(g)}
-                data-testid={g === 15 ? "button-coach-quick-addcarbs-15" : `button-coach-addcarbs-${g}`}
-              >
-                +{g}g
-              </Button>
-            ))}
-            <Button
-              type="button"
-              size="sm"
-              variant={customCarbsOpen ? "default" : "outline"}
-              className="h-9 px-3 text-xs"
-              onClick={() => setCustomCarbsOpen((v) => !v)}
-              data-testid="button-coach-addcarbs-custom"
-            >
-              Custom
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="h-9 px-3 text-xs"
-              onClick={startHypoRecheckTimer}
-              data-testid="button-coach-feel-low"
-            >
-              I feel low
-            </Button>
-          </div>
-          {customCarbsOpen ? (
-            <div className="flex items-center gap-2">
-              <Input
-                inputMode="numeric"
-                value={customCarbs}
-                onChange={(e) => setCustomCarbs(e.target.value.replace(/\D/g, ""))}
-                placeholder="e.g. 12"
-                className="h-9"
-                data-testid="input-coach-addcarbs-custom"
-              />
-              <Button
-                type="button"
-                size="sm"
-                className="h-9"
-                onClick={() => {
-                  const n = parseInt(customCarbs, 10);
-                  if (Number.isFinite(n) && n > 0) addCarbs(n);
-                  setCustomCarbs("");
-                  setCustomCarbsOpen(false);
-                }}
-                data-testid="button-coach-addcarbs-apply"
-              >
-                Add
-              </Button>
-            </div>
-          ) : null}
-          {lastIsSimilar && typeof lastCarbs === "number" && Number.isFinite(lastCarbs) && lastCarbs > 0 && carbsSoFar === 0 ? (
-            <p className="text-xs text-muted-foreground">
-              Last similar session: {Math.round(lastCarbs)}g —{" "}
-              <button
-                type="button"
-                className="font-medium text-foreground underline-offset-2 hover:underline"
-                onClick={() => update({ midCarbsGramsSoFar: Math.max(0, Math.min(400, Math.round(lastCarbs))) })}
-                data-testid="button-coach-carbs-use-last"
-              >
-                use that
-              </button>
-            </p>
-          ) : null}
-        </div>
+        ) : (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-9 w-full text-xs"
+            onClick={startHypoRecheckTimer}
+            data-testid="button-coach-feel-low"
+          >
+            I feel low — start 15‑min timer
+          </Button>
+        )}
 
         <div className="border-t border-border/40 pt-3.5">
           <Field label="How hard does it feel?">
@@ -1861,23 +1785,10 @@ function DuringQuestions({
                   size="sm"
                   variant="secondary"
                   className="h-8 px-3 text-xs flex-1"
-                  onClick={() => {
-                    addCarbs(15);
-                    startHypoRecheckTimer();
-                  }}
-                  data-testid="button-coach-symptom-treat-15"
-                >
-                  +15g & start timer
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-8 px-3 text-xs"
                   onClick={startHypoRecheckTimer}
                   data-testid="button-coach-symptom-start-timer"
                 >
-                  15‑min timer
+                  Start 15‑min timer
                 </Button>
                 <Button
                   type="button"
@@ -1898,6 +1809,8 @@ function DuringQuestions({
   );
 }
 
+const BEDTIME_PRESET_HOURS = [1, 2, 4, 8] as const;
+
 function RecoveryQuestions({
   session,
   bgUnits,
@@ -1911,6 +1824,9 @@ function RecoveryQuestions({
   onCgmRefresh,
   onBgFieldChange,
 }: PhaseProps) {
+  const bedtimeIsPreset =
+    session.bedtimeInHours != null && BEDTIME_PRESET_HOURS.includes(session.bedtimeInHours as (typeof BEDTIME_PRESET_HOURS)[number]);
+
   return (
     <div className="space-y-4">
       <ExerciseCgmBgField
@@ -1927,53 +1843,98 @@ function RecoveryQuestions({
         trendTestIdPrefix="button-coach-trend"
       />
 
-      <Field label="Carbs eaten since stopping (g)">
-        <Input
-          inputMode="numeric"
-          value={session.recoveryCarbsGrams != null ? String(session.recoveryCarbsGrams) : ""}
-          onChange={(e) => {
-            const n = parseInt(e.target.value, 10);
-            update({ recoveryCarbsGrams: Number.isFinite(n) ? Math.min(300, Math.max(0, n)) : undefined });
-          }}
-          className="h-9"
-          data-testid="input-coach-recovery-carbs"
-        />
-      </Field>
+      <FieldRow icon={Moon} label="Bedtime tonight">
+        <div className="flex flex-wrap items-center gap-2">
+          {BEDTIME_PRESET_HOURS.map((h) => (
+            <Button
+              key={h}
+              type="button"
+              size="sm"
+              variant={session.bedtimeInHours === h ? "default" : "outline"}
+              className="h-8 px-2.5 text-xs"
+              onClick={() => update({ bedtimeInHours: session.bedtimeInHours === h ? undefined : h })}
+              data-testid={`button-coach-bedtime-${h}`}
+            >
+              {h >= 8 ? `${h}h+` : `${h}h`}
+            </Button>
+          ))}
+          <Button
+            type="button"
+            size="sm"
+            variant={session.bedtimeInHours != null && !bedtimeIsPreset ? "default" : "outline"}
+            className="h-8 px-2.5 text-xs"
+            onClick={() => {
+              if (session.bedtimeInHours != null && !bedtimeIsPreset) {
+                update({ bedtimeInHours: undefined });
+              } else {
+                update({ bedtimeInHours: 3 });
+              }
+            }}
+            data-testid="button-coach-bedtime-custom"
+          >
+            Custom
+          </Button>
+        </div>
+        {session.bedtimeInHours != null && !bedtimeIsPreset ? (
+          <div className="pt-2">
+            <Input
+              inputMode="decimal"
+              value={String(session.bedtimeInHours)}
+              onChange={(e) => {
+                const n = parseFloat(e.target.value.replace(",", "."));
+                update({ bedtimeInHours: Number.isFinite(n) && n >= 0 ? Math.min(24, n) : undefined });
+              }}
+              className="h-9"
+              data-testid="input-coach-bedtime-hours"
+            />
+          </div>
+        ) : null}
+      </FieldRow>
 
-      <Field label="Bolus given for recovery food (units)">
-        <Input
-          inputMode="decimal"
-          value={session.recoveryBolusUnits != null ? String(session.recoveryBolusUnits) : ""}
-          onChange={(e) => {
-            const n = parseFloat(e.target.value.replace(",", "."));
-            update({ recoveryBolusUnits: Number.isFinite(n) && n >= 0 ? Math.min(50, n) : undefined });
-          }}
-          className="h-9"
-          data-testid="input-coach-recovery-bolus"
+      <div className="flex flex-wrap gap-2">
+        <PillToggle
+          label="Alcohol planned tonight"
+          icon={Wine}
+          checked={!!session.alcoholTonight}
+          onChange={(v) => update({ alcoholTonight: v })}
+          testId="toggle-coach-alcohol-tonight"
         />
-      </Field>
-
-      <Field label="Bedtime in (hours)">
-        <Input
-          inputMode="decimal"
-          value={session.bedtimeInHours != null ? String(session.bedtimeInHours) : ""}
-          onChange={(e) => {
-            const n = parseFloat(e.target.value.replace(",", "."));
-            update({ bedtimeInHours: Number.isFinite(n) && n >= 0 ? Math.min(24, n) : undefined });
-          }}
-          className="h-9"
-          data-testid="input-coach-bedtime-hours"
-        />
-      </Field>
-
-      <ToggleField
-        label="Alcohol planned tonight"
-        checked={!!session.alcoholTonight}
-        onChange={(v) => update({ alcoholTonight: v })}
-        testId="toggle-coach-alcohol-tonight"
-      />
+      </div>
     </div>
   );
+}
+
+/**
+ * Drives the "Open Bedtime tool" prompt in the recovery panel — urgency and copy respond to
+ * how close bedtime actually is, rather than always showing the same static button regardless
+ * of context.
+ */
+function recoveryBedtimeCta(
+  session: ActiveExerciseSession,
+): { urgent: boolean; title: string; caption: string } | null {
+  const hours = session.bedtimeInHours;
+  if (hours != null && Number.isFinite(hours)) {
+    if (hours <= 4) {
+      return {
+        urgent: true,
+        title: hours <= 1 ? "Bedtime is close" : `Bedtime in about ${Math.round(hours)}h`,
+        caption: "Delayed lows are common tonight — run a trend-aware check before you turn in.",
+      };
+    }
+    return {
+      urgent: false,
+      title: `Bedtime in about ${Math.round(hours)}h`,
+      caption: "Worth a quick check later tonight, especially after today's session.",
+    };
+  }
+  if (session.intensity === "intense" || session.intensity === "moderate") {
+    return {
+      urgent: false,
+      title: "Planning for tonight",
+      caption: "Moderate and intense sessions can cause delayed lows overnight — the Bedtime tool factors that in.",
+    };
+  }
+  return null;
 }
 
 // ----- Tiny presentational helpers -----

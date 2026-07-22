@@ -46,7 +46,11 @@ vi.mock("@/lib/storage", async (importOriginal) => {
         hypoCount: 0,
         avgPattern: "",
       }),
-      updateActiveExercise: vi.fn(() => mockSession),
+      updateActiveExercise: vi.fn((patch: Partial<ActiveExerciseSession>) => {
+        if (!mockSession) return null;
+        mockSession = { ...mockSession, ...patch };
+        return mockSession;
+      }),
       startExerciseSession: vi.fn(),
       startExercisePhase: vi.fn(),
       finishExercisePhase: vi.fn(),
@@ -121,18 +125,33 @@ describe("ExerciseGuidedCoach", () => {
     const { queryByTestId } = renderWithRouter(<ExerciseGuidedCoach />);
     expect(queryByTestId("button-coach-finish-workout")).not.toBeNull();
     expect(queryByTestId("button-coach-rpe-moderate")).not.toBeNull();
-    expect(queryByTestId("button-coach-quick-addcarbs-15")).not.toBeNull();
     expect(queryByTestId("button-coach-feel-low")).not.toBeNull();
-    expect(queryByTestId("panel-coach-carbs")).not.toBeNull();
+    expect(queryByTestId("panel-coach-during")).not.toBeNull();
     expect(queryByTestId("button-coach-symptom-shaky")).not.toBeNull();
+    // Mid-workout carb tally was removed — people rarely log grams during exercise.
+    expect(queryByTestId("button-coach-quick-addcarbs-15")).toBeNull();
+    expect(queryByTestId("panel-coach-carbs")).toBeNull();
   });
 
-  it("renders recovery phase with recovery inputs", () => {
+  it("renders recovery phase with bedtime presets and alcohol pill, no dead carb/bolus fields", () => {
     mockSession = makeSession("recovery");
     const { queryByTestId } = renderWithRouter(<ExerciseGuidedCoach />);
     expect(queryByTestId("button-coach-finish-session")).not.toBeNull();
-    expect(queryByTestId("input-coach-recovery-carbs")).not.toBeNull();
-    expect(queryByTestId("input-coach-bedtime-hours")).not.toBeNull();
+    expect(queryByTestId("button-coach-bedtime-2")).not.toBeNull();
+    expect(queryByTestId("button-coach-bedtime-custom")).not.toBeNull();
+    expect(queryByTestId("toggle-coach-alcohol-tonight")).not.toBeNull();
+    // Moderate/intense sessions still get a bedtime nudge even before a time is chosen.
+    expect(queryByTestId("button-coach-recovery-bedtime")).not.toBeNull();
+    // Dead inputs that never fed any calculation were removed.
+    expect(queryByTestId("input-coach-recovery-carbs")).toBeNull();
+    expect(queryByTestId("input-coach-recovery-bolus")).toBeNull();
+  });
+
+  it("recovery bedtime preset drives an urgent Bedtime tool prompt when bedtime is close", () => {
+    mockSession = makeSession("recovery");
+    const { queryByTestId, getByText } = renderWithRouter(<ExerciseGuidedCoach />);
+    fireEvent.click(queryByTestId("button-coach-bedtime-2")!);
+    expect(getByText(/Bedtime in about 2h/i)).toBeTruthy();
     expect(queryByTestId("button-coach-recovery-bedtime")).not.toBeNull();
   });
 });
