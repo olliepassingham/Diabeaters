@@ -21,7 +21,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { Bell, CheckCheck, Trash2 } from "lucide-react";
 import { useLocation } from "wouter";
-import { INAPP_NOTIFICATIONS_CHANGED, notifyInAppNotificationsChanged, OPEN_NOTIFICATION_BELL_EVENT } from "@/lib/in-app-notifications-events";
+import { INAPP_NOTIFICATIONS_CHANGED, notifyInAppNotificationsChanged, OPEN_NOTIFICATION_BELL_EVENT, CLOSE_NOTIFICATION_BELL_EVENT } from "@/lib/in-app-notifications-events";
 import { notifyDmInboxChanged } from "@/lib/community/dm-inbox-events";
 import {
   deleteAllInAppNotificationsForUser,
@@ -190,8 +190,13 @@ export function NotificationBell() {
         void load();
         setOpen(true);
       };
+      const closeBell = () => setOpen(false);
       window.addEventListener(OPEN_NOTIFICATION_BELL_EVENT, openBell);
-      return () => window.removeEventListener(OPEN_NOTIFICATION_BELL_EVENT, openBell);
+      window.addEventListener(CLOSE_NOTIFICATION_BELL_EVENT, closeBell);
+      return () => {
+        window.removeEventListener(OPEN_NOTIFICATION_BELL_EVENT, openBell);
+        window.removeEventListener(CLOSE_NOTIFICATION_BELL_EVENT, closeBell);
+      };
     }, [load]);
 
     /** Brief top toast + bell/list refresh when a new notification row arrives while the app is open. */

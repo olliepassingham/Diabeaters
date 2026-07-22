@@ -1,3 +1,5 @@
+import { requestCloseNotificationBell } from "@/lib/notification-inbox-deep-link";
+
 /** Programmatically open the hypo check-in respond bottom sheet. */
 export const OPEN_HYPO_CHECK_IN_RESPOND_EVENT = "diabeaters:open-hypo-check-in-respond";
 
@@ -44,5 +46,8 @@ export function consumePendingHypoCheckInRespond(): PendingHypoCheckInRespond | 
 export function requestOpenHypoCheckInRespondSheet(payload: PendingHypoCheckInRespond): void {
   storePendingHypoCheckInRespond(payload);
   if (typeof window === "undefined") return;
+  // Respond is often started from the notification bell; that popover sits above the
+  // bottom sheet (higher z-index), so close it first or the actions stay trapped underneath.
+  requestCloseNotificationBell();
   window.dispatchEvent(new CustomEvent(OPEN_HYPO_CHECK_IN_RESPOND_EVENT));
 }
