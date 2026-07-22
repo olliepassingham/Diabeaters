@@ -86,6 +86,34 @@ test.describe("Guided exercise coach redesign — manual QA", () => {
     await page.screenshot({ path: "test-results/coach-3b-pre-context-verdict.png", fullPage: true });
   });
 
+  test("active phase: exercising past the planned duration stays in Active, not silently Recovery", async ({ page }) => {
+    // Planned 60 min, started 70 min ago — user is still going, over the planned time.
+    await seedPatientSession(page, {
+      session: baseSession({
+        phase: "active",
+        durationMinutes: 60,
+        exerciseStartedAt: new Date(Date.now() - 70 * 60_000).toISOString(),
+        preBg: 7,
+        midBg: 6.8,
+        midTrend: "flat",
+      }),
+    });
+    await page.goto("/scenarios/exercise");
+    await expect(page.getByTestId("exercise-guided-coach")).toBeVisible({ timeout: 10000 });
+    // Must still be in the Active panel — planned time elapsing shouldn't force Recovery.
+    // (Radix Tabs keeps every TabsContent mounted and toggles the `hidden` attribute rather
+    // than unmounting, so we assert visibility here, not DOM presence.)
+    await expect(page.getByTestId("coach-input-panel-active")).toBeVisible();
+    await expect(page.getByTestId("coach-input-panel-recovery")).not.toBeVisible();
+    await expect(page.getByText(/over/i).first()).toBeVisible();
+    await page.screenshot({ path: "test-results/coach-10-active-overtime.png", fullPage: true });
+
+    // The status strip nudges once, but only actually finishes the workout if the user taps it.
+    await expect(page.getByText("Planned time is up")).toBeVisible({ timeout: 5000 });
+    await page.getByRole("button", { name: "Finish" }).click();
+    await expect(page.getByTestId("coach-input-panel-recovery")).toBeVisible();
+  });
+
   test("active phase: feel-low / RPE / symptoms without carb tally", async ({ page }) => {
     await seedPatientSession(page, {
       session: baseSession({

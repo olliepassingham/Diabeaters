@@ -30,7 +30,12 @@ export function ExerciseWorkoutProgressBar(props: {
   const total = Math.max(60_000, durationMinutes * 60_000);
   const elapsed = Math.max(0, nowMs - start);
   const pct = Math.min(100, (elapsed / total) * 100);
-  const remMin = Math.max(0, Math.ceil((total - elapsed) / 60_000));
+  // Going past the planned time just means someone's still exercising longer than
+  // expected — show how far over instead of freezing at "0 min left" forever.
+  const isOvertime = elapsed > total;
+  const remMin = isOvertime
+    ? Math.ceil((elapsed - total) / 60_000)
+    : Math.max(0, Math.ceil((total - elapsed) / 60_000));
 
   return (
     <div className={cn(compact ? "space-y-1" : "space-y-1.5", className)}>
@@ -39,9 +44,14 @@ export function ExerciseWorkoutProgressBar(props: {
           <Timer className="h-3 w-3 opacity-70" aria-hidden />
           Workout progress
         </span>
-        <span>
-          {Math.min(100, Math.round(pct))}%
-          {!compact ? <span className="text-muted-foreground/80"> · ~{remMin} min left</span> : null}
+        <span className={isOvertime ? "text-amber-600 dark:text-amber-400" : undefined}>
+          {isOvertime ? "Planned time up" : `${Math.round(pct)}%`}
+          {!compact ? (
+            <span className={isOvertime ? "opacity-90" : "text-muted-foreground/80"}>
+              {" "}
+              · {isOvertime ? `+${remMin} min over` : `~${remMin} min left`}
+            </span>
+          ) : null}
         </span>
       </div>
       <div
@@ -53,7 +63,8 @@ export function ExerciseWorkoutProgressBar(props: {
       >
         <div
           className={cn(
-            "h-full rounded-full bg-primary transition-[width] duration-500 ease-out",
+            "h-full rounded-full transition-[width] duration-500 ease-out",
+            isOvertime ? "bg-amber-500" : "bg-primary",
           )}
           style={{ width: `${pct}%` }}
           data-testid="progress-exercise"

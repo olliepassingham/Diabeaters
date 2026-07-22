@@ -44,6 +44,7 @@ import { cn } from "@/lib/utils";
 import { computeExerciseHypoSuggestion, resolveExerciseBgForHypo } from "@/lib/exercise-hypo-auto";
 import { ExerciseFuelPlanSummary, ExerciseHypoTreatmentHint, ExerciseWorkoutProgressBar, formatExerciseElapsedShort } from "@/components/exercise-active-session-extras";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import { calculateExercisePlan, getRecoveryInsulinHeadline, type ExercisePlanResult, type LastInsulinTiming } from "@/lib/exercise-plan";
 import {
   getExerciseReadinessVerdict,
@@ -365,25 +366,35 @@ export function AppStatusStrip() {
     if (ex.phase === "pre") exerciseAutoFinishKey.current = null;
   }, [ex]);
 
+  // Planned time elapsing doesn't mean the workout actually stopped — someone who said
+  // "60 min" but is still going at 70 shouldn't be silently dropped into Recovery mid-session.
+  // Nudge once instead, and let them confirm they're actually done via the toast action.
   useEffect(() => {
     if (!ex || ex.phase !== "active" || !ex.exerciseStartedAt) return;
     const started = new Date(ex.exerciseStartedAt).getTime();
     if (!Number.isFinite(started)) return;
     const endsAt = started + Math.max(1, ex.durationMinutes) * 60_000;
     if (Date.now() < endsAt) return;
-    const key = `auto-finish:${ex.id}`;
+    const key = `time-up:${ex.id}`;
     if (exerciseAutoFinishKey.current === key) return;
     exerciseAutoFinishKey.current = key;
-    const updated = exerciseSessionActions.finishWorkout();
-    setEx(updated);
-    if (!sc.travelModeActive) {
-      setExerciseExpanded(true);
-    }
+    const finishNow = () => {
+      const current = storage.getActiveExercise();
+      if (!current || current.phase !== "active") return;
+      const updated = exerciseSessionActions.finishWorkout();
+      setEx(updated);
+      if (!storage.getScenarioState().travelModeActive) setExerciseExpanded(true);
+    };
     toast({
-      title: "Recovery phase",
-      description: "Your planned workout time has ended — you are now in the recovery window.",
+      title: "Planned time is up",
+      description: "Still going, or ready to wrap up? Tap Finish once you've actually stopped.",
+      action: (
+        <ToastAction altText="Finish workout" onClick={finishNow}>
+          Finish
+        </ToastAction>
+      ),
     });
-  }, [ex, toast, sc.travelModeActive]);
+  }, [ex, toast, exerciseSessionActions]);
 
   useEffect(() => {
     if (!ex) {
