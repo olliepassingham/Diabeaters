@@ -3,6 +3,35 @@ import type { OvernightUsualTrend } from "@/lib/bedtime-readiness";
 
 export type BedtimeCorrectionTrend = "rising" | "steady" | "falling" | "not_sure";
 
+export type BedtimeHighSeverity = "moderate" | "high" | "very_high";
+
+/**
+ * How far above target the current reading is, independent of the trend arrow. A flat or
+ * falling reading that's only just above target and one that's dangerously high both used to
+ * get the same base caution share — this is what lets a very high reading (e.g. 16+ mmol/L
+ * against a target of 10) push toward a fuller correction even when it isn't currently rising,
+ * since staying that high overnight carries its own real risk, not just the risk of a later low.
+ */
+export function classifyBedtimeHighSeverity(bgMmol: number, targetHighMmol: number): BedtimeHighSeverity {
+  const excess = bgMmol - targetHighMmol;
+  if (excess > 6) return "very_high";
+  if (excess > 2) return "high";
+  return "moderate";
+}
+
+/**
+ * Floor on the *combined* multiplier (trend share × remaining-after-IOB share) once severity is
+ * elevated — otherwise a fresh dose (steep IOB cut) stacked with standard bedtime caution can
+ * crush a severe high down to almost nothing, which is what produced a 1u suggestion at 16.4
+ * mmol/L. Skipped when there's a genuine reason to expect glucose to keep dropping on its own
+ * (currently falling, or the user says they usually fall overnight) — that caution should stand.
+ */
+function correctionSeverityFloor(severity: BedtimeHighSeverity): number {
+  if (severity === "very_high") return 0.45;
+  if (severity === "high") return 0.3;
+  return 0;
+}
+
 export type BedtimeCorrectionSuggestion = {
   fullDose: number;
   suggestedDose: number;
@@ -53,9 +82,9 @@ export type BedtimeCorrectionResult =
 
 export function bedtimeTrendReduction(
   trend: BedtimeCorrectionTrend,
-  options: { wellAboveTarget: boolean; overnightUsualTrend?: OvernightUsualTrend },
+  options: { severity: BedtimeHighSeverity; overnightUsualTrend?: OvernightUsualTrend },
 ): { multiplier: number; note: string; overnightNote: string } {
-  const base = baseTrendTier(trend, options.wellAboveTarget);
+  const base = baseTrendTier(trend, options.severity);
   const overnight = options.overnightUsualTrend ?? "not_sure";
 
   let multiplier = base.multiplier;
@@ -81,35 +110,60 @@ export function bedtimeTrendReduction(
 
 function baseTrendTier(
   trend: BedtimeCorrectionTrend,
-  wellAboveTarget: boolean,
+  severity: BedtimeHighSeverity,
 ): { multiplier: number; note: string } {
   switch (trend) {
-    case "rising":
-      return wellAboveTarget
-        ? {
-            multiplier: 0.85,
-            note: "Rising and well above target — using a larger share of full correction than when stable.",
-          }
-        : {
-            multiplier: 0.75,
-            note: "Rising — using more than the usual cautious bedtime share while levels climb.",
-          };
-    case "falling":
+    case "rising": {
+      if (severity === "very_high") {
+        return {
+          multiplier: 0.9,
+          note: "Rising and significantly above target — using most of a full correction, since staying this high overnight carries its own risk.",
+        };
+      }
+      if (severity === "high") {
+        return {
+          multiplier: 0.85,
+          note: "Rising and well above target — using a larger share of full correction than when stable.",
+        };
+      }
+      return {
+        multiplier: 0.75,
+        note: "Rising — using more than the usual cautious bedtime share while levels climb.",
+      };
+    }
+    case "falling": {
+      if (severity === "very_high") {
+        return {
+          multiplier: 0.45,
+          note: "Falling, but still significantly above target — correcting more than the usual falling-trend caution, while staying well short of a full dose.",
+        };
+      }
       return {
         multiplier: 0.3,
         note: "Falling right now — smaller correction, since glucose may keep dropping on its own overnight.",
       };
+    }
     case "steady":
-      return {
-        multiplier: 0.5,
-        note: "Stable — standard cautious bedtime reduction (~50% of full correction).",
-      };
     case "not_sure":
-    default:
+    default: {
+      const label = trend === "steady" ? "Stable" : "Trend not set";
+      if (severity === "very_high") {
+        return {
+          multiplier: 0.65,
+          note: `${label}, but significantly above target — using more than the usual 50% bedtime share, since staying this high overnight carries its own risk.`,
+        };
+      }
+      if (severity === "high") {
+        return {
+          multiplier: 0.55,
+          note: `${label} and well above target — a slightly larger share of full correction than the usual bedtime caution.`,
+        };
+      }
       return {
         multiplier: 0.5,
-        note: "Trend not set — default cautious bedtime reduction (~50% of full correction).",
+        note: `${label} — standard cautious bedtime reduction (~50% of full correction).`,
       };
+    }
   }
 }
 
@@ -164,7 +218,6 @@ export function calculateBedtimeCorrectionDose(params: {
   insulinHours: number;
   bgTrend: BedtimeCorrectionTrend;
   overnightUsualTrend: OvernightUsualTrend;
-  wellAboveTarget: boolean;
   exercisedToday: boolean;
   hadAlcohol: boolean;
   sickDayActive: boolean;
@@ -178,7 +231,6 @@ export function calculateBedtimeCorrectionDose(params: {
     insulinHours,
     bgTrend,
     overnightUsualTrend,
-    wellAboveTarget,
     exercisedToday,
     hadAlcohol,
     sickDayActive,
@@ -220,12 +272,21 @@ export function calculateBedtimeCorrectionDose(params: {
 
   const fullDose = simple.fullDoseRounded;
   const iobReduction = iobReductionForHours(insulinHours);
+  const severity = classifyBedtimeHighSeverity(bgMmol, targetHighMmol);
   const { multiplier: bedtimeReduction, note: trendNote, overnightNote } = bedtimeTrendReduction(bgTrend, {
-    wellAboveTarget,
+    severity,
     overnightUsualTrend,
   });
 
-  const rawEffective = fullDose * bedtimeReduction * (1 - iobReduction);
+  // Don't let a severe-high floor override genuine falling-trend caution — only raise the floor
+  // when nothing already suggests glucose is on its way down on its own.
+  const expectingDrop = bgTrend === "falling" || overnightUsualTrend === "fall";
+  const rawMultiplier = bedtimeReduction * (1 - iobReduction);
+  const effectiveMultiplier = expectingDrop
+    ? rawMultiplier
+    : Math.max(rawMultiplier, correctionSeverityFloor(severity));
+
+  const rawEffective = fullDose * effectiveMultiplier;
   const suggestedDose = Math.round(rawEffective);
   const pctOfFullDose = fullDose > 0 ? Math.round((rawEffective / fullDose) * 100) : 0;
 
