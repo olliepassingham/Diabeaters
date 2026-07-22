@@ -32,6 +32,7 @@ import {
   ScenarioState,
   UserProfile,
   HypoTreatment,
+  SettingsCompletionItem,
 } from "@/lib/storage";
 import { getActiveAppMode } from "@/lib/carer-session";
 import { formatAppDate, formatAppTime } from "@/lib/region";
@@ -791,7 +792,11 @@ function SoftSettingsNudge({
   );
 }
 
-function SetupPromptCard({ completion }: { completion: { percentage: number; completed: number; total: number } }) {
+function SetupPromptCard({
+  completion,
+}: {
+  completion: { percentage: number; completed: number; total: number; missing: SettingsCompletionItem[] };
+}) {
   return (
     <Card className={cn(homeSetupCardClass, "glow-warning hover:shadow-md")} data-testid="card-setup-prompt">
       <CardContent className="space-y-3 p-4">
@@ -815,9 +820,25 @@ function SetupPromptCard({ completion }: { completion: { percentage: number; com
           <Progress value={completion.percentage} className="h-2" />
         </div>
 
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          Add the basics in Settings to unlock the full app and more tailored suggestions.
-        </p>
+        {completion.missing.length > 0 ? (
+          <div className="space-y-1 rounded-xl border border-amber-500/20 bg-amber-500/[0.04] p-1">
+            {completion.missing.map((item) => (
+              <Link
+                key={item.key}
+                href={item.href}
+                className="flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-sm text-foreground/90 transition-colors hover:bg-amber-500/10"
+                data-testid={`link-home-setup-missing-${item.key}`}
+              >
+                <span className="min-w-0 truncate">Still missing: {item.label}</span>
+                <ArrowRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            Add the basics in Settings to unlock the full app and more tailored suggestions.
+          </p>
+        )}
 
         <Link href="/settings">
           <Button className="w-full gradient-primary border-primary-border shadow-sm" data-testid="button-complete-setup">

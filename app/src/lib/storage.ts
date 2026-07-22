@@ -1713,6 +1713,52 @@ function clearBackedUpDiabeatersStorage(): void {
   }
 }
 
+/** A single "finish your setup" checklist item, once we know whether it's still missing. */
+export interface SettingsCompletionItem {
+  key: "tdd" | "carbRatio" | "correctionFactor" | "targetRange";
+  label: string;
+  href: string;
+}
+
+interface SettingsCompletionCheck extends SettingsCompletionItem {
+  done: boolean;
+}
+
+/**
+ * Single source of truth for what counts as "setup complete". Any user who has
+ * entered at least one carb ratio (breakfast, lunch, dinner, OR snack) counts —
+ * requiring a specific meal's ratio left some users (e.g. those who skip
+ * breakfast, or only dose for dinner/snacks) permanently stuck below 100%.
+ */
+function settingsCompletionItems(settings: UserSettings): SettingsCompletionCheck[] {
+  return [
+    {
+      key: "tdd",
+      label: "Total daily dose",
+      href: "/settings/ratios",
+      done: hasConfiguredTdd(settings),
+    },
+    {
+      key: "carbRatio",
+      label: "A carb ratio (breakfast, lunch, dinner, or snack)",
+      href: "/settings/ratios",
+      done: !!(settings.breakfastRatio || settings.lunchRatio || settings.dinnerRatio || settings.snackRatio),
+    },
+    {
+      key: "correctionFactor",
+      label: "Correction factor",
+      href: "/settings/ratios",
+      done: !!settings.correctionFactor,
+    },
+    {
+      key: "targetRange",
+      label: "Target BG range",
+      href: "/settings/ratios",
+      done: !!(settings.targetBgLow && settings.targetBgHigh),
+    },
+  ];
+}
+
 export const storage = {
   getLastExerciseSummary(): LastExerciseSummary | null {
     try {
@@ -2889,37 +2935,33 @@ export const storage = {
    * Used to determine dashboard layout (settings at top vs bottom).
    */
   isSettingsComplete(): boolean {
-    const settings = this.getSettings();
-    
-    const checks = [
-      hasConfiguredTdd(settings),
-      !!(settings.breakfastRatio || settings.lunchRatio),
-      !!settings.correctionFactor,
-      !!(settings.targetBgLow && settings.targetBgHigh),
-    ];
-    
-    return checks.every(c => c);
+    const { completed, total } = this.getSettingsCompletion();
+    return completed === total;
   },
 
   /**
-   * Get settings completion percentage and details.
+   * Get settings completion percentage, details, and exactly which items are
+   * still missing (with a label + where to go fix it). Used by the dashboard
+   * "Finish your setup" card and the Settings hub banner so users always know
+   * *what* is left rather than being stuck on a bare percentage.
    */
-  getSettingsCompletion(): { percentage: number; completed: number; total: number } {
+  getSettingsCompletion(): {
+    percentage: number;
+    completed: number;
+    total: number;
+    missing: SettingsCompletionItem[];
+  } {
     const settings = this.getSettings();
-    
-    const checks = [
-      hasConfiguredTdd(settings),
-      !!(settings.breakfastRatio || settings.lunchRatio),
-      !!settings.correctionFactor,
-      !!(settings.targetBgLow && settings.targetBgHigh),
-    ];
-    
-    const completed = checks.filter(c => c).length;
-    const total = checks.length;
-    return { 
-      percentage: Math.round((completed / total) * 100), 
-      completed, 
-      total 
+    const items = settingsCompletionItems(settings);
+
+    const missing = items.filter((item) => !item.done);
+    const completed = items.length - missing.length;
+    const total = items.length;
+    return {
+      percentage: Math.round((completed / total) * 100),
+      completed,
+      total,
+      missing: missing.map(({ done, ...rest }) => rest),
     };
   },
 

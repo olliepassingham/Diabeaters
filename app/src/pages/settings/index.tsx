@@ -2036,15 +2036,8 @@ export default function Settings() {
               percentage={completion.percentage}
               completed={completion.completed}
               total={completion.total}
+              missing={completion.missing}
             />
-            <div className="grid grid-cols-2 gap-2">
-              <Button asChild variant="outline" size="sm" className="h-9 rounded-xl text-xs">
-                <Link href="/settings/ratios">Ratios &amp; TDD</Link>
-              </Button>
-              <Button asChild variant="outline" size="sm" className="h-9 rounded-xl text-xs">
-                <Link href="/settings/usage#settings-usage">Usage &amp; supplies</Link>
-              </Button>
-            </div>
           </div>
         ) : null}
 

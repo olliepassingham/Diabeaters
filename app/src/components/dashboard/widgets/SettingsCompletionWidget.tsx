@@ -80,7 +80,11 @@ export function SettingsCompletionWidget(props: DashboardWidgetLayoutProps) {
 
   const settingsItems: SettingsItem[] = [
     { key: "tdd", label: "Total daily dose", complete: hasConfiguredTdd(settings) },
-    { key: "carbRatio", label: "Carb ratios", complete: !!(settings.breakfastRatio || settings.lunchRatio) },
+    {
+      key: "carbRatio",
+      label: "Carb ratios",
+      complete: !!(settings.breakfastRatio || settings.lunchRatio || settings.dinnerRatio || settings.snackRatio),
+    },
     { key: "correctionFactor", label: "Correction factor", complete: !!settings.correctionFactor },
     { key: "targetRange", label: "Target BG range", complete: !!(settings.targetBgLow && settings.targetBgHigh) },
     ...(isPumpUser

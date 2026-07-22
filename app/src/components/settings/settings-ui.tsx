@@ -228,10 +228,12 @@ export function SettingsSetupBanner({
   percentage,
   completed,
   total,
+  missing = [],
 }: {
   percentage: number;
   completed: number;
   total: number;
+  missing?: { key: string; label: string; href: string }[];
 }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-primary/20 bg-primary/[0.04] px-4 py-3.5 shadow-sm">
@@ -245,6 +247,22 @@ export function SettingsSetupBanner({
         <span className="shrink-0 text-xs font-semibold tabular-nums text-primary">{percentage}%</span>
       </div>
       <Progress value={percentage} className="mt-2.5 h-1.5" />
+      {missing.length > 0 ? (
+        <ul className="mt-3 space-y-1.5 border-t border-primary/10 pt-3">
+          {missing.map((item) => (
+            <li key={item.key}>
+              <Link
+                href={item.href}
+                className="flex items-center justify-between gap-2 rounded-lg px-1.5 py-1 text-xs text-foreground/90 transition-colors hover:bg-primary/[0.06] hover:text-foreground"
+                data-testid={`link-setup-missing-${item.key}`}
+              >
+                <span className="min-w-0 truncate">{item.label}</span>
+                <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }
