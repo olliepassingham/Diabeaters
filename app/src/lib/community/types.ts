@@ -78,6 +78,10 @@ export type DmMessageRow = {
   image_storage_path: string | null;
   created_at: string;
   read_at: string | null;
+  /** Soft-deleted (unsent) while still unread — filtered out of normal fetches. */
+  deleted_at?: string | null;
+  /** Set when the sender edited the body while still unread. */
+  edited_at?: string | null;
   /** Client-enriched after fetch. */
   image_signed_url?: string | null;
   like_count?: number;

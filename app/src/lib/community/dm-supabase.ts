@@ -77,6 +77,8 @@ function mapMessage(r: Record<string, unknown>): DmMessageRow {
     image_storage_path: typeof img === "string" && img.trim() ? img : null,
     created_at: String(r.created_at ?? ""),
     read_at: r.read_at == null ? null : String(r.read_at),
+    deleted_at: r.deleted_at == null ? null : String(r.deleted_at),
+    edited_at: r.edited_at == null ? null : String(r.edited_at),
   };
 }
 
@@ -284,6 +286,7 @@ export async function fetchDmMessages(threadId: string): Promise<{
     .from("dm_messages")
     .select("*")
     .eq("thread_id", threadId)
+    .is("deleted_at", null)
     .order("created_at", { ascending: true });
 
   if (error) return { data: null, error: new Error(error.message) };
@@ -312,7 +315,8 @@ export async function markIncomingDmMessagesAsReadInThread(threadId: string): Pr
     .update({ read_at: readAt })
     .eq("thread_id", threadId)
     .neq("sender_id", uid)
-    .is("read_at", null);
+    .is("read_at", null)
+    .is("deleted_at", null);
 
   if (error) return { readAt: null, error: new Error(error.message) };
 
@@ -374,6 +378,7 @@ export async function fetchLatestDmMessageForThreads(threadIds: string[]): Promi
         .from("dm_messages")
         .select("*")
         .eq("thread_id", tid)
+        .is("deleted_at", null)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -462,6 +467,88 @@ export async function insertDmMessage(
     });
 
   return { data: out, error: null };
+}
+
+/**
+ * Unsend your own message while the recipient has not read it yet.
+ * Server-enforced via `delete_unread_dm_message` (sender + unread only).
+ */
+export async function deleteUnreadDmMessage(messageId: string): Promise<{
+  deleted: boolean;
+  error: Error | null;
+}> {
+  const supabase = getSupabase();
+  if (!supabase) return { deleted: false, error: new Error("Supabase not configured") };
+
+  const id = messageId.trim();
+  if (!id) return { deleted: false, error: new Error("Missing message") };
+
+  const { data, error } = await supabase.rpc("delete_unread_dm_message", { p_message_id: id });
+  if (error) {
+    const msg = error.message.toLowerCase();
+    if (msg.includes("could not find") || msg.includes("schema cache") || msg.includes("function")) {
+      return {
+        deleted: false,
+        error: new Error("Delete isn’t available yet — the database update still needs applying."),
+      };
+    }
+    return { deleted: false, error: new Error(error.message) };
+  }
+  if (data !== true) {
+    return {
+      deleted: false,
+      error: new Error("This message can’t be deleted — it may already have been read."),
+    };
+  }
+  return { deleted: true, error: null };
+}
+
+/**
+ * Edit your own message body while the recipient has not read it yet.
+ * Server-enforced via `edit_unread_dm_message` (sender + unread only).
+ */
+export async function editUnreadDmMessage(
+  messageId: string,
+  body: string,
+): Promise<{
+  edited: boolean;
+  error: Error | null;
+}> {
+  const supabase = getSupabase();
+  if (!supabase) return { edited: false, error: new Error("Supabase not configured") };
+
+  const id = messageId.trim();
+  const trimmed = body.trim();
+  if (!id) return { edited: false, error: new Error("Missing message") };
+  if (trimmed.length > 8000) return { edited: false, error: new Error("Message is too long.") };
+
+  const { data, error } = await supabase.rpc("edit_unread_dm_message", {
+    p_message_id: id,
+    p_body: trimmed,
+  });
+  if (error) {
+    const msg = error.message.toLowerCase();
+    if (msg.includes("body_empty")) {
+      return { edited: false, error: new Error("Message can’t be empty.") };
+    }
+    if (msg.includes("body_too_long")) {
+      return { edited: false, error: new Error("Message is too long.") };
+    }
+    if (msg.includes("could not find") || msg.includes("schema cache") || msg.includes("function")) {
+      return {
+        edited: false,
+        error: new Error("Edit isn’t available yet — the database update still needs applying."),
+      };
+    }
+    return { edited: false, error: new Error(error.message) };
+  }
+  if (data !== true) {
+    return {
+      edited: false,
+      error: new Error("This message can’t be edited — it may already have been read."),
+    };
+  }
+  return { edited: true, error: null };
 }
 
 /** Toggle like for the current user (not allowed on own messages). */

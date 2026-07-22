@@ -74,14 +74,23 @@ export function useDmThreadLive(
           const row = mapDmMessageRow(payload.new as Record<string, unknown>);
           queryClient.setQueryData<DmThreadBundle>(dmThreadQueryKey(threadId, userId), (old) => {
             if (!old) return old;
+            // Soft-delete / unsend: drop the bubble entirely for both participants.
+            if (row.deleted_at) {
+              if (!old.messages.some((m) => m.id === row.id)) return old;
+              return { ...old, messages: old.messages.filter((m) => m.id !== row.id) };
+            }
             const existing = old.messages.find((m) => m.id === row.id);
             if (!existing) return old;
             return patchMessageInBundle(old, row.id, {
               read_at: row.read_at,
               body: row.body,
               image_storage_path: row.image_storage_path,
+              deleted_at: row.deleted_at ?? null,
+              edited_at: row.edited_at ?? null,
             });
           });
+          if (row.deleted_at) notifyDmInboxChanged();
+          else if (row.edited_at) notifyDmInboxChanged();
         },
       )
       .on("broadcast", { event: "typing" }, ({ payload }) => {

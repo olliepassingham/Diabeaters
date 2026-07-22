@@ -1,11 +1,29 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRoute } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Heart, ImagePlus, Check, CheckCheck, Send } from "lucide-react";
+import { Heart, ImagePlus, Check, CheckCheck, Send, Trash2, Pencil, MoreHorizontal } from "lucide-react";
 import { DmSharedPostPreview } from "@/components/community/dm-shared-post-preview";
 import { DmSharedStoryPreview } from "@/components/community/dm-shared-story-preview";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useDoubleTap } from "@/hooks/use-double-tap";
@@ -17,7 +35,11 @@ import {
   fetchDmThreadBundle,
   markDmThreadReadWhenOpened,
 } from "@/lib/dm-thread-query";
+import { invalidateDmInboxQueries } from "@/lib/dm-inbox-query";
+import { canDeleteUnreadDmMessage, canEditUnreadDmMessage } from "@/lib/dm-message-actions";
 import {
+  deleteUnreadDmMessage,
+  editUnreadDmMessage,
   insertDmMessage,
   parseSharedFeedPostMessage,
   parseSharedStoryMessage,
@@ -36,7 +58,8 @@ import {
 import { useDmThreadLive } from "@/lib/dm-thread-live";
 import { usePeerTypingActive } from "@/lib/dm-thread-typing";
 import { format, isToday, isYesterday } from "date-fns";
-
+import { notifyDmInboxChanged } from "@/lib/community/dm-inbox-events";
+import { notifyInAppNotificationsChanged } from "@/lib/in-app-notifications-events";
 function scrollToBottom(el: HTMLElement | null, behavior: ScrollBehavior) {
   if (!el) return;
   el.scrollTo({ top: el.scrollHeight, behavior });
@@ -146,14 +169,22 @@ function DmMessageBubble({
   groupedWithPrevious,
   readReceiptStatus,
   showReadLabel,
+  canEdit,
+  canDelete,
   onToggleLike,
+  onRequestEdit,
+  onRequestDelete,
 }: {
   message: DmMessageRow;
   mine: boolean;
   groupedWithPrevious: boolean;
   readReceiptStatus: DmReadReceiptStatus | null;
   showReadLabel: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
   onToggleLike: (m: DmMessageRow) => void;
+  onRequestEdit: (m: DmMessageRow) => void;
+  onRequestDelete: (m: DmMessageRow) => void;
 }) {
   const sharedPost = parseSharedFeedPostMessage(m.body);
   const sharedStory = !sharedPost ? parseSharedStoryMessage(m.body) : null;
@@ -165,6 +196,8 @@ function DmMessageBubble({
   const isImageOnly = showImage && !hasText && !isShared;
   const timeLabel = format(new Date(m.created_at), "HH:mm");
   const doubleTapLike = useDoubleTap(() => onToggleLike(m));
+  const showActions = mine && (canEdit || canDelete);
+  const wasEdited = Boolean(m.edited_at);
 
   const bubbleShell = cn(
     "relative max-w-[min(88%,20rem)] text-[15px] leading-relaxed",
@@ -257,6 +290,7 @@ function DmMessageBubble({
               mine ? "justify-end text-primary-foreground/70" : "text-muted-foreground",
             )}
           >
+            {wasEdited ? <span className="font-medium opacity-80">Edited</span> : null}
             <time dateTime={m.created_at}>{timeLabel}</time>
             {mine && readReceiptStatus ? <ReadReceiptIcon status={readReceiptStatus} /> : null}
           </div>
@@ -280,6 +314,44 @@ function DmMessageBubble({
           </div>
         ) : null}
       </div>
+
+      {showActions ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="mb-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground opacity-55 transition-all hover:bg-muted/80 hover:text-foreground hover:opacity-100 sm:opacity-0 sm:group-hover/msg:opacity-70"
+              aria-label="Message actions"
+              data-testid={`button-dm-actions-${m.id}`}
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-[10.5rem] rounded-xl p-1.5 shadow-lg">
+            {canEdit ? (
+              <DropdownMenuItem
+                className="cursor-pointer gap-2 rounded-lg px-2.5 py-2"
+                onSelect={() => onRequestEdit(m)}
+                data-testid={`button-dm-edit-${m.id}`}
+              >
+                <Pencil className="h-4 w-4 text-muted-foreground" aria-hidden />
+                Edit
+              </DropdownMenuItem>
+            ) : null}
+            {canEdit && canDelete ? <DropdownMenuSeparator className="my-1" /> : null}
+            {canDelete ? (
+              <DropdownMenuItem
+                className="cursor-pointer gap-2 rounded-lg px-2.5 py-2 text-destructive focus:bg-destructive/10 focus:text-destructive"
+                onSelect={() => onRequestDelete(m)}
+                data-testid={`button-dm-delete-${m.id}`}
+              >
+                <Trash2 className="h-4 w-4" aria-hidden />
+                Delete
+              </DropdownMenuItem>
+            ) : null}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : null}
     </div>
   );
 }
@@ -296,6 +368,12 @@ export default function CommunityThreadPage() {
   const [sending, setSending] = useState(false);
   const [pendingImage, setPendingImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DmMessageRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [editTarget, setEditTarget] = useState<DmMessageRow | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const editInputRef = useRef<HTMLTextAreaElement>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -404,6 +482,86 @@ export default function CommunityThreadPage() {
     [toast, user, setMessagesInCache],
   );
 
+  const confirmDeleteMessage = useCallback(async () => {
+    if (!deleteTarget || !userId) return;
+    const target = deleteTarget;
+    setDeleting(true);
+    setMessagesInCache((prev) => prev.filter((m) => m.id !== target.id));
+    setDeleteTarget(null);
+    try {
+      const res = await deleteUnreadDmMessage(target.id);
+      if (res.error || !res.deleted) {
+        setMessagesInCache((prev) => {
+          if (prev.some((m) => m.id === target.id)) return prev;
+          return [...prev, target].sort(
+            (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+          );
+        });
+        toast({
+          title: "Couldn’t delete message",
+          description: res.error?.message ?? "It may already have been read.",
+          variant: "destructive",
+        });
+        return;
+      }
+      notifyDmInboxChanged();
+      notifyInAppNotificationsChanged({ skipPageRefresh: true });
+      invalidateDmInboxQueries(queryClient);
+      toast({ title: "Message deleted" });
+    } finally {
+      setDeleting(false);
+    }
+  }, [deleteTarget, userId, setMessagesInCache, toast, queryClient]);
+
+  const openEditMessage = useCallback((m: DmMessageRow) => {
+    setEditTarget(m);
+    setEditDraft(m.body);
+  }, []);
+
+  const saveEditMessage = useCallback(async () => {
+    if (!editTarget) return;
+    const next = editDraft.trim();
+    const previous = editTarget.body.trim();
+    if (!next) {
+      toast({ title: "Message can’t be empty", variant: "destructive" });
+      return;
+    }
+    if (next === previous) {
+      setEditTarget(null);
+      return;
+    }
+
+    const target = editTarget;
+    const editedAt = new Date().toISOString();
+    setSavingEdit(true);
+    setMessagesInCache((prev) =>
+      prev.map((m) => (m.id === target.id ? { ...m, body: next, edited_at: editedAt } : m)),
+    );
+    setEditTarget(null);
+    try {
+      const res = await editUnreadDmMessage(target.id, next);
+      if (res.error || !res.edited) {
+        setMessagesInCache((prev) =>
+          prev.map((m) =>
+            m.id === target.id ? { ...m, body: target.body, edited_at: target.edited_at ?? null } : m,
+          ),
+        );
+        toast({
+          title: "Couldn’t save edit",
+          description: res.error?.message ?? "It may already have been read.",
+          variant: "destructive",
+        });
+        return;
+      }
+      notifyDmInboxChanged();
+      notifyInAppNotificationsChanged({ skipPageRefresh: true });
+      invalidateDmInboxQueries(queryClient);
+      toast({ title: "Message updated" });
+    } finally {
+      setSavingEdit(false);
+    }
+  }, [editTarget, editDraft, setMessagesInCache, toast, queryClient]);
+
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
     if (!threadId) return;
@@ -500,7 +658,15 @@ export default function CommunityThreadPage() {
                     groupedWithPrevious={groupedFlags[index] ?? false}
                     readReceiptStatus={readReceiptStatusForMessage(m, userId)}
                     showReadLabel={mine && m.id === latestReadOutgoingId}
+                    canEdit={canEditUnreadDmMessage(m, userId, {
+                      isSharedContent: Boolean(
+                        parseSharedFeedPostMessage(m.body) || parseSharedStoryMessage(m.body),
+                      ),
+                    })}
+                    canDelete={canDeleteUnreadDmMessage(m, userId)}
                     onToggleLike={(msg) => void toggleLike(msg)}
+                    onRequestEdit={openEditMessage}
+                    onRequestDelete={setDeleteTarget}
                   />
                 </div>
               );
@@ -511,6 +677,98 @@ export default function CommunityThreadPage() {
       </div>
 
       {peerTyping ? <DmTypingDots /> : null}
+
+      <BottomSheet
+        open={editTarget != null}
+        onOpenChange={(open) => {
+          if (!open && !savingEdit) setEditTarget(null);
+        }}
+        title="Edit message"
+        description="Only available until it’s been read."
+        bodyClassName="px-4 pb-5"
+        onOpenAutoFocus={(e) => {
+          e.preventDefault();
+          window.setTimeout(() => editInputRef.current?.focus(), 30);
+        }}
+      >
+        <div className="space-y-4" data-testid="sheet-dm-edit">
+          <div className="rounded-2xl border border-border/60 bg-muted/25 p-3 shadow-sm">
+            <Textarea
+              ref={editInputRef}
+              value={editDraft}
+              onChange={(e) => setEditDraft(e.target.value)}
+              maxLength={8000}
+              rows={4}
+              disabled={savingEdit}
+              placeholder="Update your message…"
+              className="min-h-[7.5rem] resize-none border-0 bg-transparent px-0 py-0 text-[16px] leading-relaxed shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+              data-testid="input-dm-edit-body"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  if (!savingEdit && editDraft.trim()) void saveEditMessage();
+                }
+              }}
+            />
+            <div className="mt-2 flex items-center justify-between gap-2 border-t border-border/40 pt-2">
+              <p className="text-[11px] tabular-nums text-muted-foreground">
+                {editDraft.trim().length}/8000
+              </p>
+              <p className="text-[11px] text-muted-foreground">⌘/Ctrl + Enter to save</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 flex-1 rounded-xl"
+              disabled={savingEdit}
+              onClick={() => setEditTarget(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="h-11 flex-1 rounded-xl"
+              disabled={savingEdit || !editDraft.trim() || editDraft.trim() === (editTarget?.body.trim() ?? "")}
+              onClick={() => void saveEditMessage()}
+              data-testid="button-dm-edit-save"
+            >
+              {savingEdit ? "Saving…" : "Save"}
+            </Button>
+          </div>
+        </div>
+      </BottomSheet>
+
+      <AlertDialog
+        open={deleteTarget != null}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent data-testid="dialog-dm-delete-confirm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this message?</AlertDialogTitle>
+            <AlertDialogDescription>
+              It hasn’t been read yet, so it will disappear for both of you. This can’t be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => {
+                e.preventDefault();
+                void confirmDeleteMessage();
+              }}
+              data-testid="button-dm-delete-confirm"
+            >
+              {deleting ? "Deleting…" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <form
         onSubmit={handleSend}
