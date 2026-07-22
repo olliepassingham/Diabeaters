@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Minus, Moon, TrendingDown, TrendingUp, HelpCircle } from "lucide-react";
+import { Loader2, Minus, Moon, Radio, TrendingDown, TrendingUp, HelpCircle } from "lucide-react";
 
 import {
   AlertDialog,
@@ -17,6 +17,10 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { dismissBedtimeOutcomePrompt } from "@/lib/bedtime-outcome-prompt";
+import { useBedtimeOutcomeCgmInsight } from "@/hooks/use-bedtime-outcome-cgm-insight";
+import type { BedtimeOvernightInsight } from "@/lib/bedtime-overnight-analysis";
+import { formatTargetBgInput } from "@/lib/hypo-context";
+import type { BgUnits } from "@/lib/cgm/types";
 import { storage, type BedtimeLog, type BedtimeOutcome } from "@/lib/storage";
 
 type Props = {
@@ -45,20 +49,42 @@ function actionSuggestedLabel(log: BedtimeLog): string | null {
   return null;
 }
 
+/** Prioritise the low over a high when a night had both — that's the direction worth flagging first. */
+function feelFromCgmInsight(insight: BedtimeOvernightInsight): BedtimeOutcome["overnightFeel"] {
+  if (insight.stats.hadLow) return "went_low";
+  if (insight.stats.hadHigh) return "went_high";
+  return "steady";
+}
+
 export function BedtimeOutcomeCheckinDialog({ open, onOpenChange, log, onSaved }: Props) {
   const { toast } = useToast();
   const [feel, setFeel] = useState<BedtimeOutcome["overnightFeel"] | null>(null);
   const [morningBg, setMorningBg] = useState("");
   const [followedAction, setFollowedAction] = useState<BedtimeOutcome["followedAction"] | null>(null);
   const [busy, setBusy] = useState(false);
+  const [prefilledFromCgm, setPrefilledFromCgm] = useState(false);
+
+  const units: BgUnits = log?.bgUnits === "mg/dL" ? "mg/dL" : "mmol/L";
+  const { insight: cgmInsight, loading: cgmLoading } = useBedtimeOutcomeCgmInsight(log, units);
 
   useEffect(() => {
     if (open) {
       setFeel(null);
       setMorningBg("");
       setFollowedAction(null);
+      setPrefilledFromCgm(false);
     }
   }, [open, log?.id]);
+
+  // Once this specific night's CGM data comes back, fill in what the sensor already
+  // saw instead of asking someone to re-type it — still fully editable below, since
+  // sensor gaps or compression lows can make the auto read wrong.
+  useEffect(() => {
+    if (!open || !cgmInsight || feel != null) return;
+    setFeel(feelFromCgmInsight(cgmInsight));
+    setMorningBg(formatTargetBgInput(cgmInsight.stats.endValue, units));
+    setPrefilledFromCgm(true);
+  }, [open, cgmInsight, feel, units]);
 
   if (!log) return null;
 
@@ -101,6 +127,7 @@ export function BedtimeOutcomeCheckinDialog({ open, onOpenChange, log, onSaved }
   };
 
   const checkBgLabel = `${log.currentBg} ${log.bgUnits}`;
+  const showCgmChecking = cgmLoading && feel == null;
 
   return (
     <AlertDialog open={open} onOpenChange={handleOpenChange}>
@@ -112,10 +139,25 @@ export function BedtimeOutcomeCheckinDialog({ open, onOpenChange, log, onSaved }
           </AlertDialogTitle>
           <AlertDialogDescription asChild>
             <div className="text-left space-y-4 text-sm text-muted-foreground">
-              <p>
-                Your bedtime check was {checkBgLabel}. Tell us what actually happened overnight so future checks can
-                reflect your own patterns.
-              </p>
+              {prefilledFromCgm ? (
+                <p className="flex items-start gap-1.5 text-foreground/90" data-testid="text-bedtime-outcome-cgm-prefilled">
+                  <Radio className="h-3.5 w-3.5 shrink-0 translate-y-0.5 text-primary" aria-hidden />
+                  <span>
+                    Filled in from your connected CGM for last night — check it looks right, then save.
+                  </span>
+                </p>
+              ) : (
+                <p>
+                  Your bedtime check was {checkBgLabel}. Tell us what actually happened overnight so future checks
+                  can reflect your own patterns.
+                  {showCgmChecking ? (
+                    <span className="mt-1.5 flex items-center gap-1.5 text-xs">
+                      <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+                      Checking your connected CGM — this may fill itself in…
+                    </span>
+                  ) : null}
+                </p>
+              )}
 
               <div className="space-y-1.5">
                 <span className="text-xs font-medium text-muted-foreground">Overnight, glucose was mostly…</span>
@@ -134,7 +176,10 @@ export function BedtimeOutcomeCheckinDialog({ open, onOpenChange, log, onSaved }
                         "h-10 min-h-0 justify-start gap-1.5 rounded-lg px-2.5 text-xs shadow-none sm:text-sm",
                         feel === value ? "" : "text-muted-foreground",
                       )}
-                      onClick={() => setFeel(value)}
+                      onClick={() => {
+                        setPrefilledFromCgm(false);
+                        setFeel(value);
+                      }}
                       disabled={busy}
                       data-testid={`button-bedtime-outcome-feel-${value}`}
                     >
@@ -157,7 +202,10 @@ export function BedtimeOutcomeCheckinDialog({ open, onOpenChange, log, onSaved }
                     inputMode="decimal"
                     placeholder={log.bgUnits === "mmol/L" ? "e.g. 6.5" : "e.g. 115"}
                     value={morningBg}
-                    onChange={(e) => setMorningBg(e.target.value)}
+                    onChange={(e) => {
+                      setPrefilledFromCgm(false);
+                      setMorningBg(e.target.value);
+                    }}
                     disabled={busy}
                     className="h-10 flex-1 text-base"
                     data-testid="input-bedtime-outcome-morning-bg"
