@@ -6,6 +6,8 @@ import {
 import { computeSimpleCorrectionDose } from "@/lib/correction-dose";
 import { calculateExercisePlan, type ExercisePlanContext } from "@/lib/exercise-plan";
 import { isBgBelowHypoThreshold } from "@/lib/exercise-hypo-auto";
+import { getBodyWeightKgFromProfile } from "@/lib/body-weight";
+import { hypoCalculatorRequiresExplicitWeight } from "@/lib/user-age";
 import {
   getExerciseGuidanceForReading,
   isExerciseStartLow,
@@ -27,7 +29,7 @@ import {
 import type { ExercisePlanResult } from "@/lib/exercise-plan";
 import { computeActiveWorkoutFuelCarry } from "@/lib/exercise-readiness";
 import { parseRatioToGramsPerUnit } from "@/lib/ratio-utils";
-import type { ExerciseBgTrend, ExerciseIntensity, ExerciseType, UserSettings } from "@/lib/storage";
+import type { ExerciseBgTrend, ExerciseIntensity, ExerciseType, UserProfile, UserSettings } from "@/lib/storage";
 import { getEffectiveTdd } from "@/lib/tdd";
 
 export type { PreExerciseInsulinSuppressedReason, PreExerciseMealCarbsSkipReason };
@@ -45,6 +47,8 @@ export type ExerciseFuelCalculationBreakdown = {
   standardUnits?: number;
   reductionPercent?: number;
   adjustedUnitsExact?: number;
+  /** Extra grams added on top of the session buffer because current BG is below the starting band. */
+  lowBgCarbTopUpGrams?: number;
 };
 
 export type ExerciseFuelCalculatorInput = {
@@ -64,6 +68,8 @@ export type ExerciseFuelCalculatorInput = {
   rapidInsulinLast2h?: boolean;
   lastMealMinutesAgo?: number;
   lastMealCarbsGrams?: number;
+  /** Body weight/age drive how much a suggested top-up scales for a low reading (optional). */
+  profile?: Partial<UserProfile>;
 };
 
 export type ExerciseFuelInsulinResult = {
@@ -504,6 +510,41 @@ function tryMealInsulinForBg(
   };
 }
 
+/**
+ * Extra carbs to add on top of the session's baseline pre-exercise buffer when current BG is
+ * below the comfortable starting band (7 mmol/L · 126 mg/dL) — so the "suggest carbs for me"
+ * amount actually scales with *how* low BG is, rather than jumping straight to the same flat
+ * session buffer for any reading below the line. Added to (not maxed with) the buffer, since
+ * the buffer alone assumes a normal starting BG; a low reading needs that plus a top-up.
+ *
+ * Uses the same weight-scaled "1g raises ~0.25 mmol/L at 70kg" assumption as the exercise hypo
+ * carb calculator, for consistency across the app. Capped for sanity; falls back to a flat,
+ * conservative bump for minors/unknown age rather than a false-precision weight-based number.
+ */
+function computeLowBgCarbTopUp(
+  currentBg: number,
+  bgUnits: "mmol/L" | "mg/dL",
+  profile: Partial<UserProfile> | undefined,
+): number {
+  const idealLow = preExerciseIdealLowBg(bgUnits);
+  if (currentBg >= idealLow) return 0;
+
+  const bgMmol = bgUnits === "mg/dL" ? currentBg / 18 : currentBg;
+  const targetMmol = bgUnits === "mg/dL" ? idealLow / 18 : idealLow;
+  const bgDifference = targetMmol - bgMmol;
+  if (bgDifference <= 0) return 0;
+
+  if (hypoCalculatorRequiresExplicitWeight(profile?.dateOfBirth)) {
+    return 10;
+  }
+
+  const weightKg = getBodyWeightKgFromProfile(profile) ?? 70;
+  const sensitivityFactor = 70 / weightKg;
+  const effectiveRise = 0.25 * sensitivityFactor;
+  const grams = bgDifference / effectiveRise;
+  return Math.min(30, Math.ceil(grams / 5) * 5);
+}
+
 function planTargetBand(bgUnits: string): string {
   const units = bgUnits === "mg/dL" ? "mg/dL" : "mmol/L";
   return `${preExerciseIdealLowBg(units)}–${preExerciseIdealHighBg(units)} ${units}`;
@@ -559,6 +600,7 @@ function pickNotes(
   mealCarbsSkipReason: PreExerciseMealCarbsSkipReason | null,
   userEnteredMealCarbs: boolean,
   projection: ExerciseFuelProjection | null,
+  lowBgCarbTopUpGrams: number,
 ): string[] {
   const notes: string[] = [];
   const units = input.bgUnits;
@@ -567,6 +609,13 @@ function pickNotes(
 
   if (mealCarbsSkipReason) {
     notes.push(preExerciseMealCarbsSkipMessage(mealCarbsSkipReason, units));
+  }
+
+  if (lowBgCarbTopUpGrams > 0 && input.currentBg != null) {
+    const startBand = units === "mmol/L" ? "7 mmol/L" : "126 mg/dL";
+    notes.push(
+      `Added ~${lowBgCarbTopUpGrams}g on top of your usual buffer because your BG (${input.currentBg} ${units}) is below the ${startBand} starting line.`,
+    );
   }
 
   if (userEnteredMealCarbs && projection?.projectedBgAtStart != null && mealCarbs > 0) {
@@ -692,6 +741,8 @@ export function computeExerciseFuelPlan(input: ExerciseFuelCalculatorInput): Exe
 
   let mealCarbs = 0;
   let mealCarbsSkipReason: PreExerciseMealCarbsSkipReason | null = null;
+  let lowBgCarbTopUpGrams = 0;
+  const bgUnitsNormalized = input.bgUnits === "mg/dL" ? "mg/dL" : "mmol/L";
 
   if (mealCarbsIsSuggested) {
     const carbsDecision = shouldSuggestPreExerciseMealCarbs({
@@ -703,7 +754,10 @@ export function computeExerciseFuelPlan(input: ExerciseFuelCalculatorInput): Exe
       settings: input.settings,
     });
     if (carbsDecision.suggest) {
-      mealCarbs = preBufferGrams;
+      if (input.currentBg != null && Number.isFinite(input.currentBg)) {
+        lowBgCarbTopUpGrams = computeLowBgCarbTopUp(input.currentBg, bgUnitsNormalized, input.profile);
+      }
+      mealCarbs = preBufferGrams + lowBgCarbTopUpGrams;
     } else if (carbsDecision.skipReason) {
       mealCarbsSkipReason = carbsDecision.skipReason;
     }
@@ -759,6 +813,7 @@ export function computeExerciseFuelPlan(input: ExerciseFuelCalculatorInput): Exe
     standardUnits: insulin?.standardUnits,
     reductionPercent: insulin?.reductionPercent,
     adjustedUnitsExact: insulin?.exactAdjusted,
+    lowBgCarbTopUpGrams: lowBgCarbTopUpGrams > 0 ? lowBgCarbTopUpGrams : undefined,
   };
 
   return {
@@ -784,6 +839,7 @@ export function computeExerciseFuelPlan(input: ExerciseFuelCalculatorInput): Exe
       mealCarbsSkipReason,
       userEnteredMealCarbs,
       projection,
+      lowBgCarbTopUpGrams,
     ),
     mealCarbsSkipReason,
     projection,

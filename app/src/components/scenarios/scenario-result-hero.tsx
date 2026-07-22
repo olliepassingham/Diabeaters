@@ -2,13 +2,15 @@ import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
-export type ScenarioResultHeroTone = "default" | "caution" | "critical" | "hypo";
+export type ScenarioResultHeroTone = "default" | "caution" | "critical" | "hypo" | "neutral";
 
 const toneSurface: Record<ScenarioResultHeroTone, string> = {
   default: "border-primary/30 bg-gradient-to-b from-primary/10 via-card to-card",
   caution: "border-amber-500/35 bg-gradient-to-b from-amber-500/10 via-card to-card dark:from-amber-950/40",
   critical: "border-red-500/35 bg-gradient-to-b from-red-500/12 via-card to-card dark:from-red-950/40",
   hypo: "border-red-500/35 bg-gradient-to-b from-red-500/10 via-card to-card dark:from-red-950/40",
+  /** Calm/plain — for a result that isn't cause for attention (e.g. "nothing needed right now"). */
+  neutral: "border-border/50 bg-background/80",
 };
 
 const toneEyebrow: Record<ScenarioResultHeroTone, string> = {
@@ -16,6 +18,7 @@ const toneEyebrow: Record<ScenarioResultHeroTone, string> = {
   caution: "text-amber-800/90 dark:text-amber-200/90",
   critical: "text-red-700/90 dark:text-red-300/90",
   hypo: "text-red-700/90 dark:text-red-300/90",
+  neutral: "text-muted-foreground",
 };
 
 export type ScenarioResultHeroProps = {

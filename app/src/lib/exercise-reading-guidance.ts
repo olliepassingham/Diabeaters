@@ -14,7 +14,7 @@ export type PreExerciseInsulinSuppressedReason =
   | "falling"
   | "high_bg";
 
-export type PreExerciseMealCarbsSkipReason = "in_range_fed" | "high_bg" | "bg_missing";
+export type PreExerciseMealCarbsSkipReason = "in_range_fed" | "high_bg" | "elevated_bg" | "bg_missing";
 
 export type ShouldSuggestPreExerciseMealInsulinInput = {
   currentBg?: number;
@@ -113,6 +113,10 @@ export function shouldSuggestPreExerciseMealCarbs(
   if (isPreExerciseHighBg(bg, bgUnits)) return { suggest: false, skipReason: "high_bg" };
   if (input.bgTrend === "falling") return { suggest: true };
   if (isPreExerciseIdealRange(bg, bgUnits)) return { suggest: false, skipReason: "in_range_fed" };
+  // Above the ideal band but not yet "very high" (e.g. 11-13 mmol/L) and not falling —
+  // still too high to need more carbs; without this, these readings fell through to the
+  // generic "suggest" default below, which wrongly offered a pre-exercise snack.
+  if (bg > preExerciseIdealHighBg(bgUnits)) return { suggest: false, skipReason: "elevated_bg" };
 
   return { suggest: true };
 }
@@ -127,6 +131,8 @@ export function preExerciseMealCarbsSkipMessage(
       return "Enter current BG and trend for a personalised pre-meal suggestion. Until then, keep fast carbs on hand and recheck before you start.";
     case "high_bg":
       return "BG looks high for hard effort — follow your team on ketones and fluids. No extra pre-meal carbs suggested here; keep fast carbs on hand if BG drops during activity.";
+    case "elevated_bg":
+      return `BG is above the usual pre-exercise band (${band}) — no extra pre-meal carbs suggested. Recheck before you start and keep fast carbs on hand in case BG drops during activity.`;
     case "in_range_fed":
       return `BG is in a typical pre-exercise band (${band}) and you are not fasted — no extra pre-meal carbs suggested. Keep fast carbs on hand for the full session.`;
   }

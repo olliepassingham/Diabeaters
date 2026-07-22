@@ -264,6 +264,122 @@ describe("computeExerciseFuelPlan", () => {
     expect(r.duringCarbs).toBe(r.sessionFuel.duringTotalGrams);
   });
 
+  it("scales the suggested pre-exercise carbs with how low BG is, not just whether it's below the line", () => {
+    const mild = computeExerciseFuelPlan({
+      exerciseType: "cardio",
+      intensity: "moderate",
+      durationMinutes: 45,
+      minutesUntilStart: 30,
+      fasted: false,
+      mealType: "snack",
+      currentBg: 6.5,
+      bgUnits: "mmol/L",
+      settings,
+      isPump: false,
+      profile: { dateOfBirth: "1990-01-01" },
+    });
+    const low = computeExerciseFuelPlan({
+      exerciseType: "cardio",
+      intensity: "moderate",
+      durationMinutes: 45,
+      minutesUntilStart: 30,
+      fasted: false,
+      mealType: "snack",
+      currentBg: 4.8,
+      bgUnits: "mmol/L",
+      settings,
+      isPump: false,
+      profile: { dateOfBirth: "1990-01-01" },
+    });
+    const veryLow = computeExerciseFuelPlan({
+      exerciseType: "cardio",
+      intensity: "moderate",
+      durationMinutes: 45,
+      minutesUntilStart: 30,
+      fasted: false,
+      mealType: "snack",
+      currentBg: 3.2,
+      bgUnits: "mmol/L",
+      settings,
+      isPump: false,
+      profile: { dateOfBirth: "1990-01-01" },
+    });
+
+    // Same session (same baseline buffer) but progressively lower BG should suggest
+    // progressively more carbs — not a single flat number for "anything below 7".
+    expect(mild.breakdown.preBufferGrams).toBe(low.breakdown.preBufferGrams);
+    expect(low.mealCarbs).toBeGreaterThan(mild.mealCarbs);
+    expect(veryLow.mealCarbs).toBeGreaterThan(low.mealCarbs);
+    expect(low.breakdown.lowBgCarbTopUpGrams).toBeGreaterThan(0);
+    expect(veryLow.breakdown.lowBgCarbTopUpGrams).toBeGreaterThan(low.breakdown.lowBgCarbTopUpGrams ?? 0);
+    expect(low.notes.some((n) => n.includes("Added ~"))).toBe(true);
+  });
+
+  it("does not add a low-BG top-up once BG reaches the ideal starting band", () => {
+    const r = computeExerciseFuelPlan({
+      exerciseType: "cardio",
+      intensity: "moderate",
+      durationMinutes: 45,
+      minutesUntilStart: 30,
+      fasted: true,
+      mealType: "snack",
+      currentBg: 8,
+      bgUnits: "mmol/L",
+      settings,
+      isPump: false,
+    });
+    expect(r.breakdown.lowBgCarbTopUpGrams).toBeUndefined();
+    expect(r.mealCarbs).toBe(r.breakdown.preBufferGrams);
+  });
+
+  it("scales the low-BG carb top-up by body weight when a profile weight is set", () => {
+    const heavier = computeExerciseFuelPlan({
+      exerciseType: "cardio",
+      intensity: "moderate",
+      durationMinutes: 45,
+      minutesUntilStart: 30,
+      fasted: false,
+      mealType: "snack",
+      currentBg: 4,
+      bgUnits: "mmol/L",
+      settings,
+      isPump: false,
+      profile: { dateOfBirth: "1990-01-01", bodyWeightKg: 100 },
+    });
+    const lighter = computeExerciseFuelPlan({
+      exerciseType: "cardio",
+      intensity: "moderate",
+      durationMinutes: 45,
+      minutesUntilStart: 30,
+      fasted: false,
+      mealType: "snack",
+      currentBg: 4,
+      bgUnits: "mmol/L",
+      settings,
+      isPump: false,
+      profile: { dateOfBirth: "1990-01-01", bodyWeightKg: 45 },
+    });
+    // Lighter body weight is more sensitive to carbs, so needs less to reach the same target.
+    expect((lighter.breakdown.lowBgCarbTopUpGrams ?? 0)).toBeLessThanOrEqual(heavier.breakdown.lowBgCarbTopUpGrams ?? 0);
+  });
+
+  it("falls back to a flat, conservative top-up for minors instead of a weight-based estimate", () => {
+    const minor = computeExerciseFuelPlan({
+      exerciseType: "cardio",
+      intensity: "moderate",
+      durationMinutes: 45,
+      minutesUntilStart: 30,
+      fasted: false,
+      mealType: "snack",
+      currentBg: 3.0,
+      bgUnits: "mmol/L",
+      settings,
+      isPump: false,
+      profile: { dateOfBirth: "2015-01-01" },
+    });
+    expect(minor.breakdown.lowBgCarbTopUpGrams).toBe(10);
+  });
+
   it("includes interval dosing for cardio sessions over 30 min", () => {
     const r = computeExerciseFuelPlan({
       exerciseType: "cardio",

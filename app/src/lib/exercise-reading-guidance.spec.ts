@@ -53,6 +53,52 @@ describe("getExerciseGuidanceForReading", () => {
     expect(r.skipReason).toBe("in_range_fed");
   });
 
+  it("shouldSuggestPreExerciseMealCarbs skips (does not add carbs) when BG is elevated but not falling", () => {
+    const r = shouldSuggestPreExerciseMealCarbs({
+      currentBg: 13,
+      bgTrend: "flat",
+      bgUnits: "mmol/L",
+      fasted: false,
+      bufferGrams: 20,
+    });
+    expect(r.suggest).toBe(false);
+    expect(r.skipReason).toBe("elevated_bg");
+  });
+
+  it("shouldSuggestPreExerciseMealCarbs skips for elevated BG even with no trend set", () => {
+    const r = shouldSuggestPreExerciseMealCarbs({
+      currentBg: 11,
+      bgUnits: "mmol/L",
+      fasted: false,
+      bufferGrams: 20,
+    });
+    expect(r.suggest).toBe(false);
+    expect(r.skipReason).toBe("elevated_bg");
+  });
+
+  it("shouldSuggestPreExerciseMealCarbs still suggests when BG is elevated but falling", () => {
+    const r = shouldSuggestPreExerciseMealCarbs({
+      currentBg: 12,
+      bgTrend: "falling",
+      bgUnits: "mmol/L",
+      fasted: false,
+      bufferGrams: 20,
+    });
+    expect(r.suggest).toBe(true);
+  });
+
+  it("shouldSuggestPreExerciseMealCarbs skips very high BG regardless of trend (ketone caution)", () => {
+    const r = shouldSuggestPreExerciseMealCarbs({
+      currentBg: 15,
+      bgTrend: "falling",
+      bgUnits: "mmol/L",
+      fasted: false,
+      bufferGrams: 20,
+    });
+    expect(r.suggest).toBe(false);
+    expect(r.skipReason).toBe("high_bg");
+  });
+
   it("shouldSuggestPreExerciseMealInsulin requires BG", () => {
     const r = shouldSuggestPreExerciseMealInsulin({
       bgUnits: "mmol/L",
