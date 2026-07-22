@@ -47,7 +47,11 @@ export function SettingsCompletionWidget(props: DashboardWidgetLayoutProps) {
 
   if (error) {
     return (
-      <WidgetCard className="ring-1 ring-amber-200/80 dark:ring-amber-800/60" data-testid="widget-settings-completion">
+      <WidgetCard
+        variant="glass-muted"
+        className="ring-1 ring-amber-200/80 dark:ring-amber-800/60"
+        data-testid="widget-settings-completion"
+      >
         <CardHeader className="p-4 pb-2 md:p-6 md:pb-3">
           <div className="flex items-center gap-2">
             <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
@@ -63,7 +67,7 @@ export function SettingsCompletionWidget(props: DashboardWidgetLayoutProps) {
 
   if (settings === null || profile === undefined) {
     return (
-      <WidgetCard data-testid="widget-settings-completion">
+      <WidgetCard variant="glass-muted" data-testid="widget-settings-completion">
         <CardContent className="p-4 md:p-6">
           <p className="text-base text-gray-700 dark:text-muted-foreground">Loading…</p>
         </CardContent>
@@ -99,7 +103,11 @@ export function SettingsCompletionWidget(props: DashboardWidgetLayoutProps) {
   }
 
   return (
-    <WidgetCard className="ring-1 ring-amber-200/70 bg-amber-50/40 dark:ring-amber-800/60 dark:bg-amber-950/20" data-testid="widget-settings-completion">
+    <WidgetCard
+      variant="glass-muted"
+      className="ring-1 ring-amber-200/70 bg-amber-50/40 dark:ring-amber-800/60 dark:bg-amber-950/20"
+      data-testid="widget-settings-completion"
+    >
       <CardHeader className="p-4 pb-2 md:p-6 md:pb-3">
         <div className="flex items-center justify-between gap-2">
           <Link href="/settings">

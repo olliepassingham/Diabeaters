@@ -8,7 +8,6 @@ import { format } from "date-fns";
 import { getUnitsPerPen, storage, Supply } from "@/lib/storage";
 import { WidgetCard } from "./WidgetCard";
 import type { DashboardWidgetLayoutProps } from "./types";
-import { isCompactLayout } from "./types";
 import { cn } from "@/lib/utils";
 import { HomeCardEmpty } from "@/components/home/home-ui";
 
@@ -46,8 +45,7 @@ function sortSuppliesByRunway(list: Supply[]): Supply[] {
   });
 }
 
-export function SupplySummaryWidget(props: DashboardWidgetLayoutProps) {
-  const compact = isCompactLayout(props);
+export function SupplySummaryWidget(_props: DashboardWidgetLayoutProps) {
   const [supplies, setSupplies] = useState<Supply[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -156,36 +154,11 @@ export function SupplySummaryWidget(props: DashboardWidgetLayoutProps) {
               </Button>
             </Link>
           </HomeCardEmpty>
-        ) : minDays !== null ? (
-          <div
-            className={cn(
-              "flex items-center justify-between gap-2 rounded-xl border border-border/80 bg-card px-3 py-2 shadow-sm",
-              compact && "flex-col text-center"
-            )}
-          >
-            <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              {compact ? "Shortest runway" : "Shortest runway (any item)"}
-            </span>
-            <span
-              className={cn(
-                "font-semibold tabular-nums",
-                compact ? "text-lg" : "text-xl",
-                minDays <= 3
-                  ? "text-red-600 dark:text-red-400"
-                  : minDays <= 7
-                    ? "text-amber-700 dark:text-amber-300"
-                    : "text-emerald-700 dark:text-emerald-400"
-              )}
-              data-testid="text-min-days"
-            >
-              {minDays} days
-            </span>
-          </div>
-        ) : (
+        ) : minDays === null ? (
           <p className="text-small text-muted-foreground rounded-lg border border-dashed border-border/60 bg-muted/20 px-3 py-2">
             Add daily usage on the Supplies page to estimate days left and fill the runway bar.
           </p>
-        )}
+        ) : null}
 
         {sortedSupplies.length > 0 && (
           <div className="flex flex-col gap-1.5">

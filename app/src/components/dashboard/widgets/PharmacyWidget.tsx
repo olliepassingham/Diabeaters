@@ -38,7 +38,7 @@ export function PharmacyWidget(props: DashboardWidgetLayoutProps) {
   }, [pharmacy, now]);
 
   return (
-    <WidgetCard data-testid="widget-pharmacy">
+    <WidgetCard variant="glass-muted" data-testid="widget-pharmacy">
       <CardHeader className={cn("space-y-0 pb-2", compact ? "px-4 pt-4" : "px-4 pt-4")}>
         <div className="flex items-center justify-between gap-2">
           <Link

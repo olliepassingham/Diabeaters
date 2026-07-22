@@ -66,7 +66,7 @@ import { repairSickDayCloudIfLocalInactive } from "@/lib/scenarios-supabase";
 import { insertHypoLog } from "@/lib/hypo-logs-supabase";
 import { invokeNotifyCarersOnHypo } from "@/lib/invoke-notify-carers-hypo";
 import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
-import { PageHeader, PageShell } from "@/components/layout";
+import { PageHeader, PageSectionLabel, PageShell } from "@/components/layout";
 import { PendingHypoCheckInBanner } from "@/components/pending-hypo-check-in-banner";
 import { CgmPrefillButton } from "@/components/cgm-prefill-button";
 import { useAutoCgmBgField } from "@/hooks/use-auto-cgm-bg-field";
@@ -987,7 +987,7 @@ export default function Dashboard() {
         }
       />
       {/* Today: high-signal cluster (reads as one section) */}
-      <section className="dashboard-home-canvas space-y-4 sm:space-y-5" data-testid="dashboard-today">
+      <section className="dashboard-home-canvas space-y-3 sm:space-y-4" data-testid="dashboard-today">
         {showVerifiedWelcome && (
           <Alert
             className="animate-fade-in-up border-emerald-500/40 bg-emerald-500/5 dark:bg-emerald-950/20 dark:border-emerald-500/30"
@@ -1085,7 +1085,8 @@ export default function Dashboard() {
         allowResize={!isMobile}
       />
 
-      <section className="animate-stagger space-y-3 sm:space-y-4 pt-2" data-testid="dashboard-widgets">
+      <section className="animate-stagger space-y-3 sm:space-y-4 pt-3 sm:pt-4" data-testid="dashboard-widgets">
+        <PageSectionLabel>Your widgets</PageSectionLabel>
         <div className="grid grid-cols-1 items-start gap-4 sm:gap-6 md:grid-cols-2">
           {widgetsToRender.map((w) => {
             const Comp = w.Component;
