@@ -1183,7 +1183,7 @@ export interface NotificationSettings {
   appointmentAlerts?: boolean;
   hypoAlerts?: boolean;
   scenarioAlerts?: boolean;
-  /** Supporter: alerts when shared glucose passes their extreme check-in limits. */
+  /** Supporter: one check-in alert when shared glucose stays past their extreme limits (~15 min). */
   liveGlucoseAlerts?: boolean;
   /** Supporter check-in alert: notify below this (always mmol/L). Default 3.5. */
   liveGlucoseAlertLowMmol?: number;

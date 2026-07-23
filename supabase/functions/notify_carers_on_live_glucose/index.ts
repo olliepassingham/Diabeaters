@@ -1,11 +1,23 @@
 /**
- * Notify linked supporters when a patient's latest shared CGM reading passes
- * that supporter's extreme check-in limits (defaults 3.5 / 14 mmol/L).
- * Dedupes per carer–patient via carer_live_glucose_alert_state.
+ * Notify linked supporters when a patient's latest shared CGM reading has
+ * *stayed* past that supporter's extreme check-in limits long enough to
+ * warrant a "check if they're OK" prompt.
+ *
+ * Policy (see `_shared/live-glucose-alert-policy.ts`):
+ * - Sustain ~15 min extreme before the first alert
+ * - One alert per excursion
+ * - ~10 min back in range before a new excursion can alert again
+ * - Atomic claim so concurrent publishes cannot send duplicate copies
  */
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { deliverPushToTokenRows, mobilePushDeliveryConfigured } from "../_shared/deliver-push.ts";
 import { fetchLatestPushTokensForUserId } from "../_shared/push-token-query.ts";
+import {
+  decideLiveGlucoseAlert,
+  type LiveGlucoseAlertState,
+  type LiveGlucoseAlertStatus,
+  type LiveGlucoseExtremeStatus,
+} from "../_shared/live-glucose-alert-policy.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -39,14 +51,52 @@ function resolveAlertLimits(prefs: Record<string, unknown>): { low: number; high
   return { low, high };
 }
 
-type AlertStatus = "ok" | "extreme_low" | "extreme_high";
-
-function computeAlertStatus(value: number, units: string, low: number, high: number): AlertStatus {
+function computeAlertStatus(value: number, units: string, low: number, high: number): LiveGlucoseAlertStatus {
   if (!Number.isFinite(value) || high <= low) return "ok";
   const mmol = toMmol(value, units);
   if (mmol < low) return "extreme_low";
   if (mmol > high) return "extreme_high";
   return "ok";
+}
+
+function parseStatus(raw: unknown): LiveGlucoseAlertStatus {
+  if (raw === "extreme_low" || raw === "extreme_high" || raw === "ok") return raw;
+  return "ok";
+}
+
+function parsePending(raw: unknown): LiveGlucoseExtremeStatus | null {
+  if (raw === "extreme_low" || raw === "extreme_high") return raw;
+  return null;
+}
+
+function msFromIso(raw: unknown): number | null {
+  if (typeof raw !== "string" || !raw) return null;
+  const ms = new Date(raw).getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function isoOrNull(ms: number | null): string | null {
+  return ms == null ? null : new Date(ms).toISOString();
+}
+
+function rowToState(row: Record<string, unknown> | null | undefined): LiveGlucoseAlertState | null {
+  if (!row) return null;
+  return {
+    lastAlertedStatus: parseStatus(row.last_alerted_status),
+    pendingStatus: parsePending(row.pending_status),
+    extremeSinceMs: msFromIso(row.extreme_since),
+    okSinceMs: msFromIso(row.ok_since),
+  };
+}
+
+function stateToRow(state: LiveGlucoseAlertState, nowIso: string) {
+  return {
+    last_alerted_status: state.lastAlertedStatus,
+    pending_status: state.pendingStatus,
+    extreme_since: isoOrNull(state.extremeSinceMs),
+    ok_since: isoOrNull(state.okSinceMs),
+    updated_at: nowIso,
+  };
 }
 
 Deno.serve(async (req: Request) => {
@@ -154,17 +204,19 @@ Deno.serve(async (req: Request) => {
 
     const { data: stateRows } = await admin
       .from("carer_live_glucose_alert_state")
-      .select("carer_id, last_alerted_status")
+      .select("carer_id, last_alerted_status, pending_status, extreme_since, ok_since")
       .eq("patient_id", patientId)
       .in("carer_id", recipients);
-    const lastByCarer = new Map<string, string>(
-      (stateRows ?? []).map((r: { carer_id: string; last_alerted_status: string }) => [
+    const stateByCarer = new Map<string, LiveGlucoseAlertState | null>(
+      (stateRows ?? []).map((r: Record<string, unknown>) => [
         String(r.carer_id),
-        String(r.last_alerted_status),
+        rowToState(r),
       ]),
     );
 
     let notified = 0;
+    const nowMs = Date.now();
+    const nowIso = new Date(nowMs).toISOString();
 
     for (const rid of recipients) {
       const prefsRaw = prefsById.get(rid);
@@ -177,28 +229,56 @@ Deno.serve(async (req: Request) => {
 
       const { low, high } = resolveAlertLimits(prefs);
       const status = computeAlertStatus(value, units, low, high);
-      const lastAlerted = lastByCarer.get(rid) ?? "ok";
+      const decision = decideLiveGlucoseAlert({
+        status,
+        state: stateByCarer.get(rid) ?? null,
+        nowMs,
+      });
 
-      if (status === "ok") {
-        if (lastAlerted !== "ok") {
-          await admin.from("carer_live_glucose_alert_state").upsert(
-            {
-              carer_id: rid,
-              patient_id: patientId,
-              last_alerted_status: "ok",
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: "carer_id,patient_id" },
-          );
-        }
+      if (decision.action === "noop") continue;
+
+      if (decision.action === "persist") {
+        await admin.from("carer_live_glucose_alert_state").upsert(
+          {
+            carer_id: rid,
+            patient_id: patientId,
+            ...stateToRow(decision.next, nowIso),
+          },
+          { onConflict: "carer_id,patient_id" },
+        );
         continue;
       }
 
-      if (lastAlerted === status) continue;
+      // action === "notify" — claim atomically so concurrent publishes only send once.
+      const { data: claimed, error: claimErr } = await admin
+        .from("carer_live_glucose_alert_state")
+        .update(stateToRow(decision.next, nowIso))
+        .eq("carer_id", rid)
+        .eq("patient_id", patientId)
+        .eq("last_alerted_status", decision.claimFrom)
+        .select("carer_id");
+
+      let wonClaim = !claimErr && Array.isArray(claimed) && claimed.length > 0;
+
+      if (!wonClaim && decision.claimFrom === "ok") {
+        // No row yet (first ever alert for this pair, coming from a clean ok state).
+        const { data: inserted, error: insertErr } = await admin
+          .from("carer_live_glucose_alert_state")
+          .insert({
+            carer_id: rid,
+            patient_id: patientId,
+            ...stateToRow(decision.next, nowIso),
+          })
+          .select("carer_id");
+        // Unique violation → another concurrent claim won; treat as lost.
+        wonClaim = !insertErr && Array.isArray(inserted) && inserted.length > 0;
+      }
+
+      if (!wonClaim) continue;
 
       const title = "Check if they're OK";
       const bodyText =
-        status === "extreme_low"
+        decision.status === "extreme_low"
           ? `${patientLabel}'s glucose is ${bgText} (below your alert limit) — please check they're OK`
           : `${patientLabel}'s glucose is ${bgText} (above your alert limit) — please check they're OK`;
 
@@ -206,9 +286,9 @@ Deno.serve(async (req: Request) => {
         kind: "live_glucose_check_in",
         deep_link: "/carer-view/glucose",
         patient_user_id: patientId,
-        alert_status: status,
+        alert_status: decision.status,
         /** Legacy field for older clients */
-        range_status: status === "extreme_low" ? "low" : "high",
+        range_status: decision.status === "extreme_low" ? "low" : "high",
         value,
         units,
         recorded_at: (row as { recorded_at?: string }).recorded_at,
@@ -234,16 +314,6 @@ Deno.serve(async (req: Request) => {
           admin,
         });
       }
-
-      await admin.from("carer_live_glucose_alert_state").upsert(
-        {
-          carer_id: rid,
-          patient_id: patientId,
-          last_alerted_status: status,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "carer_id,patient_id" },
-      );
     }
 
     return new Response(JSON.stringify({ success: true, notified }), {

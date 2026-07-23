@@ -139,7 +139,7 @@ export function NotificationsTab({
             />
             <SettingsToggleRow
               label="Glucose check-in"
-              description="When their shared reading goes past your limits — asks you to check they're OK"
+              description="One alert if their shared reading stays past your limits for about 15 minutes — asks you to check they're OK"
               checked={liveGlucoseOn}
               onCheckedChange={(checked) => onToggle("liveGlucoseAlerts", checked)}
               disabled={masterOff}
@@ -151,6 +151,7 @@ export function NotificationsTab({
                   Wider than their day-to-day targets. Defaults{" "}
                   {mmolToDisplayBg(DEFAULT_SUPPORTER_LIVE_GLUCOSE_ALERT_LOW_MMOL, bgUnits)}–
                   {mmolToDisplayBg(DEFAULT_SUPPORTER_LIVE_GLUCOSE_ALERT_HIGH_MMOL, bgUnits)} {bgUnits}.
+                  You&apos;ll only get one check-in per high or low — not a stream of repeats while levels stay there.
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
