@@ -1,8 +1,21 @@
--- Sustain / recovery fields for supporter live-glucose check-in alerts.
--- Pairs with decideLiveGlucoseAlert in live-glucose-alert-policy.ts:
---   pending_status + extreme_since  → wait until extreme has lasted ~15 min before alerting
---   ok_since                        → require ~10 min back in range before a new excursion can alert
--- last_alerted_status remains the one-shot-per-excursion guard (with atomic claim in the edge function).
+-- Create + sustain fields for supporter live-glucose check-in alerts.
+-- Safe to re-run. Use this when carer_live_glucose_alert_state may not exist yet
+-- (e.g. staging/production that never got 20260717120000).
+
+CREATE TABLE IF NOT EXISTS public.carer_live_glucose_alert_state (
+  carer_id uuid NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
+  patient_id uuid NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
+  last_alerted_status text NOT NULL CHECK (
+    last_alerted_status IN ('ok', 'extreme_low', 'extreme_high')
+  ),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (carer_id, patient_id)
+);
+
+CREATE INDEX IF NOT EXISTS carer_live_glucose_alert_state_patient_idx
+  ON public.carer_live_glucose_alert_state (patient_id);
+
+ALTER TABLE public.carer_live_glucose_alert_state ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE public.carer_live_glucose_alert_state
   ADD COLUMN IF NOT EXISTS pending_status text
