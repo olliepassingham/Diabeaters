@@ -17,7 +17,7 @@ export function CommunityFeedComposerDrawer({
   children: ReactNode;
 }) {
   return (
-    <Drawer.Root open={open} onOpenChange={onOpenChange} handleOnly shouldScaleBackground={false}>
+    <Drawer.Root open={open} onOpenChange={onOpenChange} shouldScaleBackground={false}>
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 z-[110] bg-black/80" />
         <Drawer.Content
@@ -32,7 +32,10 @@ export function CommunityFeedComposerDrawer({
             />
           </div>
           <div className="relative shrink-0 space-y-1 px-4 pb-2 text-left">
-            <Drawer.Close className="absolute right-1 top-0 rounded-sm p-2 text-foreground opacity-80 ring-offset-background transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+            <Drawer.Close
+              className="absolute right-1 top-0 rounded-sm p-2 text-foreground opacity-80 ring-offset-background transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              data-vaul-no-drag
+            >
               <X className="h-5 w-5" aria-hidden />
               <span className="sr-only">Close</span>
             </Drawer.Close>

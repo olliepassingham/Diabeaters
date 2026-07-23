@@ -346,6 +346,7 @@ export function ExerciseGuidedCoach() {
   const [now, setNow] = useState<number>(() => Date.now());
   const [routines, setRoutines] = useState<ExerciseRoutine[]>(() => storage.getRecentExercises?.(8) ?? []);
   const [adjustRoutine, setAdjustRoutine] = useState<ExerciseRoutine | null>(null);
+  const [adjustRecent, setAdjustRecent] = useState<RecentRepeatableExerciseSession | null>(null);
   const appliedDefaultsForSessionId = useRef<string | null>(null);
 
   // Quick start form (only relevant when no active session exists)
@@ -767,15 +768,18 @@ export function ExerciseGuidedCoach() {
     }
   };
 
-  const onStartFromRepeatable = (session: RecentRepeatableExerciseSession) => {
+  const onStartFromRepeatable = (
+    session: RecentRepeatableExerciseSession,
+    overrides?: Partial<ExerciseRoutineAdjustValues>,
+  ) => {
     beginGuidedSession(
       {
-        exerciseType: session.exerciseType,
-        intensity: session.intensity,
-        durationMinutes: session.durationMinutes,
+        exerciseType: overrides?.exerciseType ?? session.exerciseType,
+        intensity: overrides?.intensity ?? session.intensity,
+        durationMinutes: overrides?.durationMinutes ?? session.durationMinutes,
         exerciseName: session.exerciseName,
       },
-      { toastLabel: session.label },
+      { toastLabel: session.exerciseName?.trim() || session.label },
     );
   };
 
@@ -862,49 +866,6 @@ export function ExerciseGuidedCoach() {
   if (!activeSession) {
     return (
       <div className="space-y-4 max-sm:space-y-3" data-testid="exercise-guided-coach-start">
-        {recentWorkouts.length > 0 ? (
-          <Card
-            className="overflow-hidden rounded-2xl border-border/50 shadow-sm ring-1 ring-border/40 dark:ring-border/30"
-            data-testid="exercise-recent-workouts"
-          >
-            <CardHeader className="px-4 py-3 sm:px-5">
-              <CardTitle className="text-base font-semibold tracking-tight flex items-center gap-2">
-                <History className="h-4 w-4 text-muted-foreground" aria-hidden />
-                Recent
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-2 px-4 pb-3 pt-0 sm:px-5">
-              {recentWorkouts.map((session) => (
-                <div
-                  key={session.id}
-                  className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-border/60 bg-muted/10 px-3 py-2.5"
-                  data-testid={`exercise-recent-workout-${session.id}`}
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">
-                      {session.exerciseName?.trim() || session.label}
-                    </p>
-                    <p className="text-xs text-muted-foreground leading-snug">
-                      {format(new Date(session.completedAt), "d MMM")} · {session.label}
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="min-h-9 shrink-0"
-                    onClick={() => onStartFromRepeatable(session)}
-                    data-testid={`button-restart-recent-${session.id}`}
-                  >
-                    <RotateCcw className="h-4 w-4 mr-2" aria-hidden />
-                    Restart
-                  </Button>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        ) : null}
-
         <Card className="overflow-hidden rounded-2xl border-border/50 shadow-sm ring-1 ring-border/40 dark:ring-border/30">
           <Collapsible open={planWorkoutOpen} onOpenChange={setPlanWorkoutOpen} className="group">
             <CollapsibleTrigger asChild>
@@ -979,6 +940,55 @@ export function ExerciseGuidedCoach() {
           </Collapsible>
         </Card>
 
+        {recentWorkouts.length > 0 ? (
+          <Card
+            className="overflow-hidden rounded-2xl border-border/50 shadow-sm ring-1 ring-border/40 dark:ring-border/30"
+            data-testid="exercise-recent-workouts"
+          >
+            <CardHeader className="px-4 py-3 sm:px-5">
+              <CardTitle className="text-base font-semibold tracking-tight flex items-center gap-2">
+                <History className="h-4 w-4 text-muted-foreground" aria-hidden />
+                Recent
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-2 px-4 pb-3 pt-0 sm:px-5">
+              {recentWorkouts.map((session) => (
+                <div
+                  key={session.id}
+                  className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-border/60 bg-muted/10 px-3 py-2.5"
+                  data-testid={`exercise-recent-workout-${session.id}`}
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {session.exerciseName?.trim() || session.label}
+                    </p>
+                    <p className="text-xs text-muted-foreground leading-snug">
+                      {format(new Date(session.completedAt), "d MMM")} · {session.label}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="min-h-9 shrink-0"
+                      onClick={() => onStartFromRepeatable(session)}
+                      data-testid={`button-restart-recent-${session.id}`}
+                    >
+                      <RotateCcw className="h-4 w-4 mr-2" aria-hidden />
+                      Restart
+                    </Button>
+                    <ExerciseRoutineAdjustTrigger
+                      onClick={() => setAdjustRecent(session)}
+                      testId={`button-adjust-recent-${session.id}`}
+                    />
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        ) : null}
+
         {routines.length > 0 ? (
           <Card className="overflow-hidden rounded-2xl border-border/50 shadow-sm ring-1 ring-border/40 dark:ring-border/30">
             <CardHeader className="px-4 py-3 sm:px-5">
@@ -1026,6 +1036,28 @@ export function ExerciseGuidedCoach() {
             onStartFromRoutine(adjustRoutine, values);
           }}
           onSaveDefault={onSaveRoutineDefault}
+        />
+
+        <ExerciseRoutineAdjustSheet
+          open={!!adjustRecent}
+          onOpenChange={(open) => {
+            if (!open) setAdjustRecent(null);
+          }}
+          routine={
+            adjustRecent
+              ? {
+                  id: adjustRecent.id,
+                  name: adjustRecent.exerciseName?.trim() || adjustRecent.label,
+                  exerciseType: adjustRecent.exerciseType,
+                  intensity: adjustRecent.intensity,
+                  durationMinutes: adjustRecent.durationMinutes,
+                }
+              : null
+          }
+          onStart={(values) => {
+            if (!adjustRecent) return;
+            onStartFromRepeatable(adjustRecent, values);
+          }}
         />
       </div>
     );

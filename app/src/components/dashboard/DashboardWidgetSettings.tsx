@@ -294,6 +294,7 @@ export function DashboardWidgetSettings({
       <Drawer.Root
         open={open}
         onOpenChange={onOpenChange}
+        // List rows are drag-to-reorder — keep dismiss on the handle so the two gestures don’t fight.
         handleOnly
         shouldScaleBackground={false}
         repositionInputs={false}
@@ -314,7 +315,10 @@ export function DashboardWidgetSettings({
                 aria-label="Drag down to close"
               />
             </div>
-            <Drawer.Close className="absolute right-3 top-3 rounded-sm p-1.5 text-foreground opacity-80 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <Drawer.Close
+              className="absolute right-3 top-3 rounded-sm p-1.5 text-foreground opacity-80 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              data-vaul-no-drag
+            >
               <X className="h-4 w-4" aria-hidden />
               <span className="sr-only">Close</span>
             </Drawer.Close>

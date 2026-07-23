@@ -110,6 +110,7 @@ export function StoryOverlayEditor({ overlays, onChange, children, className }: 
       <div
         ref={containerRef}
         className={cn("relative overflow-hidden rounded-xl border border-border/50 bg-black", className)}
+        data-vaul-no-drag
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}

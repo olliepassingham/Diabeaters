@@ -16,6 +16,9 @@ export type ExerciseRoutineAdjustValues = {
   durationMinutes: number;
 };
 
+/** Minimal shape the adjust sheet needs — a saved routine or a past session both qualify. */
+export type AdjustableExercise = Pick<ExerciseRoutine, "id" | "name" | "exerciseType" | "intensity" | "durationMinutes">;
+
 const DURATION_PRESETS = [20, 30, 45, 60, 75, 90] as const;
 
 function durationPresetsFor(savedMinutes: number): number[] {
@@ -27,10 +30,10 @@ function durationPresetsFor(savedMinutes: number): number[] {
 type ExerciseRoutineAdjustSheetProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  routine: ExerciseRoutine | null;
+  routine: AdjustableExercise | null;
   /** One-off start with adjusted values (does not rewrite the saved routine). */
   onStart: (values: ExerciseRoutineAdjustValues) => void;
-  /** Persist adjusted values onto the saved routine. */
+  /** Persist adjusted values onto the saved routine. Omit for one-off history (e.g. a past session), which has no "default" to save. */
   onSaveDefault?: (values: ExerciseRoutineAdjustValues) => void;
 };
 
@@ -84,7 +87,11 @@ export function ExerciseRoutineAdjustSheet({
       open={open}
       onOpenChange={onOpenChange}
       title="Adjust workout"
-      description={`${routine.name} — tweak this session, or save as the new default.`}
+      description={
+        onSaveDefault
+          ? `${routine.name} — tweak this session, or save as the new default.`
+          : `${routine.name} — tweak this session before you start.`
+      }
       bodyClassName="overflow-y-auto overscroll-contain px-4 pb-6"
     >
       <div className="space-y-5" data-testid="exercise-routine-adjust-sheet">
