@@ -66,12 +66,13 @@
 
     <!--
       Capgo Health Connect declares many data types in its library manifest.
-      Diabeaters only reads blood glucose (and optionally steps for auth UX).
-      Strip unused Health Connect permissions so Play's Health apps form stays accurate.
+      Diabeaters only reads blood glucose for optional CGM prefill (on-device).
+      Strip every unused type — Play rejects “extra” Health Connect permissions
+      that are not tied to a clear user-facing feature (e.g. steps).
     -->
     <uses-permission android:name="android.permission.health.READ_BLOOD_GLUCOSE" />
     <uses-permission android:name="android.permission.health.WRITE_BLOOD_GLUCOSE" tools:node="remove" />
-    <uses-permission android:name="android.permission.health.READ_STEPS" />
+    <uses-permission android:name="android.permission.health.READ_STEPS" tools:node="remove" />
     <uses-permission android:name="android.permission.health.WRITE_STEPS" tools:node="remove" />
 
     <uses-permission android:name="android.permission.health.READ_DISTANCE" tools:node="remove" />

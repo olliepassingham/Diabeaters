@@ -46,6 +46,16 @@ export default function Privacy() {
                 This may be <span className="font-semibold text-foreground">special category data</span> under UK GDPR /
                 EU GDPR Article 9 when it concerns your health.
               </li>
+              <li>
+                <span className="font-semibold text-foreground">Optional Health Connect / Apple Health reads (mobile apps)</span>
+                <span className="text-muted-foreground"> — </span>
+                if you connect Health Connect (Android) or Apple Health (iOS) in Settings → CGM, Diabeaters may read{" "}
+                <span className="font-semibold text-foreground">blood glucose samples only</span> that your CGM app has
+                already shared with the phone health store. This is used on-device to optionally prefill glucose fields in
+                tools (for example exercise and driving checklists). We do not request other Health Connect data types
+                (steps, heart rate, sleep, etc.), and we do not upload those samples to our servers as part of this
+                connection.
+              </li>
             </ul>
           </section>
 
