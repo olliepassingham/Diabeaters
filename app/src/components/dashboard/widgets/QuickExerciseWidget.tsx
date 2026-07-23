@@ -15,6 +15,11 @@ import { computeExerciseHypoSuggestion, resolveExerciseBgForHypo } from "@/lib/e
 import { calculateExercisePlan } from "@/lib/exercise-plan";
 import { getExerciseReadinessVerdict, getReadinessToneClasses } from "@/lib/exercise-readiness";
 import { ExerciseHypoTreatmentHint, ExerciseWorkoutProgressBar } from "@/components/exercise-active-session-extras";
+import {
+  ExerciseRoutineAdjustSheet,
+  ExerciseRoutineAdjustTrigger,
+  type ExerciseRoutineAdjustValues,
+} from "@/components/exercise-routine-adjust-sheet";
 import { useBgPrefill } from "@/hooks/use-bg-prefill";
 import { EXERCISE_CGM_POLL_MS } from "@/hooks/use-exercise-cgm-bg";
 import { cgmTrendForExercise } from "@/lib/cgm/apply-cgm-trend";
@@ -37,6 +42,7 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
   const [activeSession, setActiveSession] = useState<ActiveExerciseSession | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [travelActiveTripHint, setTravelActiveTripHint] = useState(false);
+  const [adjustRoutine, setAdjustRoutine] = useState<ExerciseRoutine | null>(null);
   const { toast } = useToast();
 
   const [nowTick, setNowTick] = useState(() => Date.now());
@@ -176,7 +182,10 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
     });
   }, [activeSession, cgmPrefill]);
 
-  const handleQuickStart = (exercise: ExerciseRoutine) => {
+  const handleQuickStart = (
+    exercise: ExerciseRoutine,
+    overrides?: Partial<ExerciseRoutineAdjustValues>,
+  ) => {
     try {
       const existing = storage.getActiveExercise?.();
       if (existing) {
@@ -202,9 +211,9 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
       const session = storage.startExerciseSession({
         routineId: exercise.id,
         exerciseName: exercise.name,
-        exerciseType: exercise.exerciseType,
-        intensity: exercise.intensity,
-        durationMinutes: exercise.durationMinutes,
+        exerciseType: overrides?.exerciseType ?? exercise.exerciseType,
+        intensity: overrides?.intensity ?? exercise.intensity,
+        durationMinutes: overrides?.durationMinutes ?? exercise.durationMinutes,
       });
       setActiveSession(session);
       setExercises(storage.getRecentExercises?.(compact ? 3 : 5) ?? []);
@@ -222,6 +231,20 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
         variant: "destructive",
       });
     }
+  };
+
+  const handleSaveAdjustDefault = (values: ExerciseRoutineAdjustValues) => {
+    if (!adjustRoutine) return;
+    storage.updateExerciseRoutine(adjustRoutine.id, {
+      exerciseType: values.exerciseType,
+      intensity: values.intensity,
+      durationMinutes: values.durationMinutes,
+    });
+    setExercises(storage.getRecentExercises?.(compact ? 3 : 5) ?? []);
+    toast({
+      title: "Routine updated",
+      description: `${adjustRoutine.name} will use these details next time.`,
+    });
   };
 
   if (error) {
@@ -336,31 +359,44 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
                 const Icon = EXERCISE_ICONS[exercise.exerciseType] || Dumbbell;
                 const isActive = activeSession?.routineId === exercise.id;
                 return (
-                  <button
+                  <div
                     key={exercise.id}
-                    type="button"
-                    onClick={() => handleQuickStart(exercise)}
                     className={cn(
-                      "pressable card-interactive flex w-full min-h-11 items-center justify-between gap-3 rounded-xl border border-border bg-card px-3 py-2.5 text-left shadow-sm transition-colors",
+                      "flex w-full items-center gap-1.5 rounded-xl border border-border bg-card p-1 shadow-sm transition-colors",
                       "hover:border-emerald-500/35 hover:bg-emerald-500/[0.06] dark:hover:border-emerald-500/25 dark:hover:bg-emerald-950/25",
-                      isActive && "border-emerald-500/60 dark:border-emerald-500/50 opacity-50 pointer-events-none"
+                      isActive && "border-emerald-500/60 dark:border-emerald-500/50 opacity-50",
                     )}
-                    disabled={isActive}
-                    data-testid={`button-quick-exercise-${exercise.id}`}
                   >
-                    <span className="flex min-w-0 flex-1 items-center gap-3">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 dark:bg-emerald-500/15">
-                        <Icon className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                      </span>
-                      <span className="min-w-0 text-left">
-                        <span className="block text-sm font-semibold text-foreground truncate">{exercise.name}</span>
-                        <span className="block text-xs text-muted-foreground">
-                          {exercise.durationMinutes} min · {exercise.intensity}
+                    <button
+                      type="button"
+                      onClick={() => handleQuickStart(exercise)}
+                      className={cn(
+                        "pressable flex min-h-11 min-w-0 flex-1 items-center justify-between gap-3 rounded-lg px-2.5 py-2 text-left",
+                        isActive && "pointer-events-none",
+                      )}
+                      disabled={isActive}
+                      data-testid={`button-quick-exercise-${exercise.id}`}
+                    >
+                      <span className="flex min-w-0 flex-1 items-center gap-3">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 dark:bg-emerald-500/15">
+                          <Icon className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                        </span>
+                        <span className="min-w-0 text-left">
+                          <span className="block truncate text-sm font-semibold text-foreground">{exercise.name}</span>
+                          <span className="block text-xs text-muted-foreground">
+                            {exercise.durationMinutes} min · {exercise.intensity}
+                          </span>
                         </span>
                       </span>
-                    </span>
-                    <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                  </button>
+                      <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                    </button>
+                    <ExerciseRoutineAdjustTrigger
+                      disabled={isActive || !!activeSession}
+                      onClick={() => setAdjustRoutine(exercise)}
+                      testId={`button-adjust-exercise-${exercise.id}`}
+                      className="mr-0.5"
+                    />
+                  </div>
                 );
               })}
             </div>
@@ -368,7 +404,7 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
             {exercises.some((e) => e.timesUsed > 0) && !compact && (
               <div className="flex items-center gap-2 rounded-lg bg-muted/40 px-2.5 py-1.5 text-xs text-muted-foreground">
                 <Clock className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
-                <span>Tap a routine to start quick checks in the top bar</span>
+                <span>Tap to start · pencil to adjust duration or intensity first</span>
               </div>
             )}
           </>
@@ -409,6 +445,19 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
         </Link>
         )}
       </CardContent>
+
+      <ExerciseRoutineAdjustSheet
+        open={!!adjustRoutine}
+        onOpenChange={(open) => {
+          if (!open) setAdjustRoutine(null);
+        }}
+        routine={adjustRoutine}
+        onStart={(values) => {
+          if (!adjustRoutine) return;
+          handleQuickStart(adjustRoutine, values);
+        }}
+        onSaveDefault={handleSaveAdjustDefault}
+      />
     </WidgetCard>
   );
 }

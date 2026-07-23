@@ -72,6 +72,11 @@ import { normalizePlannerExerciseTypeQueryParam } from "@/lib/exercise-planner-h
 import { applyCoachDefaultsFromLastExercise, startGuidedExerciseSession, type GuidedExerciseStartParams } from "@/lib/exercise-guided-start";
 import { ExercisePumpTipsCard } from "@/components/scenarios/ExercisePumpTipsCard";
 import {
+  ExerciseRoutineAdjustSheet,
+  ExerciseRoutineAdjustTrigger,
+  type ExerciseRoutineAdjustValues,
+} from "@/components/exercise-routine-adjust-sheet";
+import {
   storage,
   DIABEATER_EXERCISE_OUTCOMES_CHANGED_EVENT,
   DIABEATER_PROFILE_CHANGED_EVENT,
@@ -340,6 +345,7 @@ export function ExerciseGuidedCoach() {
   const [activeSession, setActiveSession] = useState<ActiveExerciseSession | null>(() => storage.getActiveExercise());
   const [now, setNow] = useState<number>(() => Date.now());
   const [routines, setRoutines] = useState<ExerciseRoutine[]>(() => storage.getRecentExercises?.(8) ?? []);
+  const [adjustRoutine, setAdjustRoutine] = useState<ExerciseRoutine | null>(null);
   const appliedDefaultsForSessionId = useRef<string | null>(null);
 
   // Quick start form (only relevant when no active session exists)
@@ -791,13 +797,27 @@ export function ExerciseGuidedCoach() {
     });
   };
 
-  const onStartFromRoutine = (routine: ExerciseRoutine) => {
+  const onStartFromRoutine = (routine: ExerciseRoutine, overrides?: Partial<ExerciseRoutineAdjustValues>) => {
     beginGuidedSession({
       routineId: routine.id,
       exerciseName: routine.name,
-      exerciseType: routine.exerciseType,
-      intensity: routine.intensity,
-      durationMinutes: routine.durationMinutes,
+      exerciseType: overrides?.exerciseType ?? routine.exerciseType,
+      intensity: overrides?.intensity ?? routine.intensity,
+      durationMinutes: overrides?.durationMinutes ?? routine.durationMinutes,
+    });
+  };
+
+  const onSaveRoutineDefault = (values: ExerciseRoutineAdjustValues) => {
+    if (!adjustRoutine) return;
+    storage.updateExerciseRoutine(adjustRoutine.id, {
+      exerciseType: values.exerciseType,
+      intensity: values.intensity,
+      durationMinutes: values.durationMinutes,
+    });
+    setRoutines(storage.getRecentExercises?.(8) ?? []);
+    toast({
+      title: "Routine updated",
+      description: `${adjustRoutine.name} will use these details next time.`,
     });
   };
 
@@ -969,22 +989,44 @@ export function ExerciseGuidedCoach() {
             </CardHeader>
             <CardContent className="grid gap-2 px-4 pb-3 pt-0 sm:grid-cols-2 sm:px-5">
               {routines.map((r) => (
-                <button
+                <div
                   key={r.id}
-                  type="button"
-                  onClick={() => onStartFromRoutine(r)}
-                  className="text-left rounded-xl border border-border bg-card px-3 py-2.5 hover:border-emerald-500/35 hover:bg-emerald-500/[0.06]"
-                  data-testid={`button-coach-routine-${r.id}`}
+                  className="flex items-center gap-1 rounded-xl border border-border bg-card p-1 hover:border-emerald-500/35 hover:bg-emerald-500/[0.06]"
                 >
-                  <p className="text-sm font-semibold">{r.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {r.durationMinutes} min · {r.intensity} · {r.exerciseType}
-                  </p>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => onStartFromRoutine(r)}
+                    className="min-w-0 flex-1 rounded-lg px-2.5 py-2 text-left"
+                    data-testid={`button-coach-routine-${r.id}`}
+                  >
+                    <p className="truncate text-sm font-semibold">{r.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {r.durationMinutes} min · {r.intensity} · {r.exerciseType}
+                    </p>
+                  </button>
+                  <ExerciseRoutineAdjustTrigger
+                    onClick={() => setAdjustRoutine(r)}
+                    testId={`button-coach-adjust-routine-${r.id}`}
+                    className="mr-0.5"
+                  />
+                </div>
               ))}
             </CardContent>
           </Card>
         ) : null}
+
+        <ExerciseRoutineAdjustSheet
+          open={!!adjustRoutine}
+          onOpenChange={(open) => {
+            if (!open) setAdjustRoutine(null);
+          }}
+          routine={adjustRoutine}
+          onStart={(values) => {
+            if (!adjustRoutine) return;
+            onStartFromRoutine(adjustRoutine, values);
+          }}
+          onSaveDefault={onSaveRoutineDefault}
+        />
       </div>
     );
   }
