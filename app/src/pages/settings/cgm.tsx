@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
-import { Activity, CheckCircle2, CircleOff, Smartphone, Sparkles } from "lucide-react";
+import { Activity, CheckCircle2, CircleOff, Droplet, HeartPulse, Radio as RadioIcon, Smartphone, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { InlineInfoHint } from "@/components/ui/field-label-with-info";
 import { useToast } from "@/hooks/use-toast";
 import { healthPlatformCgmAdapter } from "@/lib/cgm/adapters/health-platform";
@@ -49,6 +51,57 @@ import {
 import { isDexcomAccountId } from "@/lib/cgm/dexcom-share-client";
 
 type StatusTone = "muted" | "amber" | "green";
+
+type CgmSourceChoice = "dexcom" | "libre" | "health";
+
+function selectedCgmSourceChoice(prefs: CgmPreferences): CgmSourceChoice | undefined {
+  if (prefs.dexcomShareEnabled) return "dexcom";
+  if (prefs.libreLinkUpEnabled) return "libre";
+  if (prefs.healthPlatformEnabled) return "health";
+  return undefined;
+}
+
+function CgmSourceChoiceCard({
+  value,
+  selected,
+  icon: Icon,
+  title,
+  description,
+  testId,
+}: {
+  value: CgmSourceChoice;
+  selected: boolean;
+  icon: typeof Activity;
+  title: string;
+  description: ReactNode;
+  testId: string;
+}) {
+  return (
+    <label
+      className={cn(
+        "flex cursor-pointer items-start gap-3 rounded-2xl border p-3.5 transition-colors outline-none focus-within:ring-2 focus-within:ring-primary/30",
+        selected
+          ? "border-primary bg-primary/[0.06] ring-1 ring-primary/20"
+          : "border-border/50 bg-muted/10 hover:border-primary/35",
+      )}
+    >
+      <RadioGroupItem value={value} id={`cgm-choice-${value}`} className="mt-1 shrink-0" data-testid={testId} />
+      <span
+        className={cn(
+          "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1",
+          selected ? "bg-primary/15 text-primary ring-primary/25" : "bg-muted/60 text-muted-foreground ring-border/40",
+        )}
+        aria-hidden
+      >
+        <Icon className="h-5 w-5" aria-hidden />
+      </span>
+      <span className="min-w-0 flex-1 space-y-0.5 pt-0.5">
+        <span className="block text-sm font-medium text-foreground">{title}</span>
+        <span className="block text-xs leading-relaxed text-muted-foreground">{description}</span>
+      </span>
+    </label>
+  );
+}
 
 function CgmToggleRow({
   id,
@@ -463,10 +516,10 @@ export function SettingsCgmRoute() {
       description="Near-live Dexcom Share or LibreLink Up, or delayed Apple Health / Health Connect."
       actions={<SettingsCgmInfoDialog />}
     >
-      <SettingsPanel>
+      <SettingsPanel className="bg-gradient-to-b from-muted/30 to-muted/5 dark:from-muted/15 dark:to-muted/5">
         <SettingsPanelBody className="flex items-start gap-3.5">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/15">
-            <Activity className="h-5 w-5" aria-hidden />
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/12 text-primary shadow-inner dark:bg-primary/20">
+            <Activity className="h-5 w-5" strokeWidth={1.75} aria-hidden />
           </span>
           <div className="min-w-0 flex-1 space-y-1.5">
             <div className="flex flex-wrap items-center gap-2">
@@ -534,76 +587,50 @@ export function SettingsCgmRoute() {
       {isNative && prefs.prefillEnabled ? (
         <SettingsPanel>
           <SettingsPanelBody className="space-y-3" data-testid="panel-cgm-source-guide">
-            <p className="text-sm font-medium text-foreground">Which CGM do you use?</p>
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              Pick one to open the right setup. You can change this later.
-            </p>
-            <div className="grid gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="h-auto min-h-11 w-full justify-start gap-3 px-3 py-2.5 text-left"
-                onClick={() =>
-                  updatePrefs({
-                    ...prefs,
-                    dexcomShareEnabled: true,
-                    libreLinkUpEnabled: false,
-                    healthPlatformEnabled: false,
-                  })
-                }
-                data-testid="button-cgm-choose-dexcom"
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-medium text-foreground">Dexcom</span>
-                  <span className="block text-[11px] leading-snug text-muted-foreground">
-                    Near-live Share — best for charts, overnight review, and supporter live BG. Account ID usually
-                    works better than email.
-                  </span>
-                </span>
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="h-auto min-h-11 w-full justify-start gap-3 px-3 py-2.5 text-left"
-                onClick={() =>
-                  updatePrefs({
-                    ...prefs,
-                    libreLinkUpEnabled: true,
-                    dexcomShareEnabled: false,
-                    healthPlatformEnabled: false,
-                  })
-                }
-                data-testid="button-cgm-choose-libre"
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-medium text-foreground">Libre</span>
-                  <span className="block text-[11px] leading-snug text-muted-foreground">
-                    Near-live via LibreLink Up (follower / care-partner login — not the patient LibreLink app alone).
-                  </span>
-                </span>
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="h-auto min-h-11 w-full justify-start gap-3 px-3 py-2.5 text-left"
-                onClick={() =>
-                  updatePrefs({
-                    ...prefs,
-                    healthPlatformEnabled: true,
-                    dexcomShareEnabled: false,
-                    libreLinkUpEnabled: false,
-                  })
-                }
-                data-testid="button-cgm-choose-health"
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-medium text-foreground">Just {healthLabel} for now</span>
-                  <span className="block text-[11px] leading-snug text-muted-foreground">
-                    Easiest — one OS permission, no Share login. Readings are often delayed; not ideal for live charts.
-                  </span>
-                </span>
-              </Button>
+            <div className="space-y-0.5">
+              <p className="text-sm font-medium text-foreground">Which CGM do you use?</p>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Pick one to open the right setup below. You can change this later.
+              </p>
             </div>
+            <RadioGroup
+              value={selectedCgmSourceChoice(prefs) ?? ""}
+              onValueChange={(value) => {
+                if (value === "dexcom") {
+                  updatePrefs({ ...prefs, dexcomShareEnabled: true, libreLinkUpEnabled: false, healthPlatformEnabled: false });
+                } else if (value === "libre") {
+                  updatePrefs({ ...prefs, libreLinkUpEnabled: true, dexcomShareEnabled: false, healthPlatformEnabled: false });
+                } else if (value === "health") {
+                  updatePrefs({ ...prefs, healthPlatformEnabled: true, dexcomShareEnabled: false, libreLinkUpEnabled: false });
+                }
+              }}
+              className="grid gap-2"
+            >
+              <CgmSourceChoiceCard
+                value="dexcom"
+                selected={selectedCgmSourceChoice(prefs) === "dexcom"}
+                icon={RadioIcon}
+                title="Dexcom"
+                description="Near-live Share — best for charts, overnight review, and supporter live BG. Account ID usually works better than email."
+                testId="button-cgm-choose-dexcom"
+              />
+              <CgmSourceChoiceCard
+                value="libre"
+                selected={selectedCgmSourceChoice(prefs) === "libre"}
+                icon={Droplet}
+                title="Libre"
+                description="Near-live via LibreLink Up (follower / care-partner login — not the patient LibreLink app alone)."
+                testId="button-cgm-choose-libre"
+              />
+              <CgmSourceChoiceCard
+                value="health"
+                selected={selectedCgmSourceChoice(prefs) === "health"}
+                icon={HeartPulse}
+                title={`Just ${healthLabel} for now`}
+                description="Easiest — one OS permission, no Share login. Readings are often delayed; not ideal for live charts."
+                testId="button-cgm-choose-health"
+              />
+            </RadioGroup>
             {(dexcomConnected || libreConnected || accessGranted) ? (
               <p className="text-[11px] leading-relaxed text-muted-foreground">
                 Already connected. If both Share/Libre and {healthLabel} are on, Diabeaters uses the freshest reading.
@@ -751,20 +778,19 @@ export function SettingsCgmRoute() {
                 <Label htmlFor="dexcom-server" className="text-xs text-muted-foreground">
                   Dexcom region
                 </Label>
-                <select
-                  id="dexcom-server"
+                <Select
                   value={dexcomServer}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setDexcomServer(value === "us" ? "us" : value === "jp" ? "jp" : "eu");
-                  }}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  data-testid="select-dexcom-server"
+                  onValueChange={(value) => setDexcomServer(value === "us" ? "us" : value === "jp" ? "jp" : "eu")}
                 >
-                  <option value="eu">Europe / UK (shareous1)</option>
-                  <option value="us">United States (share2)</option>
-                  <option value="jp">Japan / Asia-Pacific</option>
-                </select>
+                  <SelectTrigger id="dexcom-server" className="h-10 rounded-xl" data-testid="select-dexcom-server">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="eu">Europe / UK (shareous1)</SelectItem>
+                    <SelectItem value="us">United States (share2)</SelectItem>
+                    <SelectItem value="jp">Japan / Asia-Pacific</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               {dexcomError ? (
                 <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs leading-relaxed text-destructive">
@@ -845,27 +871,28 @@ export function SettingsCgmRoute() {
                 <Label htmlFor="libre-region" className="text-xs text-muted-foreground">
                   Libre region
                 </Label>
-                <select
-                  id="libre-region"
+                <Select
                   value={libreRegion}
-                  onChange={(e) => {
-                    const value = e.target.value;
+                  onValueChange={(value) =>
                     setLibreRegion(
                       value === "us" || value === "global" || value === "de" || value === "ap" || value === "au"
                         ? value
                         : "eu",
-                    );
-                  }}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  data-testid="select-libre-region"
+                    )
+                  }
                 >
-                  <option value="eu">Europe / UK</option>
-                  <option value="us">United States</option>
-                  <option value="global">Global</option>
-                  <option value="de">Germany</option>
-                  <option value="ap">Asia-Pacific</option>
-                  <option value="au">Australia</option>
-                </select>
+                  <SelectTrigger id="libre-region" className="h-10 rounded-xl" data-testid="select-libre-region">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="eu">Europe / UK</SelectItem>
+                    <SelectItem value="us">United States</SelectItem>
+                    <SelectItem value="global">Global</SelectItem>
+                    <SelectItem value="de">Germany</SelectItem>
+                    <SelectItem value="ap">Asia-Pacific</SelectItem>
+                    <SelectItem value="au">Australia</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               {libreError ? (
                 <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs leading-relaxed text-destructive">
