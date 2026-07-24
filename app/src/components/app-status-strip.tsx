@@ -23,6 +23,10 @@ import {
   Shield,
   MoreHorizontal,
   Maximize2,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  Loader2,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -58,7 +62,6 @@ import { useExerciseSessionActions } from "@/hooks/use-exercise-session-actions"
 import { requestOpenExerciseMode } from "@/lib/exercise-mode-deep-link";
 import { reconcileExerciseFuelLines } from "@/lib/exercise-recommendation";
 import { CgmLiveBgChip } from "@/components/cgm-live-bg-chip";
-import { CgmPrefillButton } from "@/components/cgm-prefill-button";
 import { cgmTrendForExercise } from "@/lib/cgm/apply-cgm-trend";
 import { isCgmPrefillActive } from "@/lib/cgm/preferences";
 import { useBgPrefill } from "@/hooks/use-bg-prefill";
@@ -1114,10 +1117,7 @@ export function AppStatusStrip() {
 
           {exerciseExpanded && !isExerciseScenarioPage ? (
             <div
-              className={cn(
-                "rounded-2xl border border-border/60 bg-background/55 px-3 py-3 backdrop-blur space-y-2",
-                readiness?.verdict ? getReadinessToneClasses(readiness.verdict.verdict) : null,
-              )}
+              className="space-y-3 rounded-2xl border border-border/60 bg-background/55 px-3 py-3 backdrop-blur max-h-[min(64vh,34rem)] overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]"
               data-testid="status-exercise-expanded"
             >
               <div className="flex items-start justify-between gap-3">
@@ -1177,177 +1177,30 @@ export function AppStatusStrip() {
                 />
               ) : null}
 
-              {exerciseHypoStrip ? <ExerciseHypoTreatmentHint suggestion={exerciseHypoStrip} /> : null}
-
-              {ex.phase === "pre" ? (
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground">Current BG</p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Input
-                      inputMode="decimal"
-                      placeholder={bgUnits === "mmol/L" ? "e.g. 7.2" : "e.g. 130"}
-                      value={exerciseBgInput}
-                      onChange={(e) => onExerciseCgmTrackedChange(e.target.value)}
-                      className="h-9 min-w-[10rem] flex-1"
-                      data-testid="status-exercise-bg"
-                    />
-                    <div className="flex flex-wrap gap-2">
-                      {(["flat", "rising", "falling"] as const).map((t) => (
-                        <Button
-                          key={t}
-                          type="button"
-                          size="sm"
-                          variant={trendButtonSelected(t) ? "default" : "outline"}
-                          className={btnClass}
-                          onClick={() => onExerciseTrendPick(t)}
-                          data-testid={`status-exercise-trend-${t}`}
-                        >
-                          {t}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                  <CgmPrefillButton
-                    prefill={exerciseCgmPrefill}
-                    loading={exerciseCgmLoading}
-                    bgUnits={bgUnits}
-                    currentValue={exerciseBgInput}
-                    onApply={applyExerciseCgmPrefill}
-                    onApplyTrend={applyExerciseCgmTrend}
-                    onRefresh={refreshExerciseCgm}
-                    emptyHint={exerciseCgmEmptyHint}
-                    allowSync
-                    testId="button-exercise-cgm-prefill"
-                  />
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-medium text-muted-foreground">BG now</p>
-                    <p className="text-xs font-medium text-muted-foreground">Trend</p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Input
-                      inputMode="decimal"
-                      placeholder={bgUnits === "mmol/L" ? "e.g. 7.2" : "e.g. 130"}
-                      value={exerciseBgInput}
-                      onChange={(e) => onExerciseCgmTrackedChange(e.target.value)}
-                      className="h-9 min-w-[10rem] flex-1"
-                      data-testid="status-exercise-bg"
-                    />
-                    <div className="flex flex-wrap gap-2">
-                      {(["flat", "rising", "falling"] as const).map((t) => (
-                        <Button
-                          key={t}
-                          type="button"
-                          size="sm"
-                          variant={trendButtonSelected(t) ? "default" : "outline"}
-                          className={btnClass}
-                          onClick={() => onExerciseTrendPick(t)}
-                          data-testid={`status-exercise-trend-${t}`}
-                        >
-                          {t}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                  <CgmPrefillButton
-                    prefill={exerciseCgmPrefill}
-                    loading={exerciseCgmLoading}
-                    bgUnits={bgUnits}
-                    currentValue={exerciseBgInput}
-                    onApply={applyExerciseCgmPrefill}
-                    onApplyTrend={applyExerciseCgmTrend}
-                    onRefresh={refreshExerciseCgm}
-                    emptyHint={exerciseCgmEmptyHint}
-                    allowSync
-                    testId="button-exercise-cgm-prefill"
-                  />
-                </div>
-              )}
-
-              {ex.phase === "pre" ? (
-                <>
-                  <div className="space-y-1.5">
-                    <p className="text-xs font-medium text-muted-foreground">Rapid-acting insulin in the last 2 hours?</p>
-                    <div className="flex flex-wrap gap-2">
-                      {(
-                        [
-                          { id: "yes" as const, label: "Yes" },
-                          { id: "no" as const, label: "No" },
-                        ] as const
-                      ).map((o) => (
-                        <Button
-                          key={o.id}
-                          type="button"
-                          size="sm"
-                          variant={ex.preRapidInsulin2h === o.id ? "default" : "outline"}
-                          className={btnClass}
-                          onClick={() => {
-                            const togglingOff = ex.preRapidInsulin2h === o.id;
-                            const next = togglingOff ? undefined : o.id;
-                            const patch: Parameters<typeof storage.updateActiveExercise>[0] = {
-                              preRapidInsulin2h: next,
-                            };
-                            if (o.id === "no" && next === "no") {
-                              patch.preChecklist = { ...ex.preChecklist, basalAdjusted: true };
-                            }
-                            storage.updateActiveExercise(patch);
-                            setEx(storage.getActiveExercise());
-                          }}
-                          data-testid={`status-exercise-rapid-insulin-${o.id}`}
-                        >
-                          {o.label}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-2 pt-1">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={ex.preChecklist.carbsConsidered ? "default" : "outline"}
-                      className={btnClass}
-                      onClick={() => {
-                        storage.updateActiveExercise({
-                          preChecklist: { ...ex.preChecklist, carbsConsidered: !ex.preChecklist.carbsConsidered },
-                        });
-                        setEx(storage.getActiveExercise());
-                      }}
-                    >
-                      Carbs planned
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={ex.preChecklist.basalAdjusted ? "default" : "outline"}
-                      className={btnClass}
-                      onClick={() => {
-                        storage.updateActiveExercise({
-                          preChecklist: { ...ex.preChecklist, basalAdjusted: !ex.preChecklist.basalAdjusted },
-                        });
-                        setEx(storage.getActiveExercise());
-                      }}
-                    >
-                      Insulin considered
-                    </Button>
-                  </div>
-                </>
-              ) : null}
-
-              {ex.phase === "active" && exercisePlan && readiness?.verdict ? (
-                <div className="pt-1">
-                  {(() => {
+              {/* The actual answer — up top, not buried under every input below it. */}
+              {readiness?.verdict && exercisePlan
+                ? (() => {
                     const v = readiness.verdict;
+                    const fuelLines =
+                      ex.phase === "pre" ? preFuelPlanLines : ex.phase === "active" ? activeFuelPlanLines : recoveryFuelPlanLines;
+                    const fuelVariant = ex.phase === "pre" ? "pre" : ex.phase === "active" ? "active" : "recovery";
                     const isCaution = v.verdict === "caution";
                     const isHighCaution = isCaution && v.title.toLowerCase().includes("high");
-                    const mergedCarbCaution = isCaution && !isHighCaution && duringCarbBallpark(exercisePlan.during);
+                    const mergedCarbCaution =
+                      ex.phase === "active" && isCaution && !isHighCaution && duringCarbBallpark(exercisePlan.during);
+                    const bodyText =
+                      ex.phase === "active"
+                        ? duringQuickStatusBody(v, exercisePlan.during, Boolean(mergedCarbCaution))
+                        : v.detail;
+                    const needsCarbPrompt = ex.phase === "pre" && fuelLines.length === 0;
+                    const needsInsulinPrompt = ex.phase === "pre" && ex.preRapidInsulin2h == null;
                     return (
                       <div
                         className={cn(
-                          "rounded-2xl border px-3 py-3 space-y-1.5 bg-background/75",
+                          "rounded-2xl border px-3.5 py-3 space-y-2 bg-background/80",
                           getReadinessToneClasses(v.verdict),
                         )}
+                        data-testid="status-exercise-verdict"
                       >
                         <div className="flex items-start justify-between gap-2">
                           <p className="text-base font-semibold leading-tight text-foreground">{v.title}</p>
@@ -1356,108 +1209,181 @@ export function AppStatusStrip() {
                               type="button"
                               variant="ghost"
                               size="icon"
-                              className="h-9 w-9 shrink-0 -mr-1.5 -mt-1 text-muted-foreground hover:text-foreground"
+                              className="h-8 w-8 shrink-0 -mr-1 -mt-1 text-muted-foreground hover:text-foreground"
                               onClick={() => setExerciseDetailOpen(true)}
-                              aria-label="More exercise guidance"
+                              aria-label="More guidance"
                               data-testid="status-exercise-more-info"
                             >
                               <Info className="h-4 w-4" aria-hidden />
                             </Button>
                           ) : null}
                         </div>
-                        <p className="text-sm leading-snug text-foreground/90">
-                          {duringQuickStatusBody(v, exercisePlan.during, Boolean(mergedCarbCaution))}
-                        </p>
-                        {activeFuelPlanLines.length > 0 ? (
-                          <ExerciseFuelPlanSummary lines={activeFuelPlanLines} variant="active" className="mt-2" />
+                        <p className="text-sm leading-snug text-foreground/90">{bodyText}</p>
+                        {exerciseHypoStrip ? <ExerciseHypoTreatmentHint suggestion={exerciseHypoStrip} className="mt-1" /> : null}
+                        {fuelLines.length > 0 ? (
+                          <ExerciseFuelPlanSummary lines={fuelLines} variant={fuelVariant} className="mt-1" />
                         ) : null}
-                      </div>
-                    );
-                  })()}
-                </div>
-              ) : null}
-
-              {ex.phase === "recovery" && exercisePlan && readiness?.verdict ? (
-                <div className="pt-1">
-                  <div
-                    className={cn(
-                      "rounded-2xl border px-3 py-3 space-y-1.5 bg-background/75",
-                      getReadinessToneClasses(readiness.verdict.verdict),
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="text-base font-semibold leading-tight text-foreground">{readiness.verdict.title}</p>
-                      {exerciseExtraInfoLines.length > 0 ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-9 w-9 shrink-0 -mr-1.5 -mt-1 text-muted-foreground hover:text-foreground"
-                          onClick={() => setExerciseDetailOpen(true)}
-                          aria-label="More recovery guidance"
-                          data-testid="status-exercise-more-info"
-                        >
-                          <Info className="h-4 w-4" aria-hidden />
-                        </Button>
-                      ) : null}
-                    </div>
-                    <p className="text-sm leading-snug text-foreground/90">{readiness.verdict.detail}</p>
-                    {recoveryFuelPlanLines.length > 0 ? (
-                      <ExerciseFuelPlanSummary lines={recoveryFuelPlanLines} variant="recovery" className="mt-2" />
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
-
-              {ex.phase === "pre" && readiness?.verdict ? (
-                <div className="pt-1">
-                  <div
-                    className={cn(
-                      "rounded-2xl border px-3 py-3 space-y-1.5 bg-background/75",
-                      getReadinessToneClasses(readiness.verdict.verdict),
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="text-base font-semibold leading-tight text-foreground">{readiness.verdict.title}</p>
-                      {exerciseExtraInfoLines.length > 0 ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-9 w-9 shrink-0 -mr-1.5 -mt-1 text-muted-foreground hover:text-foreground"
-                          onClick={() => setExerciseDetailOpen(true)}
-                          aria-label="More pre-workout guidance"
-                          data-testid="status-exercise-more-info"
-                        >
-                          <Info className="h-4 w-4" aria-hidden />
-                        </Button>
-                      ) : null}
-                    </div>
-                    <p className="text-sm leading-snug text-foreground/90">{readiness.verdict.detail}</p>
-                    {preFuelPlanLines.length > 0 ? (
-                      <ExerciseFuelPlanSummary lines={preFuelPlanLines} variant="pre" className="mt-2" />
-                    ) : null}
-                    {(() => {
-                      const needsCarbPrompt = !ex.preChecklist.carbsConsidered && preFuelPlanLines.length === 0;
-                      const needsInsulinPrompt = !ex.preChecklist.basalAdjusted;
-                      const show = needsCarbPrompt || needsInsulinPrompt;
-                      if (!show) return null;
-                      return (
-                        <div className="pt-2 border-t border-border/50 space-y-1.5">
-                          <p className="text-xs font-medium text-muted-foreground">Before you start</p>
-                          <ul className="space-y-1 text-xs text-muted-foreground">
-                            {needsCarbPrompt ? <li>Have fast carbs within reach.</li> : null}
+                        {needsCarbPrompt || needsInsulinPrompt ? (
+                          <div className="pt-2 border-t border-border/50 space-y-1 text-xs text-muted-foreground">
+                            {needsCarbPrompt ? <p>Have fast carbs within reach.</p> : null}
                             {needsInsulinPrompt ? (
-                              <li>
+                              <p>
                                 {usesClosedLoop(storage.getSettings())
                                   ? "Review IOB and your loop's exercise settings before you push intensity."
                                   : "Consider insulin on board / recent bolus before you push intensity."}
-                              </li>
+                              </p>
                             ) : null}
-                          </ul>
-                        </div>
-                      );
-                    })()}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })()
+                : null}
+
+              {/* BG + trend, one row — most of the time this is already right from live CGM. */}
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium text-muted-foreground">
+                  {ex.phase === "pre" ? "Current BG" : ex.phase === "active" ? "BG now" : "BG at end"}
+                </p>
+                <div className="flex items-center gap-2">
+                  <Input
+                    inputMode="decimal"
+                    placeholder={bgUnits === "mmol/L" ? "e.g. 7.2" : "e.g. 130"}
+                    value={exerciseBgInput}
+                    onChange={(e) => onExerciseCgmTrackedChange(e.target.value)}
+                    className="h-9 min-w-0 flex-1"
+                    data-testid="status-exercise-bg"
+                  />
+                  <div className="flex shrink-0 items-center gap-0.5 rounded-lg border border-border/60 bg-background/60 p-0.5">
+                    {(
+                      [
+                        { id: "falling" as const, Icon: TrendingDown, label: "Falling" },
+                        { id: "flat" as const, Icon: Minus, label: "Flat" },
+                        { id: "rising" as const, Icon: TrendingUp, label: "Rising" },
+                      ] as const
+                    ).map(({ id, Icon, label }) => (
+                      <Button
+                        key={id}
+                        type="button"
+                        size="icon"
+                        variant={trendButtonSelected(id) ? "default" : "ghost"}
+                        className="h-7 w-7 rounded-md"
+                        onClick={() => onExerciseTrendPick(id)}
+                        aria-label={label}
+                        aria-pressed={trendButtonSelected(id)}
+                        title={label}
+                        data-testid={`status-exercise-trend-${id}`}
+                      >
+                        <Icon className="h-3.5 w-3.5" aria-hidden />
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+                {(() => {
+                  if (!cgmPrefillActive) return null;
+                  if (exerciseCgmLoading && !exerciseCgmPrefill) {
+                    return (
+                      <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                        <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+                        Checking recent BG…
+                      </p>
+                    );
+                  }
+                  if (!exerciseCgmPrefill) {
+                    if (!exerciseCgmEmptyHint) return null;
+                    return (
+                      <p className="text-[11px] leading-snug text-muted-foreground">
+                        {exerciseCgmEmptyHint}{" "}
+                        <button
+                          type="button"
+                          className="text-primary underline-offset-2 hover:underline"
+                          onClick={refreshExerciseCgm}
+                        >
+                          Check again
+                        </button>
+                      </p>
+                    );
+                  }
+                  const prefill = exerciseCgmPrefill;
+                  if (!exerciseBgInput.trim()) {
+                    return (
+                      <div className="space-y-0.5">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-[11px]"
+                          onClick={() => {
+                            applyExerciseCgmPrefill(prefill.value);
+                            const t = cgmTrendForExercise(prefill.reading?.trend);
+                            if (t) applyExerciseCgmTrend(t);
+                          }}
+                          data-testid="button-exercise-cgm-prefill"
+                        >
+                          Use {prefill.value} {bgUnits}
+                        </Button>
+                        <p className="text-[11px] leading-snug text-muted-foreground">{prefill.source}</p>
+                      </div>
+                    );
+                  }
+                  if (exerciseBgInput.trim() === prefill.value) {
+                    return (
+                      <p className="text-[11px] leading-snug text-muted-foreground" data-testid="status-exercise-cgm-synced">
+                        Synced · {prefill.source}
+                      </p>
+                    );
+                  }
+                  return (
+                    <div className="space-y-0.5">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-[11px]"
+                        onClick={() => applyExerciseCgmPrefill(prefill.value)}
+                        data-testid="button-exercise-cgm-prefill-sync"
+                      >
+                        Use {prefill.value} {bgUnits} instead
+                      </Button>
+                      <p className="text-[11px] leading-snug text-muted-foreground">{prefill.source}</p>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {ex.phase === "pre" ? (
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-muted-foreground">Rapid-acting insulin in the last 2 hours?</p>
+                  <div className="flex gap-2">
+                    {(
+                      [
+                        { id: "yes" as const, label: "Yes" },
+                        { id: "no" as const, label: "No" },
+                      ] as const
+                    ).map((o) => (
+                      <Button
+                        key={o.id}
+                        type="button"
+                        size="sm"
+                        variant={ex.preRapidInsulin2h === o.id ? "default" : "outline"}
+                        className={cn(btnClass, "flex-1")}
+                        onClick={() => {
+                          const togglingOff = ex.preRapidInsulin2h === o.id;
+                          const next = togglingOff ? undefined : o.id;
+                          const patch: Parameters<typeof storage.updateActiveExercise>[0] = {
+                            preRapidInsulin2h: next,
+                          };
+                          if (o.id === "no" && next === "no") {
+                            patch.preChecklist = { ...ex.preChecklist, basalAdjusted: true };
+                          }
+                          storage.updateActiveExercise(patch);
+                          setEx(storage.getActiveExercise());
+                        }}
+                        data-testid={`status-exercise-rapid-insulin-${o.id}`}
+                      >
+                        {o.label}
+                      </Button>
+                    ))}
                   </div>
                 </div>
               ) : null}
