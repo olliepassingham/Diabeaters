@@ -23,6 +23,7 @@ import {
   Flower2,
   Footprints,
   Info,
+  Maximize2,
   Moon,
   Pill,
   Play,
@@ -106,6 +107,7 @@ import {
 } from "@/lib/exercise-readiness";
 import { reconcileExerciseFuelLines } from "@/lib/exercise-recommendation";
 import { useExerciseSessionActions } from "@/hooks/use-exercise-session-actions";
+import { requestOpenExerciseMode } from "@/lib/exercise-mode-deep-link";
 import { computeExerciseHypoSuggestion, resolveExerciseBgForHypo } from "@/lib/exercise-hypo-auto";
 import { buildExercisePersonalizationLines } from "@/lib/exercise-personalization";
 import { format } from "date-fns";
@@ -1117,6 +1119,19 @@ export function ExerciseGuidedCoach() {
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
+                ) : null}
+                {phase === "active" ? (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 shrink-0 rounded-full text-muted-foreground"
+                    onClick={() => requestOpenExerciseMode()}
+                    data-testid="button-coach-exercise-mode"
+                    aria-label="Exercise mode — full-screen view"
+                    title="Exercise mode"
+                  >
+                    <Maximize2 className="h-4 w-4" />
+                  </Button>
                 ) : null}
                 {phase === "pre" ? (
                   <Button

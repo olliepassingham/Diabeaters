@@ -22,6 +22,7 @@ import {
   Sparkles,
   Shield,
   MoreHorizontal,
+  Maximize2,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -54,6 +55,7 @@ import {
   type ExerciseReadinessResult,
 } from "@/lib/exercise-readiness";
 import { useExerciseSessionActions } from "@/hooks/use-exercise-session-actions";
+import { requestOpenExerciseMode } from "@/lib/exercise-mode-deep-link";
 import { reconcileExerciseFuelLines } from "@/lib/exercise-recommendation";
 import { CgmLiveBgChip } from "@/components/cgm-live-bg-chip";
 import { CgmPrefillButton } from "@/components/cgm-prefill-button";
@@ -1008,6 +1010,16 @@ export function AppStatusStrip() {
                         <Plane className="mr-2 h-3.5 w-3.5 opacity-70" aria-hidden />
                         End travel mode
                       </DropdownMenuItem>
+                      {ex.phase === "active" ? (
+                        <DropdownMenuItem
+                          onClick={() => requestOpenExerciseMode()}
+                          className="cursor-pointer"
+                          data-testid="status-exercise-mode"
+                        >
+                          <Maximize2 className="mr-2 h-3.5 w-3.5 opacity-70" aria-hidden />
+                          Exercise mode
+                        </DropdownMenuItem>
+                      ) : null}
                       <DropdownMenuItem
                         onClick={handleEndExercise}
                         className="cursor-pointer"
@@ -1030,6 +1042,19 @@ export function AppStatusStrip() {
                   >
                     {exerciseExpanded ? "Hide" : "Check"}
                   </Button>
+                  {ex.phase === "active" ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className={cn(btnClass, "px-2")}
+                      onClick={() => requestOpenExerciseMode()}
+                      aria-label="Exercise mode"
+                      title="Exercise mode"
+                      data-testid="status-exercise-mode"
+                    >
+                      <Maximize2 className="h-3.5 w-3.5" aria-hidden />
+                    </Button>
+                  ) : null}
                   <Button
                     size="sm"
                     variant="outline"
@@ -1067,6 +1092,16 @@ export function AppStatusStrip() {
                       <Plane className="mr-2 h-3.5 w-3.5 opacity-70" aria-hidden />
                       End travel mode
                     </DropdownMenuItem>
+                    {ex.phase === "active" ? (
+                      <DropdownMenuItem
+                        onClick={() => requestOpenExerciseMode()}
+                        className="cursor-pointer"
+                        data-testid="status-exercise-mode"
+                      >
+                        <Maximize2 className="mr-2 h-3.5 w-3.5 opacity-70" aria-hidden />
+                        Exercise mode
+                      </DropdownMenuItem>
+                    ) : null}
                     <DropdownMenuItem onClick={handleEndExercise} className="cursor-pointer" data-testid="status-exercise-end">
                       <Power className="mr-2 h-3.5 w-3.5 opacity-70" aria-hidden />
                       End exercise session
