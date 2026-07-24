@@ -12,6 +12,7 @@ import { Link, useLocation } from "wouter";
 import { Repeat, Plus, Utensils, Coffee, Sun, Moon, Cookie, Clock, Syringe, Check, Trash2, Pencil, Star, TrendingUp, History, Tag, Dumbbell, Play, RotateCcw, BookmarkPlus } from "lucide-react";
 import { storage, Routine, RoutineMealType, RoutineOutcome, UserSettings, ExerciseRoutine, ExerciseType, ExerciseIntensity, DIABEATER_EXERCISE_OUTCOMES_CHANGED_EVENT } from "@/lib/storage";
 import { listRecentRepeatableExerciseSessions, type RecentRepeatableExerciseSession } from "@/lib/exercise-session-repeat";
+import { EXERCISE_TYPE_OPTIONS, EXERCISE_INTENSITY_OPTIONS } from "@/lib/exercise-catalog";
 import { buildExerciseScenarioRepeatHref } from "@/lib/exercise-planner-href";
 import { format } from "date-fns";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
@@ -27,10 +28,10 @@ const MEAL_TYPES: { value: RoutineMealType; label: string; icon: typeof Utensils
 ];
 
 const OUTCOMES: { value: RoutineOutcome; label: string; color: string }[] = [
-  { value: "great", label: "Great - stayed in range", color: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300" },
-  { value: "good", label: "Good - minor drift", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300" },
-  { value: "okay", label: "Okay - needed correction", color: "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300" },
-  { value: "not_ideal", label: "Not ideal - learning moment", color: "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300" },
+  { value: "great", label: "Great - stayed in range", color: "bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-300" },
+  { value: "good", label: "Good - minor drift", color: "bg-sky-500/10 text-sky-700 dark:bg-sky-400/15 dark:text-sky-300" },
+  { value: "okay", label: "Okay - needed correction", color: "bg-amber-500/10 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300" },
+  { value: "not_ideal", label: "Not ideal - learning moment", color: "bg-orange-500/10 text-orange-700 dark:bg-orange-400/15 dark:text-orange-300" },
 ];
 
 const TIMING_OPTIONS = [
@@ -71,28 +72,17 @@ function formatRoutineInsulinLine(routine: Routine): string | null {
   return dose;
 }
 
-const EXERCISE_TYPES: { value: ExerciseType; label: string }[] = [
-  { value: "cardio", label: "Cardio" },
-  { value: "strength", label: "Strength" },
-  { value: "hiit", label: "HIIT" },
-  { value: "yoga", label: "Yoga" },
-  { value: "walking", label: "Walking" },
-  { value: "court", label: "Court & racket sports" },
-  { value: "field", label: "Field & team sports" },
-  { value: "swimming", label: "Swimming" },
-];
+/** Same catalog used by the Guided Coach and status strip, so every exercise type has exactly
+ * one label app-wide (e.g. always "Yoga / Pilates", never just "Yoga" on this page only). */
+const EXERCISE_TYPES = EXERCISE_TYPE_OPTIONS;
+const EXERCISE_INTENSITIES = EXERCISE_INTENSITY_OPTIONS;
 
-const EXERCISE_INTENSITIES: { value: ExerciseIntensity; label: string }[] = [
-  { value: "light", label: "Light" },
-  { value: "moderate", label: "Moderate" },
-  { value: "intense", label: "Intense" },
-];
-
+/** Emerald-tinted scheme matching the rest of the redesigned exercise tool (status strip, Guided Coach). */
 function getIntensityStyle(intensity: ExerciseIntensity): string {
   switch (intensity) {
-    case "light": return "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300";
-    case "moderate": return "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300";
-    case "intense": return "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300";
+    case "light": return "bg-sky-500/10 text-sky-700 dark:bg-sky-400/15 dark:text-sky-300";
+    case "moderate": return "bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-300";
+    case "intense": return "bg-amber-500/10 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300";
   }
 }
 
@@ -678,7 +668,7 @@ export function RoutinesContent() {
                   return (
                   <Card
                     key={routine.id}
-                    className="overflow-hidden border-border/50 shadow-none ring-1 ring-black/[0.03] dark:ring-white/[0.04]"
+                    className="overflow-hidden border-border/50 shadow-none ring-1 ring-border/40 dark:ring-border/30"
                     data-testid={`card-routine-${routine.id}`}
                   >
                     <CardContent className="p-4 sm:p-5">
@@ -1026,7 +1016,7 @@ export function RoutinesContent() {
             {exerciseRoutines.map((routine) => (
               <Card
                 key={routine.id}
-                className="overflow-hidden border-border/50 shadow-none ring-1 ring-black/[0.03] dark:ring-white/[0.04]"
+                className="overflow-hidden border-border/50 shadow-none ring-1 ring-border/40 dark:ring-border/30"
                 data-testid={`card-exercise-routine-${routine.id}`}
               >
                 <CardContent className="p-4 sm:p-5">

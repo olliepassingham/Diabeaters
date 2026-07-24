@@ -120,17 +120,29 @@ describe("ExerciseGuidedCoach", () => {
     expect(queryByTestId("button-coach-env-outdoor_hot")).not.toBeNull();
   });
 
-  it("renders during phase with recovery CTA and RPE buttons", () => {
+  it("renders during phase with a prominent Exercise mode CTA and collapsed RPE/symptom logging", () => {
     mockSession = makeSession("active");
     const { queryByTestId } = renderWithRouter(<ExerciseGuidedCoach />);
     expect(queryByTestId("button-coach-finish-workout")).not.toBeNull();
-    expect(queryByTestId("button-coach-rpe-moderate")).not.toBeNull();
+    // Exercise Mode is the prominent primary "during" action now.
+    expect(queryByTestId("button-coach-exercise-mode")).not.toBeNull();
     expect(queryByTestId("button-coach-feel-low")).not.toBeNull();
-    expect(queryByTestId("panel-coach-during")).not.toBeNull();
+    // RPE/symptom logging is secondary — collapsed by default, not competing for attention.
+    expect(queryByTestId("button-coach-rpe-moderate")).toBeNull();
+    fireEvent.click(queryByTestId("button-coach-section-log-how-it-feels")!);
+    expect(queryByTestId("button-coach-rpe-moderate")).not.toBeNull();
     expect(queryByTestId("button-coach-symptom-shaky")).not.toBeNull();
     // Mid-workout carb tally was removed — people rarely log grams during exercise.
     expect(queryByTestId("button-coach-quick-addcarbs-15")).toBeNull();
     expect(queryByTestId("panel-coach-carbs")).toBeNull();
+  });
+
+  it("auto-expands during-phase logging when symptoms are already flagged", () => {
+    mockSession = { ...makeSession("active"), midSymptoms: ["shaky"], midSymptomSeverity: "moderate" };
+    const { queryByTestId } = renderWithRouter(<ExerciseGuidedCoach />);
+    // Don't hide active symptom guidance behind a collapsed accordion.
+    expect(queryByTestId("button-coach-rpe-moderate")).not.toBeNull();
+    expect(queryByTestId("panel-coach-symptoms-action")).not.toBeNull();
   });
 
   it("renders recovery phase with bedtime presets and alcohol pill, no dead carb/bolus fields", () => {

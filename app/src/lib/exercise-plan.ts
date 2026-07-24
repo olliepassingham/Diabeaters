@@ -191,11 +191,22 @@ function hasModerateInsulin(timing: LastInsulinTiming | undefined): boolean {
   return timing === "h2_4";
 }
 
-/** Round gram targets to 5g steps; bias down when reducing, up when increasing, so type nudges are visible. */
-function roundCarbsGrams(raw: number, mult: number): number {
+/**
+ * Round a final gram target to the nearest 5g step for practical dosing, biased down when the
+ * *combined* type + deeper-context multiplier is a net decrease and up when it's a net increase
+ * (so a deliberate nudge — e.g. cardio's during-carb bump — stays visible after rounding).
+ *
+ * Intentionally called only ONCE per pre/during/post value, after every multiplier has already
+ * been applied to the full-precision number. Previously this same bias was applied at each
+ * intermediate stage (base curve, then type nudge, then deeper context), which compounds: a
+ * mild, intended trim (e.g. strength's ~8%) could land just under a 5g boundary after the first
+ * rounding pass and then get floored a second time, turning an ~8% trim into a 50% cut. Applying
+ * the bias once, to the combined multiplier, keeps nudges visible without amplifying them.
+ */
+function roundGramsForNudge(raw: number, aggregateMultiplier: number): number {
   if (raw <= 0) return 0;
-  if (mult < 1) return Math.floor(raw / 5) * 5;
-  if (mult > 1) return Math.ceil(raw / 5) * 5;
+  if (aggregateMultiplier < 1) return Math.floor(raw / 5) * 5;
+  if (aggregateMultiplier > 1) return Math.ceil(raw / 5) * 5;
   return Math.round(raw / 5) * 5;
 }
 
@@ -269,7 +280,7 @@ function applyExerciseTypeCarbAdjustments(
   pre: number,
   during: number,
   post: number,
-): { pre: number; during: number; post: number } {
+): { pre: number; during: number; post: number; preM: number; duringM: number; postM: number } {
   const k = typeKey.toLowerCase();
   let preM = 1;
   let duringM = 1;
@@ -320,16 +331,22 @@ function applyExerciseTypeCarbAdjustments(
     postM = 1 + (postM - 1) * 0.5;
   }
 
-  let outPre = roundCarbsGrams(pre * preM, preM);
-  let outDuring = roundCarbsGrams(during * duringM, duringM);
-  let outPost = roundCarbsGrams(post * postM, postM);
+  // Kept unrounded here — rounding happens once, at the very end of calculateExercisePlan,
+  // after deeper-context multipliers have also been applied.
+  const outPre = pre * preM;
+  let outDuring = during * duringM;
+  const outPost = post * postM;
+  let duringMForRounding = duringM;
 
   // HIIT at moderate+: small extra during buffer when base during was 0 but session is glycolytic.
   if (k === "hiit" && (intensity === "moderate" || intensity === "intense") && outDuring === 0 && during === 0) {
     outDuring = intensity === "intense" ? 10 : 5;
+    // This is a fixed floor addition, not a proportional nudge — let any deeper-context
+    // multiplier alone decide the final rounding direction for this value.
+    duringMForRounding = 1;
   }
 
-  return { pre: outPre, during: outDuring, post: outPost };
+  return { pre: outPre, during: outDuring, post: outPost, preM, duringM: duringMForRounding, postM };
 }
 
 type ExerciseIntensityKey = "light" | "moderate" | "intense";
@@ -346,14 +363,14 @@ type CarbRampCurve = { thresholdMin: number; base: number; ratePerMin: number; c
 function rampGrams(duration: number, curve: CarbRampCurve): number {
   if (duration < curve.thresholdMin) return 0;
   const raw = curve.base + curve.ratePerMin * (duration - curve.thresholdMin);
-  return roundCarbsGrams(Math.min(curve.cap, Math.max(0, raw)), 1);
+  return Math.min(curve.cap, Math.max(0, raw));
 }
 
 /** Post-exercise: a floor that matches typical short/default sessions, ramping up only for longer ones. */
 function rampGramsWithFloor(duration: number, curve: CarbRampCurve): number {
-  if (duration <= curve.thresholdMin) return roundCarbsGrams(curve.base, 1);
+  if (duration <= curve.thresholdMin) return curve.base;
   const raw = curve.base + curve.ratePerMin * (duration - curve.thresholdMin);
-  return roundCarbsGrams(Math.min(curve.cap, Math.max(curve.base, raw)), 1);
+  return Math.min(curve.cap, Math.max(curve.base, raw));
 }
 
 /** Carbs to eat now if BG is low, sized as a pre-exercise buffer — scales with duration and intensity. */
@@ -545,10 +562,17 @@ export function calculateExercisePlan(
   // Deeper context (environment / sleep / alcohol / history) applied on top of type adjustments.
   const deeperMult = deeperContextCarbMultipliers(context);
   if (deeperMult.pre !== 1 || deeperMult.during !== 1 || deeperMult.post !== 1) {
-    preExerciseCarbs = roundCarbsGrams(preExerciseCarbs * deeperMult.pre, deeperMult.pre);
-    duringCarbs = roundCarbsGrams(duringCarbs * deeperMult.during, deeperMult.during);
-    postExerciseCarbs = roundCarbsGrams(postExerciseCarbs * deeperMult.post, deeperMult.post);
+    preExerciseCarbs = preExerciseCarbs * deeperMult.pre;
+    duringCarbs = duringCarbs * deeperMult.during;
+    postExerciseCarbs = postExerciseCarbs * deeperMult.post;
   }
+
+  // Round once, now that every intensity/type/deeper-context multiplier has been applied to the
+  // full-precision value — see roundGramsForNudge for why this must happen exactly once, biased
+  // by the combined multiplier rather than re-biased at each stage.
+  preExerciseCarbs = roundGramsForNudge(preExerciseCarbs, typeAdjusted.preM * deeperMult.pre);
+  duringCarbs = roundGramsForNudge(duringCarbs, typeAdjusted.duringM * deeperMult.during);
+  postExerciseCarbs = roundGramsForNudge(postExerciseCarbs, typeAdjusted.postM * deeperMult.post);
 
   // History-aware bolus reduction nudge: hypo-prone routines bias toward the higher end.
   if (context.historyBias?.hypoProne || context.historyBias?.typicalResponse === "dropped") {

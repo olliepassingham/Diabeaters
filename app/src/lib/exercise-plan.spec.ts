@@ -148,6 +148,19 @@ describe("calculateExercisePlan", () => {
     expect(cardio.pre.contextualNotes?.some((n) => n.includes("activity type"))).toBe(true);
   });
 
+  it("does not let a mild type nudge collapse into a much larger cut at a 5g rounding boundary", () => {
+    // Regression: 20 min moderate strength used to round to 5g ("Have ready ~5g fast carbs") —
+    // a 50% cut — because the ~8% strength trim was re-rounded on top of an already-rounded base
+    // (11.5g -> 10g -> x0.92 -> floor to 5g). It should land close to a cardio session of the
+    // same length/intensity (which rounds to 10g), not half of it.
+    const ctx = { ...baseCtx, durationMinutes: 20, intensity: "moderate" as const };
+    const cardio = calculateExercisePlan({ ...ctx, exerciseType: "cardio" });
+    const strength = calculateExercisePlan({ ...ctx, exerciseType: "strength" });
+    expect(cardio.pre.carbsIfLow).toBe(10);
+    expect(strength.pre.carbsIfLow).toBeGreaterThanOrEqual(cardio.pre.carbsIfLow - 5);
+    expect(strength.pre.carbsIfLow).not.toBeLessThan(cardio.pre.carbsIfLow / 2);
+  });
+
   it("adjusts post-exercise bolus reduction by exercise type (strength < cardio)", () => {
     const ctx = { ...baseCtx, durationMinutes: 60, intensity: "moderate" as const };
     const cardio = calculateExercisePlan({ ...ctx, exerciseType: "cardio" });
