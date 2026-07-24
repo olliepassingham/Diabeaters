@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Activity, CircleCheck, Droplet, Loader2, Minus, TrendingDown, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { BRAND_MARK_IMAGE_SRC } from "@/lib/brand-mark";
 import {
   storage,
   DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT,
@@ -115,106 +116,135 @@ function ExerciseModeContent({
 
   return (
     <div
-      className="fixed inset-0 z-[130] flex flex-col bg-neutral-950 text-white [padding-top:max(1.5rem,env(safe-area-inset-top))] [padding-bottom:max(1.5rem,env(safe-area-inset-bottom))]"
+      className="fixed inset-0 z-[130] flex flex-col overflow-hidden bg-neutral-950 text-white [padding-top:max(1.25rem,env(safe-area-inset-top))] [padding-bottom:max(1.5rem,env(safe-area-inset-bottom))]"
       role="dialog"
       aria-modal="true"
       aria-label="Exercise mode"
       data-testid="exercise-mode-overlay"
     >
-      <div className="flex items-center justify-center gap-2 px-6 text-sm font-medium uppercase tracking-wide text-white/50">
-        <Activity className="h-4 w-4 shrink-0" aria-hidden />
-        <span className="truncate">{session.exerciseName}</span>
-      </div>
+      {/* Decorative only — a soft brand-coloured glow and grain-free gradient instead of flat black. */}
+      <div
+        className="pointer-events-none absolute inset-0 bg-gradient-to-b from-neutral-900 via-neutral-950 to-black"
+        aria-hidden
+      />
+      <div
+        className={cn(
+          "pointer-events-none absolute -top-24 left-1/2 h-80 w-80 -translate-x-1/2 rounded-full blur-3xl transition-colors duration-700",
+          hypoSuggestion ? "bg-amber-500/[0.14]" : "bg-emerald-400/[0.12]",
+        )}
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-56 bg-gradient-to-t from-black/60 to-transparent"
+        aria-hidden
+      />
 
-      <div className="flex flex-1 flex-col items-center justify-center gap-7 px-6">
-        <div className="w-full max-w-xs space-y-3 text-center">
-          <p
-            className="text-6xl font-bold tabular-nums tracking-tight"
-            data-testid="text-exercise-mode-elapsed"
-          >
-            {formatExerciseElapsedShort(elapsedMs)}
-          </p>
-          <div className="space-y-1.5">
-            <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
-              <div
-                className={cn(
-                  "h-full rounded-full transition-[width] duration-500 ease-out",
-                  isOvertime ? "bg-amber-400" : "bg-emerald-400",
-                )}
-                style={{ width: `${pct}%` }}
-                role="progressbar"
-                aria-valuenow={Math.round(pct)}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                data-testid="progress-exercise-mode"
-              />
-            </div>
-            <p className={cn("text-xs font-medium", isOvertime ? "text-amber-300" : "text-white/50")}>
-              {isOvertime ? `+${remainingMin} min over planned` : `~${remainingMin} min left of ${session.durationMinutes} min`}
-            </p>
-          </div>
+      <div className="relative z-10 flex flex-1 flex-col">
+        <div className="flex items-center justify-center gap-1.5 pt-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-white/30">
+          <img
+            src={BRAND_MARK_IMAGE_SRC}
+            alt=""
+            aria-hidden
+            className="h-3 w-3 opacity-80"
+            style={{ filter: "invert(1)" }}
+          />
+          Diabeaters
+        </div>
+        <div className="mt-2 flex items-center justify-center gap-2 px-6 text-sm font-medium uppercase tracking-wide text-white/55">
+          <Activity className="h-4 w-4 shrink-0" aria-hidden />
+          <span className="truncate">{session.exerciseName}</span>
         </div>
 
-        <div
-          className="w-full max-w-xs rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-center"
-          data-testid="exercise-mode-bg-card"
-        >
-          {loading && !reading ? (
-            <p className="flex items-center justify-center gap-2 text-sm text-white/60">
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-              Checking BG…
+        <div className="flex flex-1 flex-col items-center justify-center gap-7 px-6">
+          <div className="w-full max-w-xs space-y-3 text-center">
+            <p
+              className="text-6xl font-bold tabular-nums tracking-tight [text-shadow:0_0_32px_rgba(16,185,129,0.25)]"
+              data-testid="text-exercise-mode-elapsed"
+            >
+              {formatExerciseElapsedShort(elapsedMs)}
             </p>
-          ) : reading ? (
-            <>
-              <div className="flex items-center justify-center gap-2">
-                <span className="text-4xl font-bold tabular-nums tracking-tight">{reading.value}</span>
-                <span className="text-base font-medium text-white/50">{reading.units}</span>
-                {showTrendArrow && TrendIcon ? (
-                  <TrendIcon className="h-6 w-6 text-white/70" aria-hidden />
-                ) : null}
+            <div className="space-y-1.5">
+              <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className={cn(
+                    "h-full rounded-full transition-[width] duration-500 ease-out",
+                    isOvertime ? "bg-amber-400" : "bg-emerald-400",
+                  )}
+                  style={{ width: `${pct}%` }}
+                  role="progressbar"
+                  aria-valuenow={Math.round(pct)}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  data-testid="progress-exercise-mode"
+                />
               </div>
-              <p className="mt-1 text-xs text-white/40">
-                {formatAgeMinutes(reading.ageMinutes)} ago{reading.sourceLabel ? ` · ${reading.sourceLabel}` : ""}
-              </p>
-              {!nearLiveConnected ? (
-                <p className="mt-2 text-[11px] leading-snug text-white/35">{liveCgmConnectMessage()}</p>
-              ) : null}
-            </>
-          ) : (
-            <p className="text-sm text-white/40">No recent reading</p>
-          )}
-        </div>
-
-        {hypoSuggestion ? (
-          <div
-            className="w-full max-w-xs rounded-2xl border border-amber-400/30 bg-amber-500/15 px-5 py-4 text-center"
-            data-testid="exercise-mode-hypo-hint"
-          >
-            <div className="flex items-center justify-center gap-1.5 text-amber-200">
-              <Droplet className="h-4 w-4" aria-hidden />
-              <p className="text-sm font-semibold">
-                {hypoSuggestion.clinicalHypo ? "Reading looks low" : "Treat now"}
+              <p className={cn("text-xs font-medium", isOvertime ? "text-amber-300" : "text-white/50")}>
+                {isOvertime ? `+${remainingMin} min over planned` : `~${remainingMin} min left of ${session.durationMinutes} min`}
               </p>
             </div>
-            <p className="mt-1 text-sm leading-snug text-amber-100/90">
-              Take about <strong className="font-semibold">{hypoSuggestion.carbsGrams}g</strong> fast carbs now, then
-              recheck.
-            </p>
           </div>
-        ) : null}
-      </div>
 
-      <div className="px-6">
-        <Button
-          type="button"
-          size="lg"
-          className="h-14 w-full rounded-2xl bg-white text-base font-semibold text-neutral-950 hover:bg-white/90"
-          onClick={onFinish}
-          data-testid="button-exercise-mode-finish"
-        >
-          <CircleCheck className="mr-2 h-5 w-5" aria-hidden />
-          Finish workout
-        </Button>
+          <div
+            className="w-full max-w-xs rounded-2xl border border-white/10 bg-white/[0.06] px-5 py-4 text-center shadow-[0_8px_32px_rgba(0,0,0,0.35)] backdrop-blur-sm"
+            data-testid="exercise-mode-bg-card"
+          >
+            {loading && !reading ? (
+              <p className="flex items-center justify-center gap-2 text-sm text-white/60">
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                Checking BG…
+              </p>
+            ) : reading ? (
+              <>
+                <div className="flex items-center justify-center gap-2">
+                  <span className="text-4xl font-bold tabular-nums tracking-tight">{reading.value}</span>
+                  <span className="text-base font-medium text-white/50">{reading.units}</span>
+                  {showTrendArrow && TrendIcon ? (
+                    <TrendIcon className="h-6 w-6 text-white/70" aria-hidden />
+                  ) : null}
+                </div>
+                <p className="mt-1 text-xs text-white/40">
+                  {formatAgeMinutes(reading.ageMinutes)} ago{reading.sourceLabel ? ` · ${reading.sourceLabel}` : ""}
+                </p>
+                {!nearLiveConnected ? (
+                  <p className="mt-2 text-[11px] leading-snug text-white/35">{liveCgmConnectMessage()}</p>
+                ) : null}
+              </>
+            ) : (
+              <p className="text-sm text-white/40">No recent reading</p>
+            )}
+          </div>
+
+          {hypoSuggestion ? (
+            <div
+              className="w-full max-w-xs rounded-2xl border border-amber-400/30 bg-amber-500/15 px-5 py-4 text-center shadow-[0_8px_32px_rgba(0,0,0,0.35)] backdrop-blur-sm"
+              data-testid="exercise-mode-hypo-hint"
+            >
+              <div className="flex items-center justify-center gap-1.5 text-amber-200">
+                <Droplet className="h-4 w-4" aria-hidden />
+                <p className="text-sm font-semibold">
+                  {hypoSuggestion.clinicalHypo ? "Reading looks low" : "Treat now"}
+                </p>
+              </div>
+              <p className="mt-1 text-sm leading-snug text-amber-100/90">
+                Take about <strong className="font-semibold">{hypoSuggestion.carbsGrams}g</strong> fast carbs now, then
+                recheck.
+              </p>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="px-6">
+          <Button
+            type="button"
+            size="lg"
+            className="h-14 w-full rounded-2xl bg-white text-base font-semibold text-neutral-950 hover:bg-white/90"
+            onClick={onFinish}
+            data-testid="button-exercise-mode-finish"
+          >
+            <CircleCheck className="mr-2 h-5 w-5" aria-hidden />
+            Finish workout
+          </Button>
+        </div>
       </div>
     </div>
   );
