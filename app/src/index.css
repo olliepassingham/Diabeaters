@@ -76,7 +76,9 @@
         rgb(var(--app-background) / 0.98) 40%,
         rgb(var(--app-background)) 100%
       );
-    background-attachment: fixed;
+    /* Never use background-attachment: fixed here — Android WebView often freezes or
+       blocks page scrolling when fixed backgrounds are present on the scroll root. Soft
+       atmosphere is already handled by the fixed AppShellBackdrop layers. */
   }
 
   .dark .app-canvas {
@@ -87,6 +89,23 @@
     background: transparent;
     /* Keep pull-past-edge inside the scroller — no rubber-banding the whole shell. */
     overscroll-behavior: contain;
+  }
+
+  /*
+   * Capacitor Android WebView: keep document/body from becoming a broken second scrollport.
+   * All authenticated app scrolling goes through `#app-scroll-main` (see App.tsx).
+   */
+  html.android-native,
+  html.android-native body {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  html.android-native #root {
+    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
   }
 
   /*

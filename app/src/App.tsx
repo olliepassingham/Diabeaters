@@ -137,9 +137,8 @@ import {
   shouldRegisterServiceWorker,
 } from "@/lib/native-platform";
 import { AskAnythingProvider } from "@/components/ai-coach/ask-anything-context";
-import { isCommunityAccountProfile, storage, DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT } from "@/lib/storage";
+import { isCommunityAccountProfile, storage } from "@/lib/storage";
 import { cn } from "@/lib/utils";
-import type { ActiveExerciseSession } from "@/lib/storage";
 import { getCommunityMemberLandingPath } from "@/lib/community-landing";
 import NotFound from "@/pages/not-found";
 import ShotsPage from "@/pages/shots";
@@ -1170,7 +1169,7 @@ function UnverifiedAccountShell({
   onLogout: () => void | Promise<void>;
 }) {
   return (
-    <div className="relative flex min-h-screen w-full min-w-0 flex-col app-canvas text-foreground">
+    <div className="relative flex h-dvh min-h-0 w-full min-w-0 flex-col overflow-hidden app-canvas text-foreground">
       <ClinicalPrefsCloudSync />
       <SickDayCloudRepairSync />
       {!suppressClinicalPollers ? <SickDayMedDuePoller /> : null}
@@ -1188,7 +1187,7 @@ function UnverifiedAccountShell({
       />
       <main
         id="app-scroll-main"
-        className="relative z-[1] min-h-0 w-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:p-6"
+        className="relative z-[1] min-h-0 w-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-4 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:p-6 [-webkit-overflow-scrolling:touch]"
         style={{
           paddingBottom: MAIN_BOTTOM_SCROLL_PADDING_NO_NAV,
           scrollPaddingBottom: MAIN_BOTTOM_SCROLL_PADDING_NO_NAV,
@@ -1219,22 +1218,6 @@ function AuthenticatedShell() {
   const iosNotifPrompt = useNativeLocalNotificationPermissionPrompt(!suppressClinicalPollers);
   const { bedtimeReminderPromptOpen, setBedtimeReminderPromptOpen } =
     useBedtimeReminderPromptAfterOnboarding(!suppressClinicalPollers);
-
-  const [activeExerciseSession, setActiveExerciseSession] = useState<ActiveExerciseSession | null>(() =>
-    storage.getActiveExercise(),
-  );
-
-  useEffect(() => {
-    const sync = () => {
-      setActiveExerciseSession(storage.getActiveExercise());
-    };
-    sync();
-    window.addEventListener(DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT, sync);
-    return () => window.removeEventListener(DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT, sync);
-  }, []);
-
-  /** Lock scroll to `#app-scroll-main` so header + exercise strip stay in view during quick exercise. */
-  const lockShellHeightForExercise = Boolean(activeExerciseSession);
 
   const handleLogout = async () => {
     clearCarerClientSessionKeys();
@@ -1412,12 +1395,10 @@ function AuthenticatedShell() {
           onLogout={handleLogout}
         />
       ) : (
-    <div
-      className={cn(
-        "relative flex w-full min-w-0 flex-col app-canvas text-foreground",
-        lockShellHeightForExercise || isFillHeightChatView ? "h-dvh min-h-0 overflow-hidden" : "min-h-screen",
-      )}
-    >
+    // Always pin the shell to the viewport and scroll only inside `#app-scroll-main`.
+    // Android Capacitor WebViews (especially with remote `server.url`) do not scroll the
+    // document reliably when the shell grows with `min-h-screen` — content becomes stuck.
+    <div className="relative flex h-dvh min-h-0 w-full min-w-0 flex-col overflow-hidden app-canvas text-foreground">
       <NativePushForegroundSync />
       <NativeNavBackHandler pathname={pathOnly} setLocation={setLocation} />
       <AchievementSync />
@@ -1475,7 +1456,7 @@ function AuthenticatedShell() {
       <main
         id="app-scroll-main"
         className={cn(
-          "relative z-[1] min-h-0 w-full min-w-0 flex-1 overflow-x-hidden [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]",
+          "relative z-[1] min-h-0 w-full min-w-0 flex-1 overflow-x-hidden overscroll-contain [-webkit-overflow-scrolling:touch] [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]",
           isFillHeightChatView
             ? "flex flex-col overflow-hidden p-0 md:p-0"
             : "overflow-y-auto px-4 pb-4 pt-1.5 md:px-6 md:pb-6 md:pt-2",
