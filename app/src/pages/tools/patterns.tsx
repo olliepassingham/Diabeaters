@@ -1,9 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
-import { AlertTriangle, CheckCircle2, Info, LineChart, Radio, Sparkles, X } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ChevronRight,
+  Info,
+  LineChart,
+  Radio,
+  Sparkles,
+  X,
+} from "lucide-react";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EmptyState } from "@/components/empty-state";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { OverlappingBarChart } from "@/components/patterns/overlapping-bar-chart";
@@ -31,19 +41,35 @@ import { resolveUserTargetBgRange } from "@/lib/target-bg-range";
 import { normalizeBgUnits } from "@/lib/alcohol-night-tool";
 import { cn } from "@/lib/utils";
 
-const TONE_ICONS: Record<PatternInsightTone, React.ReactNode> = {
-  attention: <AlertTriangle className="h-4 w-4 text-amber-500 dark:text-amber-400" />,
-  positive: <CheckCircle2 className="h-4 w-4 text-emerald-500 dark:text-emerald-400" />,
-  neutral: <Info className="h-4 w-4 text-muted-foreground" />,
+/** Tone-specific styling for a "What we've noticed" row — icon, badge tint, and card wash. */
+const TONE_STYLES: Record<
+  PatternInsightTone,
+  { Icon: typeof AlertTriangle; badge: string; card: string }
+> = {
+  attention: {
+    Icon: AlertTriangle,
+    badge: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+    card: "border-amber-500/20 bg-amber-500/[0.05] dark:bg-amber-500/[0.07]",
+  },
+  positive: {
+    Icon: CheckCircle2,
+    badge: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+    card: "border-emerald-500/20 bg-emerald-500/[0.05] dark:bg-emerald-500/[0.07]",
+  },
+  neutral: {
+    Icon: Info,
+    badge: "bg-primary/10 text-primary",
+    card: "border-border/50 bg-muted/25",
+  },
 };
 
 /** Below this many distinct local-calendar days, the overlay is too thin to show meaningful pattern shape. */
 const MIN_DAYS_FOR_OVERLAY = 3;
 
 const DAY_RANGE_OPTIONS = [
-  { days: 3, label: "3d" },
-  { days: 7, label: "7d" },
-  { days: 14, label: "14d" },
+  { days: 3, label: "3 days" },
+  { days: 7, label: "7 days" },
+  { days: 14, label: "14 days" },
 ] as const;
 
 const DAY_KIND_OPTIONS: { id: GlucoseDayKind; label: string }[] = [
@@ -52,31 +78,9 @@ const DAY_KIND_OPTIONS: { id: GlucoseDayKind; label: string }[] = [
   { id: "weekends", label: "Weekends" },
 ];
 
-function FilterPill({
-  selected,
-  onClick,
-  children,
-  testId,
-}: {
-  selected: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-  testId?: string;
-}) {
-  return (
-    <Button
-      type="button"
-      size="sm"
-      variant={selected ? "default" : "outline"}
-      className={cn("h-8 rounded-full px-3 text-xs font-medium shadow-none", !selected && "bg-background/60")}
-      onClick={onClick}
-      aria-pressed={selected}
-      data-testid={testId}
-    >
-      {children}
-    </Button>
-  );
-}
+/** Compact select trigger shared by the three glucose-pattern filters. */
+const FILTER_TRIGGER_CLASS =
+  "h-9 rounded-lg border-border/60 bg-background/70 px-2.5 text-xs font-medium shadow-none focus:ring-1";
 
 function PatternsInfoDialog() {
   return (
@@ -179,43 +183,45 @@ function GlucoseDayPatternCard() {
     <Card data-testid="card-patterns-glucose-overlay">
       <CardHeader className="space-y-3 pb-2">
         <CardTitle className="text-base">Daily glucose</CardTitle>
-        <div className="space-y-2" data-testid="patterns-glucose-filters">
-          <div className="flex flex-wrap gap-1.5">
-            {DAY_RANGE_OPTIONS.map((opt) => (
-              <FilterPill
-                key={opt.days}
-                selected={dayRange === opt.days}
-                onClick={() => setDayRange(opt.days)}
-                testId={`filter-glucose-days-${opt.days}`}
-              >
-                {opt.label}
-              </FilterPill>
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {GLUCOSE_TIME_WINDOWS.map((opt) => (
-              <FilterPill
-                key={opt.id}
-                selected={timeWindowId === opt.id}
-                onClick={() => setTimeWindowId(opt.id)}
-                testId={`filter-glucose-time-${opt.id}`}
-              >
-                {opt.label}
-              </FilterPill>
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {DAY_KIND_OPTIONS.map((opt) => (
-              <FilterPill
-                key={opt.id}
-                selected={dayKind === opt.id}
-                onClick={() => setDayKind(opt.id)}
-                testId={`filter-glucose-kind-${opt.id}`}
-              >
-                {opt.label}
-              </FilterPill>
-            ))}
-          </div>
+        <div className="grid grid-cols-3 gap-1.5" data-testid="patterns-glucose-filters">
+          <Select value={String(dayRange)} onValueChange={(v) => setDayRange(Number(v) as 3 | 7 | 14)}>
+            <SelectTrigger className={FILTER_TRIGGER_CLASS} data-testid="filter-glucose-range">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {DAY_RANGE_OPTIONS.map((opt) => (
+                <SelectItem key={opt.days} value={String(opt.days)} className="text-xs">
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={timeWindowId} onValueChange={(v) => setTimeWindowId(v as GlucoseTimeWindowId)}>
+            <SelectTrigger className={FILTER_TRIGGER_CLASS} data-testid="filter-glucose-time">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {GLUCOSE_TIME_WINDOWS.map((opt) => (
+                <SelectItem key={opt.id} value={opt.id} className="text-xs">
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={dayKind} onValueChange={(v) => setDayKind(v as GlucoseDayKind)}>
+            <SelectTrigger className={FILTER_TRIGGER_CLASS} data-testid="filter-glucose-kind">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {DAY_KIND_OPTIONS.map((opt) => (
+                <SelectItem key={opt.id} value={opt.id} className="text-xs">
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </CardHeader>
       <CardContent>
@@ -281,10 +287,14 @@ export default function PatternsPage() {
 
   const hourlyBuckets = useMemo(() => computeHourlyHypoComparison(hypoDates, new Date()), [hypoDates]);
   const weekdayBuckets = useMemo(() => computeWeekdayHypoComparison(hypoDates, new Date()), [hypoDates]);
+  const weeklyTrendWeeks = 12;
   const weeklyTrend = useMemo(
-    () => computeWeeklyTrend(hypoDates, exerciseDates, new Date(), 12),
+    () => computeWeeklyTrend(hypoDates, exerciseDates, new Date(), weeklyTrendWeeks),
     [hypoDates, exerciseDates],
   );
+  const hourlyTotal = useMemo(() => hourlyBuckets.reduce((sum, b) => sum + b.currentCount, 0), [hourlyBuckets]);
+  const weekdayTotal = useMemo(() => weekdayBuckets.reduce((sum, b) => sum + b.currentCount, 0), [weekdayBuckets]);
+  const weeklyTrendTotal = useMemo(() => weeklyTrend.reduce((sum, p) => sum + p.hypoCount, 0), [weeklyTrend]);
 
   const handleDismiss = (id: string) => {
     dismissPatternInsight(id);
@@ -324,46 +334,59 @@ export default function PatternsPage() {
                   <CardTitle className="text-base">What we've noticed</CardTitle>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-2">
-                {visibleInsights.map((insight) => (
-                  <div
-                    key={insight.id}
-                    data-testid="pattern-insight-row"
-                    className="flex items-start gap-2.5 rounded-lg bg-muted/25 px-3 py-2.5"
-                  >
-                    <span className="mt-0.5 shrink-0" aria-hidden="true">
-                      {TONE_ICONS[insight.tone]}
-                    </span>
-                    <div className="min-w-0 flex-1 space-y-0.5">
-                      <p className="text-sm font-medium text-foreground">{insight.title}</p>
-                      <p className="text-sm leading-relaxed text-foreground">{insight.body}</p>
-                      {insight.actionLabel && insight.actionHref ? (
-                        <Link
-                          href={insight.actionHref}
-                          className="inline-block text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
-                        >
-                          {insight.actionLabel}
-                        </Link>
-                      ) : null}
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 shrink-0 -mr-1"
-                      aria-label="Dismiss insight"
-                      onClick={() => handleDismiss(insight.id)}
+              <CardContent className="space-y-2.5">
+                {visibleInsights.map((insight) => {
+                  const tone = TONE_STYLES[insight.tone];
+                  const ToneIcon = tone.Icon;
+                  return (
+                    <div
+                      key={insight.id}
+                      data-testid="pattern-insight-row"
+                      className={cn("relative flex items-start gap-3 rounded-xl border px-3 py-3", tone.card)}
                     >
-                      <X className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                ))}
+                      <span
+                        className={cn("mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full", tone.badge)}
+                        aria-hidden="true"
+                      >
+                        <ToneIcon className="h-4 w-4" />
+                      </span>
+                      <div className="min-w-0 flex-1 space-y-1 pr-6">
+                        <p className="text-sm font-semibold leading-snug text-foreground">{insight.title}</p>
+                        <p className="text-sm leading-relaxed text-muted-foreground">{insight.body}</p>
+                        {insight.actionLabel && insight.actionHref ? (
+                          <Link
+                            href={insight.actionHref}
+                            className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-background px-2.5 py-1 text-xs font-semibold text-primary shadow-sm ring-1 ring-border/60 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            {insight.actionLabel}
+                            <ChevronRight className="h-3 w-3" aria-hidden />
+                          </Link>
+                        ) : null}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-1.5 top-1.5 h-7 w-7 shrink-0 text-muted-foreground/70 hover:bg-background/80 hover:text-foreground"
+                        aria-label="Dismiss insight"
+                        onClick={() => handleDismiss(insight.id)}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  );
+                })}
               </CardContent>
             </Card>
           ) : null}
 
           <Card data-testid="card-patterns-hourly">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">When lows happen</CardTitle>
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle className="text-base">When lows happen</CardTitle>
+                <span className="shrink-0 rounded-full bg-muted/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                  {hourlyTotal} in last 30 days
+                </span>
+              </div>
             </CardHeader>
             <CardContent>
               <OverlappingBarChart
@@ -378,7 +401,12 @@ export default function PatternsPage() {
 
           <Card data-testid="card-patterns-weekday">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Which days</CardTitle>
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle className="text-base">Which days</CardTitle>
+                <span className="shrink-0 rounded-full bg-muted/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                  {weekdayTotal} in last 6 weeks
+                </span>
+              </div>
             </CardHeader>
             <CardContent>
               <OverlappingBarChart
@@ -392,7 +420,12 @@ export default function PatternsPage() {
 
           <Card data-testid="card-patterns-weekly-trend">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Weekly trend</CardTitle>
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle className="text-base">Weekly trend</CardTitle>
+                <span className="shrink-0 rounded-full bg-muted/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                  {weeklyTrendTotal} in {weeklyTrendWeeks} weeks
+                </span>
+              </div>
             </CardHeader>
             <CardContent>
               <WeeklyTrendChart points={weeklyTrend} data-testid="chart-patterns-weekly-trend" />

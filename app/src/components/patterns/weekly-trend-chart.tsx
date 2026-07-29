@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useId, useMemo } from "react";
 import type { WeeklyTrendPoint } from "@/lib/insights/pattern-charts";
 import { cn } from "@/lib/utils";
 
@@ -18,6 +18,7 @@ const PAD = { top: 10, right: 8, bottom: 26, left: 26 };
  * glance without needing a separate chart.
  */
 export function WeeklyTrendChart({ points, className, "data-testid": testId }: WeeklyTrendChartProps) {
+  const gradientId = useId().replace(/:/g, "");
   const innerWidth = WIDTH - PAD.left - PAD.right;
   const innerHeight = HEIGHT - PAD.top - PAD.bottom;
 
@@ -35,6 +36,16 @@ export function WeeklyTrendChart({ points, className, "data-testid": testId }: W
     return points
       .map((p, i) => `${i === 0 ? "M" : "L"}${xFor(i).toFixed(1)},${yForHypo(p.hypoCount).toFixed(1)}`)
       .join(" ");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- xFor/yForHypo depend only on stable inputs above
+  }, [points, maxHypo]);
+
+  const areaPath = useMemo(() => {
+    if (points.length < 2) return "";
+    const baseline = PAD.top + innerHeight;
+    const top = points
+      .map((p, i) => `${i === 0 ? "M" : "L"}${xFor(i).toFixed(1)},${yForHypo(p.hypoCount).toFixed(1)}`)
+      .join(" ");
+    return `${top} L${xFor(points.length - 1).toFixed(1)},${baseline} L${xFor(0).toFixed(1)},${baseline} Z`;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- xFor/yForHypo depend only on stable inputs above
   }, [points, maxHypo]);
 
@@ -57,6 +68,17 @@ export function WeeklyTrendChart({ points, className, "data-testid": testId }: W
         role="img"
         aria-label={`Weekly lows trend over ${points.length} weeks, with exercise sessions overlaid`}
       >
+        <defs>
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="hsl(var(--chart-2))" stopOpacity="0.28" />
+            <stop offset="100%" stopColor="hsl(var(--chart-2))" stopOpacity="0" />
+          </linearGradient>
+          <linearGradient id={`${gradientId}-ex`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#0ea5e9" stopOpacity="0.32" />
+            <stop offset="100%" stopColor="#0ea5e9" stopOpacity="0.1" />
+          </linearGradient>
+        </defs>
+
         {yTicks.map((tick) => {
           const y = yForHypo(tick);
           return (
@@ -87,24 +109,43 @@ export function WeeklyTrendChart({ points, className, "data-testid": testId }: W
               y={yForExercise(p.exerciseCount)}
               width={barWidth}
               height={PAD.top + innerHeight - yForExercise(p.exerciseCount)}
-              fill="#0ea5e9"
-              fillOpacity={0.18}
-              rx={2}
+              fill={`url(#${gradientId}-ex)`}
+              rx={2.5}
             />
           );
         })}
 
-        {points.length > 1 ? <path d={linePath} fill="none" stroke="hsl(var(--chart-2))" strokeWidth={2.25} strokeLinejoin="round" strokeLinecap="round" /> : null}
+        {points.length > 1 ? <path d={areaPath} fill={`url(#${gradientId})`} /> : null}
 
-        {points.map((p, i) => (
-          <circle
-            key={`pt-${p.weekStartMs}`}
-            cx={xFor(i)}
-            cy={yForHypo(p.hypoCount)}
-            r={p.hypoCount > 0 ? 3 : 1.5}
-            fill="hsl(var(--chart-2))"
+        {points.length > 1 ? (
+          <path
+            d={linePath}
+            fill="none"
+            stroke="hsl(var(--chart-2))"
+            strokeWidth={2.25}
+            strokeLinejoin="round"
+            strokeLinecap="round"
           />
-        ))}
+        ) : null}
+
+        {points.map((p, i) => {
+          const isLast = i === points.length - 1;
+          return (
+            <g key={`pt-${p.weekStartMs}`}>
+              {isLast && p.hypoCount > 0 ? (
+                <circle cx={xFor(i)} cy={yForHypo(p.hypoCount)} r={6} fill="hsl(var(--chart-2))" fillOpacity={0.2} />
+              ) : null}
+              <circle
+                cx={xFor(i)}
+                cy={yForHypo(p.hypoCount)}
+                r={p.hypoCount > 0 ? (isLast ? 3.5 : 3) : 1.5}
+                fill="hsl(var(--chart-2))"
+                stroke={isLast ? "hsl(var(--card))" : "none"}
+                strokeWidth={isLast ? 1.5 : 0}
+              />
+            </g>
+          );
+        })}
 
         {labelIndices.map((i) => {
           const p = points[i];

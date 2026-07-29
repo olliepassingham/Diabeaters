@@ -57,8 +57,12 @@ export function OverlappingBarChart({
       >
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="hsl(var(--chart-2))" stopOpacity="0.9" />
-            <stop offset="100%" stopColor="hsl(var(--chart-2))" stopOpacity="0.55" />
+            <stop offset="0%" stopColor="hsl(var(--chart-2))" stopOpacity="0.95" />
+            <stop offset="100%" stopColor="hsl(var(--chart-2))" stopOpacity="0.6" />
+          </linearGradient>
+          <linearGradient id={`${gradientId}-prev`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="currentColor" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="currentColor" stopOpacity="0.1" />
           </linearGradient>
         </defs>
 
@@ -91,9 +95,8 @@ export function OverlappingBarChart({
                 y={yFor(bucket.previousCount)}
                 width={wideBarWidth}
                 height={barHeight(bucket.previousCount)}
-                fill="currentColor"
-                fillOpacity={0.22}
-                rx={2}
+                fill={`url(#${gradientId}-prev)`}
+                rx={3}
               />
               <rect
                 x={centerX - narrowBarWidth / 2}
@@ -101,7 +104,7 @@ export function OverlappingBarChart({
                 width={narrowBarWidth}
                 height={barHeight(bucket.currentCount)}
                 fill={`url(#${gradientId})`}
-                rx={1.5}
+                rx={2}
               />
               {i % labelEvery === 0 ? (
                 <text
