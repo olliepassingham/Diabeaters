@@ -24,6 +24,7 @@ import {
 import { isIosDevice } from "@/lib/native-platform";
 import { appendCgmReadings } from "@/lib/cgm/cgm-history-store";
 import { convertGlucoseValue } from "@/lib/cgm/units";
+import { withTimeout } from "@/lib/cgm/async-timeout";
 
 function shouldSkipCapgoAvailability(id: CgmSourceId): boolean {
   if (id !== "health_platform") return false;
@@ -31,6 +32,12 @@ function shouldSkipCapgoAvailability(id: CgmSourceId): boolean {
 }
 
 const LIVE_CGM_SOURCES: CgmSourceId[] = ["dexcom_share", "libre_link_up", "nightscout"];
+
+/** Near-live Share/Libre/Nightscout get first crack; phone health stores are delayed fallbacks. */
+const LIVE_ADAPTER_BUDGET_MS = 12_000;
+/** Cap Health Connect / Capgo so a hung native bridge cannot burn the whole prefill window. */
+const HEALTH_ADAPTER_BUDGET_WITH_LIVE_MS = 5_000;
+const HEALTH_ADAPTER_BUDGET_SOLO_MS = 12_000;
 
 const ALL_ADAPTERS: CgmAdapter[] = [healthPlatformCgmAdapter, dexcomShareCgmAdapter, libreLinkUpCgmAdapter, nightscoutCgmAdapter];
 
@@ -55,25 +62,84 @@ function isAdapterEnabledInProduct(id: CgmSourceId): boolean {
   return isCgmSourceEnabledInV1(id) || LIVE_CGM_SOURCES.includes(id);
 }
 
-/** Fetch the freshest reading from enabled adapters (v1 UI: health platform). */
+function isLiveCgmSource(id: CgmSourceId): boolean {
+  return LIVE_CGM_SOURCES.includes(id);
+}
+
+/**
+ * Prefer near-live cloud CGM (Dexcom Share / Libre / Nightscout) before HealthKit /
+ * Health Connect. Previously health ran first and Capgo on Android could hang long
+ * enough that the outer prefill timeout fired before Dexcom was ever tried — so the
+ * home live-BG chip stayed empty even with working Share credentials.
+ */
+export function prioritizeCgmAdapterIds(ids: CgmSourceId[]): CgmSourceId[] {
+  const live: CgmSourceId[] = [];
+  const delayed: CgmSourceId[] = [];
+  for (const id of ids) {
+    if (isLiveCgmSource(id)) live.push(id);
+    else delayed.push(id);
+  }
+  return [...live, ...delayed];
+}
+
+/** Per-adapter wall clock so one hung bridge cannot block the rest. */
+export function cgmAdapterAttemptBudgetMs(id: CgmSourceId, enabled: readonly CgmSourceId[]): number {
+  if (id === "health_platform") {
+    const hasLive = enabled.some((x) => isLiveCgmSource(x));
+    return hasLive ? HEALTH_ADAPTER_BUDGET_WITH_LIVE_MS : HEALTH_ADAPTER_BUDGET_SOLO_MS;
+  }
+  return LIVE_ADAPTER_BUDGET_MS;
+}
+
+async function tryAdapterReading(
+  adapter: CgmAdapter,
+  userUnits: BgUnits,
+  budgetMs: number,
+): Promise<GlucoseReading | null> {
+  try {
+    return await withTimeout(
+      (async () => {
+        // iOS health reads use our native bridge; skip Capgo isAvailable (can hang).
+        if (!shouldSkipCapgoAvailability(adapter.id)) {
+          const availability = await adapter.isAvailable();
+          if (!availability.available) return null;
+        }
+        return await adapter.getLatestReading(userUnits);
+      })(),
+      budgetMs,
+      `${adapter.id} timed out.`,
+    );
+  } catch {
+    // Timed out or threw — try the next source instead of failing the whole prefill.
+    return null;
+  }
+}
+
+/** Fetch the freshest reading from enabled adapters (live cloud CGM before phone health). */
 export async function fetchLatestCgmReading(userUnits: BgUnits): Promise<GlucoseReading | null> {
   const prefs = readCgmPreferences();
   if (!isCgmPrefillActive(prefs)) return null;
 
-  const enabled = enabledAdapterIds(prefs).filter((id) => isAdapterEnabledInProduct(id));
+  const enabled = prioritizeCgmAdapterIds(
+    enabledAdapterIds(prefs).filter((id) => isAdapterEnabledInProduct(id)),
+  );
   let best: GlucoseReading | null = null;
 
-  for (const id of enabled) {
+  for (let i = 0; i < enabled.length; i++) {
+    const id = enabled[i]!;
     const adapter = getCgmAdapter(id);
     if (!adapter) continue;
-    // iOS health reads use our native bridge; skip Capgo isAvailable (can hang).
-    if (!shouldSkipCapgoAvailability(id)) {
-      const availability = await adapter.isAvailable();
-      if (!availability.available) continue;
+
+    const reading = await tryAdapterReading(adapter, userUnits, cgmAdapterAttemptBudgetMs(id, enabled));
+    if (reading && (!best || reading.ageMinutes < best.ageMinutes)) {
+      best = reading;
     }
-    const reading = await adapter.getLatestReading(userUnits);
-    if (!reading) continue;
-    if (!best || reading.ageMinutes < best.ageMinutes) best = reading;
+
+    // Near-live Share/Libre already won — don't wait on Health Connect afterward.
+    const remaining = enabled.slice(i + 1);
+    if (best && isLiveCgmSource(best.source) && remaining.length > 0 && remaining.every((r) => !isLiveCgmSource(r))) {
+      break;
+    }
   }
 
   // Best-effort trickle into local multi-day history for the Patterns page —
