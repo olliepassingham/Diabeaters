@@ -109,6 +109,36 @@ describe("buildGlucoseDayOverlay", () => {
     const series = buildGlucoseDayOverlay(points, "mg/dL", { now: NOW });
     expect(series[0]!.segments[0]![0]!.value).toBe(145);
   });
+
+  it("filters points to a time-of-day window", () => {
+    const points = [
+      point(atLocal(0, 5, 0), 90),
+      point(atLocal(0, 8, 0), 110),
+      point(atLocal(0, 14, 0), 130),
+    ];
+    const morning = buildGlucoseDayOverlay(points, "mg/dL", {
+      now: NOW,
+      minuteStart: 6 * 60,
+      minuteEnd: 12 * 60,
+    });
+    expect(morning).toHaveLength(1);
+    expect(morning[0]!.segments.flat()).toHaveLength(1);
+    expect(morning[0]!.segments[0]![0]!.minuteOfDay).toBe(8 * 60);
+  });
+
+  it("filters to weekdays only", () => {
+    // NOW is Wed 22 Jul 2026 — daysAgo 0=Wed, 1=Tue, 2=Mon, 3=Sun, 4=Sat
+    const points = [
+      point(atLocal(0, 8), 100), // Wed weekday
+      point(atLocal(3, 8), 100), // Sun weekend
+      point(atLocal(4, 8), 100), // Sat weekend
+    ];
+    const weekdays = buildGlucoseDayOverlay(points, "mg/dL", { now: NOW, days: 7, dayKind: "weekdays" });
+    expect(weekdays).toHaveLength(1);
+    expect(weekdays[0]!.isMostRecent).toBe(true);
+    const weekends = buildGlucoseDayOverlay(points, "mg/dL", { now: NOW, days: 7, dayKind: "weekends" });
+    expect(weekends).toHaveLength(2);
+  });
 });
 
 describe("glucoseDayOverlayDayCount", () => {

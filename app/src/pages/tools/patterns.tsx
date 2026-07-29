@@ -3,8 +3,9 @@ import { Link } from "wouter";
 import { AlertTriangle, CheckCircle2, Info, LineChart, Radio, Sparkles, X } from "lucide-react";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
+import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { OverlappingBarChart } from "@/components/patterns/overlapping-bar-chart";
 import { WeeklyTrendChart } from "@/components/patterns/weekly-trend-chart";
 import { GlucoseDayOverlayChart } from "@/components/patterns/glucose-day-overlay-chart";
@@ -19,9 +20,16 @@ import { storage } from "@/lib/storage";
 import { isCgmPrefillActive } from "@/lib/cgm/preferences";
 import { fetchLiveCgmHistory } from "@/lib/cgm/live-cgm-history";
 import { countCgmLocalHistoryDays, getCgmLocalHistory } from "@/lib/cgm/cgm-history-store";
-import { buildGlucoseDayOverlay } from "@/lib/cgm/glucose-day-overlay";
+import {
+  buildGlucoseDayOverlay,
+  glucoseTimeWindowById,
+  GLUCOSE_TIME_WINDOWS,
+  type GlucoseDayKind,
+  type GlucoseTimeWindowId,
+} from "@/lib/cgm/glucose-day-overlay";
 import { resolveUserTargetBgRange } from "@/lib/target-bg-range";
 import { normalizeBgUnits } from "@/lib/alcohol-night-tool";
+import { cn } from "@/lib/utils";
 
 const TONE_ICONS: Record<PatternInsightTone, React.ReactNode> = {
   attention: <AlertTriangle className="h-4 w-4 text-amber-500 dark:text-amber-400" />,
@@ -32,12 +40,79 @@ const TONE_ICONS: Record<PatternInsightTone, React.ReactNode> = {
 /** Below this many distinct local-calendar days, the overlay is too thin to show meaningful pattern shape. */
 const MIN_DAYS_FOR_OVERLAY = 3;
 
+const DAY_RANGE_OPTIONS = [
+  { days: 3, label: "3d" },
+  { days: 7, label: "7d" },
+  { days: 14, label: "14d" },
+] as const;
+
+const DAY_KIND_OPTIONS: { id: GlucoseDayKind; label: string }[] = [
+  { id: "all", label: "All days" },
+  { id: "weekdays", label: "Weekdays" },
+  { id: "weekends", label: "Weekends" },
+];
+
+function FilterPill({
+  selected,
+  onClick,
+  children,
+  testId,
+}: {
+  selected: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  testId?: string;
+}) {
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant={selected ? "default" : "outline"}
+      className={cn("h-8 rounded-full px-3 text-xs font-medium shadow-none", !selected && "bg-background/60")}
+      onClick={onClick}
+      aria-pressed={selected}
+      data-testid={testId}
+    >
+      {children}
+    </Button>
+  );
+}
+
+function PatternsInfoDialog() {
+  return (
+    <PageInfoDialog
+      title="About Your patterns"
+      description="Charts from glucose and logs on this device — educational only, not medical advice."
+    >
+      <InfoSection title="Daily glucose pattern">
+        <p>
+          Each recent day is drawn on the same time-of-day axis so recurring spikes or dips stand out. Today is solid;
+          earlier days fade. Use the day range, time-of-day, and weekday filters to zoom into the hours that matter.
+        </p>
+      </InfoSection>
+      <InfoSection title="Hypo charts">
+        <p>
+          When lows happen, which days, and weekly trend come from hypo treatments and exercise sessions you have logged
+          in the app on this phone.
+        </p>
+      </InfoSection>
+      <InfoSection title="Care team">
+        <p>
+          Patterns are a conversation starter with your diabetes team — not a diagnosis or dosing instruction.
+        </p>
+      </InfoSection>
+    </PageInfoDialog>
+  );
+}
+
 function GlucoseDayPatternCard() {
   const [refreshTick, setRefreshTick] = useState(0);
+  const [dayRange, setDayRange] = useState<3 | 7 | 14>(7);
+  const [timeWindowId, setTimeWindowId] = useState<GlucoseTimeWindowId>("all");
+  const [dayKind, setDayKind] = useState<GlucoseDayKind>("all");
   const cgmConnected = isCgmPrefillActive();
+  const timeWindow = glucoseTimeWindowById(timeWindowId);
 
-  // Kick off an immediate ~24h backfill (Dexcom Share / LibreLinkUp only — the
-  // only sources with a bulk-history API) so a first-ever visit isn't empty.
   useEffect(() => {
     if (!cgmConnected) return;
     let cancelled = false;
@@ -57,14 +132,22 @@ function GlucoseDayPatternCard() {
   const targetRange = useMemo(() => resolveUserTargetBgRange(storage.getSettings(), units), [units]);
 
   const dayCount = useMemo(
-    () => (cgmConnected ? countCgmLocalHistoryDays(7) : 0),
+    () => (cgmConnected ? countCgmLocalHistoryDays(dayRange) : 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [cgmConnected, refreshTick],
+    [cgmConnected, refreshTick, dayRange],
   );
   const series = useMemo(
-    () => (cgmConnected ? buildGlucoseDayOverlay(getCgmLocalHistory(7), units, { days: 7 }) : []),
+    () =>
+      cgmConnected
+        ? buildGlucoseDayOverlay(getCgmLocalHistory(dayRange), units, {
+            days: dayRange,
+            minuteStart: timeWindow.minuteStart,
+            minuteEnd: timeWindow.minuteEnd,
+            dayKind,
+          })
+        : [],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [cgmConnected, units, refreshTick],
+    [cgmConnected, units, refreshTick, dayRange, timeWindow.minuteStart, timeWindow.minuteEnd, dayKind],
   );
 
   if (!cgmConnected) {
@@ -75,10 +158,9 @@ function GlucoseDayPatternCard() {
             <Radio className="h-4 w-4" aria-hidden />
           </span>
           <div className="min-w-0 flex-1 space-y-1.5">
-            <p className="text-sm font-medium text-foreground">See your daily glucose pattern</p>
+            <p className="text-sm font-medium text-foreground">Daily glucose pattern</p>
             <p className="text-sm leading-relaxed text-muted-foreground">
-              Connect a CGM to see each recent day's glucose overlaid on one chart — a great way to spot a recurring
-              spike or dip at a similar time each day.
+              Connect a CGM to overlay recent days and spot recurring spikes or dips.
             </p>
             <Link
               href="/settings/cgm"
@@ -95,36 +177,76 @@ function GlucoseDayPatternCard() {
 
   return (
     <Card data-testid="card-patterns-glucose-overlay">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base">Daily glucose pattern</CardTitle>
-        <CardDescription className="text-xs leading-snug">
-          Each of the last {Math.min(dayCount, 7)} day{Math.min(dayCount, 7) === 1 ? "" : "s"}, overlaid by time of
-          day. Today is solid; earlier days fade — a recurring shape most days is worth mentioning to your care team.
-          Mealtime shading is a general guide, not your logged meals.
-        </CardDescription>
+      <CardHeader className="space-y-3 pb-2">
+        <CardTitle className="text-base">Daily glucose</CardTitle>
+        <div className="space-y-2" data-testid="patterns-glucose-filters">
+          <div className="flex flex-wrap gap-1.5">
+            {DAY_RANGE_OPTIONS.map((opt) => (
+              <FilterPill
+                key={opt.days}
+                selected={dayRange === opt.days}
+                onClick={() => setDayRange(opt.days)}
+                testId={`filter-glucose-days-${opt.days}`}
+              >
+                {opt.label}
+              </FilterPill>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {GLUCOSE_TIME_WINDOWS.map((opt) => (
+              <FilterPill
+                key={opt.id}
+                selected={timeWindowId === opt.id}
+                onClick={() => setTimeWindowId(opt.id)}
+                testId={`filter-glucose-time-${opt.id}`}
+              >
+                {opt.label}
+              </FilterPill>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {DAY_KIND_OPTIONS.map((opt) => (
+              <FilterPill
+                key={opt.id}
+                selected={dayKind === opt.id}
+                onClick={() => setDayKind(opt.id)}
+                testId={`filter-glucose-kind-${opt.id}`}
+              >
+                {opt.label}
+              </FilterPill>
+            ))}
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         {dayCount < MIN_DAYS_FOR_OVERLAY ? (
           <div className="space-y-3">
-            {dayCount > 0 ? (
+            {series.length > 0 ? (
               <GlucoseDayOverlayChart
                 series={series}
                 units={units}
                 targetRange={targetRange}
+                minuteStart={timeWindow.minuteStart}
+                minuteEnd={timeWindow.minuteEnd}
                 data-testid="chart-patterns-glucose-overlay"
               />
             ) : null}
             <p className="text-xs leading-relaxed text-muted-foreground" data-testid="text-glucose-overlay-building">
-              Still building your pattern — {dayCount === 0 ? "no days yet" : `${dayCount} day${dayCount === 1 ? "" : "s"} so far`}.
-              Multi-day glucose history isn't available from your CGM in one go, so this fills in gradually as you use
-              the app. Check back in a few days for the full picture.
+              Still building — {dayCount === 0 ? "no days yet" : `${dayCount} day${dayCount === 1 ? "" : "s"} so far`}.
+              Check back as more readings accumulate on this device.
             </p>
           </div>
+        ) : series.length === 0 ? (
+          <p className="text-sm text-muted-foreground" data-testid="text-glucose-overlay-empty-filter">
+            No readings in this window. Try a wider day range or time of day.
+          </p>
         ) : (
           <GlucoseDayOverlayChart
             series={series}
             units={units}
             targetRange={targetRange}
+            minuteStart={timeWindow.minuteStart}
+            minuteEnd={timeWindow.minuteEnd}
             data-testid="chart-patterns-glucose-overlay"
           />
         )}
@@ -181,11 +303,8 @@ export default function PatternsPage() {
             Your patterns
           </span>
         }
+        actions={<PatternsInfoDialog />}
       />
-      <p className="text-sm leading-snug text-muted-foreground">
-        Insights and charts from your logged hypos and exercise sessions on this device — educational only, not
-        medical advice.
-      </p>
 
       <GlucoseDayPatternCard />
 
@@ -193,7 +312,7 @@ export default function PatternsPage() {
         <EmptyState
           icon={Sparkles}
           title="Not enough data yet"
-          description="Log a few hypo treatments from the home dashboard and this page will start finding patterns in when and how often they happen."
+          description="Log a few hypo treatments and this page will start finding patterns in when they happen."
         />
       ) : (
         <>
@@ -245,10 +364,6 @@ export default function PatternsPage() {
           <Card data-testid="card-patterns-hourly">
             <CardHeader className="pb-2">
               <CardTitle className="text-base">When lows happen</CardTitle>
-              <CardDescription className="text-xs leading-snug">
-                Time of day, last 30 days vs the 30 days before that. A recurring bar in the same window most weeks
-                is worth mentioning to your care team.
-              </CardDescription>
             </CardHeader>
             <CardContent>
               <OverlappingBarChart
@@ -264,9 +379,6 @@ export default function PatternsPage() {
           <Card data-testid="card-patterns-weekday">
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Which days</CardTitle>
-              <CardDescription className="text-xs leading-snug">
-                Day of week, last 6 weeks vs the 6 weeks before that.
-              </CardDescription>
             </CardHeader>
             <CardContent>
               <OverlappingBarChart
@@ -281,10 +393,6 @@ export default function PatternsPage() {
           <Card data-testid="card-patterns-weekly-trend">
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Weekly trend</CardTitle>
-              <CardDescription className="text-xs leading-snug">
-                Lows per week over the last 12 weeks, with exercise sessions shaded behind — useful for spotting
-                whether more activity lines up with more lows.
-              </CardDescription>
             </CardHeader>
             <CardContent>
               <WeeklyTrendChart points={weeklyTrend} data-testid="chart-patterns-weekly-trend" />
@@ -292,11 +400,6 @@ export default function PatternsPage() {
           </Card>
         </>
       )}
-
-      <p className="text-center text-xs text-muted-foreground pb-4">
-        Patterns from your own logs on this device — educational only, not medical advice. Bring anything that
-        surprises you to your diabetes team.
-      </p>
     </PageShell>
   );
 }

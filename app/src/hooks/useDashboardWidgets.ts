@@ -49,6 +49,55 @@ function normaliseOrders(list: WidgetPlacement[]): WidgetPlacement[] {
   return sorted.map((p, i) => ({ ...p, order: i }));
 }
 
+/**
+ * One-time: place Your patterns immediately after Quick exercise when the layout
+ * still looks like the old default (patterns sat after Tip of the day).
+ */
+function migratePatternsAfterExercise(list: WidgetPlacement[]): WidgetPlacement[] {
+  if (typeof localStorage === "undefined") return list;
+  const FLAG = "diabeaters_dash_patterns_after_exercise_v1";
+  try {
+    if (localStorage.getItem(FLAG)) return list;
+  } catch {
+    return list;
+  }
+
+  const sorted = [...list].sort((a, b) => a.order - b.order);
+  const tip = sorted.find((p) => p.id === "tip-of-day");
+  const patterns = sorted.find((p) => p.id === "pattern-insights");
+  const exercise = sorted.find((p) => p.id === "quick-exercise");
+  if (!tip || !patterns || !exercise) {
+    try {
+      localStorage.setItem(FLAG, "1");
+    } catch {
+      /* ignore */
+    }
+    return list;
+  }
+
+  // Only migrate layouts that still match the old default relative order.
+  if (patterns.order <= tip.order) {
+    try {
+      localStorage.setItem(FLAG, "1");
+    } catch {
+      /* ignore */
+    }
+    return list;
+  }
+
+  const without = sorted.filter((p) => p.id !== "pattern-insights");
+  const exIdx = without.findIndex((p) => p.id === "quick-exercise");
+  if (exIdx < 0) return list;
+  without.splice(exIdx + 1, 0, patterns);
+  const next = without.map((p, i) => ({ ...p, order: i }));
+  try {
+    localStorage.setItem(FLAG, "1");
+  } catch {
+    /* ignore */
+  }
+  return next;
+}
+
 function mergeWithRegistry(saved: PersistedRow[] | null): WidgetPlacement[] {
   const defaults = buildDefaultPlacements();
   if (!saved?.length) return defaults;
@@ -76,7 +125,7 @@ function mergeWithRegistry(saved: PersistedRow[] | null): WidgetPlacement[] {
     };
   });
 
-  return normaliseOrders(merged);
+  return normaliseOrders(migratePatternsAfterExercise(merged));
 }
 
 function loadPlacements(): WidgetPlacement[] {
@@ -95,7 +144,10 @@ function loadPlacements(): WidgetPlacement[] {
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return buildDefaultPlacements();
 
-    return mergeWithRegistry(parsed as PersistedRow[]);
+    const merged = mergeWithRegistry(parsed as PersistedRow[]);
+    // Persist one-time migrations (e.g. patterns after exercise) so order sticks.
+    persistPlacements(merged);
+    return merged;
   } catch {
     return buildDefaultPlacements();
   }

@@ -66,6 +66,14 @@ export const DASHBOARD_WIDGET_REGISTRY: DashboardWidgetDefinition[] = [
     component: QuickExerciseWidget,
   },
   {
+    id: "pattern-insights",
+    label: "Your patterns",
+    description: "Spots patterns in your logged hypos, exercise, and checks.",
+    defaultEnabled: true,
+    defaultSize: "full",
+    component: PatternInsightsWidget,
+  },
+  {
     id: "ratio-adviser",
     label: "Your ratios",
     description: "Carb ratios by meal, with a shortcut into meal planning.",
@@ -96,14 +104,6 @@ export const DASHBOARD_WIDGET_REGISTRY: DashboardWidgetDefinition[] = [
     defaultEnabled: true,
     defaultSize: "full",
     component: TipOfDayWidget,
-  },
-  {
-    id: "pattern-insights",
-    label: "Your patterns",
-    description: "Spots patterns in your logged hypos, exercise, and checks.",
-    defaultEnabled: true,
-    defaultSize: "full",
-    component: PatternInsightsWidget,
   },
   {
     id: "settings-completion",

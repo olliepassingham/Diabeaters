@@ -7,43 +7,65 @@ type GlucoseDayOverlayChartProps = {
   series: GlucoseDaySeries[];
   units: BgUnits;
   targetRange: { low: number; high: number };
+  /** Inclusive start of the visible x-axis in minutes since midnight. */
+  minuteStart?: number;
+  /** Exclusive end of the visible x-axis in minutes since midnight. */
+  minuteEnd?: number;
   className?: string;
   "data-testid"?: string;
 };
 
 const WIDTH = 320;
 const HEIGHT = 200;
-const PAD = { top: 10, right: 10, bottom: 34, left: 30 };
+const PAD = { top: 10, right: 10, bottom: 28, left: 30 };
 const MINUTES_PER_DAY = 24 * 60;
 
-/** Generic typical UK mealtime windows, in minutes since midnight — a visual anchor only, not logged data. */
+/** Generic typical UK mealtime windows — visual anchors on the full-day view only. */
 const MEALTIME_BANDS: { label: string; startMinute: number; endMinute: number }[] = [
   { label: "Breakfast", startMinute: 7 * 60, endMinute: 9 * 60 },
   { label: "Lunch", startMinute: 12 * 60, endMinute: 14 * 60 },
   { label: "Dinner", startMinute: 18 * 60, endMinute: 20 * 60 },
 ];
 
-const HOUR_TICKS = [0, 6, 12, 18, 24];
-
 function hourTickLabel(hour: number): string {
-  if (hour === 0 || hour === 24) return "12am";
-  if (hour === 12) return "12pm";
-  return hour < 12 ? `${hour}am` : `${hour - 12}pm`;
+  const h = ((hour % 24) + 24) % 24;
+  if (h === 0) return "12am";
+  if (h === 12) return "12pm";
+  return h < 12 ? `${h}am` : `${h - 12}pm`;
+}
+
+function buildHourTicks(minuteStart: number, minuteEnd: number): number[] {
+  const spanHours = (minuteEnd - minuteStart) / 60;
+  const step = spanHours <= 6 ? 1 : spanHours <= 12 ? 2 : 6;
+  const firstHour = Math.ceil(minuteStart / 60);
+  const lastHour = Math.floor(minuteEnd / 60);
+  const ticks: number[] = [];
+  for (let h = firstHour; h <= lastHour; h += step) {
+    ticks.push(h);
+  }
+  if (ticks.length === 0) ticks.push(Math.round(minuteStart / 60));
+  return ticks;
 }
 
 /**
- * Each recent day's glucose trace plotted on a shared 24h time-of-day axis —
+ * Each recent day's glucose trace plotted on a shared time-of-day axis —
  * so a recurring shape (e.g. a spike most mornings) is visible at a glance.
- * Same hand-rolled SVG language as the other Patterns charts. Older days fade
- * out; the most recent day is drawn last, solid, on top.
+ * Older days fade out; the most recent day is drawn last, solid, on top.
  */
 export function GlucoseDayOverlayChart({
   series,
   units,
   targetRange,
+  minuteStart = 0,
+  minuteEnd = MINUTES_PER_DAY,
   className,
   "data-testid": testId,
 }: GlucoseDayOverlayChartProps) {
+  const viewStart = Math.max(0, Math.min(MINUTES_PER_DAY - 1, minuteStart));
+  const viewEnd = Math.max(viewStart + 1, Math.min(MINUTES_PER_DAY, minuteEnd));
+  const viewSpan = viewEnd - viewStart;
+  const showMealBands = viewStart === 0 && viewEnd === MINUTES_PER_DAY;
+
   const innerWidth = WIDTH - PAD.left - PAD.right;
   const innerHeight = HEIGHT - PAD.top - PAD.bottom;
 
@@ -58,7 +80,7 @@ export function GlucoseDayOverlayChart({
     };
   }, [series, targetRange, units]);
 
-  const xFor = (minuteOfDay: number) => PAD.left + (minuteOfDay / MINUTES_PER_DAY) * innerWidth;
+  const xFor = (minuteOfDay: number) => PAD.left + ((minuteOfDay - viewStart) / viewSpan) * innerWidth;
   const yFor = (value: number) => PAD.top + innerHeight - ((value - yMin) / (yMax - yMin)) * innerHeight;
 
   const yTicks = useMemo(() => {
@@ -66,6 +88,7 @@ export function GlucoseDayOverlayChart({
     return [yMin, (yMin + yMax) / 2, yMax].map(round);
   }, [yMin, yMax, units]);
 
+  const hourTicks = useMemo(() => buildHourTicks(viewStart, viewEnd), [viewStart, viewEnd]);
   const mostRecentCount = Math.max(1, series.length);
 
   return (
@@ -76,20 +99,20 @@ export function GlucoseDayOverlayChart({
         role="img"
         aria-label={`Glucose over the day, overlaid across ${series.length} recent day${series.length === 1 ? "" : "s"}, most recent day highlighted`}
       >
-        {/* Typical mealtime bands — a visual anchor only, not logged meal data */}
-        {MEALTIME_BANDS.map((band) => (
-          <rect
-            key={band.label}
-            x={xFor(band.startMinute)}
-            y={PAD.top}
-            width={xFor(band.endMinute) - xFor(band.startMinute)}
-            height={innerHeight}
-            fill="currentColor"
-            fillOpacity={0.05}
-          />
-        ))}
+        {showMealBands
+          ? MEALTIME_BANDS.map((band) => (
+              <rect
+                key={band.label}
+                x={xFor(band.startMinute)}
+                y={PAD.top}
+                width={xFor(band.endMinute) - xFor(band.startMinute)}
+                height={innerHeight}
+                fill="currentColor"
+                fillOpacity={0.05}
+              />
+            ))
+          : null}
 
-        {/* Target range band */}
         <rect
           x={PAD.left}
           y={yFor(targetRange.high)}
@@ -143,30 +166,16 @@ export function GlucoseDayOverlayChart({
           );
         })}
 
-        {HOUR_TICKS.map((hour) => (
+        {hourTicks.map((hour) => (
           <text
             key={hour}
             x={xFor(hour * 60)}
-            y={HEIGHT - PAD.bottom + 12}
+            y={HEIGHT - PAD.bottom + 14}
             textAnchor="middle"
             fontSize="8"
             fill="currentColor"
           >
             {hourTickLabel(hour)}
-          </text>
-        ))}
-
-        {MEALTIME_BANDS.map((band) => (
-          <text
-            key={`label-${band.label}`}
-            x={xFor((band.startMinute + band.endMinute) / 2)}
-            y={HEIGHT - PAD.bottom + 24}
-            textAnchor="middle"
-            fontSize="7"
-            fill="currentColor"
-            opacity={0.7}
-          >
-            {band.label}
           </text>
         ))}
       </svg>
@@ -178,11 +187,11 @@ export function GlucoseDayOverlayChart({
         </span>
         <span className="flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full bg-muted-foreground/30" aria-hidden />
-          Earlier this week
+          Earlier days
         </span>
         <span className="flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-sm" style={{ backgroundColor: "#22c55e", opacity: 0.5 }} aria-hidden />
-          Target range
+          Target
         </span>
       </div>
     </div>
