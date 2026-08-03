@@ -37,6 +37,12 @@ import {
   type GlucoseDayKind,
   type GlucoseTimeWindowId,
 } from "@/lib/cgm/glucose-day-overlay";
+import {
+  glucoseDayFiltersToOverlayOptions,
+  readGlucoseDayFilters,
+  writeGlucoseDayFilters,
+  type GlucoseDayRange,
+} from "@/lib/cgm/glucose-day-filters";
 import { resolveUserTargetBgRange } from "@/lib/target-bg-range";
 import { normalizeBgUnits } from "@/lib/alcohol-night-tool";
 import { cn } from "@/lib/utils";
@@ -66,11 +72,11 @@ const TONE_STYLES: Record<
 /** Below this many distinct local-calendar days, the overlay is too thin to show meaningful pattern shape. */
 const MIN_DAYS_FOR_OVERLAY = 3;
 
-const DAY_RANGE_OPTIONS = [
+const DAY_RANGE_OPTIONS: { days: GlucoseDayRange; label: string }[] = [
   { days: 3, label: "3 days" },
   { days: 7, label: "7 days" },
   { days: 14, label: "14 days" },
-] as const;
+];
 
 const DAY_KIND_OPTIONS: { id: GlucoseDayKind; label: string }[] = [
   { id: "all", label: "All days" },
@@ -111,11 +117,14 @@ function PatternsInfoDialog() {
 
 function GlucoseDayPatternCard() {
   const [refreshTick, setRefreshTick] = useState(0);
-  const [dayRange, setDayRange] = useState<3 | 7 | 14>(7);
-  const [timeWindowId, setTimeWindowId] = useState<GlucoseTimeWindowId>("all");
-  const [dayKind, setDayKind] = useState<GlucoseDayKind>("all");
+  const [filters, setFilters] = useState(() => readGlucoseDayFilters());
+  const { dayRange, timeWindowId, dayKind } = filters;
   const cgmConnected = isCgmPrefillActive();
   const timeWindow = glucoseTimeWindowById(timeWindowId);
+
+  useEffect(() => {
+    writeGlucoseDayFilters(filters);
+  }, [filters]);
 
   useEffect(() => {
     if (!cgmConnected) return;
@@ -143,15 +152,14 @@ function GlucoseDayPatternCard() {
   const series = useMemo(
     () =>
       cgmConnected
-        ? buildGlucoseDayOverlay(getCgmLocalHistory(dayRange), units, {
-            days: dayRange,
-            minuteStart: timeWindow.minuteStart,
-            minuteEnd: timeWindow.minuteEnd,
-            dayKind,
-          })
+        ? buildGlucoseDayOverlay(
+            getCgmLocalHistory(dayRange),
+            units,
+            glucoseDayFiltersToOverlayOptions(filters),
+          )
         : [],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [cgmConnected, units, refreshTick, dayRange, timeWindow.minuteStart, timeWindow.minuteEnd, dayKind],
+    [cgmConnected, units, refreshTick, filters],
   );
 
   if (!cgmConnected) {
@@ -184,7 +192,10 @@ function GlucoseDayPatternCard() {
       <CardHeader className="space-y-3 pb-2">
         <CardTitle className="text-base">Daily glucose</CardTitle>
         <div className="grid grid-cols-3 gap-1.5" data-testid="patterns-glucose-filters">
-          <Select value={String(dayRange)} onValueChange={(v) => setDayRange(Number(v) as 3 | 7 | 14)}>
+          <Select
+            value={String(dayRange)}
+            onValueChange={(v) => setFilters((prev) => ({ ...prev, dayRange: Number(v) as GlucoseDayRange }))}
+          >
             <SelectTrigger className={FILTER_TRIGGER_CLASS} data-testid="filter-glucose-range">
               <SelectValue />
             </SelectTrigger>
@@ -197,7 +208,10 @@ function GlucoseDayPatternCard() {
             </SelectContent>
           </Select>
 
-          <Select value={timeWindowId} onValueChange={(v) => setTimeWindowId(v as GlucoseTimeWindowId)}>
+          <Select
+            value={timeWindowId}
+            onValueChange={(v) => setFilters((prev) => ({ ...prev, timeWindowId: v as GlucoseTimeWindowId }))}
+          >
             <SelectTrigger className={FILTER_TRIGGER_CLASS} data-testid="filter-glucose-time">
               <SelectValue />
             </SelectTrigger>
@@ -210,7 +224,10 @@ function GlucoseDayPatternCard() {
             </SelectContent>
           </Select>
 
-          <Select value={dayKind} onValueChange={(v) => setDayKind(v as GlucoseDayKind)}>
+          <Select
+            value={dayKind}
+            onValueChange={(v) => setFilters((prev) => ({ ...prev, dayKind: v as GlucoseDayKind }))}
+          >
             <SelectTrigger className={FILTER_TRIGGER_CLASS} data-testid="filter-glucose-kind">
               <SelectValue />
             </SelectTrigger>

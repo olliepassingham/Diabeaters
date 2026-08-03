@@ -15,6 +15,11 @@ import { isCgmPrefillActive } from "@/lib/cgm/preferences";
 import { fetchLiveCgmHistory } from "@/lib/cgm/live-cgm-history";
 import { countCgmLocalHistoryDays, getCgmLocalHistory } from "@/lib/cgm/cgm-history-store";
 import { buildGlucoseDayOverlay } from "@/lib/cgm/glucose-day-overlay";
+import {
+  formatGlucoseDayFiltersSummary,
+  glucoseDayFiltersToOverlayOptions,
+  readGlucoseDayFilters,
+} from "@/lib/cgm/glucose-day-filters";
 import { resolveUserTargetBgRange } from "@/lib/target-bg-range";
 import { normalizeBgUnits } from "@/lib/alcohol-night-tool";
 
@@ -23,14 +28,21 @@ const MIN_DAYS_FOR_OVERLAY = 1;
 
 /**
  * Home widget: leads with the overlapping daily glucose pattern chart when
- * CGM history is available (same view as "Your patterns", without the long
- * explanation). Falls back to the hypo time-of-day chart when there's no
- * glucose history yet.
+ * CGM history is available (same view as "Your patterns", including whatever
+ * day-range / time-of-day / weekday filters the user last set on that page).
+ * Falls back to the hypo time-of-day chart when there's no glucose history yet.
  */
 export function PatternInsightsWidget(props: DashboardWidgetLayoutProps) {
   const compact = isCompactLayout(props);
   const [refreshTick, setRefreshTick] = useState(0);
+  const [filters, setFilters] = useState(() => readGlucoseDayFilters());
   const cgmConnected = isCgmPrefillActive();
+  const overlayOptions = useMemo(() => glucoseDayFiltersToOverlayOptions(filters), [filters]);
+  const filterSummary = useMemo(() => formatGlucoseDayFiltersSummary(filters), [filters]);
+
+  useEffect(() => {
+    setFilters(readGlucoseDayFilters());
+  }, [refreshTick]);
 
   useEffect(() => {
     if (!cgmConnected) return;
@@ -47,18 +59,35 @@ export function PatternInsightsWidget(props: DashboardWidgetLayoutProps) {
     };
   }, [cgmConnected]);
 
+  // Re-read filters when returning to the home screen (e.g. after changing them on Patterns).
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") setRefreshTick((t) => t + 1);
+    };
+    const onFocus = () => setRefreshTick((t) => t + 1);
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, []);
+
   const units = normalizeBgUnits(storage.getProfile()?.bgUnits);
   const targetRange = useMemo(() => resolveUserTargetBgRange(storage.getSettings(), units), [units]);
 
   const dayCount = useMemo(
-    () => (cgmConnected ? countCgmLocalHistoryDays(7) : 0),
+    () => (cgmConnected ? countCgmLocalHistoryDays(filters.dayRange) : 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [cgmConnected, refreshTick],
+    [cgmConnected, refreshTick, filters.dayRange],
   );
   const glucoseSeries = useMemo(
-    () => (cgmConnected ? buildGlucoseDayOverlay(getCgmLocalHistory(7), units, { days: 7 }) : []),
+    () =>
+      cgmConnected
+        ? buildGlucoseDayOverlay(getCgmLocalHistory(filters.dayRange), units, overlayOptions)
+        : [],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [cgmConnected, units, refreshTick],
+    [cgmConnected, units, refreshTick, filters.dayRange, overlayOptions],
   );
   const hasGlucoseChart = cgmConnected && dayCount >= MIN_DAYS_FOR_OVERLAY && glucoseSeries.length > 0;
 
@@ -96,7 +125,13 @@ export function PatternInsightsWidget(props: DashboardWidgetLayoutProps) {
             <CardTitle className="text-h3 text-foreground">Your patterns</CardTitle>
           </div>
           {hasGlucoseChart ? (
-            <span className="shrink-0 text-xs text-muted-foreground">Daily glucose</span>
+            <span
+              className="max-w-[55%] shrink-0 truncate text-xs text-muted-foreground"
+              title={filterSummary}
+              data-testid="text-widget-glucose-filter-summary"
+            >
+              {filterSummary}
+            </span>
           ) : hasHypoChart ? (
             <span className="shrink-0 text-xs text-muted-foreground">Lows by time of day</span>
           ) : null}
@@ -108,6 +143,8 @@ export function PatternInsightsWidget(props: DashboardWidgetLayoutProps) {
             series={glucoseSeries}
             units={units}
             targetRange={targetRange}
+            minuteStart={overlayOptions.minuteStart}
+            minuteEnd={overlayOptions.minuteEnd}
             className={compact ? "[&_svg]:min-h-[140px]" : undefined}
             data-testid="chart-widget-glucose-overlay"
           />

@@ -16,6 +16,7 @@ import {
   DIABEATER_ACTIVE_USER_CHANGED_EVENT,
   DIABEATER_SCENARIO_STATE_CHANGED_EVENT,
   storage,
+  type BedtimeLog,
   type HolidayPrep,
   type Supply,
   type ScenarioState,
@@ -30,6 +31,10 @@ import { collectAllActivityEvents, getActivityWeekSummary } from "@/lib/activity
 import { computeStreakStats } from "@/lib/activity-streaks";
 import { prefetchToolsDestinationHref } from "@/lib/tools-route-prefetch";
 import { tripStyleLabel } from "@/lib/travel-active-guidance";
+import {
+  bedtimeReadinessLabel,
+  findMorningHomeBedtimeLog,
+} from "@/lib/bedtime-overnight-window";
 import { cn } from "@/lib/utils";
 
 /**
@@ -211,12 +216,14 @@ function TodayAtAGlanceContent(props: { supplyShortcutHidden?: boolean; healthSt
   const { healthStatus } = props;
   const [supplies, setSupplies] = useState<Supply[]>(() => storage.getSupplies());
   const [scenarioState, setScenarioState] = useState<ScenarioState>(() => storage.getScenarioState());
+  const [bedtimeLogs, setBedtimeLogs] = useState<BedtimeLog[]>(() => storage.getBedtimeLogs());
   const [activityTick, setActivityTick] = useState(0);
 
   useEffect(() => {
     const refresh = () => {
       setSupplies(storage.getSupplies());
       setScenarioState(storage.getScenarioState());
+      setBedtimeLogs(storage.getBedtimeLogs());
       setActivityTick((t) => t + 1);
     };
     refresh();
@@ -250,6 +257,11 @@ function TodayAtAGlanceContent(props: { supplyShortcutHidden?: boolean; healthSt
   );
   const hour = new Date().getHours();
   const isEvening = hour >= 19 || hour < 6;
+  const morningBedtimeLog = useMemo(
+    () => (!isEvening ? findMorningHomeBedtimeLog(bedtimeLogs) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- activityTick refreshes on focus/visibility
+    [bedtimeLogs, isEvening, activityTick],
+  );
 
   const parseISODateOnly = (dateStr: string | undefined): Date | null => {
     if (!dateStr) return null;
@@ -492,6 +504,29 @@ function TodayAtAGlanceContent(props: { supplyShortcutHidden?: boolean; healthSt
           ) : (
             supplyBlock
           )
+        ) : null}
+
+        {morningBedtimeLog ? (
+          <Link href="/scenarios/bedtime" className="block pt-0.5">
+            <div
+              className={cn(
+                "flex cursor-pointer items-center gap-2 rounded-lg border border-transparent px-2.5 py-2 text-sm leading-snug transition-colors",
+                morningBedtimeLog.readinessLevel === "alert"
+                  ? "bg-red-50/90 text-red-900 hover:border-red-200/80 hover:bg-red-100/90 dark:border-red-900/30 dark:bg-red-950/35 dark:text-red-100 dark:hover:bg-red-950/50"
+                  : morningBedtimeLog.readinessLevel === "monitor"
+                    ? "bg-amber-50/90 text-amber-950 hover:border-amber-200/80 hover:bg-amber-100/90 dark:border-amber-900/30 dark:bg-amber-950/35 dark:text-amber-100 dark:hover:bg-amber-950/50"
+                    : "bg-emerald-50/90 text-emerald-950 hover:border-emerald-200/80 hover:bg-emerald-100/90 dark:border-emerald-900/30 dark:bg-emerald-950/35 dark:text-emerald-100 dark:hover:bg-emerald-950/50",
+              )}
+              data-testid="card-morning-bedtime-score"
+            >
+              <Moon className="h-4 w-4 shrink-0" aria-hidden />
+              <div className="min-w-0 flex-1">
+                <p className="font-medium">Last night · {bedtimeReadinessLabel(morningBedtimeLog.readinessLevel)}</p>
+                <p className="text-[11px] leading-tight opacity-80">Tap to review how overnight went</p>
+              </div>
+              <ArrowRight className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
+            </div>
+          </Link>
         ) : null}
 
         {isEvening ? (

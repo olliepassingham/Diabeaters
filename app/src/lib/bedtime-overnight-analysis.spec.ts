@@ -5,7 +5,7 @@ import {
   entriesToOvernightReadings,
   filterEntriesToSleepWindow,
 } from "./bedtime-overnight-analysis";
-import { computeBedtimeSleepWindow, findReviewableBedtimeLog, resolveOvernightReviewTarget } from "./bedtime-overnight-window";
+import { computeBedtimeSleepWindow, findReviewableBedtimeLog, resolveOvernightReviewTarget, findMorningHomeBedtimeLog, isBedtimeMorningHomeWindow, bedtimeReadinessLabel } from "./bedtime-overnight-window";
 import type { BedtimeLog } from "@/lib/storage";
 
 function makeLog(overrides: Partial<BedtimeLog> = {}): BedtimeLog {
@@ -51,6 +51,47 @@ describe("bedtime overnight window", () => {
     expect(target).not.toBeNull();
     expect(target!.source).toBe("calendar_fallback");
     expect(target!.window.endMs).toBeLessThanOrEqual(now);
+  });
+});
+
+describe("morning home bedtime score", () => {
+  function localMs(year: number, month: number, day: number, hour: number, minute = 0): number {
+    return new Date(year, month - 1, day, hour, minute, 0, 0).getTime();
+  }
+
+  it("is only in the morning window (6–11 local)", () => {
+    expect(isBedtimeMorningHomeWindow(localMs(2026, 7, 9, 5, 59))).toBe(false);
+    expect(isBedtimeMorningHomeWindow(localMs(2026, 7, 9, 6))).toBe(true);
+    expect(isBedtimeMorningHomeWindow(localMs(2026, 7, 9, 11, 59))).toBe(true);
+    expect(isBedtimeMorningHomeWindow(localMs(2026, 7, 9, 12))).toBe(false);
+  });
+
+  it("surfaces last night's readiness during morning when the sleep window has ended", () => {
+    const morning = localMs(2026, 7, 9, 8, 30);
+    // Check at 22:00 previous evening, sleep immediately → ends 06:00 (default 8h)
+    const checkAt = new Date(2026, 6, 8, 22, 0, 0, 0).toISOString();
+    const logs = [makeLog({ id: "last-night", date: checkAt, hoursUntilSleep: 0, readinessLevel: "steady" })];
+    expect(findMorningHomeBedtimeLog(logs, morning)?.id).toBe("last-night");
+  });
+
+  it("hides the score after noon even if last night is still fresh", () => {
+    const afternoon = localMs(2026, 7, 9, 12, 5);
+    const checkAt = new Date(2026, 6, 8, 22, 0, 0, 0).toISOString();
+    const logs = [makeLog({ id: "last-night", date: checkAt, hoursUntilSleep: 0 })];
+    expect(findMorningHomeBedtimeLog(logs, afternoon)).toBeNull();
+  });
+
+  it("ignores stale nights that ended more than 18 hours ago", () => {
+    const morning = localMs(2026, 7, 11, 9);
+    const checkAt = new Date(2026, 6, 8, 22, 0, 0, 0).toISOString();
+    const logs = [makeLog({ id: "old-night", date: checkAt, hoursUntilSleep: 0 })];
+    expect(findMorningHomeBedtimeLog(logs, morning)).toBeNull();
+  });
+
+  it("labels readiness levels for the home card", () => {
+    expect(bedtimeReadinessLabel("steady")).toBe("Steady");
+    expect(bedtimeReadinessLabel("monitor")).toBe("Monitor");
+    expect(bedtimeReadinessLabel("alert")).toBe("Alert");
   });
 });
 

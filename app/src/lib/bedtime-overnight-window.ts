@@ -94,3 +94,39 @@ export function formatSleepWindowLabel(startMs: number, endMs: number): string {
     new Date(ms).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
   return `${fmt(startMs)} – ${fmt(endMs)}`;
 }
+
+/** Local-hour morning window for the home Today card (after night hours, before noon). */
+export const BEDTIME_MORNING_HOME_START_HOUR = 6;
+export const BEDTIME_MORNING_HOME_END_HOUR = 12;
+/** Don't surface a readiness score for a night that ended more than this long ago. */
+export const BEDTIME_MORNING_HOME_MAX_AGE_MS = 18 * 60 * 60 * 1000;
+
+export function isBedtimeMorningHomeWindow(nowMs = Date.now()): boolean {
+  const hour = new Date(nowMs).getHours();
+  return hour >= BEDTIME_MORNING_HOME_START_HOUR && hour < BEDTIME_MORNING_HOME_END_HOUR;
+}
+
+/**
+ * Last night's bedtime check for the home Today card: only during local morning,
+ * only when the sleep window has ended recently enough that "last night" still applies.
+ */
+export function findMorningHomeBedtimeLog(logs: BedtimeLog[], nowMs = Date.now()): BedtimeLog | null {
+  if (!isBedtimeMorningHomeWindow(nowMs)) return null;
+  const log = findReviewableBedtimeLog(logs, nowMs);
+  if (!log) return null;
+  const window = computeBedtimeSleepWindow(log);
+  if (!window) return null;
+  if (nowMs - window.endMs > BEDTIME_MORNING_HOME_MAX_AGE_MS) return null;
+  return log;
+}
+
+export function bedtimeReadinessLabel(level: BedtimeLog["readinessLevel"]): string {
+  switch (level) {
+    case "steady":
+      return "Steady";
+    case "monitor":
+      return "Monitor";
+    case "alert":
+      return "Alert";
+  }
+}
