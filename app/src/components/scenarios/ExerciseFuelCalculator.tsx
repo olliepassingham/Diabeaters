@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, useCallback, useEffect, type ReactNode } from "react";
 import { Link } from "wouter";
-import { BookOpen, Calculator, ChevronDown, Dumbbell, RotateCcw, X } from "lucide-react";
+import { BookOpen, Calculator, ChevronDown, Dumbbell, RotateCcw, Sparkles, X } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
@@ -780,9 +780,56 @@ export function ExerciseFuelCalculator() {
                     }
                   />
                 </div>
+                {!mealCarbsTouched && suggestedMealCarbs != null && suggestedMealCarbs > 0 ? (
+                  <div
+                    className="relative overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/10 via-primary/[0.04] to-transparent px-4 py-3.5"
+                    data-testid="efc-suggested-carbs-card"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
+                        <Sparkles className="h-5 w-5" aria-hidden />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">
+                          Suggested for you
+                        </p>
+                        <p className="flex items-baseline gap-1.5 leading-none">
+                          <span
+                            className="text-3xl font-bold tabular-nums text-foreground"
+                            data-testid="efc-suggested-carbs-value"
+                          >
+                            {suggestedMealCarbs}g
+                          </span>
+                          <span className="text-sm font-medium text-muted-foreground">before exercise</span>
+                        </p>
+                        <p className="mt-1 text-xs leading-snug text-muted-foreground">
+                          Based on your session, BG, and trend above
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : !mealCarbsTouched ? (
+                  <div
+                    className="flex items-center gap-3 rounded-2xl border border-border/50 bg-muted/20 px-4 py-3"
+                    data-testid="efc-suggested-carbs-none"
+                  >
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+                      <Sparkles className="h-4 w-4" aria-hidden />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground">No carbs suggested right now</p>
+                      <p className="text-xs text-muted-foreground">Enter an amount below if you're planning to eat</p>
+                    </div>
+                  </div>
+                ) : null}
+
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <Label htmlFor="efc-meal-carbs">Carbs before exercise (g)</Label>
+                    <Label htmlFor="efc-meal-carbs">
+                      {!mealCarbsTouched && suggestedMealCarbs != null && suggestedMealCarbs > 0
+                        ? "Know your own amount instead?"
+                        : "Carbs before exercise (g)"}
+                    </Label>
                     <Input
                       id="efc-meal-carbs"
                       type="number"
@@ -804,13 +851,7 @@ export function ExerciseFuelCalculator() {
                         <RotateCcw className="h-3 w-3 shrink-0 text-primary" aria-hidden />
                         Use our estimate{suggestedMealCarbs != null ? ` (${suggestedMealCarbs}g)` : ""}
                       </button>
-                    ) : (
-                      <p className="text-[11px] text-muted-foreground">
-                        {suggestedMealCarbs != null && suggestedMealCarbs > 0
-                          ? "Our estimate — edit if you know your own carbs"
-                          : "No carbs suggested yet — edit if you're planning to eat"}
-                      </p>
-                    )}
+                    ) : null}
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="efc-meal-type">Meal type</Label>
