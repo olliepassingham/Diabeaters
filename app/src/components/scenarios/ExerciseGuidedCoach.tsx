@@ -109,7 +109,6 @@ import { reconcileExerciseFuelLines } from "@/lib/exercise-recommendation";
 import { useExerciseSessionActions } from "@/hooks/use-exercise-session-actions";
 import { requestOpenExerciseMode } from "@/lib/exercise-mode-deep-link";
 import { computeExerciseHypoSuggestion, resolveExerciseBgForHypo } from "@/lib/exercise-hypo-auto";
-import { buildExercisePersonalizationLines } from "@/lib/exercise-personalization";
 import { format } from "date-fns";
 import {
   ExerciseFuelPlanSummary,
@@ -119,7 +118,6 @@ import {
 } from "@/components/exercise-active-session-extras";
 import { getWorkoutElapsedMs, isExercisePaused } from "@/lib/exercise-session-timing";
 import { ExerciseCgmBgField } from "@/components/exercise-cgm-bg-field";
-import { CgmReadingSourceNote } from "@/components/cgm-reading-source-note";
 import { useExerciseCgmBg } from "@/hooks/use-exercise-cgm-bg";
 import type { BgPrefillResult } from "@/lib/cgm/prefill";
 // Shared with the exercise routines page and elsewhere so every exercise type has exactly one
@@ -525,27 +523,6 @@ export function ExerciseGuidedCoach() {
   }, [activeSession]);
 
   const historyBias = useMemo(() => deriveHistoryBias(activeSession), [activeSession]);
-
-  /**
-   * Richer, explainable history footnote (pattern direction, hypo clustering, last-planned
-   * mismatch) — replaces the older one-line historyBias summary so the same past-session
-   * data is put to fuller use instead of two thinner, parallel systems.
-   */
-  const personalizationLines = useMemo(() => {
-    if (!activeSession) return [];
-    try {
-      return buildExercisePersonalizationLines({
-        exerciseType: activeSession.exerciseType,
-        intensity: activeSession.intensity,
-        durationMinutes: activeSession.durationMinutes,
-        outcomes: storage.getExerciseOutcomes(),
-        hypoTreatments: storage.getHypoTreatments(),
-        activityLogs: storage.getActivityLogs(),
-      });
-    } catch {
-      return [];
-    }
-  }, [activeSession]);
 
   const exercisePlan: ExercisePlanResult | null = useMemo(() => {
     if (!activeSession) return null;
@@ -1205,8 +1182,8 @@ export function ExerciseGuidedCoach() {
             data-testid="coach-phase-card"
           >
             {readiness ? (
-              <div className="space-y-1.5" data-testid="coach-readiness-card">
-                <div className="flex items-start justify-between gap-2">
+              <div className="space-y-3" data-testid="coach-readiness-card">
+                <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <span
                       className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full", verdictVisuals.chipClass)}
@@ -1219,7 +1196,7 @@ export function ExerciseGuidedCoach() {
                   {phaseTimerLabel ? (
                     <span
                       className={cn(
-                        "text-xs tabular-nums shrink-0 pt-1",
+                        "text-xs tabular-nums shrink-0",
                         workoutPaused ? "font-medium text-amber-600 dark:text-amber-400" : "text-muted-foreground",
                       )}
                       data-testid="coach-phase-timer"
@@ -1235,18 +1212,8 @@ export function ExerciseGuidedCoach() {
                     </span>
                   ) : null}
                 </div>
-                <p className="text-sm leading-snug text-foreground/90 pl-9">{readiness.detail}</p>
-                <CgmReadingSourceNote prefill={cgmPrefill} bgValue={bgInput} className="pt-0.5" />
                 {fuelPlanLines.length > 0 ? (
-                  <ExerciseFuelPlanSummary lines={fuelPlanLines} variant={fuelPlanVariant} className="mt-2" />
-                ) : null}
-                {personalizationLines[0] ? (
-                  <p
-                    className="text-xs text-muted-foreground pt-1 border-t border-border/40 mt-1"
-                    data-testid="coach-personalization-note"
-                  >
-                    {personalizationLines[0].text}
-                  </p>
+                  <ExerciseFuelPlanSummary lines={fuelPlanLines} variant={fuelPlanVariant} />
                 ) : null}
               </div>
             ) : null}
