@@ -671,22 +671,19 @@ export function ExerciseFuelCalculator() {
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your session</p>
 
                 <div className="space-y-1.5">
-                  <Label>Activity</Label>
-                  <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4" role="group" aria-label="Activity">
-                    {EXERCISE_TYPE_OPTIONS.map((o) => (
-                      <Button
-                        key={o.value}
-                        type="button"
-                        size="sm"
-                        variant={exerciseType === o.value ? "default" : "outline"}
-                        className="h-10 min-h-0 whitespace-normal rounded-lg px-1.5 text-[11px] leading-tight sm:text-xs"
-                        onClick={() => setExerciseType(o.value)}
-                        data-testid={`efc-type-${o.value}`}
-                      >
-                        {o.label}
-                      </Button>
-                    ))}
-                  </div>
+                  <Label htmlFor="efc-activity">Activity</Label>
+                  <Select value={exerciseType} onValueChange={(v) => setExerciseType(v as ExerciseType)}>
+                    <SelectTrigger id="efc-activity" data-testid="efc-activity">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {EXERCISE_TYPE_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value} data-testid={`efc-type-${o.value}`}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">

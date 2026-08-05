@@ -34,7 +34,8 @@ test.describe("Exercise fuel & insulin manual QA", () => {
     await expect(page.getByTestId("efc-meal-carbs")).toBeVisible();
     await page.screenshot({ path: "test-results/efc-1-form-open.png", fullPage: true });
 
-    // pill selectors
+    // activity dropdown + intensity pills
+    await page.getByTestId("efc-activity").click();
     await page.getByTestId("efc-type-hiit").click();
     await page.getByTestId("efc-intensity-intense").click();
     await page.getByTestId("efc-bg").fill("7");
@@ -69,6 +70,7 @@ test.describe("Exercise fuel & insulin manual QA", () => {
     await seedPatientSession(page, { snackRatio: "1:10g", correctionFactor: 3 });
     await page.goto("/scenarios/exercise");
     await page.getByTestId("efc-collapsible-trigger").click();
+    await page.getByTestId("efc-activity").click();
     await page.getByTestId("efc-type-cardio").click();
     await page.getByTestId("efc-intensity-moderate").click();
 
@@ -108,6 +110,7 @@ test.describe("Exercise fuel & insulin manual QA", () => {
     await seedPatientSession(page, { snackRatio: "1:10g", correctionFactor: 3 });
     await page.goto("/scenarios/exercise");
     await page.getByTestId("efc-collapsible-trigger").click();
+    await page.getByTestId("efc-activity").click();
     await page.getByTestId("efc-type-cardio").click();
     await page.getByTestId("efc-intensity-moderate").click();
     await page.getByTestId("efc-bg").fill("4.8");
