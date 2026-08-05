@@ -25,6 +25,7 @@ import {
   Info,
   Maximize2,
   Moon,
+  Pause,
   Pill,
   Play,
   History,
@@ -116,6 +117,7 @@ import {
   ExerciseWorkoutProgressBar,
   formatExerciseElapsedShort,
 } from "@/components/exercise-active-session-extras";
+import { getWorkoutElapsedMs, isExercisePaused } from "@/lib/exercise-session-timing";
 import { ExerciseCgmBgField } from "@/components/exercise-cgm-bg-field";
 import { CgmReadingSourceNote } from "@/components/cgm-reading-source-note";
 import { useExerciseCgmBg } from "@/hooks/use-exercise-cgm-bg";
@@ -838,6 +840,18 @@ export function ExerciseGuidedCoach() {
     setActiveSession(updated);
   };
 
+  const onPauseWorkout = () => {
+    if (!activeSession || activeSession.phase !== "active" || activeSession.pausedAt) return;
+    const updated = sessionActions.pauseWorkout();
+    setActiveSession(updated);
+  };
+
+  const onResumeWorkout = () => {
+    if (!activeSession || activeSession.phase !== "active" || !activeSession.pausedAt) return;
+    const updated = sessionActions.resumeWorkout();
+    setActiveSession(updated);
+  };
+
   const onEndSession = () => {
     if (!activeSession) return;
     sessionActions.endSession();
@@ -849,9 +863,7 @@ export function ExerciseGuidedCoach() {
   const phaseTimerLabel: string | null = useMemo(() => {
     if (!activeSession) return null;
     if (activeSession.phase === "active" && activeSession.exerciseStartedAt) {
-      const t = new Date(activeSession.exerciseStartedAt).getTime();
-      if (!Number.isFinite(t)) return null;
-      return formatExerciseElapsedShort(now - t);
+      return formatExerciseElapsedShort(getWorkoutElapsedMs(activeSession, now));
     }
     if (activeSession.phase === "recovery" && activeSession.exerciseEndedAt) {
       const t = new Date(activeSession.exerciseEndedAt).getTime();
@@ -860,6 +872,8 @@ export function ExerciseGuidedCoach() {
     }
     return null;
   }, [activeSession, now]);
+
+  const workoutPaused = isExercisePaused(activeSession);
 
   // ----- Render -----
   if (!activeSession) {
@@ -1129,16 +1143,41 @@ export function ExerciseGuidedCoach() {
                     Start
                   </Button>
                 ) : phase === "active" ? (
-                  <Button
-                    size="sm"
-                    variant="default"
-                    onClick={onFinishWorkout}
-                    className="whitespace-nowrap"
-                    data-testid="button-coach-finish-workout"
-                  >
-                    <ArrowRight className="h-3.5 w-3.5 mr-1" />
-                    Recovery
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    {workoutPaused ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={onResumeWorkout}
+                        className="whitespace-nowrap"
+                        data-testid="button-coach-resume-workout"
+                      >
+                        <Play className="h-3.5 w-3.5 mr-1" />
+                        Resume
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={onPauseWorkout}
+                        className="whitespace-nowrap"
+                        data-testid="button-coach-pause-workout"
+                      >
+                        <Pause className="h-3.5 w-3.5 mr-1" />
+                        Pause
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={onFinishWorkout}
+                      className="whitespace-nowrap"
+                      data-testid="button-coach-finish-workout"
+                    >
+                      <ArrowRight className="h-3.5 w-3.5 mr-1" />
+                      Recovery
+                    </Button>
+                  </div>
                 ) : phase === "recovery" ? (
                   <Button
                     size="sm"
@@ -1179,11 +1218,20 @@ export function ExerciseGuidedCoach() {
                   </div>
                   {phaseTimerLabel ? (
                     <span
-                      className="text-xs tabular-nums text-muted-foreground shrink-0 pt-1"
+                      className={cn(
+                        "text-xs tabular-nums shrink-0 pt-1",
+                        workoutPaused ? "font-medium text-amber-600 dark:text-amber-400" : "text-muted-foreground",
+                      )}
                       data-testid="coach-phase-timer"
-                      title={phase === "active" ? "Workout elapsed" : "Time since workout ended"}
+                      title={
+                        phase === "active"
+                          ? workoutPaused
+                            ? "Workout paused"
+                            : "Workout elapsed"
+                          : "Time since workout ended"
+                      }
                     >
-                      {phaseTimerLabel}
+                      {workoutPaused ? `Paused · ${phaseTimerLabel}` : phaseTimerLabel}
                     </span>
                   ) : null}
                 </div>
@@ -1209,6 +1257,8 @@ export function ExerciseGuidedCoach() {
                 exerciseStartedAt={activeSession.exerciseStartedAt}
                 durationMinutes={activeSession.durationMinutes}
                 nowMs={now}
+                pausedAt={activeSession.pausedAt}
+                totalPausedMs={activeSession.totalPausedMs}
               />
             ) : null}
 

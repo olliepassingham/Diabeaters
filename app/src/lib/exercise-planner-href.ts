@@ -1,4 +1,5 @@
 import type { ActiveExerciseSession, ExerciseBgTrend, ExercisePhase } from "@/lib/storage";
+import { getWorkoutRemainingMs } from "@/lib/exercise-session-timing";
 
 /** Legacy `type=sports` links map to `field` after court/field split. */
 export function normalizePlannerExerciseTypeQueryParam(type: string | null): string | null {
@@ -153,9 +154,7 @@ export function adviserExerciseWithinHoursForSession(
     return 1;
   }
   if (session.phase === "active" && session.exerciseStartedAt) {
-    const end =
-      new Date(session.exerciseStartedAt).getTime() + session.durationMinutes * 60 * 1000;
-    const leftMin = Math.max(0, (end - nowMs) / 60000);
+    const leftMin = getWorkoutRemainingMs(session, nowMs) / 60000;
     return Math.max(1, Math.ceil(leftMin / 60));
   }
   if (session.phase === "recovery" && session.recoveryEndsAt) {

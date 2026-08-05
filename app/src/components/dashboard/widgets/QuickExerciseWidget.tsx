@@ -322,7 +322,9 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
                   {activeSession.phase === "pre"
                     ? "Preparing — start when ready"
                     : activeSession.phase === "active"
-                      ? "Workout in progress"
+                      ? activeSession.pausedAt
+                        ? "Workout paused"
+                        : "Workout in progress"
                       : "Recovery window"}
                 </p>
               </div>
@@ -333,6 +335,8 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
                 exerciseStartedAt={activeSession.exerciseStartedAt}
                 durationMinutes={activeSession.durationMinutes}
                 nowMs={nowTick}
+                pausedAt={activeSession.pausedAt}
+                totalPausedMs={activeSession.totalPausedMs}
                 compact
               />
             ) : null}

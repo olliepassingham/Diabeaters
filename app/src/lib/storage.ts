@@ -1370,6 +1370,13 @@ export interface ActiveExerciseSession {
   exerciseEndedAt?: string;
   recoveryEndsAt?: string;
   recoveryMinutes: number;
+  /**
+   * While set, the active workout clock is frozen. Cleared on resume after folding
+   * the open pause into `totalPausedMs`.
+   */
+  pausedAt?: string;
+  /** Accumulated completed pause duration (ms) for the current active workout. */
+  totalPausedMs?: number;
   midCheckDone: boolean;
   preChecklist: {
     bgChecked: boolean;
@@ -4722,6 +4729,35 @@ export const storage = {
     return this.updateActiveExercise({
       phase: "active",
       exerciseStartedAt: new Date().toISOString(),
+      pausedAt: undefined,
+      totalPausedMs: 0,
+    });
+  },
+
+  /** Freeze the active workout clock. No-op if not active or already paused. */
+  pauseExercisePhase(): ActiveExerciseSession | null {
+    const session = this.getActiveExercise();
+    if (!session || session.phase !== "active" || !session.exerciseStartedAt || session.pausedAt) {
+      return session;
+    }
+    return this.updateActiveExercise({ pausedAt: new Date().toISOString() });
+  },
+
+  /** Resume a paused workout and fold the open pause into `totalPausedMs`. */
+  resumeExercisePhase(): ActiveExerciseSession | null {
+    const session = this.getActiveExercise();
+    if (!session || session.phase !== "active" || !session.pausedAt) {
+      return session;
+    }
+    const pausedAtMs = new Date(session.pausedAt).getTime();
+    const openPauseMs = Number.isFinite(pausedAtMs) ? Math.max(0, Date.now() - pausedAtMs) : 0;
+    const prior =
+      typeof session.totalPausedMs === "number" && Number.isFinite(session.totalPausedMs)
+        ? Math.max(0, session.totalPausedMs)
+        : 0;
+    return this.updateActiveExercise({
+      pausedAt: undefined,
+      totalPausedMs: prior + openPauseMs,
     });
   },
 
@@ -4742,6 +4778,7 @@ export const storage = {
       phase: "recovery",
       exerciseEndedAt: now.toISOString(),
       recoveryEndsAt: recoveryEnds.toISOString(),
+      pausedAt: undefined,
     });
   },
 

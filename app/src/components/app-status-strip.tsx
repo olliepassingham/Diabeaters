@@ -23,6 +23,7 @@ import {
   Shield,
   MoreHorizontal,
   Maximize2,
+  Pause,
   TrendingUp,
   TrendingDown,
   Minus,
@@ -48,6 +49,7 @@ import { usesClosedLoop } from "@/lib/closed-loop";
 import { cn } from "@/lib/utils";
 import { computeExerciseHypoSuggestion, resolveExerciseBgForHypo } from "@/lib/exercise-hypo-auto";
 import { ExerciseFuelPlanSummary, ExerciseHypoTreatmentHint, ExerciseWorkoutProgressBar, formatExerciseElapsedShort } from "@/components/exercise-active-session-extras";
+import { getWorkoutElapsedMs, isExercisePaused } from "@/lib/exercise-session-timing";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import { calculateExercisePlan, getRecoveryInsulinHeadline, type ExercisePlanResult, type LastInsulinTiming } from "@/lib/exercise-plan";
@@ -375,11 +377,10 @@ export function AppStatusStrip() {
   // "60 min" but is still going at 70 shouldn't be silently dropped into Recovery mid-session.
   // Nudge once instead, and let them confirm they're actually done via the toast action.
   useEffect(() => {
-    if (!ex || ex.phase !== "active" || !ex.exerciseStartedAt) return;
-    const started = new Date(ex.exerciseStartedAt).getTime();
-    if (!Number.isFinite(started)) return;
-    const endsAt = started + Math.max(1, ex.durationMinutes) * 60_000;
-    if (Date.now() < endsAt) return;
+    if (!ex || ex.phase !== "active" || !ex.exerciseStartedAt || ex.pausedAt) return;
+    const elapsed = getWorkoutElapsedMs(ex, Date.now());
+    const total = Math.max(1, ex.durationMinutes) * 60_000;
+    if (elapsed < total) return;
     const key = `time-up:${ex.id}`;
     if (exerciseAutoFinishKey.current === key) return;
     exerciseAutoFinishKey.current = key;
@@ -524,6 +525,22 @@ export function AppStatusStrip() {
     });
   };
 
+  const handlePauseWorkoutFromActive = () => {
+    const s = storage.getActiveExercise();
+    if (!s || s.phase !== "active" || s.pausedAt) return;
+    const updated = exerciseSessionActions.pauseWorkout();
+    setEx(updated);
+    toast({ title: "Workout paused", description: "Timer frozen — tap Resume when you start again." });
+  };
+
+  const handleResumeWorkoutFromActive = () => {
+    const s = storage.getActiveExercise();
+    if (!s || s.phase !== "active" || !s.pausedAt) return;
+    const updated = exerciseSessionActions.resumeWorkout();
+    setEx(updated);
+    toast({ title: "Workout resumed", description: "Timer running again." });
+  };
+
   const handleEndPumpFailure = () => {
     try {
       storage.endPumpFailureMode();
@@ -541,11 +558,7 @@ export function AppStatusStrip() {
   const isPump = isPumpDeliveryMethod(stripProfile?.insulinDeliveryMethod);
   const exercisePhaseTimerLabel =
     ex?.phase === "active" && ex.exerciseStartedAt
-      ? (() => {
-          const started = new Date(ex.exerciseStartedAt).getTime();
-          if (!Number.isFinite(started)) return null;
-          return formatExerciseElapsedShort(Date.now() - started);
-        })()
+      ? formatExerciseElapsedShort(getWorkoutElapsedMs(ex, Date.now()))
       : ex?.phase === "recovery" && ex.exerciseEndedAt
         ? (() => {
             const ended = new Date(ex.exerciseEndedAt).getTime();
@@ -553,6 +566,7 @@ export function AppStatusStrip() {
             return formatExerciseElapsedShort(Date.now() - ended);
           })()
         : null;
+  const exercisePaused = isExercisePaused(ex);
 
   const exercisePlan = useMemo(() => {
     if (!ex) return null;
@@ -1139,30 +1153,70 @@ export function AppStatusStrip() {
                     Start workout
                   </Button>
                 ) : ex.phase === "active" ? (
-                  <Button
-                    size="sm"
-                    variant="default"
-                    className={cn("h-8 shrink-0 px-2.5 text-xs sm:text-sm", "whitespace-nowrap")}
-                    onClick={handleFinishWorkoutFromActive}
-                    data-testid="status-exercise-finish-active"
-                  >
-                    <CircleCheck className="h-3.5 w-3.5 mr-1 shrink-0" aria-hidden />
-                    Workout done
-                  </Button>
+                  <div className="flex shrink-0 items-center gap-1">
+                    {exercisePaused ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className={cn("h-8 px-2.5 text-xs sm:text-sm", "whitespace-nowrap")}
+                        onClick={handleResumeWorkoutFromActive}
+                        data-testid="status-exercise-resume"
+                      >
+                        <Play className="h-3.5 w-3.5 mr-1 shrink-0" aria-hidden />
+                        Resume
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className={cn("h-8 px-2.5 text-xs sm:text-sm", "whitespace-nowrap")}
+                        onClick={handlePauseWorkoutFromActive}
+                        data-testid="status-exercise-pause"
+                      >
+                        <Pause className="h-3.5 w-3.5 mr-1 shrink-0" aria-hidden />
+                        Pause
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="default"
+                      className={cn("h-8 px-2.5 text-xs sm:text-sm", "whitespace-nowrap")}
+                      onClick={handleFinishWorkoutFromActive}
+                      data-testid="status-exercise-finish-active"
+                    >
+                      <CircleCheck className="h-3.5 w-3.5 mr-1 shrink-0" aria-hidden />
+                      Workout done
+                    </Button>
+                  </div>
                 ) : null}
               </div>
 
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-medium text-foreground/90">
-                  {ex.phase === "pre" ? "Before you start" : ex.phase === "active" ? "During" : "Recovery"}
+                  {ex.phase === "pre"
+                    ? "Before you start"
+                    : ex.phase === "active"
+                      ? exercisePaused
+                        ? "Paused"
+                        : "During"
+                      : "Recovery"}
                 </p>
                 {exercisePhaseTimerLabel ? (
                   <span
-                    className="text-xs tabular-nums text-muted-foreground"
+                    className={cn(
+                      "text-xs tabular-nums",
+                      exercisePaused ? "font-medium text-amber-600 dark:text-amber-400" : "text-muted-foreground",
+                    )}
                     data-testid={ex.phase === "active" ? "status-exercise-elapsed" : "status-exercise-recovery-elapsed"}
-                    title={ex.phase === "active" ? "Workout elapsed" : "Time since workout ended"}
+                    title={
+                      ex.phase === "active"
+                        ? exercisePaused
+                          ? "Workout paused"
+                          : "Workout elapsed"
+                        : "Time since workout ended"
+                    }
                   >
-                    {exercisePhaseTimerLabel}
+                    {exercisePaused ? `Paused · ${exercisePhaseTimerLabel}` : exercisePhaseTimerLabel}
                   </span>
                 ) : null}
               </div>
@@ -1173,6 +1227,8 @@ export function AppStatusStrip() {
                   exerciseStartedAt={ex.exerciseStartedAt}
                   durationMinutes={ex.durationMinutes}
                   nowMs={stripClock}
+                  pausedAt={ex.pausedAt}
+                  totalPausedMs={ex.totalPausedMs}
                   compact
                 />
               ) : null}

@@ -2,6 +2,7 @@ import { LocalNotifications } from "@capacitor/local-notifications";
 
 import { ensureNativeLocalNotificationPermission } from "@/lib/native-local-notifications";
 import { androidNotificationChannel, supportsNativeLocalNotifications } from "@/lib/native-platform";
+import { getWorkoutElapsedMs } from "@/lib/exercise-session-timing";
 import { storage, type ActiveExerciseSession } from "@/lib/storage";
 
 export type ExerciseReminderKind =
@@ -150,21 +151,26 @@ export async function scheduleExerciseActiveReminders(session: ActiveExerciseSes
   const ok = await ensureReminderPermission();
   if (!ok) return;
   if (!session.exerciseStartedAt) return;
-
-  const startedMs = new Date(session.exerciseStartedAt).getTime();
-  if (!Number.isFinite(startedMs)) return;
+  // Don't schedule while paused — resume will re-anchor from remaining effective time.
+  if (session.pausedAt) return;
 
   const nowMs = Date.now();
   const durationMs = session.durationMinutes * 60_000;
-  const midMs = startedMs + Math.floor(durationMs * 0.5);
-  const finishMs = startedMs + durationMs;
+  const elapsedMs = getWorkoutElapsedMs(session, nowMs);
+  const remainingMs = Math.max(0, durationMs - elapsedMs);
+  const midTargetMs = Math.floor(durationMs * 0.5);
+  const midRemainingMs = midTargetMs - elapsedMs;
+
+  const finishMs = nowMs + remainingMs;
   const recoveryMs = finishMs + 30 * 60_000;
 
   const toSchedule: Array<{ kind: ExerciseReminderKind; atMs: number }> = [
-    { kind: "mid_check", atMs: midMs },
     { kind: "finish_now", atMs: finishMs },
     { kind: "recovery_check_30m", atMs: recoveryMs },
   ];
+  if (midRemainingMs > 30_000) {
+    toSchedule.unshift({ kind: "mid_check", atMs: nowMs + midRemainingMs });
+  }
 
   const notifications = toSchedule
     .filter((x) => x.atMs > nowMs + 30_000)

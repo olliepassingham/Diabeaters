@@ -1,6 +1,7 @@
 import type { ExerciseFuelPlanLine } from "@/lib/exercise-readiness";
 import type { ExercisePhase } from "@/lib/storage";
 import type { ExerciseHypoSuggestion } from "@/lib/exercise-hypo-auto";
+import { getWorkoutElapsedMs } from "@/lib/exercise-session-timing";
 import { cn } from "@/lib/utils";
 import { Droplet, Timer, UtensilsCrossed } from "lucide-react";
 
@@ -19,20 +20,21 @@ export function ExerciseWorkoutProgressBar(props: {
   exerciseStartedAt?: string;
   durationMinutes: number;
   nowMs: number;
+  pausedAt?: string;
+  totalPausedMs?: number;
   className?: string;
   /** Collapse vertical gap when embedded in a tight strip */
   compact?: boolean;
 }) {
-  const { phase, exerciseStartedAt, durationMinutes, nowMs, className, compact } = props;
+  const { phase, exerciseStartedAt, durationMinutes, nowMs, pausedAt, totalPausedMs, className, compact } = props;
   if (phase !== "active" || !exerciseStartedAt) return null;
-  const start = new Date(exerciseStartedAt).getTime();
-  if (!Number.isFinite(start)) return null;
   const total = Math.max(60_000, durationMinutes * 60_000);
-  const elapsed = Math.max(0, nowMs - start);
+  const elapsed = getWorkoutElapsedMs({ exerciseStartedAt, pausedAt, totalPausedMs }, nowMs);
   const pct = Math.min(100, (elapsed / total) * 100);
   // Going past the planned time just means someone's still exercising longer than
   // expected — show how far over instead of freezing at "0 min left" forever.
   const isOvertime = elapsed > total;
+  const isPaused = Boolean(pausedAt);
   const remMin = isOvertime
     ? Math.ceil((elapsed - total) / 60_000)
     : Math.max(0, Math.ceil((total - elapsed) / 60_000));
@@ -42,11 +44,11 @@ export function ExerciseWorkoutProgressBar(props: {
       <div className="flex items-center justify-between gap-2 text-[11px] font-medium tabular-nums text-muted-foreground">
         <span className="inline-flex items-center gap-1">
           <Timer className="h-3 w-3 opacity-70" aria-hidden />
-          Workout progress
+          {isPaused ? "Paused" : "Workout progress"}
         </span>
         <span className={isOvertime ? "text-amber-600 dark:text-amber-400" : undefined}>
-          {isOvertime ? "Planned time up" : `${Math.round(pct)}%`}
-          {!compact ? (
+          {isPaused ? "Clock frozen" : isOvertime ? "Planned time up" : `${Math.round(pct)}%`}
+          {!compact && !isPaused ? (
             <span className={isOvertime ? "opacity-90" : "text-muted-foreground/80"}>
               {" "}
               · {isOvertime ? `+${remMin} min over` : `~${remMin} min left`}
@@ -64,7 +66,7 @@ export function ExerciseWorkoutProgressBar(props: {
         <div
           className={cn(
             "h-full rounded-full transition-[width] duration-500 ease-out",
-            isOvertime ? "bg-amber-500" : "bg-primary",
+            isPaused ? "bg-muted-foreground/50" : isOvertime ? "bg-amber-500" : "bg-primary",
           )}
           style={{ width: `${pct}%` }}
           data-testid="progress-exercise"

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Activity, CircleCheck, Droplet, Loader2, Minus, TrendingDown, TrendingUp } from "lucide-react";
+import { Activity, CircleCheck, Droplet, Loader2, Minus, Pause, Play, TrendingDown, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { BRAND_MARK_IMAGE_SRC } from "@/lib/brand-mark";
@@ -22,6 +22,7 @@ import { buildExercisePlanContextFromCoachSession } from "@/lib/exercise-coach-p
 import { calculateExercisePlan } from "@/lib/exercise-plan";
 import { computeExerciseHypoSuggestion } from "@/lib/exercise-hypo-auto";
 import { formatExerciseElapsedShort } from "@/components/exercise-active-session-extras";
+import { getWorkoutElapsedMs, isExercisePaused } from "@/lib/exercise-session-timing";
 
 function trendIcon(trend: "rising" | "falling" | "flat" | undefined) {
   if (trend === "rising") return TrendingUp;
@@ -99,12 +100,11 @@ function ExerciseModeContent({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, bgUnits, reading, usableTrend]);
 
-  const elapsedMs = session.exerciseStartedAt
-    ? Math.max(0, nowMs - new Date(session.exerciseStartedAt).getTime())
-    : 0;
+  const elapsedMs = getWorkoutElapsedMs(session, nowMs);
   const totalMs = Math.max(60_000, session.durationMinutes * 60_000);
   const pct = Math.min(100, (elapsedMs / totalMs) * 100);
   const isOvertime = elapsedMs > totalMs;
+  const paused = isExercisePaused(session);
   const remainingMin = isOvertime
     ? Math.ceil((elapsedMs - totalMs) / 60_000)
     : Math.max(0, Math.ceil((totalMs - elapsedMs) / 60_000));
@@ -112,6 +112,11 @@ function ExerciseModeContent({
   const onFinish = () => {
     sessionActions.finishWorkout();
     onClose();
+  };
+
+  const onPauseToggle = () => {
+    if (paused) sessionActions.resumeWorkout();
+    else sessionActions.pauseWorkout();
   };
 
   return (
@@ -153,12 +158,25 @@ function ExerciseModeContent({
         <div className="mt-2 flex items-center justify-center gap-2 px-6 text-sm font-medium uppercase tracking-wide text-white/55">
           <Activity className="h-4 w-4 shrink-0" aria-hidden />
           <span className="truncate">{session.exerciseName}</span>
+          {paused ? (
+            <span
+              className="rounded-full bg-amber-400/20 px-2 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-amber-200"
+              data-testid="badge-exercise-mode-paused"
+            >
+              Paused
+            </span>
+          ) : null}
         </div>
 
         <div className="flex flex-1 flex-col items-center justify-center gap-7 px-6">
           <div className="w-full max-w-xs space-y-3 text-center">
             <p
-              className="text-6xl font-bold tabular-nums tracking-tight [text-shadow:0_0_32px_rgba(16,185,129,0.25)]"
+              className={cn(
+                "text-6xl font-bold tabular-nums tracking-tight",
+                paused
+                  ? "text-white/70"
+                  : "[text-shadow:0_0_32px_rgba(16,185,129,0.25)]",
+              )}
               data-testid="text-exercise-mode-elapsed"
             >
               {formatExerciseElapsedShort(elapsedMs)}
@@ -168,7 +186,7 @@ function ExerciseModeContent({
                 <div
                   className={cn(
                     "h-full rounded-full transition-[width] duration-500 ease-out",
-                    isOvertime ? "bg-amber-400" : "bg-emerald-400",
+                    paused ? "bg-white/40" : isOvertime ? "bg-amber-400" : "bg-emerald-400",
                   )}
                   style={{ width: `${pct}%` }}
                   role="progressbar"
@@ -178,8 +196,17 @@ function ExerciseModeContent({
                   data-testid="progress-exercise-mode"
                 />
               </div>
-              <p className={cn("text-xs font-medium", isOvertime ? "text-amber-300" : "text-white/50")}>
-                {isOvertime ? `+${remainingMin} min over planned` : `~${remainingMin} min left of ${session.durationMinutes} min`}
+              <p
+                className={cn(
+                  "text-xs font-medium",
+                  paused ? "text-amber-200/80" : isOvertime ? "text-amber-300" : "text-white/50",
+                )}
+              >
+                {paused
+                  ? "Timer paused"
+                  : isOvertime
+                    ? `+${remainingMin} min over planned`
+                    : `~${remainingMin} min left of ${session.durationMinutes} min`}
               </p>
             </div>
           </div>
@@ -233,7 +260,27 @@ function ExerciseModeContent({
           ) : null}
         </div>
 
-        <div className="px-6">
+        <div className="flex flex-col gap-2 px-6">
+          <Button
+            type="button"
+            size="lg"
+            variant="outline"
+            className="h-12 w-full rounded-2xl border-white/20 bg-white/5 text-base font-semibold text-white hover:bg-white/10 hover:text-white"
+            onClick={onPauseToggle}
+            data-testid={paused ? "button-exercise-mode-resume" : "button-exercise-mode-pause"}
+          >
+            {paused ? (
+              <>
+                <Play className="mr-2 h-5 w-5" aria-hidden />
+                Resume
+              </>
+            ) : (
+              <>
+                <Pause className="mr-2 h-5 w-5" aria-hidden />
+                Pause
+              </>
+            )}
+          </Button>
           <Button
             type="button"
             size="lg"

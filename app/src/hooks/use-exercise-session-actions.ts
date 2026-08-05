@@ -1,17 +1,16 @@
 import { useCallback } from "react";
 
 import { storage, type ActiveExerciseSession } from "@/lib/storage";
-import {
-  cancelExerciseActiveReminders,
-  cancelExerciseReminders,
-  scheduleExerciseActiveReminders,
-  scheduleExerciseRecoveryReminder,
-} from "@/lib/exercise-reminders";
+import { cancelExerciseActiveReminders, cancelExerciseReminders, scheduleExerciseActiveReminders, scheduleExerciseRecoveryReminder } from "@/lib/exercise-reminders";
 import { resetExerciseCgmAlertCooldown } from "@/lib/exercise-cgm-alerts";
 
 export type ExerciseSessionActions = {
   /** Pre → Active. Schedules mid/finish/recovery reminders anchored to the real start time. */
   startWorkout: () => ActiveExerciseSession | null;
+  /** Freeze the active workout clock and cancel mid/finish reminders until resume. */
+  pauseWorkout: () => ActiveExerciseSession | null;
+  /** Resume a paused workout and reschedule remaining mid/finish reminders. */
+  resumeWorkout: () => ActiveExerciseSession | null;
   /** Active → Recovery. Cancels the now-irrelevant active reminders and re-anchors the recovery check to the real end time. */
   finishWorkout: () => ActiveExerciseSession | null;
   /** Ends the session entirely — cancels every pending reminder and clears the CGM alert cooldown. */
@@ -32,6 +31,22 @@ export function useExerciseSessionActions(): ExerciseSessionActions {
     const current = storage.getActiveExercise();
     if (!current || current.phase !== "pre") return current ?? null;
     storage.startExercisePhase();
+    const updated = storage.getActiveExercise();
+    if (updated) void scheduleExerciseActiveReminders(updated);
+    return updated;
+  }, []);
+
+  const pauseWorkout = useCallback((): ActiveExerciseSession | null => {
+    const current = storage.getActiveExercise();
+    if (!current || current.phase !== "active" || current.pausedAt) return current ?? null;
+    void cancelExerciseActiveReminders(current.id);
+    return storage.pauseExercisePhase();
+  }, []);
+
+  const resumeWorkout = useCallback((): ActiveExerciseSession | null => {
+    const current = storage.getActiveExercise();
+    if (!current || current.phase !== "active" || !current.pausedAt) return current ?? null;
+    storage.resumeExercisePhase();
     const updated = storage.getActiveExercise();
     if (updated) void scheduleExerciseActiveReminders(updated);
     return updated;
@@ -59,5 +74,5 @@ export function useExerciseSessionActions(): ExerciseSessionActions {
     storage.endExerciseSession();
   }, []);
 
-  return { startWorkout, finishWorkout, endSession };
+  return { startWorkout, pauseWorkout, resumeWorkout, finishWorkout, endSession };
 }

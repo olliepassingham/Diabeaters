@@ -87,6 +87,7 @@ import {
   type TravelTripStyle,
 } from "@/lib/travel-active-guidance";
 import { buildExerciseScenarioPlannerHref } from "@/lib/exercise-planner-href";
+import { getWorkoutElapsedMs } from "@/lib/exercise-session-timing";
 import {
   ExerciseWorkoutProgressBar,
   formatExerciseElapsedShort,
@@ -1514,9 +1515,7 @@ export default function Travel() {
     const liveTripExercise = activeExerciseForTravel;
     const travelExerciseElapsedLabel =
       liveTripExercise?.phase === "active" && liveTripExercise.exerciseStartedAt
-        ? formatExerciseElapsedShort(
-            travelExerciseUiClock - new Date(liveTripExercise.exerciseStartedAt).getTime(),
-          )
+        ? formatExerciseElapsedShort(getWorkoutElapsedMs(liveTripExercise, travelExerciseUiClock))
         : liveTripExercise?.phase === "recovery" && liveTripExercise.exerciseEndedAt
           ? formatExerciseElapsedShort(
               travelExerciseUiClock - new Date(liveTripExercise.exerciseEndedAt).getTime(),
@@ -1644,6 +1643,8 @@ export default function Travel() {
                         exerciseStartedAt={liveTripExercise.exerciseStartedAt}
                         durationMinutes={liveTripExercise.durationMinutes}
                         nowMs={travelExerciseUiClock}
+                        pausedAt={liveTripExercise.pausedAt}
+                        totalPausedMs={liveTripExercise.totalPausedMs}
                       />
                     ) : null}
                   </div>

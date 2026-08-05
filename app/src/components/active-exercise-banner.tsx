@@ -41,6 +41,7 @@ import {
   trendForPlannerFromActiveSession,
 } from "@/lib/exercise-planner-href";
 import { cancelExerciseReminders, scheduleExerciseActiveReminders } from "@/lib/exercise-reminders";
+import { getWorkoutElapsedMs } from "@/lib/exercise-session-timing";
 import { cn } from "@/lib/utils";
 import { CgmPrefillButton } from "@/components/cgm-prefill-button";
 import { useBgPrefill } from "@/hooks/use-bg-prefill";
@@ -721,9 +722,10 @@ export function ActiveExerciseBanner() {
     const tick = () => {
       const now = Date.now();
       if (session.phase === "active" && session.exerciseStartedAt) {
-        const start = new Date(session.exerciseStartedAt).getTime();
-        const elapsedMs = now - start;
+        const elapsedMs = getWorkoutElapsedMs(session, now);
         setElapsed(elapsedMs);
+
+        if (session.pausedAt) return;
 
         const typeConfig = getTypeConfig(session.exerciseType);
         const checkTimingMs = session.durationMinutes * 60 * 1000 * typeConfig.midCheckTiming;
@@ -867,10 +869,7 @@ export function ActiveExerciseBanner() {
 
   const isEvening = new Date().getHours() >= 18;
 
-  const nowMsActive =
-    session?.phase === "active" && session.exerciseStartedAt
-      ? new Date(session.exerciseStartedAt).getTime() + elapsed
-      : Date.now();
+  const nowMsActive = Date.now();
 
   const hypoSuggestionBanner = useMemo(() => {
     if (!session) return null;
@@ -988,6 +987,8 @@ export function ActiveExerciseBanner() {
                   exerciseStartedAt={session.exerciseStartedAt}
                   durationMinutes={session.durationMinutes}
                   nowMs={nowMsActive}
+                  pausedAt={session.pausedAt}
+                  totalPausedMs={session.totalPausedMs}
                   compact
                 />
                 <ExerciseHypoTreatmentHint suggestion={hypoSuggestionBanner} />
