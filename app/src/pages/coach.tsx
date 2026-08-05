@@ -535,8 +535,9 @@ export default function CoachPage() {
 
   if (!hasConsent) {
     // /coach uses a fill-height shell with overflow-hidden for the chat UI.
-    // Consent must scroll inside that shell — otherwise long copy clips the
-    // Continue / Agree buttons on phones.
+    // Consent must scroll inside that shell, and the action bar must sit *above*
+    // the fixed BottomNav (which is out of document flow) — otherwise Continue /
+    // Agree land behind the tab bar and look “missing” on phones.
     return (
       <div
         className="mx-auto flex h-full min-h-0 w-full max-w-lg flex-col bg-background text-foreground"
@@ -604,9 +605,17 @@ export default function CoachPage() {
             </CardContent>
           </Card>
         </div>
-        <div className="z-10 shrink-0 border-t border-border/50 bg-background/95 px-4 py-3 backdrop-blur-xl sm:px-5">
+        <div
+          className="z-10 shrink-0 border-t border-border/50 bg-background/95 px-4 pt-3 backdrop-blur-xl sm:px-5 pb-[calc(var(--bottom-nav-height,7.5rem)+var(--keyboard-inset-bottom,0px)+0.5rem)]"
+          data-testid="coach-consent-actions"
+        >
           {consentStep === 0 ? (
-            <Button type="button" className="w-full sm:w-auto" onClick={() => setConsentStep(1)}>
+            <Button
+              type="button"
+              className="w-full sm:w-auto"
+              onClick={() => setConsentStep(1)}
+              data-testid="button-coach-consent-continue"
+            >
               Continue
             </Button>
           ) : (
@@ -616,6 +625,7 @@ export default function CoachPage() {
                 className="min-w-[10rem] flex-1 sm:flex-none"
                 onClick={() => void acceptMutation.mutateAsync()}
                 disabled={acceptMutation.isPending}
+                data-testid="button-coach-consent-agree"
               >
                 {acceptMutation.isPending ? (
                   <>
@@ -626,7 +636,12 @@ export default function CoachPage() {
                   "I understand and agree"
                 )}
               </Button>
-              <Button type="button" variant="outline" onClick={() => setConsentStep(0)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setConsentStep(0)}
+                data-testid="button-coach-consent-back"
+              >
                 Back
               </Button>
             </div>
@@ -768,7 +783,7 @@ export default function CoachPage() {
           </div>
         ) : null}
 
-        <div className="px-3 py-2.5 pb-[calc(max(0.5rem,env(safe-area-inset-bottom,0px))+var(--keyboard-inset-bottom,0px))]">
+        <div className="px-3 py-2.5 pb-[calc(var(--bottom-nav-height,7.5rem)+var(--keyboard-inset-bottom,0px)+0.5rem)]">
           <div className="flex items-end gap-2 rounded-[1.75rem] border border-border/50 bg-muted/35 p-1.5 pl-3 shadow-sm ring-1 ring-black/[0.03] dark:ring-white/[0.04]">
             <Textarea
               ref={draftTextareaRef}
