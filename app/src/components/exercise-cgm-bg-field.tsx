@@ -3,7 +3,6 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CgmLiveBgChip } from "@/components/cgm-live-bg-chip";
 import { CgmPrefillButton } from "@/components/cgm-prefill-button";
 import type { BgPrefillResult } from "@/lib/cgm/prefill";
 import type { ExerciseBgTrend } from "@/lib/storage";
@@ -45,14 +44,10 @@ export function ExerciseCgmBgField({
   inputRef,
   className,
 }: ExerciseCgmBgFieldProps) {
-  const showLiveChip = Boolean(prefill?.fromCgm);
-
+  // One BG surface: the editable field is the source of truth. CGM chip was removed so
+  // connected users don't see the same reading three times (chip + input + update button).
   return (
     <div className={className} data-testid="exercise-cgm-bg-field">
-      {showLiveChip ? (
-        <CgmLiveBgChip prefill={prefill} loading={loading} onRefresh={onRefresh} className="mb-2" />
-      ) : null}
-
       <div className="space-y-2">
         <div className="space-y-1.5">
           <Label className="text-xs">BG now</Label>

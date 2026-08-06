@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
 import type { BgPrefillResult } from "@/lib/cgm/prefill";
 import { cgmTrendForExercise } from "@/lib/cgm/apply-cgm-trend";
 import type { ExerciseBgTrend } from "@/lib/storage";
@@ -30,6 +30,10 @@ function applyPrefill(
   if (trend && onApplyTrend) onApplyTrend(trend);
 }
 
+function normalizeBg(raw: string): string {
+  return raw.trim().replace(",", ".");
+}
+
 export function CgmPrefillButton({
   prefill,
   loading,
@@ -53,6 +57,29 @@ export function CgmPrefillButton({
 
   if (currentValue.trim()) {
     if (!allowSync || !prefill) return null;
+
+    // Field already matches CGM — quiet source line + refresh, not another value button.
+    if (normalizeBg(currentValue) === normalizeBg(prefill.value)) {
+      return (
+        <div className="flex items-center justify-between gap-2 pt-0.5" data-testid={`${testId}-matched`}>
+          <p className="min-w-0 truncate text-[11px] leading-snug text-muted-foreground">{prefill.source}</p>
+          {onRefresh ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0 text-muted-foreground"
+              onClick={onRefresh}
+              aria-label="Refresh glucose reading"
+              data-testid={`${testId}-refresh`}
+            >
+              <RefreshCw className="h-3.5 w-3.5" aria-hidden />
+            </Button>
+          ) : null}
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-1 pt-1">
         <Button

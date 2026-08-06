@@ -21,6 +21,7 @@ import {
   EXERCISE_MEAL_TYPE_OPTIONS,
   EXERCISE_START_IN_OPTIONS,
   EXERCISE_TYPE_OPTIONS,
+  exerciseStartInLabel,
 } from "@/lib/exercise-catalog";
 import {
   computeExerciseFuelPlan,
@@ -629,7 +630,13 @@ export function ExerciseFuelCalculator() {
     const typeLabel = EXERCISE_TYPE_OPTIONS.find((o) => o.value === exerciseType)?.label ?? exerciseType;
     const intensityLabel = EXERCISE_INTENSITY_OPTIONS.find((o) => o.value === intensity)?.label ?? intensity;
     const start =
-      minutesUntilStart <= 0 ? "now" : minutesUntilStart === 60 ? "~1h" : `${minutesUntilStart}m`;
+      minutesUntilStart <= 0
+        ? "now"
+        : minutesUntilStart === 90
+          ? "~1.5h"
+          : minutesUntilStart % 60 === 0
+            ? `~${minutesUntilStart / 60}h`
+            : `${minutesUntilStart}m`;
     return `${intensityLabel} ${typeLabel} · ${duration} min · ${start}`;
   }, [exerciseType, intensity, duration, minutesUntilStart]);
 
@@ -728,7 +735,11 @@ export function ExerciseFuelCalculator() {
 
                 <div className="space-y-1.5">
                   <Label>Starting in</Label>
-                  <div className={cn(EFC_PILL_GRID, "grid-cols-5")} role="group" aria-label="Minutes until exercise starts">
+                  <div
+                    className={cn(EFC_PILL_GRID, "grid-cols-4 sm:grid-cols-8")}
+                    role="group"
+                    aria-label="Minutes until exercise starts"
+                  >
                     {EXERCISE_START_IN_OPTIONS.map((m) => (
                       <Button
                         key={m}
@@ -739,7 +750,7 @@ export function ExerciseFuelCalculator() {
                         onClick={() => setMinutesUntilStart(m)}
                         data-testid={`efc-start-${m}`}
                       >
-                        {m === 0 ? "Now" : `${m}m`}
+                        {exerciseStartInLabel(m)}
                       </Button>
                     ))}
                   </div>

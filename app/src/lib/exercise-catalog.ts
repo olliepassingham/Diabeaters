@@ -17,7 +17,15 @@ export const EXERCISE_INTENSITY_OPTIONS: Array<{ value: ExerciseIntensity; label
   { value: "intense", label: "Intense" },
 ];
 
-export const EXERCISE_START_IN_OPTIONS = [0, 15, 30, 45, 60] as const;
+export const EXERCISE_START_IN_OPTIONS = [0, 15, 30, 45, 60, 90, 120, 180] as const;
+
+/** Short pill label for a start-in minutes value. */
+export function exerciseStartInLabel(minutes: number): string {
+  if (minutes <= 0) return "Now";
+  if (minutes === 90) return "1.5h";
+  if (minutes % 60 === 0) return `${minutes / 60}h`;
+  return `${minutes}m`;
+}
 
 export const EXERCISE_MEAL_TYPE_OPTIONS = [
   { value: "snack", label: "Snack" },
