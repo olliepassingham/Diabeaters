@@ -7,7 +7,7 @@ import { isAndroidDevice, isCapacitorNativeShell } from "@/lib/native-platform";
 
 type NativeNavBackHandlerProps = {
   pathname: string;
-  setLocation: (path: string) => void;
+  setLocation: (path: string, options?: { replace?: boolean }) => void;
   enabled?: boolean;
 };
 

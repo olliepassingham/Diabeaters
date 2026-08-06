@@ -92,9 +92,11 @@
   }
 
   /*
-   * Capacitor Android WebView: keep document/body from becoming a broken second scrollport.
-   * All authenticated app scrolling goes through `#app-scroll-main` (see App.tsx).
+   * Capacitor native WebView: keep document/body from becoming a broken second scrollport
+   * (and stop iOS rubber-banding the shell). All app scrolling goes through `#app-scroll-main`.
    */
+  html.ios-native,
+  html.ios-native body,
   html.android-native,
   html.android-native body {
     height: 100%;
@@ -102,6 +104,7 @@
     overscroll-behavior: none;
   }
 
+  html.ios-native #root,
   html.android-native #root {
     height: 100%;
     max-height: 100%;
@@ -118,10 +121,30 @@
     font-size: 16px !important;
   }
 
-  /* Capacitor shell: no pinch/double-tap zoom in the installed app */
+  /* Capacitor shell: no pinch/double-tap zoom; chrome isn’t selectable like a webpage */
   html.ios-native,
   html.android-native {
     touch-action: manipulation;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  html.ios-native input,
+  html.ios-native textarea,
+  html.ios-native select,
+  html.ios-native [contenteditable="true"],
+  html.ios-native article,
+  html.ios-native [data-selectable],
+  html.android-native input,
+  html.android-native textarea,
+  html.android-native select,
+  html.android-native [contenteditable="true"],
+  html.android-native article,
+  html.android-native [data-selectable] {
+    -webkit-user-select: text;
+    user-select: text;
+    -webkit-touch-callout: default;
   }
 
   @media (prefers-reduced-motion: no-preference) {
@@ -143,6 +166,17 @@
 
     ::view-transition-new(app-main) {
       animation-name: app-main-fade-in;
+    }
+
+    /* Stack-pop back: outgoing slides right, incoming settles from the left */
+    html[data-nav-direction="back"] ::view-transition-old(app-main) {
+      animation-name: app-main-pop-out;
+      animation-duration: 0.22s;
+    }
+
+    html[data-nav-direction="back"] ::view-transition-new(app-main) {
+      animation-name: app-main-pop-in;
+      animation-duration: 0.22s;
     }
 
     /*
@@ -187,6 +221,28 @@
     to {
       opacity: 0;
       transform: translateY(-4px);
+    }
+  }
+
+  @keyframes app-main-pop-in {
+    from {
+      opacity: 0.92;
+      transform: translateX(-12%);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes app-main-pop-out {
+    from {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    to {
+      opacity: 0.55;
+      transform: translateX(28%);
     }
   }
 }

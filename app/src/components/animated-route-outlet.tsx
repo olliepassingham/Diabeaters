@@ -8,6 +8,11 @@ import { supportsViewTransition } from "@/lib/nav-view-transition";
 /** Snappy ease-out — close to iOS system curves */
 const easeOut = [0.22, 1, 0.36, 1] as const;
 
+function readNavDirection(): "forward" | "back" {
+  if (typeof document === "undefined") return "forward";
+  return document.documentElement.dataset.navDirection === "back" ? "back" : "forward";
+}
+
 /**
  * Cross-fade (and light vertical motion) when the route key changes.
  * Bottom tabs: when `startViewTransition` is available, the outlet keeps a
@@ -42,8 +47,9 @@ export function AnimatedRouteOutlet({
     : `${pathname}${search ? `?${search}` : ""}`;
 
   const tabFramerTransition =
-    isBottomTabRoute && !stableTabOutlet && !reduceMotion ? 0.12 : isBottomTabRoute ? 0 : 0.14;
+    isBottomTabRoute && !stableTabOutlet && !reduceMotion ? 0.12 : isBottomTabRoute ? 0 : 0.16;
   const duration = reduceMotion ? 0 : tabFramerTransition;
+  const isBack = !reduceMotion && !vt && readNavDirection() === "back";
 
   useLayoutEffect(() => {
     const el = document.getElementById("app-scroll-main");
@@ -55,15 +61,19 @@ export function AnimatedRouteOutlet({
 
   const tabMotionBucket = isBottomTabRoute && stableTabOutlet;
   const initial = reduceMotion
-    ? { opacity: 1, y: 0 }
+    ? { opacity: 1, x: 0, y: 0 }
     : tabMotionBucket
-      ? { opacity: 1, y: 0 }
-      : { opacity: 0, y: 8 };
+      ? { opacity: 1, x: 0, y: 0 }
+      : isBack
+        ? { opacity: 0.92, x: -18, y: 0 }
+        : { opacity: 0, x: 0, y: 8 };
   const exit = reduceMotion
-    ? { opacity: 1, y: 0 }
+    ? { opacity: 1, x: 0, y: 0 }
     : tabMotionBucket
-      ? { opacity: 1, y: 0 }
-      : { opacity: 0, y: -5 };
+      ? { opacity: 1, x: 0, y: 0 }
+      : isBack
+        ? { opacity: 0.55, x: 40, y: 0 }
+        : { opacity: 0, x: 0, y: -5 };
 
   return (
     <AnimatePresence initial={false} mode="sync">
@@ -71,7 +81,7 @@ export function AnimatedRouteOutlet({
         key={routeKey}
         className={cn("min-w-0 w-full", fillHeight && "flex min-h-0 flex-1 flex-col h-full")}
         initial={initial}
-        animate={{ opacity: 1, y: 0 }}
+        animate={{ opacity: 1, x: 0, y: 0 }}
         exit={exit}
         transition={{ duration, ease: easeOut }}
       >

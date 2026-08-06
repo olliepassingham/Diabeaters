@@ -1,4 +1,7 @@
-import { navigateWithViewTransition } from "@/lib/nav-view-transition";
+import {
+  historyBackWithViewTransition,
+  navigateWithViewTransition,
+} from "@/lib/nav-view-transition";
 import { hapticLight } from "@/lib/haptics";
 import {
   canNavigateBack,
@@ -20,25 +23,32 @@ export {
   trackNavHistory,
 };
 
+type SetLocation = (path: string, options?: { replace?: boolean }) => void;
+
 export function navigateBack(
   pathname: string,
-  setLocation: (path: string) => void,
+  setLocation: SetLocation,
   explicitFallback?: string,
 ): void {
   const fallback = explicitFallback ?? resolveBackFallback(pathname);
   void hapticLight();
 
-  if (hasInAppNavHistory(pathname)) {
-    window.history.back();
+  // Prefer animated stack-pop to the known parent (Tools/Guides detail → hub).
+  // History.back alone skips view transitions and feels like a remount flash.
+  if (fallback) {
+    navigateWithViewTransition(setLocation, fallback, {
+      replace: true,
+      direction: "back",
+    });
     return;
   }
 
-  if (fallback) {
-    navigateWithViewTransition(setLocation, fallback);
+  if (hasInAppNavHistory(pathname)) {
+    historyBackWithViewTransition();
     return;
   }
 
   if (typeof window !== "undefined" && window.history.length > 1) {
-    window.history.back();
+    historyBackWithViewTransition();
   }
 }

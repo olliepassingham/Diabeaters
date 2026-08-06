@@ -45,6 +45,31 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return nil
     }
 
+    /// Disable WKWebView rubber-banding so the shell doesn’t feel like Safari.
+    private func scheduleDisableWebViewBounceRetries() {
+        Self.disableWebViewBounceIfPresent()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            Self.disableWebViewBounceIfPresent()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            Self.disableWebViewBounceIfPresent()
+        }
+    }
+
+    private static func disableWebViewBounceIfPresent() {
+        for scene in UIApplication.shared.connectedScenes {
+            guard let windowScene = scene as? UIWindowScene else { continue }
+            for window in windowScene.windows where window.isKeyWindow {
+                if let webView = findWKWebView(in: window.rootViewController?.view) {
+                    webView.scrollView.bounces = false
+                    webView.scrollView.alwaysBounceVertical = false
+                    webView.scrollView.alwaysBounceHorizontal = false
+                    return
+                }
+            }
+        }
+    }
+
     /// Reset stale SpringBoard badge before JS loads (APNs can leave a phantom count after reinstall).
     private func clearApplicationIconBadge() {
         UNUserNotificationCenter.current().removeAllDeliveredNotifications()
@@ -70,6 +95,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         clearApplicationIconBadge()
         DispatchQueue.main.async {
             application.registerForRemoteNotifications()
+            self.scheduleDisableWebViewBounceRetries()
         }
         return true
     }
@@ -148,6 +174,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func applicationDidBecomeActive(_ application: UIApplication) {
         clearApplicationIconBadge()
         scheduleInspectableWebViewRetries()
+        scheduleDisableWebViewBounceRetries()
         application.registerForRemoteNotifications()
     }
 

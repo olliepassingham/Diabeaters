@@ -13,6 +13,42 @@ describe("Travel page", () => {
     expect(screen.queryByTestId("button-start-travel-plan")).not.toBeNull();
   });
 
+  it("opens on What do you need even when a plan draft exists", () => {
+    storage.saveTravelWizardDraft({
+      step: "results",
+      plan: {
+        duration: 5,
+        destination: "Spain",
+        travelType: "international",
+        timezoneChange: "none",
+        timezoneHours: 0,
+        timezoneDirection: "east",
+        startDate: "2030-06-01",
+        endDate: "2030-06-05",
+        accessRisk: "easy",
+        weatherChange: "same",
+        weatherSeverity: "mild",
+        tripStyle: "relaxed",
+      },
+      packingList: [
+        {
+          name: "Fast-acting insulin",
+          category: "insulin",
+          estimatedAmount: 2,
+          unit: "pens",
+          checked: false,
+          reasoning: "test",
+        },
+      ],
+      resultsTab: "packing",
+      savedAt: new Date().toISOString(),
+    });
+
+    render(<Travel />);
+    expect(screen.queryByTestId("button-start-travel-plan")).not.toBeNull();
+    expect(screen.queryByText("What do you need?")).not.toBeNull();
+  });
+
   it("renders active travel dashboard without crashing", () => {
     const today = new Date();
     const start = today.toISOString().split("T")[0];

@@ -1,9 +1,14 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { navigateWithViewTransition, supportsViewTransition } from "./nav-view-transition";
+import {
+  historyBackWithViewTransition,
+  navigateWithViewTransition,
+  supportsViewTransition,
+} from "./nav-view-transition";
 
 afterEach(() => {
   vi.restoreAllMocks();
   delete (document as unknown as { startViewTransition?: unknown }).startViewTransition;
+  delete document.documentElement.dataset.navDirection;
 });
 
 describe("nav-view-transition", () => {
@@ -36,5 +41,19 @@ describe("nav-view-transition", () => {
 
     expect(startViewTransition).toHaveBeenCalled();
     expect(setLocation).toHaveBeenCalledWith("/account");
+  });
+
+  it("marks back direction and replace when requested", () => {
+    const setLocation = vi.fn();
+    navigateWithViewTransition(setLocation, "/tools", { replace: true, direction: "back" });
+    expect(document.documentElement.dataset.navDirection).toBe("back");
+    expect(setLocation).toHaveBeenCalledWith("/tools", { replace: true });
+  });
+
+  it("historyBackWithViewTransition calls history.back", () => {
+    const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
+    historyBackWithViewTransition();
+    expect(back).toHaveBeenCalled();
+    expect(document.documentElement.dataset.navDirection).toBe("back");
   });
 });

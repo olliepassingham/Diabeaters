@@ -1125,6 +1125,8 @@ export default function Travel() {
         setRiskWarnings(warnings);
       }
     } else {
+      // Prefill from draft if present, but always land on "What do you need?" —
+      // do not auto-jump into the travel plan wizard/results on open.
       const draft = storage.getTravelWizardDraft();
       if (draft && (draft.step === "inputs" || draft.step === "results")) {
         const nextPlan = withDefaultTripDates(draft.plan as TravelPlan);
@@ -1140,7 +1142,6 @@ export default function Travel() {
           setPackingList([]);
           setRiskWarnings([]);
         }
-        setStep(draft.step);
         if (draft.resultsTab === "packing" || draft.resultsTab === "emergency" || draft.resultsTab === "climate") {
           setResultsTab(draft.resultsTab);
         }
@@ -1172,6 +1173,11 @@ export default function Travel() {
   }, [step, plan, packingList, resultsTab]);
 
   const handleStartPlan = () => {
+    const draft = storage.getTravelWizardDraft();
+    if (draft?.step === "results" && packingList.length > 0) {
+      setStep("results");
+      return;
+    }
     setTravelWizardStep(0);
     setStep("inputs");
   };

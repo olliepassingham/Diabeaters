@@ -1,10 +1,25 @@
-/**
- * Open an external HTTPS URL in a new browser tab (after in-app preview).
- * Keeps the app tab active; use with rel="noopener" semantics via window features.
- */
-export function openExternalUrl(url: string): void {
+import { Browser } from "@capacitor/browser";
+
+import { isCapacitorNativeShell } from "@/lib/native-platform";
+
+function openInWindow(url: string): void {
   const opened = window.open(url, "_blank", "noopener,noreferrer");
   if (opened) {
     opened.opener = null;
   }
+}
+
+/**
+ * Open an external HTTPS URL outside the app shell.
+ * Native: system browser / SFSafariViewController via @capacitor/browser.
+ * Web: new tab via window.open.
+ */
+export function openExternalUrl(url: string): void {
+  if (isCapacitorNativeShell()) {
+    void Browser.open({ url }).catch(() => {
+      openInWindow(url);
+    });
+    return;
+  }
+  openInWindow(url);
 }

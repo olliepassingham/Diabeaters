@@ -57,6 +57,7 @@ const config: CapacitorConfig = {
   ios: {
     includePlugins: [
       "@capacitor/app",
+      "@capacitor/browser",
       "@capacitor/camera",
       "@capacitor/haptics",
       "@capacitor/local-notifications",

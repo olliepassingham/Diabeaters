@@ -2,15 +2,17 @@ import { useLayoutEffect, useRef } from "react";
 import { canNavigateBack, navigateBack } from "@/lib/nav-back";
 import { isCapacitorNativeShell } from "@/lib/native-platform";
 
-const EDGE_ZONE_PX = 28;
-const SWIPE_THRESHOLD_PX = 72;
-const GESTURE_DECIDE_PX = 12;
-const HORIZONTAL_BIAS = 8;
+const EDGE_ZONE_PX = 36;
+const SWIPE_THRESHOLD_PX = 56;
+const VELOCITY_THRESHOLD_PX_PER_MS = 0.45;
+const GESTURE_DECIDE_PX = 10;
+const HORIZONTAL_BIAS = 6;
 
 type GestureState = {
   active: boolean;
   startX: number;
   startY: number;
+  startTime: number;
   decided: boolean;
   horizontal: boolean;
 };
@@ -33,7 +35,7 @@ function isHorizontalScrollContainer(el: Element | null): boolean {
 
 export type UseEdgeSwipeBackOptions = {
   pathname: string;
-  setLocation: (path: string) => void;
+  setLocation: (path: string, options?: { replace?: boolean }) => void;
   enabled?: boolean;
 };
 
@@ -55,6 +57,7 @@ export function useEdgeSwipeBack({ pathname, setLocation, enabled = true }: UseE
       active: false,
       startX: 0,
       startY: 0,
+      startTime: 0,
       decided: false,
       horizontal: false,
     };
@@ -77,6 +80,7 @@ export function useEdgeSwipeBack({ pathname, setLocation, enabled = true }: UseE
       gesture.active = true;
       gesture.startX = t.clientX;
       gesture.startY = t.clientY;
+      gesture.startTime = performance.now();
       gesture.decided = false;
       gesture.horizontal = false;
     };
@@ -107,7 +111,11 @@ export function useEdgeSwipeBack({ pathname, setLocation, enabled = true }: UseE
       if (!gesture.active) return;
       const t = e.changedTouches[0];
       const dx = t.clientX - gesture.startX;
-      const shouldGoBack = gesture.horizontal && dx >= SWIPE_THRESHOLD_PX;
+      const elapsed = Math.max(1, performance.now() - gesture.startTime);
+      const velocity = dx / elapsed;
+      const shouldGoBack =
+        gesture.horizontal &&
+        (dx >= SWIPE_THRESHOLD_PX || (dx >= 36 && velocity >= VELOCITY_THRESHOLD_PX_PER_MS));
       reset();
       if (!shouldGoBack || !canNavigateBack(pathRef.current)) return;
       navigateBack(pathRef.current, setLocationRef.current);
