@@ -38,8 +38,9 @@ import {
 import { cn } from "@/lib/utils";
 
 /**
- * Today's "at a glance" surface: one soft card holding the supply status row (when nothing needs
- * attention) alongside the activity/streak summary, instead of two separately bordered boxes.
+ * Today's "at a glance" surface. Supply is an exception signal: only show the left
+ * shortcut when nothing is tracked yet (onboarding CTA). When stock is OK the Today
+ * glance is full-width; when low/critical, attention rows appear inside Today.
  */
 export function SupplyTrackerTodaySection({ healthStatus }: { healthStatus: HealthStatus }) {
   const [supplies, setSupplies] = useState<Supply[]>(() => storage.getSupplies());
@@ -66,15 +67,9 @@ export function SupplyTrackerTodaySection({ healthStatus }: { healthStatus: Heal
     };
   }, []);
 
-  const suppliesNeedingAttentionCount = useMemo(
-    () =>
-      supplies.filter((s) => {
-        const st = storage.getSupplyStatus(s);
-        return st === "critical" || st === "low";
-      }).length,
-    [supplies],
-  );
-  const hideSupplyShortcutCard = suppliesNeedingAttentionCount > 0;
+  // Only surface the supply half for empty-state discovery — not a permanent "Stock OK" panel.
+  const showSupplyShortcutCard = supplies.length === 0;
+  const supplyShortcutHidden = !showSupplyShortcutCard;
 
   return (
     <section className="animate-fade-in-up" style={{ animationDelay: "80ms" }}>
@@ -86,13 +81,13 @@ export function SupplyTrackerTodaySection({ healthStatus }: { healthStatus: Heal
         <div
           className={cn(
             "grid grid-cols-1",
-            !hideSupplyShortcutCard && "divide-y divide-border/50 sm:grid-cols-2 sm:divide-x sm:divide-y-0",
+            showSupplyShortcutCard && "divide-y divide-border/50 sm:grid-cols-2 sm:divide-x sm:divide-y-0",
           )}
         >
-          {!hideSupplyShortcutCard ? (
+          {showSupplyShortcutCard ? (
             <SupplyStatusContent supplies={supplies} scenarioState={scenarioState} />
           ) : null}
-          <TodayAtAGlanceContent supplyShortcutHidden={hideSupplyShortcutCard} healthStatus={healthStatus} />
+          <TodayAtAGlanceContent supplyShortcutHidden={supplyShortcutHidden} healthStatus={healthStatus} />
         </div>
       </Card>
     </section>
@@ -356,15 +351,19 @@ function TodayAtAGlanceContent(props: { supplyShortcutHidden?: boolean; healthSt
   const hideVisibleGlanceBanner =
     omitDuplicateStockBanner || omitTravelStatusBanner || omitHeroAlignedGlanceBanner;
 
+  const supplyAttentionVisible = suppliesNeedingAttention.slice(0, 2);
+  const supplyAttentionExtra = Math.max(0, suppliesNeedingAttention.length - supplyAttentionVisible.length);
+
   const supplyBlock = (
     <div
-      className={
+      className={cn(
+        "rounded-xl border px-2.5 py-2",
         worstSupplyAttention === "critical"
-          ? "rounded-lg bg-red-500/[0.07] px-2 py-1.5 dark:bg-red-950/25"
+          ? "border-red-500/25 bg-red-500/[0.04] dark:border-red-500/20 dark:bg-red-950/20"
           : worstSupplyAttention === "low"
-            ? "rounded-lg bg-amber-500/[0.08] px-2 py-1.5 dark:bg-amber-950/20"
-            : "rounded-lg bg-muted/25 px-2 py-1.5 dark:bg-muted/15"
-      }
+            ? "border-amber-500/20 bg-amber-500/[0.04] dark:border-amber-400/20 dark:bg-amber-950/15"
+            : "border-border/50 bg-muted/20 dark:bg-muted/10",
+      )}
     >
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Supplies</p>
@@ -379,10 +378,10 @@ function TodayAtAGlanceContent(props: { supplyShortcutHidden?: boolean; healthSt
         ) : null}
       </div>
       <ul className="space-y-1">
-        {suppliesNeedingAttention.slice(0, 4).map((supply) => {
+        {supplyAttentionVisible.map((supply) => {
           const st = storage.getSupplyStatus(supply);
           return (
-            <li key={supply.id} className="flex min-h-9 items-center justify-between gap-2 text-sm leading-tight">
+            <li key={supply.id} className="flex min-h-8 items-center justify-between gap-2 text-sm leading-tight">
               <span className="min-w-0 truncate text-foreground/90">{supply.name}</span>
               <Badge variant={st === "critical" ? "destructive" : "secondary"} className="shrink-0 text-[11px] tabular-nums">
                 {storage.getDaysRemaining(supply)}d left
@@ -391,6 +390,11 @@ function TodayAtAGlanceContent(props: { supplyShortcutHidden?: boolean; healthSt
           );
         })}
       </ul>
+      {supplyAttentionExtra > 0 ? (
+        <p className="mt-1.5 text-[11px] text-muted-foreground">
+          +{supplyAttentionExtra} more in Supply Tracker
+        </p>
+      ) : null}
     </div>
   );
 
@@ -398,7 +402,7 @@ function TodayAtAGlanceContent(props: { supplyShortcutHidden?: boolean; healthSt
     <div className="space-y-0 px-4 py-3.5" data-testid="dashboard-today-inline">
       <Link
         href="/tools/activity"
-        className="group -mx-1 mb-2 flex items-center justify-between gap-2 rounded-lg border-b border-border/50 px-1 pb-2 outline-none ring-offset-background transition-colors hover:bg-muted/35 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 dark:hover:bg-muted/20"
+        className="group -mx-1 mb-2 flex items-center justify-between gap-2 rounded-lg border-b border-border/40 px-1 pb-2 outline-none ring-offset-background transition-colors hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 dark:hover:bg-muted/15"
         data-testid="link-today-activity-calendar"
         aria-label={
           activityWeek.countLast7Days === 0
@@ -409,7 +413,7 @@ function TodayAtAGlanceContent(props: { supplyShortcutHidden?: boolean; healthSt
         onFocus={() => prefetchToolsDestinationHref("/tools/activity")}
       >
         <div className="flex min-w-0 items-center gap-2">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary transition-colors group-hover:bg-primary/25">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/12 text-primary transition-colors group-hover:bg-primary/20">
             <Calendar className="h-3.5 w-3.5" aria-hidden />
           </div>
           <div className="min-w-0">
@@ -440,20 +444,21 @@ function TodayAtAGlanceContent(props: { supplyShortcutHidden?: boolean; healthSt
         </span>
       </Link>
 
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-1.5">
         {hideVisibleGlanceBanner ? (
           <span className="sr-only" data-testid="text-today-status">
             {status.message}
           </span>
         ) : (
           <div
-            className={`flex items-start gap-2 rounded-md px-2 py-1.5 ${
+            className={cn(
+              "flex items-start gap-2 rounded-lg border px-2.5 py-1.5",
               status.type === "warning"
-                ? "bg-red-500/10 dark:bg-red-950/20"
+                ? "border-red-500/20 bg-red-500/[0.05] dark:border-red-500/20 dark:bg-red-950/20"
                 : status.type === "info"
-                  ? "bg-amber-500/12 dark:bg-amber-950/25"
-                  : "bg-green-500/10 dark:bg-green-950/25"
-            }`}
+                  ? "border-amber-500/20 bg-amber-500/[0.05] dark:border-amber-500/20 dark:bg-amber-950/20"
+                  : "border-emerald-500/20 bg-emerald-500/[0.05] dark:border-emerald-500/20 dark:bg-emerald-950/20",
+            )}
           >
             {status.type === "warning" ? (
               <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-500" aria-hidden />
@@ -472,7 +477,7 @@ function TodayAtAGlanceContent(props: { supplyShortcutHidden?: boolean; healthSt
           <div data-testid="dashboard-today-extras">
             <Link href="/scenarios/travel" className="block">
               <div
-                className="cursor-pointer rounded-lg bg-muted/25 px-2.5 py-2 transition-colors hover:bg-muted/40 dark:bg-muted/15 dark:hover:bg-muted/25"
+                className="cursor-pointer rounded-xl border border-border/45 bg-muted/15 px-2.5 py-2 transition-colors hover:bg-muted/30 dark:border-border/35 dark:bg-muted/10 dark:hover:bg-muted/20"
                 data-testid="dashboard-today-trip-countdown"
               >
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Travel</p>
@@ -491,14 +496,14 @@ function TodayAtAGlanceContent(props: { supplyShortcutHidden?: boolean; healthSt
         ) : null}
 
         {scenarioState.sickDayActive ? (
-          <div className="rounded-lg bg-orange-50/90 px-2.5 py-2 text-sm leading-snug text-orange-900 dark:bg-orange-950/40 dark:text-orange-100">
+          <div className="rounded-xl border border-orange-500/20 bg-orange-500/[0.05] px-2.5 py-2 text-sm leading-snug text-orange-950 dark:border-orange-500/25 dark:bg-orange-950/25 dark:text-orange-100">
             Sick day — {scenarioState.sickDaySeverity || "moderate"} severity
           </div>
         ) : null}
 
         {showSupplyAttentionRows ? (
           supplyShortcutHidden ? (
-            <Link href="/supplies" className="block rounded-lg no-underline outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+            <Link href="/supplies" className="block rounded-xl no-underline outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
               {supplyBlock}
             </Link>
           ) : (
@@ -507,15 +512,15 @@ function TodayAtAGlanceContent(props: { supplyShortcutHidden?: boolean; healthSt
         ) : null}
 
         {morningBedtimeLog ? (
-          <Link href="/scenarios/bedtime" className="block pt-0.5">
+          <Link href="/scenarios/bedtime" className="block">
             <div
               className={cn(
-                "flex cursor-pointer items-center gap-2 rounded-lg border border-transparent px-2.5 py-2 text-sm leading-snug transition-colors",
+                "flex cursor-pointer items-center gap-2 rounded-xl border px-2.5 py-2 text-sm leading-snug transition-colors",
                 morningBedtimeLog.readinessLevel === "alert"
-                  ? "bg-red-50/90 text-red-900 hover:border-red-200/80 hover:bg-red-100/90 dark:border-red-900/30 dark:bg-red-950/35 dark:text-red-100 dark:hover:bg-red-950/50"
+                  ? "border-red-500/20 bg-red-500/[0.05] text-red-950 hover:bg-red-500/[0.08] dark:border-red-500/25 dark:bg-red-950/25 dark:text-red-100"
                   : morningBedtimeLog.readinessLevel === "monitor"
-                    ? "bg-amber-50/90 text-amber-950 hover:border-amber-200/80 hover:bg-amber-100/90 dark:border-amber-900/30 dark:bg-amber-950/35 dark:text-amber-100 dark:hover:bg-amber-950/50"
-                    : "bg-emerald-50/90 text-emerald-950 hover:border-emerald-200/80 hover:bg-emerald-100/90 dark:border-emerald-900/30 dark:bg-emerald-950/35 dark:text-emerald-100 dark:hover:bg-emerald-950/50",
+                    ? "border-amber-500/20 bg-amber-500/[0.05] text-amber-950 hover:bg-amber-500/[0.08] dark:border-amber-500/25 dark:bg-amber-950/25 dark:text-amber-100"
+                    : "border-emerald-500/20 bg-emerald-500/[0.05] text-emerald-950 hover:bg-emerald-500/[0.08] dark:border-emerald-500/25 dark:bg-emerald-950/25 dark:text-emerald-100",
               )}
               data-testid="card-morning-bedtime-score"
             >
@@ -530,12 +535,12 @@ function TodayAtAGlanceContent(props: { supplyShortcutHidden?: boolean; healthSt
         ) : null}
 
         {isEvening ? (
-          <Link href="/scenarios/bedtime" className="block pt-0.5">
+          <Link href="/scenarios/bedtime" className="block">
             <div
-              className="flex cursor-pointer items-center gap-2 rounded-lg border border-transparent bg-indigo-50/90 px-2.5 py-2 text-sm leading-snug text-indigo-900 transition-colors hover:border-indigo-200/80 hover:bg-indigo-100/90 dark:border-indigo-900/30 dark:bg-indigo-950/35 dark:text-indigo-100 dark:hover:bg-indigo-950/50"
+              className="flex cursor-pointer items-center gap-2 rounded-xl border border-border/45 bg-muted/15 px-2.5 py-2 text-sm leading-snug text-foreground transition-colors hover:bg-muted/30 dark:border-border/35 dark:bg-muted/10 dark:hover:bg-muted/20"
               data-testid="card-evening-bedtime"
             >
-              <Moon className="h-4 w-4 shrink-0" aria-hidden />
+              <Moon className="h-4 w-4 shrink-0 text-primary" aria-hidden />
               <span className="min-w-0 font-medium">Bedtime check</span>
               <ArrowRight className="ml-auto h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
             </div>

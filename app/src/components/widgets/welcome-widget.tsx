@@ -109,15 +109,19 @@ export function WelcomeWidget() {
   };
 
   return (
-    <Card className="dashboard-card-hover dashboard-card-scale bg-white/80 dark:bg-neutral-900/70 border-neutral-200/60 dark:border-neutral-700/50 shadow-sm" data-testid="widget-welcome">
+    <Card
+      variant="glass-muted"
+      className="dashboard-card-hover overflow-hidden rounded-2xl border border-border/50 shadow-none dark:border-border/40"
+      data-testid="widget-welcome"
+    >
       <CardContent className="p-4 md:p-5 pt-5 pb-4">
         <div className="flex items-start gap-3">
-          <div className={`p-2.5 rounded-full ${config.iconBg} shrink-0`}>
+          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${config.iconBg}`}>
             <Icon className={`h-5 w-5 ${config.iconColor}`} />
           </div>
           <div className="flex-1 min-w-0 space-y-2">
             <div className="flex items-start justify-between gap-2">
-              <h3 className="font-semibold text-sm">{config.title}</h3>
+              <h3 className="font-display text-sm font-semibold tracking-tight">{config.title}</h3>
               <Button
                 size="icon"
                 variant="ghost"
@@ -129,7 +133,7 @@ export function WelcomeWidget() {
                 <X className="h-4 w-4" />
               </Button>
             </div>
-            <p className="text-sm text-muted-foreground">{config.message}</p>
+            <p className="text-sm leading-relaxed text-muted-foreground">{config.message}</p>
             <Button size="sm" variant="outline" data-testid="button-welcome-cta" type="button" onClick={handleCta}>
               {config.cta}
               <ArrowRight className="h-3.5 w-3.5 ml-1.5" />

@@ -67,7 +67,7 @@ import { repairSickDayCloudIfLocalInactive } from "@/lib/scenarios-supabase";
 import { insertHypoLog } from "@/lib/hypo-logs-supabase";
 import { invokeNotifyCarersOnHypo } from "@/lib/invoke-notify-carers-hypo";
 import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
-import { PageHeader, PageSectionLabel, PageShell } from "@/components/layout";
+import { PageHeader, PageShell } from "@/components/layout";
 import { PendingHypoCheckInBanner } from "@/components/pending-hypo-check-in-banner";
 import { CgmPrefillButton } from "@/components/cgm-prefill-button";
 import { useAutoCgmBgField } from "@/hooks/use-auto-cgm-bg-field";
@@ -419,8 +419,8 @@ function HeroCard({
   return (
     <>
       <Card
-        variant="glass-strong"
-        className={cn(homeDashboardCardClass, "hover:shadow-lg hover:ring-primary/20")}
+        variant="glass"
+        className={cn(homeDashboardCardClass, "hover:shadow-md")}
         data-testid="card-hero"
       >
         <CardContent className="p-4 md:p-6 space-y-3 md:space-y-5">
@@ -759,13 +759,13 @@ function SoftSettingsNudge({
 }) {
   return (
     <div
-      className="animate-fade-in-up rounded-xl border border-border/60 bg-muted/25 px-3 py-2.5 sm:px-4"
+      className="animate-fade-in-up rounded-2xl border border-border/50 bg-muted/20 px-3 py-2.5 sm:px-4 dark:border-border/40 dark:bg-muted/15"
       data-testid="banner-soft-setup-nudge"
       role="status"
       aria-live="polite"
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm leading-relaxed text-muted-foreground">
           When you are ready, add a few numbers in Settings for fuller suggestions ({completion.completed}/
           {completion.total} so far).
         </p>
@@ -798,11 +798,11 @@ function SetupPromptCard({
   completion: { percentage: number; completed: number; total: number; missing: SettingsCompletionItem[] };
 }) {
   return (
-    <Card className={cn(homeSetupCardClass, "glow-warning hover:shadow-md")} data-testid="card-setup-prompt">
+    <Card className={cn(homeSetupCardClass, "hover:shadow-md")} data-testid="card-setup-prompt">
       <CardContent className="space-y-3 p-4">
         <div className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-700 ring-1 ring-amber-500/25 dark:text-amber-300">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-700 dark:text-amber-300">
               <AlertCircle className="h-4 w-4" aria-hidden />
             </div>
             <h3 className="font-display text-base font-semibold tracking-tight">Finish your setup</h3>
@@ -821,7 +821,7 @@ function SetupPromptCard({
         </div>
 
         {completion.missing.length > 0 ? (
-          <div className="space-y-1 rounded-xl border border-amber-500/20 bg-amber-500/[0.04] p-1">
+          <div className="space-y-1 rounded-xl border border-amber-500/15 bg-amber-500/[0.03] p-1">
             {completion.missing.map((item) => (
               <Link
                 key={item.key}
@@ -1008,7 +1008,7 @@ export default function Dashboard() {
         }
       />
       {/* Today: high-signal cluster (reads as one section) */}
-      <section className="dashboard-home-canvas space-y-3 sm:space-y-4" data-testid="dashboard-today">
+      <section className="dashboard-home-canvas space-y-2.5 sm:space-y-3.5" data-testid="dashboard-today">
         {showVerifiedWelcome && (
           <Alert
             className="animate-fade-in-up border-emerald-500/40 bg-emerald-500/5 dark:bg-emerald-950/20 dark:border-emerald-500/30"
@@ -1106,8 +1106,7 @@ export default function Dashboard() {
         allowResize={!isMobile}
       />
 
-      <section className="animate-stagger space-y-3 sm:space-y-4 pt-3 sm:pt-4" data-testid="dashboard-widgets">
-        <PageSectionLabel>Your widgets</PageSectionLabel>
+      <section className="animate-stagger space-y-3 sm:space-y-4 pt-1.5 sm:pt-2" data-testid="dashboard-widgets">
         <div className="grid grid-cols-1 items-start gap-4 sm:gap-6 md:grid-cols-2">
           {widgetsToRender.map((w) => {
             const Comp = w.Component;

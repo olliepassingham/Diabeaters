@@ -225,8 +225,8 @@
     }
   }
 
-  /* Home dashboard — extra lift on the today cluster (light mode only). */
-  :root:not(.dark) .dashboard-home-canvas {
+  /* Home dashboard — extra lift on the today cluster. */
+  .dashboard-home-canvas {
     position: relative;
     isolation: isolate;
     border-radius: 1.25rem;
@@ -244,6 +244,19 @@
       radial-gradient(ellipse 100% 75% at 50% -5%, rgb(var(--color-primary) / 0.12), transparent 65%),
       linear-gradient(180deg, rgb(var(--color-primary-light) / 0.38) 0%, rgb(var(--color-primary-light) / 0.08) 100%);
     border: 1px solid rgb(var(--color-primary-border) / 0.1);
+  }
+
+  .dark .dashboard-home-canvas::before {
+    content: "";
+    position: absolute;
+    inset: -0.35rem -0.5rem;
+    z-index: -1;
+    border-radius: 1.35rem;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 100% 70% at 50% -8%, rgb(var(--color-primary) / 0.14), transparent 60%),
+      linear-gradient(180deg, rgb(var(--color-primary) / 0.06) 0%, transparent 100%);
+    border: 1px solid rgb(var(--color-primary-border) / 0.08);
   }
 
   /* Home Ask Beatie — soft halo on wrapper so button shadow does not hide it */
