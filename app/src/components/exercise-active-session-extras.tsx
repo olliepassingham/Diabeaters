@@ -103,7 +103,7 @@ export function ExerciseFuelPlanSummary(props: {
     return (
       <div
         className={cn(
-          "rounded-xl border border-border/60 bg-muted/15 px-3.5 py-3",
+          "rounded-xl border border-border/60 bg-background/70 px-3.5 py-3 shadow-sm",
           className,
         )}
         data-testid="exercise-fuel-plan"
@@ -112,20 +112,30 @@ export function ExerciseFuelPlanSummary(props: {
           <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
             <UtensilsCrossed className="h-4 w-4" aria-hidden />
           </span>
-          <div className="min-w-0 flex-1 space-y-2">
-            <p className="text-sm font-semibold text-foreground">{primary.label}</p>
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              {primary.label}
+            </p>
             <p className="text-xl font-bold tabular-nums leading-none tracking-tight text-foreground">{amount}</p>
             {detail ? <p className="text-sm leading-snug text-muted-foreground">{detail}</p> : null}
             {extras.length > 0 ? (
-              <ul className="space-y-1.5 border-t border-border/50 pt-2">
-                {extras.map((line) => (
-                  <li key={line.id} className="text-sm leading-snug">
-                    <span className="font-medium text-foreground">{line.label}</span>
-                    {line.text.trim() ? (
-                      <span className="text-muted-foreground"> — {line.text.trim()}</span>
-                    ) : null}
-                  </li>
-                ))}
+              <ul className="space-y-1.5 border-t border-border/50 pt-2.5">
+                {extras.map((line) => {
+                  const extra = splitCarbLineText(line.text);
+                  return (
+                    <li key={line.id} className="flex items-baseline justify-between gap-3 text-sm leading-snug">
+                      <span className="font-medium text-foreground">{line.label}</span>
+                      {line.text.trim() ? (
+                        <span className="min-w-0 text-right text-muted-foreground">
+                          {extra.amount}
+                          {extra.detail ? (
+                            <span className="text-muted-foreground/80"> · {extra.detail}</span>
+                          ) : null}
+                        </span>
+                      ) : null}
+                    </li>
+                  );
+                })}
               </ul>
             ) : null}
           </div>

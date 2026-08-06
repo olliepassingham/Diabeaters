@@ -13,7 +13,7 @@ const hypoSuggestion: ExerciseHypoSuggestion = {
 };
 
 const takeNowLine: ExerciseFuelPlanLine = { id: "on_hand", label: "Take now", text: "20g fast carbs" };
-const carryLine: ExerciseFuelPlanLine = { id: "during", label: "Carry on you", text: "~30g fast carbs" };
+const carryLine: ExerciseFuelPlanLine = { id: "during", label: "Carry with you", text: "~30g fast carbs" };
 
 describe("reconcileExerciseFuelLines", () => {
   it("returns the lines unchanged when there is no hypo suggestion", () => {

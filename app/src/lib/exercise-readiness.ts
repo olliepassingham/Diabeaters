@@ -804,7 +804,7 @@ export function getExerciseFuelPlanLines(
       const carryDetail = formatCarbsForScenario(carry.carryGrams, profile, "exercise_during");
       lines.push({
         id: "during",
-        label: "Carry on you",
+        label: "Carry with you",
         text: carryDetail
           ? `~${Math.round(carry.carryGrams)}g fast carbs · ${carryDetail}`
           : `~${Math.round(carry.carryGrams)}g fast carbs`,
@@ -817,8 +817,10 @@ export function getExerciseFuelPlanLines(
         const doseDetail = formatCarbsForScenario(carry.doseGrams, profile, "exercise_during");
         lines.push({
           id: "on_hand",
-          label: `Take ~${Math.round(carry.doseGrams)}g every ${carry.intervalMinutes} min`,
-          text: doseDetail ?? "",
+          label: `Every ${carry.intervalMinutes} min`,
+          text: doseDetail
+            ? `~${Math.round(carry.doseGrams)}g · ${doseDetail}`
+            : `~${Math.round(carry.doseGrams)}g`,
         });
       }
     }

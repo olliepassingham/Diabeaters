@@ -292,7 +292,7 @@ describe("getExerciseFuelPlanLines active phase", () => {
       intensity: "intense",
     });
     expect(lines.some((l) => l.id === "post")).toBe(false);
-    expect(lines.find((l) => l.id === "during")?.label).toBe("Carry on you");
+    expect(lines.find((l) => l.id === "during")?.label).toBe("Carry with you");
     expect(lines.find((l) => l.id === "during")?.text).toContain("30g");
   });
 
@@ -352,7 +352,7 @@ describe("getExerciseFuelPlanLines active phase", () => {
       intensity: "intense",
     });
     expect(lines.find((l) => l.id === "during")?.text).toContain("60g");
-    expect(lines.some((l) => l.label.includes("every 30 min"))).toBe(true);
+    expect(lines.some((l) => l.label === "Every 30 min")).toBe(true);
   });
 });
 

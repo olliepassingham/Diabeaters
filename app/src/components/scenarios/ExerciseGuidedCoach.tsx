@@ -149,9 +149,13 @@ function ExerciseTypeIcon({ type, className }: { type: ExerciseType; className?:
 function sessionMetaLine(session: ActiveExerciseSession): string {
   const typeLabel = EXERCISE_TYPE_OPTIONS.find((o) => o.value === session.exerciseType)?.label ?? session.exerciseType;
   const nameMatchesType = session.exerciseName.trim().toLowerCase() === typeLabel.toLowerCase();
+  const intensity =
+    session.intensity.length > 0
+      ? session.intensity.charAt(0).toUpperCase() + session.intensity.slice(1)
+      : session.intensity;
   return nameMatchesType
-    ? `${session.durationMinutes} min · ${session.intensity}`
-    : `${session.durationMinutes} min · ${session.intensity} · ${session.exerciseType}`;
+    ? `${session.durationMinutes} min · ${intensity}`
+    : `${session.durationMinutes} min · ${intensity} · ${typeLabel}`;
 }
 
 const INTENSITY_OPTIONS: ExerciseIntensity[] = ["light", "moderate", "intense"];
@@ -1061,114 +1065,113 @@ export function ExerciseGuidedCoach() {
     <div className="space-y-4 max-sm:space-y-3" data-testid="exercise-guided-coach">
       <Card className="overflow-hidden rounded-2xl border-border/50 shadow-sm ring-1 ring-border/40 dark:ring-border/30">
         <CardHeader className="pb-2">
-          <div className="space-y-2.5">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-3">
-                <div
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500/12 text-emerald-600 dark:text-emerald-400"
-                  aria-hidden
-                >
-                  <ExerciseTypeIcon type={activeSession.exerciseType} className="h-5 w-5" />
-                </div>
-                <div className="min-w-0 space-y-0.5">
-                  <CardTitle className="text-h3 truncate">{activeSession.exerciseName}</CardTitle>
-                  <p className="text-xs text-muted-foreground capitalize" data-testid="text-coach-session-meta">
-                    {sessionMetaLine(activeSession)}
-                  </p>
-                </div>
+          <div className="space-y-3">
+            {/* Title always gets the full row; actions sit below so Pause/Recovery never crush the name. */}
+            <div className="flex items-start gap-3">
+              <div
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500/12 text-emerald-600 dark:text-emerald-400"
+                aria-hidden
+              >
+                <ExerciseTypeIcon type={activeSession.exerciseType} className="h-5 w-5" />
               </div>
-              <div className="flex shrink-0 items-center gap-1">
-                {phase === "pre" || phase === "active" ? (
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 shrink-0 rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                        data-testid="button-coach-end-session"
-                        aria-label="End session"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>End this session?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This clears the current {phase === "pre" ? "planned" : "in-progress"} workout and cancels
-                          any scheduled check-in reminders for it.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Keep going</AlertDialogCancel>
-                        <AlertDialogAction onClick={onEndSession} data-testid="button-coach-end-session-confirm">
-                          End session
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                ) : null}
-                {phase === "pre" ? (
-                  <Button
-                    size="sm"
-                    variant="default"
-                    onClick={onStartWorkout}
-                    className="whitespace-nowrap"
-                    data-testid="button-coach-start-workout"
-                  >
-                    <Play className="h-3.5 w-3.5 mr-1" />
-                    Start
-                  </Button>
-                ) : phase === "active" ? (
-                  <div className="flex items-center gap-1">
-                    {workoutPaused ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={onResumeWorkout}
-                        className="whitespace-nowrap"
-                        data-testid="button-coach-resume-workout"
-                      >
-                        <Play className="h-3.5 w-3.5 mr-1" />
-                        Resume
-                      </Button>
-                    ) : (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={onPauseWorkout}
-                        className="whitespace-nowrap"
-                        data-testid="button-coach-pause-workout"
-                      >
-                        <Pause className="h-3.5 w-3.5 mr-1" />
-                        Pause
-                      </Button>
-                    )}
+              <div className="min-w-0 flex-1 space-y-0.5">
+                <CardTitle className="text-h3 truncate leading-tight">{activeSession.exerciseName}</CardTitle>
+                <p className="text-xs text-muted-foreground" data-testid="text-coach-session-meta">
+                  {sessionMetaLine(activeSession)}
+                </p>
+              </div>
+              {phase === "pre" || phase === "active" ? (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
                     <Button
-                      size="sm"
-                      variant="default"
-                      onClick={onFinishWorkout}
-                      className="whitespace-nowrap"
-                      data-testid="button-coach-finish-workout"
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 shrink-0 rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                      data-testid="button-coach-end-session"
+                      aria-label="End session"
                     >
-                      <ArrowRight className="h-3.5 w-3.5 mr-1" />
-                      Recovery
+                      <X className="h-4 w-4" />
                     </Button>
-                  </div>
-                ) : phase === "recovery" ? (
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>End this session?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This clears the current {phase === "pre" ? "planned" : "in-progress"} workout and cancels
+                        any scheduled check-in reminders for it.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Keep going</AlertDialogCancel>
+                      <AlertDialogAction onClick={onEndSession} data-testid="button-coach-end-session-confirm">
+                        End session
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              ) : null}
+            </div>
+
+            {phase === "pre" ? (
+              <Button
+                size="sm"
+                variant="default"
+                onClick={onStartWorkout}
+                className="h-10 w-full rounded-xl text-[15px] font-semibold"
+                data-testid="button-coach-start-workout"
+              >
+                <Play className="h-4 w-4 mr-1.5" aria-hidden />
+                Start workout
+              </Button>
+            ) : phase === "active" ? (
+              <div className="grid grid-cols-2 gap-2">
+                {workoutPaused ? (
                   <Button
                     size="sm"
-                    variant="default"
-                    onClick={onEndSession}
-                    className="whitespace-nowrap"
-                    data-testid="button-coach-finish-session"
+                    variant="outline"
+                    onClick={onResumeWorkout}
+                    className="h-10 rounded-xl text-[15px] font-semibold"
+                    data-testid="button-coach-resume-workout"
                   >
-                    <CircleCheck className="h-3.5 w-3.5 mr-1" />
-                    Finish
+                    <Play className="h-4 w-4 mr-1.5" aria-hidden />
+                    Resume
                   </Button>
-                ) : null}
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={onPauseWorkout}
+                    className="h-10 rounded-xl text-[15px] font-semibold"
+                    data-testid="button-coach-pause-workout"
+                  >
+                    <Pause className="h-4 w-4 mr-1.5" aria-hidden />
+                    Pause
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="default"
+                  onClick={onFinishWorkout}
+                  className="h-10 rounded-xl text-[15px] font-semibold"
+                  data-testid="button-coach-finish-workout"
+                >
+                  <ArrowRight className="h-4 w-4 mr-1.5" aria-hidden />
+                  Recovery
+                </Button>
               </div>
-            </div>
+            ) : phase === "recovery" ? (
+              <Button
+                size="sm"
+                variant="default"
+                onClick={onEndSession}
+                className="h-10 w-full rounded-xl text-[15px] font-semibold"
+                data-testid="button-coach-finish-session"
+              >
+                <CircleCheck className="h-4 w-4 mr-1.5" aria-hidden />
+                Finish
+              </Button>
+            ) : null}
+
             <ExercisePhaseStepper phase={phase} />
           </div>
         </CardHeader>
