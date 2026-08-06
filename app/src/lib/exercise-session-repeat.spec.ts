@@ -45,7 +45,7 @@ describe("findLastRepeatableExerciseSession", () => {
 });
 
 describe("listRecentRepeatableExerciseSessions", () => {
-  it("returns unique recent sessions newest first", () => {
+  it("returns one row per exercise type, newest first", () => {
     const outcomes: ExerciseOutcome[] = [
       {
         id: "1",
@@ -80,5 +80,41 @@ describe("listRecentRepeatableExerciseSessions", () => {
     expect(recent).toHaveLength(2);
     expect(recent[0]?.id).toBe("2");
     expect(recent[1]?.id).toBe("1");
+  });
+
+  it("keeps only the newest session when the same type was restarted with a different duration", () => {
+    const outcomes: ExerciseOutcome[] = [
+      {
+        id: "tennis-90",
+        exerciseType: "court",
+        intensity: "moderate",
+        durationMinutes: 90,
+        exerciseName: "Tennis",
+        feltHypo: false,
+        completedAt: "2026-08-05T10:00:00.000Z",
+      },
+      {
+        id: "tennis-120",
+        exerciseType: "court",
+        intensity: "moderate",
+        durationMinutes: 120,
+        exerciseName: "Tennis",
+        feltHypo: false,
+        completedAt: "2026-08-03T10:00:00.000Z",
+      },
+      {
+        id: "golf",
+        exerciseType: "walking",
+        intensity: "moderate",
+        durationMinutes: 240,
+        exerciseName: "Golf",
+        feltHypo: false,
+        completedAt: "2026-07-24T10:00:00.000Z",
+      },
+    ];
+
+    const recent = listRecentRepeatableExerciseSessions({ outcomes, limit: 5 });
+    expect(recent.map((s) => s.id)).toEqual(["tennis-90", "golf"]);
+    expect(recent[0]?.durationMinutes).toBe(90);
   });
 });

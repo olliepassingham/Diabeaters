@@ -63,12 +63,13 @@ function fromSummary(s: LastExerciseSummary): RepeatableExerciseSession {
 export function exerciseSessionSignature(
   session: Pick<RepeatableExerciseSession, "exerciseType" | "intensity" | "durationMinutes" | "exerciseName">,
 ): string {
-  const name = (session.exerciseName ?? "").trim().toLowerCase();
-  return `${session.exerciseType}|${session.intensity}|${session.durationMinutes}|${name}`;
+  // Recents restart the last setup for a sport/activity family. Duration/intensity tweaks
+  // (via Adjust) should not create duplicate rows for the same type.
+  return session.exerciseType;
 }
 
 /**
- * Recent unique completed sessions for quick restart (deduped by type, intensity, duration, name).
+ * Recent unique completed sessions for quick restart (one per exercise type, newest first).
  */
 export function listRecentRepeatableExerciseSessions(input: {
   outcomes: ExerciseOutcome[];
