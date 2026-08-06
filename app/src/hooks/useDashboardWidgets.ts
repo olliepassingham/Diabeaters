@@ -50,46 +50,33 @@ function normaliseOrders(list: WidgetPlacement[]): WidgetPlacement[] {
 }
 
 /**
- * One-time: place Your patterns immediately after Quick exercise when the layout
- * still looks like the old default (patterns sat after Tip of the day).
+ * One-time: apply Aug 2026 home defaults — Patterns after Community, Routines off.
+ * Preserves custom sizes/enabled for other widgets; only forces Routines off and registry order.
  */
-function migratePatternsAfterExercise(list: WidgetPlacement[]): WidgetPlacement[] {
+function migrateHomeWidgetDefaultsV2(list: WidgetPlacement[]): WidgetPlacement[] {
   if (typeof localStorage === "undefined") return list;
-  const FLAG = "diabeaters_dash_patterns_after_exercise_v1";
+  const FLAG = "diabeaters_dash_home_order_v2";
   try {
     if (localStorage.getItem(FLAG)) return list;
   } catch {
     return list;
   }
 
-  const sorted = [...list].sort((a, b) => a.order - b.order);
-  const tip = sorted.find((p) => p.id === "tip-of-day");
-  const patterns = sorted.find((p) => p.id === "pattern-insights");
-  const exercise = sorted.find((p) => p.id === "quick-exercise");
-  if (!tip || !patterns || !exercise) {
-    try {
-      localStorage.setItem(FLAG, "1");
-    } catch {
-      /* ignore */
-    }
-    return list;
-  }
+  const byId = new Map(list.map((p) => [p.id, p]));
+  const next = DASHBOARD_WIDGET_REGISTRY.map((def, index) => {
+    const prev = byId.get(def.id);
+    return {
+      id: def.id,
+      type: def.id,
+      enabled: def.id === "routines" ? false : typeof prev?.enabled === "boolean" ? prev.enabled : def.defaultEnabled,
+      order: index,
+      size:
+        prev?.size === "full" || prev?.size === "half"
+          ? prev.size
+          : def.defaultSize,
+    };
+  });
 
-  // Only migrate layouts that still match the old default relative order.
-  if (patterns.order <= tip.order) {
-    try {
-      localStorage.setItem(FLAG, "1");
-    } catch {
-      /* ignore */
-    }
-    return list;
-  }
-
-  const without = sorted.filter((p) => p.id !== "pattern-insights");
-  const exIdx = without.findIndex((p) => p.id === "quick-exercise");
-  if (exIdx < 0) return list;
-  without.splice(exIdx + 1, 0, patterns);
-  const next = without.map((p, i) => ({ ...p, order: i }));
   try {
     localStorage.setItem(FLAG, "1");
   } catch {
@@ -125,7 +112,7 @@ function mergeWithRegistry(saved: PersistedRow[] | null): WidgetPlacement[] {
     };
   });
 
-  return normaliseOrders(migratePatternsAfterExercise(merged));
+  return normaliseOrders(migrateHomeWidgetDefaultsV2(merged));
 }
 
 function loadPlacements(): WidgetPlacement[] {
@@ -145,7 +132,7 @@ function loadPlacements(): WidgetPlacement[] {
     if (!Array.isArray(parsed)) return buildDefaultPlacements();
 
     const merged = mergeWithRegistry(parsed as PersistedRow[]);
-    // Persist one-time migrations (e.g. patterns after exercise) so order sticks.
+    // Persist one-time migrations (e.g. home order v2) so order sticks.
     persistPlacements(merged);
     return merged;
   } catch {

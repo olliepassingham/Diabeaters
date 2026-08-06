@@ -2,15 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { hypoTreatmentsInRollingHours } from "@/lib/hypo-context";
 import { Link } from "wouter";
 import { Calculator } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { ScenarioResultHero, ScenarioResultHeroSuffix } from "@/components/scenarios/scenario-result-hero";
-import { PageInfoDialog } from "@/components/page-info-dialog";
-import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
+import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
 import {
   computeSimpleCorrectionDose,
@@ -127,7 +126,20 @@ export default function CorrectionHelpPage() {
             title="About Correction helper"
             description="Estimate a standard correction dose from your current BG and the correction factor (ISF) saved in Ratios."
           >
-            {null}
+            <InfoSection title="How the estimate works">
+              <p>
+                Uses: (current BG − correction target) ÷ ISF. Default target is your upper target BG from settings (same
+                idea as the Bedtime tool before overnight safeguards).
+              </p>
+            </InfoSection>
+            <InfoSection title="Educational estimate only">
+              <p>
+                Diabeaters is not a medical device. These numbers are not a prescription. Confirm any doses or treatment
+                changes with your diabetes team. Seek emergency care for severe hypoglycaemia, DKA symptoms, or any
+                emergency.
+              </p>
+              <MedicalSourcesLink anchor="insulin" className="mt-2 inline-block" />
+            </InfoSection>
           </PageInfoDialog>
         }
       />
@@ -186,15 +198,11 @@ export default function CorrectionHelpPage() {
       )}
 
       <Card data-testid="card-correction-calculator">
-        <CardHeader>
+        <CardHeader className="pb-3">
           <CardTitle className="text-h3 flex items-center gap-2">
             <Calculator className="h-5 w-5 text-primary" />
             Correction estimate
           </CardTitle>
-          <CardDescription>
-            Uses: (current BG − correction target) ÷ ISF. Default target is your upper target BG from settings (same idea
-            as the Bedtime tool before overnight safeguards).
-          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {!hasValidIsf ? (
@@ -291,10 +299,6 @@ export default function CorrectionHelpPage() {
           )}
         </CardContent>
       </Card>
-
-      <MedicalNumericOutputDisclaimer compact />
-
-      <MedicalSourcesLink anchor="insulin" />
     </PageShell>
   );
 }

@@ -29,7 +29,8 @@ export interface DashboardWidgetDefinition {
 
 /**
  * Default order is array order (also used as initial `order` index). Persisted `order` in localStorage overrides.
- * New users: all main widgets on; Welcome stays off by default (same content can appear in Today).
+ * New users: Community → Patterns → Supplies → Pharmacy → Quick exercise → Ratios → Appointments →
+ * Routines (off) → Tip of the day; Settings progress on; Welcome stays off.
  * UK-English copy throughout.
  */
 export const DASHBOARD_WIDGET_REGISTRY: DashboardWidgetDefinition[] = [
@@ -40,6 +41,14 @@ export const DASHBOARD_WIDGET_REGISTRY: DashboardWidgetDefinition[] = [
     defaultEnabled: true,
     defaultSize: "half",
     component: CommunityQuickPostWidget,
+  },
+  {
+    id: "pattern-insights",
+    label: "Your patterns",
+    description: "Spots patterns in your logged hypos, exercise, and checks.",
+    defaultEnabled: true,
+    defaultSize: "full",
+    component: PatternInsightsWidget,
   },
   {
     id: "supply-summary",
@@ -66,14 +75,6 @@ export const DASHBOARD_WIDGET_REGISTRY: DashboardWidgetDefinition[] = [
     component: QuickExerciseWidget,
   },
   {
-    id: "pattern-insights",
-    label: "Your patterns",
-    description: "Spots patterns in your logged hypos, exercise, and checks.",
-    defaultEnabled: true,
-    defaultSize: "full",
-    component: PatternInsightsWidget,
-  },
-  {
     id: "ratio-adviser",
     label: "Your ratios",
     description: "Carb ratios by meal, with a shortcut into meal planning.",
@@ -93,7 +94,7 @@ export const DASHBOARD_WIDGET_REGISTRY: DashboardWidgetDefinition[] = [
     id: "routines",
     label: "Routines",
     description: "Saved meal patterns and quick links to your full routines list.",
-    defaultEnabled: true,
+    defaultEnabled: false,
     defaultSize: "half",
     component: RoutinesWidget,
   },

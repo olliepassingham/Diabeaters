@@ -250,6 +250,27 @@ export function communityToolsForHub(): ToolDef[] {
   return [coach, ...COMMUNITY_TOOLS];
 }
 
+/** Shared icon badge — soft tinted circle so tiles read as a single family across the hub. */
+function ToolIconBadge({
+  icon: Icon,
+  size = "default",
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  size?: "default" | "large";
+}) {
+  return (
+    <span
+      className={cn(
+        "flex shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors duration-[var(--app-motion-duration)] ease-[var(--app-motion-ease)] group-hover:bg-primary/15",
+        size === "large" ? "h-11 w-11 sm:h-12 sm:w-12" : "h-10 w-10 sm:h-11 sm:w-11",
+      )}
+      aria-hidden
+    >
+      <Icon className={size === "large" ? "h-5 w-5 sm:h-[1.35rem] sm:w-[1.35rem]" : "h-5 w-5"} />
+    </span>
+  );
+}
+
 function ToolCard({
   href,
   icon: Icon,
@@ -260,9 +281,9 @@ function ToolCard({
   const warm = useCallback(() => prefetchToolsDestinationHref(href), [href]);
   const cardClass =
     layout === "compact"
-      ? "pressable card-interactive flex h-full min-h-[6rem] w-full cursor-pointer flex-col rounded-2xl"
-      : "pressable card-interactive flex h-full min-h-[6.5rem] w-full cursor-pointer flex-col rounded-2xl";
-  const pad = layout === "compact" ? "p-5" : "p-5 sm:p-6";
+      ? "pressable card-interactive flex h-full min-h-[5.75rem] w-full cursor-pointer flex-col rounded-2xl border-border/40"
+      : "pressable card-interactive flex h-full min-h-[6.25rem] w-full cursor-pointer flex-col rounded-2xl border-border/40";
+  const pad = layout === "compact" ? "p-4 sm:p-5" : "p-4 sm:p-5";
   return (
     <Link
       href={href}
@@ -272,16 +293,14 @@ function ToolCard({
       onTouchStart={warm}
     >
       <Card variant="glass" className={cardClass}>
-        <CardContent className={cn("flex h-full items-center", pad)}>
-          <div className="flex flex-1 items-center gap-3 sm:gap-4">
-            <Icon className="h-7 w-7 shrink-0 text-primary sm:h-8 sm:w-8" aria-hidden />
-            <div className="min-w-0 flex-1">
-              <h3 className="font-display text-h3 font-semibold text-foreground">{title}</h3>
-              <p className="mt-0.5 truncate text-sm text-muted-foreground">{description}</p>
-            </div>
+        <CardContent className={cn("flex h-full items-center gap-3", pad)}>
+          <ToolIconBadge icon={Icon} />
+          <div className="min-w-0 flex-1">
+            <h3 className="truncate font-display text-h3 font-semibold text-foreground">{title}</h3>
+            <p className="mt-0.5 truncate text-sm text-muted-foreground">{description}</p>
           </div>
           <ChevronRight
-            className="h-5 w-5 shrink-0 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5"
+            className="h-[1.125rem] w-[1.125rem] shrink-0 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5"
             aria-hidden
           />
         </CardContent>
@@ -301,15 +320,15 @@ function LearnToolRow({ href, icon: Icon, title, description }: Omit<ToolDef, "i
       onFocus={warm}
       onTouchStart={warm}
     >
-      <Card variant="glass" className="pressable card-interactive cursor-pointer rounded-2xl">
-        <CardContent className="flex items-center gap-3 p-4 sm:gap-4 sm:p-5">
-          <Icon className="h-8 w-8 shrink-0 text-primary sm:h-9 sm:w-9" aria-hidden />
+      <Card variant="glass" className="pressable card-interactive cursor-pointer rounded-2xl border-border/40">
+        <CardContent className="flex items-center gap-3 p-4 sm:gap-4 sm:p-4">
+          <ToolIconBadge icon={Icon} size="large" />
           <div className="min-w-0 flex-1">
-            <h3 className="font-display text-h3 font-semibold text-foreground">{title}</h3>
+            <h3 className="truncate font-display text-h3 font-semibold text-foreground">{title}</h3>
             <p className="mt-0.5 truncate text-sm text-muted-foreground">{description}</p>
           </div>
           <ChevronRight
-            className="h-5 w-5 shrink-0 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5"
+            className="h-[1.125rem] w-[1.125rem] shrink-0 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5"
             aria-hidden
           />
         </CardContent>

@@ -15,3 +15,5 @@ playwright/.cache
 app/public/robots.txt
 supabase/.temp/
 .vercel
+# Operator exports with PII — regenerate via scripts/export-user-directory.mjs
+docs/operations/user-directory.xlsx
