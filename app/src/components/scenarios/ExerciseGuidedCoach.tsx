@@ -1063,7 +1063,7 @@ export function ExerciseGuidedCoach() {
 
   return (
     <div className="space-y-4 max-sm:space-y-3" data-testid="exercise-guided-coach">
-      <Card className="overflow-hidden rounded-2xl border-border/50 shadow-sm ring-1 ring-border/40 dark:ring-border/30">
+      <Card className="overflow-hidden rounded-2xl border-border/40 bg-card/80 shadow-sm">
         <CardHeader className="pb-2">
           <div className="space-y-3">
             {/* Title always gets the full row; actions sit below so Pause/Recovery never crush the name. */}
@@ -1124,13 +1124,13 @@ export function ExerciseGuidedCoach() {
                 Start workout
               </Button>
             ) : phase === "active" ? (
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2.5">
                 {workoutPaused ? (
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant="default"
                     onClick={onResumeWorkout}
-                    className="h-10 rounded-xl text-[15px] font-semibold"
+                    className="h-11 rounded-xl text-[15px] font-semibold shadow-sm"
                     data-testid="button-coach-resume-workout"
                   >
                     <Play className="h-4 w-4 mr-1.5" aria-hidden />
@@ -1141,7 +1141,7 @@ export function ExerciseGuidedCoach() {
                     size="sm"
                     variant="outline"
                     onClick={onPauseWorkout}
-                    className="h-10 rounded-xl text-[15px] font-semibold"
+                    className="h-11 rounded-xl border-border/60 bg-background/70 text-[15px] font-semibold shadow-sm"
                     data-testid="button-coach-pause-workout"
                   >
                     <Pause className="h-4 w-4 mr-1.5" aria-hidden />
@@ -1150,9 +1150,12 @@ export function ExerciseGuidedCoach() {
                 )}
                 <Button
                   size="sm"
-                  variant="default"
+                  variant={workoutPaused ? "outline" : "default"}
                   onClick={onFinishWorkout}
-                  className="h-10 rounded-xl text-[15px] font-semibold"
+                  className={cn(
+                    "h-11 rounded-xl text-[15px] font-semibold shadow-sm",
+                    workoutPaused && "border-border/60 bg-background/70",
+                  )}
                   data-testid="button-coach-finish-workout"
                 >
                   <ArrowRight className="h-4 w-4 mr-1.5" aria-hidden />
@@ -1181,9 +1184,45 @@ export function ExerciseGuidedCoach() {
               nested boxes — merging them removes that "double chrome" and the extra border
               layer around every phase's questions. ----- */}
           <div
-            className={cn("rounded-2xl border p-3.5 sm:p-4 space-y-3.5", verdictVisuals.cardClass)}
+            className={cn(
+              "rounded-2xl border p-3.5 sm:p-4 space-y-3.5",
+              phase === "active"
+                ? "border-border/40 bg-muted/20 dark:bg-muted/10"
+                : verdictVisuals.cardClass,
+            )}
             data-testid="coach-phase-card"
           >
+            {/* During: elapsed time is the glanceable hero; readiness/fuel sit underneath. */}
+            {phase === "active" && phaseTimerLabel ? (
+              <div className="space-y-2.5" data-testid="coach-active-timer-hero">
+                <div className="text-center pt-0.5 pb-0.5">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    {workoutPaused ? "Paused" : "Elapsed"}
+                  </p>
+                  <p
+                    className={cn(
+                      "mt-1 text-[2.75rem] leading-none font-semibold tabular-nums tracking-tight sm:text-5xl",
+                      workoutPaused ? "text-amber-600 dark:text-amber-400" : "text-foreground",
+                    )}
+                    data-testid="coach-phase-timer"
+                    title={workoutPaused ? "Workout paused" : "Workout elapsed"}
+                  >
+                    {phaseTimerLabel}
+                  </p>
+                </div>
+                {activeSession.exerciseStartedAt ? (
+                  <ExerciseWorkoutProgressBar
+                    phase={phase}
+                    exerciseStartedAt={activeSession.exerciseStartedAt}
+                    durationMinutes={activeSession.durationMinutes}
+                    nowMs={now}
+                    pausedAt={activeSession.pausedAt}
+                    totalPausedMs={activeSession.totalPausedMs}
+                  />
+                ) : null}
+              </div>
+            ) : null}
+
             {readiness ? (
               <div className="space-y-3" data-testid="coach-readiness-card">
                 <div className="flex items-center justify-between gap-2">
@@ -1196,22 +1235,13 @@ export function ExerciseGuidedCoach() {
                     </span>
                     <p className="text-base font-semibold leading-tight text-foreground truncate">{readiness.title}</p>
                   </div>
-                  {phaseTimerLabel ? (
+                  {phase !== "active" && phaseTimerLabel ? (
                     <span
-                      className={cn(
-                        "text-xs tabular-nums shrink-0",
-                        workoutPaused ? "font-medium text-amber-600 dark:text-amber-400" : "text-muted-foreground",
-                      )}
+                      className="text-xs tabular-nums shrink-0 text-muted-foreground"
                       data-testid="coach-phase-timer"
-                      title={
-                        phase === "active"
-                          ? workoutPaused
-                            ? "Workout paused"
-                            : "Workout elapsed"
-                          : "Time since workout ended"
-                      }
+                      title="Time since workout ended"
                     >
-                      {workoutPaused ? `Paused · ${phaseTimerLabel}` : phaseTimerLabel}
+                      {phaseTimerLabel}
                     </span>
                   ) : null}
                 </div>
@@ -1221,29 +1251,18 @@ export function ExerciseGuidedCoach() {
               </div>
             ) : null}
 
-            {phase === "active" && activeSession.exerciseStartedAt ? (
-              <ExerciseWorkoutProgressBar
-                phase={phase}
-                exerciseStartedAt={activeSession.exerciseStartedAt}
-                durationMinutes={activeSession.durationMinutes}
-                nowMs={now}
-                pausedAt={activeSession.pausedAt}
-                totalPausedMs={activeSession.totalPausedMs}
-              />
-            ) : null}
-
-            {/* Full-screen Exercise Mode is the primary "during" experience now — a simplified,
-                glanceable view for mid-workout phone checks. Lead with it here instead of a small
-                icon button, since the rest of this card is a secondary/fallback surface. */}
+            {/* Quiet secondary path into full-screen Exercise Mode — Pause/Recovery and the
+                timer stay primary on this page. */}
             {phase === "active" ? (
               <Button
                 type="button"
-                size="lg"
-                className="h-12 w-full rounded-xl text-[15px] font-semibold"
+                size="sm"
+                variant="ghost"
+                className="h-9 w-full rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground"
                 onClick={() => requestOpenExerciseMode()}
                 data-testid="button-coach-exercise-mode"
               >
-                <Maximize2 className="h-4 w-4 mr-2" aria-hidden />
+                <Maximize2 className="h-3.5 w-3.5 mr-1.5 opacity-80" aria-hidden />
                 Open Exercise mode
               </Button>
             ) : null}
@@ -1698,61 +1717,66 @@ function DuringQuestions({
 
   return (
     <div className="space-y-4">
-      <ExerciseCgmBgField
-        bgUnits={bgUnits}
-        bgValue={bgInput}
-        trend={sessionTrend(session)}
-        onBgChange={onBgFieldChange}
-        onTrendChange={onTrendChange}
-        prefill={cgmPrefill}
-        loading={cgmLoading}
-        onRefresh={onCgmRefresh}
-        emptyHint={cgmEmptyHint}
-        inputTestId="input-coach-bg"
-        trendTestIdPrefix="button-coach-trend"
-        inputRef={bgRef}
-      />
+      {/* Compact mid-workout check-in: BG + trend + feel-low, one surface. */}
+      <div
+        className="space-y-3 rounded-xl border border-border/50 bg-background/70 p-3 sm:p-3.5"
+        data-testid="coach-during-checkin"
+      >
+        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">BG check-in</p>
+        <ExerciseCgmBgField
+          bgUnits={bgUnits}
+          bgValue={bgInput}
+          trend={sessionTrend(session)}
+          onBgChange={onBgFieldChange}
+          onTrendChange={onTrendChange}
+          prefill={cgmPrefill}
+          loading={cgmLoading}
+          onRefresh={onCgmRefresh}
+          emptyHint={cgmEmptyHint}
+          inputTestId="input-coach-bg"
+          trendTestIdPrefix="button-coach-trend"
+          inputRef={bgRef}
+        />
 
-      {/* Always-visible: the one safety-critical mid-workout action. Effort/symptom logging is
-          secondary and lives in the collapsible section below (Exercise Mode is the primary
-          full-screen "during" surface now — this page is a lighter fallback). */}
-      {hypoRecheckEndsAt != null ? (
-        <div
-          className="rounded-lg border border-amber-300/70 bg-amber-50/60 dark:border-amber-800/50 dark:bg-amber-950/25 px-2.5 py-2 text-sm"
-          data-testid="panel-coach-hypo-recheck"
-        >
-          <div className="flex items-center justify-between gap-2">
-            <p className="font-medium text-amber-900 dark:text-amber-100">Treat & re-check</p>
-            <span className="text-xs tabular-nums text-amber-900/80 dark:text-amber-100/80">{hypoRemainingLabel}</span>
+        {/* Always-visible safety action; effort/symptoms stay in the collapsible below. */}
+        {hypoRecheckEndsAt != null ? (
+          <div
+            className="rounded-xl border border-amber-300/70 bg-amber-50/60 dark:border-amber-800/50 dark:bg-amber-950/25 px-2.5 py-2 text-sm"
+            data-testid="panel-coach-hypo-recheck"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-medium text-amber-900 dark:text-amber-100">Treat & re-check</p>
+              <span className="text-xs tabular-nums text-amber-900/80 dark:text-amber-100/80">{hypoRemainingLabel}</span>
+            </div>
+            <div className="flex items-center justify-between gap-2 pt-1">
+              <p className="text-xs text-amber-900/80 dark:text-amber-100/80 leading-snug">
+                Take fast carbs now if your plan uses this, then re-check when the timer ends.
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-7 shrink-0 px-2 text-xs"
+                onClick={() => setHypoRecheckEndsAt(null)}
+                data-testid="button-coach-hypo-clear"
+              >
+                Dismiss
+              </Button>
+            </div>
           </div>
-          <div className="flex items-center justify-between gap-2 pt-1">
-            <p className="text-xs text-amber-900/80 dark:text-amber-100/80 leading-snug">
-              Take fast carbs now if your plan uses this, then re-check when the timer ends.
-            </p>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="h-7 shrink-0 px-2 text-xs"
-              onClick={() => setHypoRecheckEndsAt(null)}
-              data-testid="button-coach-hypo-clear"
-            >
-              Dismiss
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          className="h-9 w-full text-xs"
-          onClick={startHypoRecheckTimer}
-          data-testid="button-coach-feel-low"
-        >
-          I feel low — start 15‑min timer
-        </Button>
-      )}
+        ) : (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-9 w-full rounded-xl border-border/60 text-xs"
+            onClick={startHypoRecheckTimer}
+            data-testid="button-coach-feel-low"
+          >
+            I feel low — start 15‑min timer
+          </Button>
+        )}
+      </div>
 
       <DeeperContextSection
         title="Log how it feels"

@@ -120,11 +120,14 @@ describe("ExerciseGuidedCoach", () => {
     expect(queryByTestId("button-coach-env-outdoor_hot")).not.toBeNull();
   });
 
-  it("renders during phase with a prominent Exercise mode CTA and collapsed RPE/symptom logging", () => {
+  it("renders during phase with hero timer, quiet Exercise mode, and collapsed RPE/symptom logging", () => {
     mockSession = makeSession("active");
     const { queryByTestId } = renderWithRouter(<ExerciseGuidedCoach />);
     expect(queryByTestId("button-coach-finish-workout")).not.toBeNull();
-    // Exercise Mode is the prominent primary "during" action now.
+    expect(queryByTestId("coach-active-timer-hero")).not.toBeNull();
+    expect(queryByTestId("coach-phase-timer")).not.toBeNull();
+    expect(queryByTestId("coach-during-checkin")).not.toBeNull();
+    // Exercise Mode is a quiet secondary path; Pause/Recovery + timer lead.
     expect(queryByTestId("button-coach-exercise-mode")).not.toBeNull();
     expect(queryByTestId("button-coach-feel-low")).not.toBeNull();
     // RPE/symptom logging is secondary — collapsed by default, not competing for attention.
