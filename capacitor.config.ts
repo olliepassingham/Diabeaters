@@ -30,6 +30,15 @@ const config: CapacitorConfig = {
     : {}),
   plugins: {
     /**
+     * Keep splash until React shell paints — `hideNativeSplashWhenReady` fades it out.
+     */
+    SplashScreen: {
+      launchAutoHide: false,
+      launchShowDuration: 0,
+      backgroundColor: "#EFF6FF",
+      showSpinner: false,
+    },
+    /**
      * iOS: show banners and play sound while the app is open (same as lock-screen alerts).
      */
     PushNotifications: {
@@ -52,6 +61,7 @@ const config: CapacitorConfig = {
       "@capacitor/haptics",
       "@capacitor/local-notifications",
       "@capacitor/push-notifications",
+      "@capacitor/splash-screen",
       "@capacitor/status-bar",
       "@capgo/capacitor-health",
     ],

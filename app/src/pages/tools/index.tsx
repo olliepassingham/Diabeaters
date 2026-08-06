@@ -41,6 +41,7 @@ import { useOffline } from "@/hooks/use-offline";
 import { filterOfflineCloudTools } from "@/lib/offline-app-gate";
 import { OfflineDeviceNotice } from "@/components/offline-device-notice";
 import { hasLiveCgmCredentials, readCgmPreferences } from "@/lib/cgm/preferences";
+import { hapticLight } from "@/lib/haptics";
 
 function tileEnterDelay(index: number, stepMs = 12, capMs = 72): string {
   return `${Math.min(index * stepMs, capMs)}ms`;
@@ -291,6 +292,9 @@ function ToolCard({
       onPointerEnter={warm}
       onFocus={warm}
       onTouchStart={warm}
+      onClick={() => {
+        void hapticLight();
+      }}
     >
       <Card variant="glass" className={cardClass}>
         <CardContent className={cn("flex h-full items-center gap-3", pad)}>
@@ -319,6 +323,9 @@ function LearnToolRow({ href, icon: Icon, title, description }: Omit<ToolDef, "i
       onPointerEnter={warm}
       onFocus={warm}
       onTouchStart={warm}
+      onClick={() => {
+        void hapticLight();
+      }}
     >
       <Card variant="glass" className="pressable card-interactive cursor-pointer rounded-2xl border-border/40">
         <CardContent className="flex items-center gap-3 p-4 sm:gap-4 sm:p-4">

@@ -198,13 +198,13 @@
     transition-property: transform, box-shadow, background-color, border-color, opacity;
     transition-duration: var(--app-motion-duration);
     transition-timing-function: var(--app-motion-ease);
-    will-change: transform;
   }
 
   @media (hover: hover) and (pointer: fine) {
     .hover-elevate:hover {
       transform: translateY(-1px);
       box-shadow: var(--shadow-md);
+      will-change: transform;
     }
   }
 
@@ -590,7 +590,6 @@
     transition-property: transform, box-shadow, border-color, background-color;
     transition-duration: var(--app-motion-duration);
     transition-timing-function: var(--app-motion-ease);
-    will-change: transform;
   }
 
   @media (hover: hover) and (pointer: fine) {
@@ -598,12 +597,14 @@
       transform: translateY(-1px);
       box-shadow: var(--shadow-lg);
       border-color: rgb(var(--color-border) / 0.95);
+      will-change: transform;
     }
   }
 
   .card-interactive:active {
     transform: translateY(0px) scale(0.99);
     box-shadow: var(--shadow);
+    will-change: transform;
   }
 
   .surface-solid {

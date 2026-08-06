@@ -12,6 +12,7 @@ import { canShowAlcoholScenarios, canShowDrivingReadiness } from "@/lib/user-age
 import { PageShell } from "@/components/layout";
 import { OfflineDeviceNotice } from "@/components/offline-device-notice";
 import { DobUnknownNotice } from "@/components/dob-unknown-notice";
+import { hapticLight } from "@/lib/haptics";
 
 type ScenarioCardDef = {
   href: string;
@@ -72,6 +73,9 @@ function ScenarioCard({ href, icon: Icon, title, description }: ScenarioCardDef)
     <Link
       href={href}
       className="group pressable block h-full min-w-0 w-full rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      onClick={() => {
+        void hapticLight();
+      }}
     >
       <Card
         variant="glass"

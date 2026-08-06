@@ -118,3 +118,20 @@ export function FeedLoadingSkeleton({ rows = 3 }: { rows?: number }) {
     </ul>
   );
 }
+
+/** Quiet page placeholder for generic lazy routes (settings, account, single tools). */
+export function PageLoadingSkeleton({ rows = 4 }: { rows?: number }) {
+  return (
+    <div className="mx-auto w-full max-w-3xl space-y-3 px-1" aria-busy="true" aria-label="Loading">
+      <Skeleton className="h-8 w-40 rounded-lg" />
+      <Skeleton className="h-4 w-64 max-w-full rounded-md opacity-70" />
+      {Array.from({ length: rows }, (_, i) => (
+        <Skeleton
+          key={i}
+          className="h-24 w-full rounded-2xl animate-soft-in"
+          style={{ animationDelay: `${i * 40}ms` }}
+        />
+      ))}
+    </div>
+  );
+}

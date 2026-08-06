@@ -27,6 +27,7 @@ import { ExerciseCgmServerMonitorSync } from "@/components/exercise-cgm-server-m
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { FeedLoadingSkeleton, HubLoadingSkeleton, PageLoadingSkeleton } from "@/components/empty-state";
 
 import { ThemeProvider } from "@/hooks/use-theme";
 import { ErrorBoundary } from "@/components/error-boundary";
@@ -186,8 +187,9 @@ const MAIN_BOTTOM_SCROLL_PADDING_NO_NAV =
   "calc(env(safe-area-inset-bottom, 0px) + 1.5rem)";
 
 function RouteFallback() {
-  // Hold the spinner back briefly: fast chunk loads render nothing (feels instant),
-  // only genuinely slow loads show a fading-in spinner instead of a flash.
+  // Hold the skeleton back briefly: fast chunk loads render nothing (feels instant),
+  // only genuinely slow loads show a shell-matched placeholder instead of a spinner flash.
+  const [location] = useLocation();
   const [show, setShow] = useState(false);
   useEffect(() => {
     const t = window.setTimeout(() => setShow(true), 180);
@@ -196,17 +198,32 @@ function RouteFallback() {
 
   if (!show) return <div className="min-h-[40vh]" aria-hidden />;
 
+  const path = location.split("?")[0] || "/";
+  let body: ReactNode;
+  if (
+    path === "/tools" ||
+    path === "/scenarios" ||
+    path === "/education" ||
+    path.startsWith("/education/")
+  ) {
+    body = <HubLoadingSkeleton tiles={6} />;
+  } else if (path === "/community" || path.startsWith("/community/post")) {
+    body = <FeedLoadingSkeleton rows={4} />;
+  } else if (path.startsWith("/community/messages")) {
+    body = <PageLoadingSkeleton rows={5} />;
+  } else if (path.startsWith("/tools/") || path.startsWith("/scenarios/")) {
+    body = <PageLoadingSkeleton rows={4} />;
+  } else if (path === "/account" || path.startsWith("/settings") || path === "/notifications") {
+    body = <PageLoadingSkeleton rows={5} />;
+  } else if (path.startsWith("/carer-view")) {
+    body = <PageLoadingSkeleton rows={4} />;
+  } else {
+    body = <PageLoadingSkeleton rows={3} />;
+  }
+
   return (
-    <div
-      className="flex min-h-[40vh] flex-col items-center justify-center gap-3 text-sm text-muted-foreground animate-in fade-in duration-300"
-      role="status"
-      aria-live="polite"
-    >
-      <div
-        className="h-8 w-8 shrink-0 rounded-full border-2 border-primary/20 border-t-primary animate-spin"
-        aria-hidden
-      />
-      <span>Loading…</span>
+    <div className="animate-in fade-in duration-200 py-2" role="status" aria-live="polite">
+      {body}
     </div>
   );
 }

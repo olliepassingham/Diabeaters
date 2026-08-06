@@ -17,6 +17,7 @@ import { registerNotificationActionTypes } from "@/lib/notification-actions";
 import { clearNativeAppBadge, scheduleNativeAppBadgeBootClear } from "@/lib/native-app-badge";
 import { isCapacitorNativeShell } from "@/lib/native-platform";
 import { ensurePushDeepLinkListenersAttached } from "@/lib/push-tokens";
+import { hideNativeSplashWhenReady } from "@/lib/native-splash";
 import { prefetchOfflineCriticalRoutes } from "@/lib/offline-critical-prefetch";
 import "@/lib/offline-guides-entry";
 
@@ -52,3 +53,14 @@ createRoot(rootEl).render(
     </Router>
   </React.StrictMode>
 );
+
+// After first paint: fade OS splash so cold start doesn't flash white/network gap.
+requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
+    void hideNativeSplashWhenReady();
+  });
+});
+// Safety net if the first frames are blocked (slow network / chunk).
+window.setTimeout(() => {
+  void hideNativeSplashWhenReady();
+}, 2500);
