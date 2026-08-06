@@ -148,25 +148,43 @@ describe("ExerciseGuidedCoach", () => {
     expect(queryByTestId("panel-coach-symptoms-action")).not.toBeNull();
   });
 
-  it("renders recovery phase with bedtime presets and alcohol pill, no dead carb/bolus fields", () => {
+  it("keeps daytime recovery lean — no tonight planning or Bedtime CTA", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-06T14:00:00"));
     mockSession = makeSession("recovery");
-    const { queryByTestId } = renderWithRouter(<ExerciseGuidedCoach />);
+    const { queryByTestId, queryByText } = renderWithRouter(<ExerciseGuidedCoach />);
     expect(queryByTestId("button-coach-finish-session")).not.toBeNull();
-    expect(queryByTestId("button-coach-bedtime-2")).not.toBeNull();
-    expect(queryByTestId("button-coach-bedtime-custom")).not.toBeNull();
-    expect(queryByTestId("toggle-coach-alcohol-tonight")).not.toBeNull();
-    // Moderate/intense sessions still get a bedtime nudge even before a time is chosen.
-    expect(queryByTestId("button-coach-recovery-bedtime")).not.toBeNull();
+    expect(queryByTestId("coach-recovery-window-note")).not.toBeNull();
+    expect(queryByTestId("button-coach-bedtime-2")).toBeNull();
+    expect(queryByTestId("toggle-coach-alcohol-tonight")).toBeNull();
+    expect(queryByTestId("button-coach-recovery-bedtime")).toBeNull();
+    expect(queryByText(/Recovery notes/i)).toBeNull();
     // Dead inputs that never fed any calculation were removed.
     expect(queryByTestId("input-coach-recovery-carbs")).toBeNull();
     expect(queryByTestId("input-coach-recovery-bolus")).toBeNull();
+    vi.useRealTimers();
+  });
+
+  it("shows tonight planning and Bedtime CTA in the evening after moderate/intense sessions", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-06T20:00:00"));
+    mockSession = makeSession("recovery");
+    const { queryByTestId } = renderWithRouter(<ExerciseGuidedCoach />);
+    expect(queryByTestId("button-coach-bedtime-2")).not.toBeNull();
+    expect(queryByTestId("button-coach-bedtime-custom")).not.toBeNull();
+    expect(queryByTestId("toggle-coach-alcohol-tonight")).not.toBeNull();
+    expect(queryByTestId("button-coach-recovery-bedtime")).not.toBeNull();
+    vi.useRealTimers();
   });
 
   it("recovery bedtime preset drives an urgent Bedtime tool prompt when bedtime is close", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-06T20:00:00"));
     mockSession = makeSession("recovery");
     const { queryByTestId, getByText } = renderWithRouter(<ExerciseGuidedCoach />);
     fireEvent.click(queryByTestId("button-coach-bedtime-2")!);
     expect(getByText(/Bedtime in about 2h/i)).toBeTruthy();
     expect(queryByTestId("button-coach-recovery-bedtime")).not.toBeNull();
+    vi.useRealTimers();
   });
 });

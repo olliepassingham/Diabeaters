@@ -22,7 +22,6 @@ import {
   Dumbbell,
   Flower2,
   Footprints,
-  Info,
   Maximize2,
   Moon,
   Pause,
@@ -548,9 +547,11 @@ export function ExerciseGuidedCoach() {
     }
   }, [activeSession, bgInput, bgUnits, historyBias, trendForReadiness, settings]);
 
+  const recoveryEveningContext = isExerciseRecoveryEveningContext(new Date(now));
   const recoveryBedtimeCtaInfo = useMemo(
-    () => (activeSession ? recoveryBedtimeCta(activeSession) : null),
-    [activeSession],
+    () =>
+      activeSession && recoveryEveningContext ? recoveryBedtimeCta(activeSession) : null,
+    [activeSession, recoveryEveningContext],
   );
 
   const phasePumpTips = useMemo(() => {
@@ -1310,60 +1311,46 @@ export function ExerciseGuidedCoach() {
                     bgInput={bgInput}
                     onTrendChange={onTrendChange}
                     update={update}
+                    showTonightPlanning={recoveryEveningContext}
                     {...cgmPhaseProps}
                   />
-                  {/* One recovery section instead of separate stacked boxes: a plain-text recovery
-                      window note, an actionable bedtime CTA (kept bordered since it's a button-driven
-                      call to action), and the recovery tips list — all inside the same unified card. */}
+                  {/* Keep recovery lean: one short window line + optional evening Bedtime CTA.
+                      Generic tip lists were clutter — fuel/readiness already carry the action. */}
                   {exercisePlan || recoveryBedtimeCtaInfo ? (
                     <div className="border-t border-border/50 pt-3.5 space-y-3">
                       {exercisePlan ? (
-                        <p className="text-xs text-muted-foreground leading-snug">
-                          Recovery window (~{exercisePlan.recovery.monitorHours}): delayed lows still happen — keep
-                          snacks and your hypo plan close.
+                        <p
+                          className="text-xs text-muted-foreground leading-snug"
+                          data-testid="coach-recovery-window-note"
+                        >
+                          ~{exercisePlan.recovery.monitorHours}h recovery · watch for delayed lows
                         </p>
                       ) : null}
                       {recoveryBedtimeCtaInfo ? (
                         <div
                           className={cn(
-                            "rounded-xl border px-3.5 py-3 space-y-1.5",
+                            "rounded-xl border px-3.5 py-3 space-y-2",
                             recoveryBedtimeCtaInfo.urgent
                               ? "border-primary/40 bg-primary/5"
                               : "border-border/50 bg-muted/10",
                           )}
+                          data-testid="coach-recovery-bedtime-cta"
                         >
                           <p className="text-sm font-medium text-foreground flex items-center gap-2">
                             <Moon className="h-4 w-4 shrink-0" aria-hidden />
                             {recoveryBedtimeCtaInfo.title}
                           </p>
-                          <p className="text-xs text-muted-foreground leading-snug">{recoveryBedtimeCtaInfo.caption}</p>
                           <Link href="/scenarios/bedtime">
                             <Button
                               variant={recoveryBedtimeCtaInfo.urgent ? "default" : "outline"}
                               size="sm"
-                              className="w-full mt-1"
+                              className="w-full"
                               data-testid="button-coach-recovery-bedtime"
                             >
                               Open Bedtime tool
                               <ArrowRight className="h-3.5 w-3.5 ml-auto" />
                             </Button>
                           </Link>
-                        </div>
-                      ) : null}
-                      {exercisePlan && exercisePlan.recovery.tips.length > 0 ? (
-                        <div className="space-y-2">
-                          <p className="text-sm font-medium text-foreground flex items-center gap-2">
-                            <Info className="h-4 w-4 text-muted-foreground shrink-0" />
-                            Recovery notes
-                          </p>
-                          <ul className="space-y-1.5 text-sm text-muted-foreground">
-                            {exercisePlan.recovery.tips.slice(0, 5).map((tip, i) => (
-                              <li key={i} className="flex gap-2">
-                                <span className="text-primary">•</span>
-                                <span>{tip}</span>
-                              </li>
-                            ))}
-                          </ul>
                         </div>
                       ) : null}
                     </div>
@@ -1935,7 +1922,8 @@ function RecoveryQuestions({
   cgmEmptyHint,
   onCgmRefresh,
   onBgFieldChange,
-}: PhaseProps) {
+  showTonightPlanning,
+}: PhaseProps & { showTonightPlanning: boolean }) {
   const bedtimeIsPreset =
     session.bedtimeInHours != null && BEDTIME_PRESET_HOURS.includes(session.bedtimeInHours as (typeof BEDTIME_PRESET_HOURS)[number]);
 
@@ -1955,95 +1943,105 @@ function RecoveryQuestions({
         trendTestIdPrefix="button-coach-trend"
       />
 
-      <FieldRow icon={Moon} label="Bedtime tonight">
-        <div className="flex flex-wrap items-center gap-2">
-          {BEDTIME_PRESET_HOURS.map((h) => (
-            <Button
-              key={h}
-              type="button"
-              size="sm"
-              variant={session.bedtimeInHours === h ? "default" : "outline"}
-              className="h-8 px-2.5 text-xs"
-              onClick={() => update({ bedtimeInHours: session.bedtimeInHours === h ? undefined : h })}
-              data-testid={`button-coach-bedtime-${h}`}
-            >
-              {h >= 8 ? `${h}h+` : `${h}h`}
-            </Button>
-          ))}
-          <Button
-            type="button"
-            size="sm"
-            variant={session.bedtimeInHours != null && !bedtimeIsPreset ? "default" : "outline"}
-            className="h-8 px-2.5 text-xs"
-            onClick={() => {
-              if (session.bedtimeInHours != null && !bedtimeIsPreset) {
-                update({ bedtimeInHours: undefined });
-              } else {
-                update({ bedtimeInHours: 3 });
-              }
-            }}
-            data-testid="button-coach-bedtime-custom"
-          >
-            Custom
-          </Button>
-        </div>
-        {session.bedtimeInHours != null && !bedtimeIsPreset ? (
-          <div className="pt-2">
-            <Input
-              inputMode="decimal"
-              value={String(session.bedtimeInHours)}
-              onChange={(e) => {
-                const n = parseFloat(e.target.value.replace(",", "."));
-                update({ bedtimeInHours: Number.isFinite(n) && n >= 0 ? Math.min(24, n) : undefined });
-              }}
-              className="h-9"
-              data-testid="input-coach-bedtime-hours"
+      {/* Bedtime / alcohol only matter closer to night — daytime recovery stays BG-focused. */}
+      {showTonightPlanning ? (
+        <>
+          <FieldRow icon={Moon} label="Bedtime tonight">
+            <div className="flex flex-wrap items-center gap-2">
+              {BEDTIME_PRESET_HOURS.map((h) => (
+                <Button
+                  key={h}
+                  type="button"
+                  size="sm"
+                  variant={session.bedtimeInHours === h ? "default" : "outline"}
+                  className="h-8 px-2.5 text-xs"
+                  onClick={() => update({ bedtimeInHours: session.bedtimeInHours === h ? undefined : h })}
+                  data-testid={`button-coach-bedtime-${h}`}
+                >
+                  {h >= 8 ? `${h}h+` : `${h}h`}
+                </Button>
+              ))}
+              <Button
+                type="button"
+                size="sm"
+                variant={session.bedtimeInHours != null && !bedtimeIsPreset ? "default" : "outline"}
+                className="h-8 px-2.5 text-xs"
+                onClick={() => {
+                  if (session.bedtimeInHours != null && !bedtimeIsPreset) {
+                    update({ bedtimeInHours: undefined });
+                  } else {
+                    update({ bedtimeInHours: 3 });
+                  }
+                }}
+                data-testid="button-coach-bedtime-custom"
+              >
+                Custom
+              </Button>
+            </div>
+            {session.bedtimeInHours != null && !bedtimeIsPreset ? (
+              <div className="pt-2">
+                <Input
+                  inputMode="decimal"
+                  value={String(session.bedtimeInHours)}
+                  onChange={(e) => {
+                    const n = parseFloat(e.target.value.replace(",", "."));
+                    update({ bedtimeInHours: Number.isFinite(n) && n >= 0 ? Math.min(24, n) : undefined });
+                  }}
+                  className="h-9"
+                  data-testid="input-coach-bedtime-hours"
+                />
+              </div>
+            ) : null}
+          </FieldRow>
+
+          <div className="flex flex-wrap gap-2">
+            <PillToggle
+              label="Alcohol planned tonight"
+              icon={Wine}
+              checked={!!session.alcoholTonight}
+              onChange={(v) => update({ alcoholTonight: v })}
+              testId="toggle-coach-alcohol-tonight"
             />
           </div>
-        ) : null}
-      </FieldRow>
-
-      <div className="flex flex-wrap gap-2">
-        <PillToggle
-          label="Alcohol planned tonight"
-          icon={Wine}
-          checked={!!session.alcoholTonight}
-          onChange={(v) => update({ alcoholTonight: v })}
-          testId="toggle-coach-alcohol-tonight"
-        />
-      </div>
+        </>
+      ) : null}
     </div>
   );
 }
 
 /**
+ * Evening / overnight local hours — when the Bedtime tool and "tonight" prompts are useful.
+ * Matches the overnight window used by post-exercise educational copy (from 5pm).
+ */
+function isExerciseRecoveryEveningContext(now: Date = new Date()): boolean {
+  const h = now.getHours();
+  return h >= 17 || h < 5;
+}
+
+/**
  * Drives the "Open Bedtime tool" prompt in the recovery panel — urgency and copy respond to
- * how close bedtime actually is, rather than always showing the same static button regardless
- * of context.
+ * how close bedtime actually is. Caller must already gate to evening context.
  */
 function recoveryBedtimeCta(
   session: ActiveExerciseSession,
-): { urgent: boolean; title: string; caption: string } | null {
+): { urgent: boolean; title: string } | null {
   const hours = session.bedtimeInHours;
   if (hours != null && Number.isFinite(hours)) {
     if (hours <= 4) {
       return {
         urgent: true,
         title: hours <= 1 ? "Bedtime is close" : `Bedtime in about ${Math.round(hours)}h`,
-        caption: "Delayed lows are common tonight — run a trend-aware check before you turn in.",
       };
     }
     return {
       urgent: false,
       title: `Bedtime in about ${Math.round(hours)}h`,
-      caption: "Worth a quick check later tonight, especially after today's session.",
     };
   }
   if (session.intensity === "intense" || session.intensity === "moderate") {
     return {
       urgent: false,
       title: "Planning for tonight",
-      caption: "Moderate and intense sessions can cause delayed lows overnight — the Bedtime tool factors that in.",
     };
   }
   return null;

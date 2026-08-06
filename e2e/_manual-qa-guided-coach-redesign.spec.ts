@@ -158,7 +158,8 @@ test.describe("Guided exercise coach redesign — manual QA", () => {
     await page.screenshot({ path: "test-results/coach-7-recovery.png", fullPage: true });
   });
 
-  test("recovery phase: bedtime presets replace dead carb/bolus inputs and drive the Bedtime CTA", async ({ page }) => {
+  test("recovery phase: evening shows bedtime presets and Bedtime CTA; tips stay off the page", async ({ page }) => {
+    await page.clock.setFixedTime(new Date("2026-08-06T20:00:00"));
     await seedPatientSession(page, {
       session: baseSession({
         phase: "recovery",
@@ -176,12 +177,13 @@ test.describe("Guided exercise coach redesign — manual QA", () => {
     // Carbs eaten / bolus-given inputs never fed any calculation — removed for good.
     await expect(page.getByTestId("input-coach-recovery-carbs")).toHaveCount(0);
     await expect(page.getByTestId("input-coach-recovery-bolus")).toHaveCount(0);
+    await expect(page.getByText(/Recovery notes/i)).toHaveCount(0);
 
-    // Generic, low-key nudge before a bedtime is chosen.
+    // Evening: low-key Bedtime nudge before a time is chosen.
     await expect(page.getByTestId("button-coach-recovery-bedtime")).toBeVisible();
     await page.screenshot({ path: "test-results/coach-8-recovery-bedtime-default.png", fullPage: true });
 
-    // Picking a close bedtime should escalate the CTA to an urgent, filled prompt.
+    // Picking a close bedtime should escalate the CTA title.
     await page.getByTestId("button-coach-bedtime-2").click();
     await page.waitForTimeout(150);
     await expect(page.getByText(/Bedtime in about 2h/i)).toBeVisible();
