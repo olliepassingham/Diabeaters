@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
-import { Activity, CircleCheck, Droplet, Loader2, Minus, Pause, Play, TrendingDown, TrendingUp } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation } from "wouter";
+import { Activity, CircleCheck, Droplet, Loader2, Minus, Pause, Play, TrendingDown, TrendingUp, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { BRAND_MARK_IMAGE_SRC } from "@/lib/brand-mark";
@@ -24,6 +25,8 @@ import { computeExerciseHypoSuggestion } from "@/lib/exercise-hypo-auto";
 import { formatExerciseElapsedShort } from "@/components/exercise-active-session-extras";
 import { getWorkoutElapsedMs, isExercisePaused } from "@/lib/exercise-session-timing";
 
+const EXERCISE_GUIDE_HREF = "/scenarios/exercise";
+
 function trendIcon(trend: "rising" | "falling" | "flat" | undefined) {
   if (trend === "rising") return TrendingUp;
   if (trend === "falling") return TrendingDown;
@@ -47,6 +50,7 @@ function ExerciseModeContent({
   onClose: () => void;
 }) {
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [pathname, setLocation] = useLocation();
   const sessionActions = useExerciseSessionActions();
 
   useEffect(() => {
@@ -62,6 +66,25 @@ function ExerciseModeContent({
       document.body.style.overflow = previousOverflow;
     };
   }, []);
+
+  const exitToActiveExercisePage = useCallback(() => {
+    onClose();
+    const pathOnly = pathname.split("?")[0] ?? pathname;
+    if (pathOnly !== EXERCISE_GUIDE_HREF) {
+      setLocation(EXERCISE_GUIDE_HREF);
+    }
+  }, [onClose, pathname, setLocation]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        exitToActiveExercisePage();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [exitToActiveExercisePage]);
 
   const profile: Partial<UserProfile> = storage.getProfile() ?? {};
   const settings = storage.getSettings();
@@ -145,15 +168,29 @@ function ExerciseModeContent({
       />
 
       <div className="relative z-10 flex flex-1 flex-col">
-        <div className="flex items-center justify-center gap-1.5 pt-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-white/30">
-          <img
-            src={BRAND_MARK_IMAGE_SRC}
-            alt=""
-            aria-hidden
-            className="h-3 w-3 opacity-80"
-            style={{ filter: "invert(1)" }}
-          />
-          Diabeaters
+        <div className="grid grid-cols-[2.75rem_1fr_2.75rem] items-center gap-1 px-3 pt-0.5">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-11 w-11 rounded-full text-white/70 hover:bg-white/10 hover:text-white"
+            onClick={exitToActiveExercisePage}
+            aria-label="Close exercise mode"
+            data-testid="button-exercise-mode-close"
+          >
+            <X className="h-5 w-5" aria-hidden />
+          </Button>
+          <div className="flex items-center justify-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-white/30">
+            <img
+              src={BRAND_MARK_IMAGE_SRC}
+              alt=""
+              aria-hidden
+              className="h-3 w-3 opacity-80"
+              style={{ filter: "invert(1)" }}
+            />
+            Diabeaters
+          </div>
+          <span className="block" aria-hidden />
         </div>
         <div className="mt-2 flex items-center justify-center gap-2 px-6 text-sm font-medium uppercase tracking-wide text-white/55">
           <Activity className="h-4 w-4 shrink-0" aria-hidden />
@@ -300,8 +337,8 @@ function ExerciseModeContent({
 /**
  * Always-mounted host — listens for {@link EXERCISE_MODE_OPEN_EVENT} and the active-exercise
  * change event, but renders nothing (and does no BG polling) unless a session is genuinely
- * `"active"` and the overlay has been opened. Auto-closes the moment the session leaves the
- * active phase (Finish → recovery, or End), matching the "only way out is finishing" design.
+ * `"active"` and the overlay has been opened. Closing returns to the active exercise guide;
+ * finishing or ending the session also dismisses the overlay.
  */
 export function ExerciseModeOverlay() {
   const [open, setOpen] = useState(false);
