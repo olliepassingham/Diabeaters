@@ -522,18 +522,67 @@
 
   .surface-field {
     /* Override shadcn input/textarea defaults on the same node */
-    background: var(--surface-glass-bg-strong) !important;
-    -webkit-backdrop-filter: blur(var(--surface-glass-blur)) !important;
-    backdrop-filter: blur(var(--surface-glass-blur)) !important;
-    border: 1px solid rgb(var(--color-input) / 0.82) !important;
-    box-shadow: var(--shadow-xs) !important;
+    background: rgb(var(--color-bg-card) / 0.72) !important;
+    -webkit-backdrop-filter: blur(10px) saturate(1.05) !important;
+    backdrop-filter: blur(10px) saturate(1.05) !important;
+    border: 1px solid rgb(var(--color-border) / 0.7) !important;
+    box-shadow: none !important;
+  }
+
+  .surface-field:hover:not(:disabled):not(:focus-visible) {
+    border-color: rgb(var(--color-border) / 0.95) !important;
   }
 
   .surface-field:focus-visible {
-    border-color: rgb(var(--color-primary-border) / 0.55) !important;
-    box-shadow:
-      0 0 0 3px hsl(var(--ring) / 0.25),
-      var(--shadow-sm) !important;
+    border-color: rgb(var(--color-primary-border) / 0.65) !important;
+    box-shadow: 0 0 0 3px hsl(var(--ring) / 0.18) !important;
+  }
+
+  .dark .surface-field {
+    background: rgb(var(--color-bg-card) / 0.55) !important;
+    border-color: rgb(var(--color-border) / 0.55) !important;
+  }
+
+  /** Nested composers (comment bars, inline reply) — parent owns the chrome. */
+  .surface-field-bare {
+    background: transparent !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .surface-field-bare:hover:not(:disabled),
+  .surface-field-bare:focus-visible {
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /** Single-surface text composer shell (comment / reply bars). */
+  .text-composer-shell {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.5rem;
+    border-radius: 1.15rem;
+    border: 1px solid rgb(var(--color-border) / 0.65);
+    background: rgb(var(--color-bg-card) / 0.78);
+    -webkit-backdrop-filter: blur(10px) saturate(1.05);
+    backdrop-filter: blur(10px) saturate(1.05);
+    padding: 0.35rem 0.35rem 0.35rem 0.85rem;
+    box-shadow: none;
+    transition:
+      border-color var(--app-motion-duration) var(--app-motion-ease),
+      box-shadow var(--app-motion-duration) var(--app-motion-ease);
+  }
+
+  .text-composer-shell:focus-within {
+    border-color: rgb(var(--color-primary-border) / 0.6);
+    box-shadow: 0 0 0 3px hsl(var(--ring) / 0.16);
+  }
+
+  .dark .text-composer-shell {
+    background: rgb(var(--color-bg-card) / 0.5);
+    border-color: rgb(var(--color-border) / 0.5);
   }
 
   /* Optional: make cards/tiles feel more tactile when they opt-in */
@@ -573,20 +622,26 @@
 @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
   .surface-glass,
   .surface-glass-strong,
-  .surface-field {
+  .surface-field,
+  .text-composer-shell {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
     background:
-      linear-gradient(180deg, rgb(var(--color-primary-light) / 0.055) 0%, rgb(var(--color-primary-light) / 0.028) 100%),
-      rgb(var(--color-bg-card) / 0.92);
+      linear-gradient(180deg, rgb(var(--color-primary-light) / 0.04) 0%, transparent 100%),
+      rgb(var(--color-bg-card) / 0.94);
   }
 
   .dark .surface-glass,
   .dark .surface-glass-strong,
-  .dark .surface-field {
+  .dark .surface-field,
+  .dark .text-composer-shell {
     background:
-      linear-gradient(180deg, rgb(var(--color-primary) / 0.055) 0%, rgb(var(--color-primary) / 0.028) 100%),
-      rgb(var(--color-bg-card) / 0.9);
+      linear-gradient(180deg, rgb(var(--color-primary) / 0.045) 0%, transparent 100%),
+      rgb(var(--color-bg-card) / 0.92);
+  }
+
+  .surface-field-bare {
+    background: transparent !important;
   }
 
   .surface-glass-muted {

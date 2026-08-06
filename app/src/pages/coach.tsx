@@ -784,14 +784,14 @@ export default function CoachPage() {
         ) : null}
 
         <div className="px-3 py-2.5 pb-[calc(var(--bottom-nav-height,7.5rem)+var(--keyboard-inset-bottom,0px)+0.5rem)]">
-          <div className="flex items-end gap-2 rounded-[1.75rem] border border-border/50 bg-muted/35 p-1.5 pl-3 shadow-sm ring-1 ring-black/[0.03] dark:ring-white/[0.04]">
+          <div className="text-composer-shell rounded-[1.35rem]">
             <Textarea
               ref={draftTextareaRef}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               placeholder="Type your question…"
               rows={1}
-              className="min-h-10 max-h-40 flex-1 resize-none overflow-hidden border-0 bg-transparent px-0 py-2.5 text-[16px] leading-snug shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+              className="surface-field-bare min-h-10 max-h-40 flex-1 resize-none overflow-hidden px-0 py-2.5 text-[16px] leading-snug"
               disabled={sendMutation.isPending}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {

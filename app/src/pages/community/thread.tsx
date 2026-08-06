@@ -692,7 +692,7 @@ export default function CommunityThreadPage() {
         }}
       >
         <div className="space-y-4" data-testid="sheet-dm-edit">
-          <div className="rounded-2xl border border-border/60 bg-muted/25 p-3 shadow-sm">
+          <div className="text-composer-shell flex-col items-stretch rounded-2xl p-3">
             <Textarea
               ref={editInputRef}
               value={editDraft}
@@ -701,7 +701,7 @@ export default function CommunityThreadPage() {
               rows={4}
               disabled={savingEdit}
               placeholder="Update your message…"
-              className="min-h-[7.5rem] resize-none border-0 bg-transparent px-0 py-0 text-[16px] leading-relaxed shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+              className="surface-field-bare min-h-[7.5rem] resize-none px-0 py-0 text-[16px] leading-relaxed"
               data-testid="input-dm-edit-body"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -800,7 +800,7 @@ export default function CommunityThreadPage() {
             </Button>
           </div>
         ) : null}
-        <div className="flex items-end gap-2 rounded-[1.75rem] border border-border/50 bg-muted/35 p-1.5 pl-2 shadow-sm ring-1 ring-black/[0.03] dark:ring-white/[0.04]">
+        <div className="text-composer-shell rounded-[1.35rem] pl-1.5">
           <Button
             type="button"
             variant="ghost"
@@ -823,7 +823,7 @@ export default function CommunityThreadPage() {
             placeholder={messagingBlocked ? "Messaging unavailable" : "Message…"}
             maxLength={8000}
             disabled={sending || !user || messagingBlocked}
-            className="min-h-10 max-h-28 flex-1 resize-none border-0 bg-transparent px-1 py-2.5 text-[16px] leading-snug shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+            className="surface-field-bare min-h-10 max-h-28 flex-1 resize-none px-1 py-2.5 text-[16px] leading-snug"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();

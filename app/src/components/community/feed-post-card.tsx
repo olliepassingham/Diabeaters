@@ -799,7 +799,7 @@ export function FeedPostCard({
               )}
             </div>
           )}
-          <div className="flex items-end gap-2 rounded-[1.35rem] border border-border/50 bg-muted/30 p-1.5 pl-3 shadow-sm ring-1 ring-black/[0.03] dark:ring-white/[0.04]">
+          <div className="text-composer-shell">
             <div className="min-w-0 flex-1">
               <MentionTextarea
                 textareaRef={commentInputRef}
@@ -811,9 +811,10 @@ export function FeedPostCard({
                 hideHint
                 autoGrow
                 maxGrowPx={148}
+                bare
                 placeholder={mayEngage ? "Add a comment…" : "Set up your @handle to comment"}
                 disabled={!mayEngage}
-                className="min-h-10 resize-none border-0 bg-transparent px-0 py-2.5 text-[15px] leading-snug shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                className="min-h-10 resize-none px-0 py-2 text-[15px] leading-snug"
               />
             </div>
             <Button

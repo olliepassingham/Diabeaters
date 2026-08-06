@@ -31,6 +31,11 @@ type MentionTextareaProps = {
   autoGrow?: boolean;
   /** Max height in px when autoGrow is on. Default 160. */
   maxGrowPx?: number;
+  /**
+   * Skip the glass field chrome — use inside a parent composer shell
+   * (comment bar, reply strip) so you don't get a box-in-a-box.
+   */
+  bare?: boolean;
 };
 
 export function MentionTextarea({
@@ -47,6 +52,7 @@ export function MentionTextarea({
   hideHint = false,
   autoGrow = false,
   maxGrowPx = 160,
+  bare = false,
 }: MentionTextareaProps) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [suggestions, setSuggestions] = useState<MentionSuggestion[]>([]);
@@ -167,7 +173,8 @@ export function MentionTextarea({
         autoCorrect="off"
         spellCheck={false}
         className={cn(
-          "surface-field w-full rounded-xl text-base",
+          "w-full rounded-xl text-base leading-relaxed",
+          bare ? "surface-field-bare px-0 py-2.5" : "surface-field",
           autoGrow ? "min-h-0 overflow-hidden" : "min-h-[5.5rem]",
           className,
         )}
