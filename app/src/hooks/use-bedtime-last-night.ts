@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   analyzeBedtimeOvernight,
+  bedtimeOvernightSummaryFromInsight,
   entriesToOvernightReadings,
   filterEntriesToSleepWindow,
+  overnightSummariesDiffer,
   type BedtimeOvernightInsight,
 } from "@/lib/bedtime-overnight-analysis";
 import { resolveOvernightReviewTarget, type OvernightReviewTarget } from "@/lib/bedtime-overnight-window";
@@ -113,8 +115,8 @@ export function useBedtimeLastNight(logs: BedtimeLog[], units: BgUnits): {
           setStatus("no_readings");
           setMessage(
             reviewTarget.source === "bedtime_log"
-              ? "No CGM readings in your estimated sleep window. Sensor gaps or sharing delays are common — try refresh in a few minutes."
-              : "No CGM readings found for last night (about 11pm–7am). Check sharing is on and try refresh.",
+              ? "No glucose points loaded for that sleep window yet. Sharing can lag — tap refresh in a moment, or check again when your CGM app shows the night."
+              : "No glucose points loaded for last night (about 11pm–7am) yet. Tap refresh shortly, or confirm Share is on in Settings → CGM.",
           );
         });
         return;
@@ -127,6 +129,12 @@ export function useBedtimeLastNight(logs: BedtimeLog[], units: BgUnits): {
           setMessage("Could not summarise overnight readings.");
         });
         return;
+      }
+      if (log) {
+        const summary = bedtimeOvernightSummaryFromInsight(next);
+        if (overnightSummariesDiffer(log.overnightCgmSummary, summary) && summary) {
+          storage.updateBedtimeLog(log.id, { overnightCgmSummary: summary });
+        }
       }
       apply(() => {
         setInsight(next);

@@ -6,6 +6,7 @@ import {
   type ActivityEvent,
   type ActivityKind,
 } from "@/lib/activity-history";
+import { toBedtimeStreakDayKey } from "@/lib/bedtime-overnight-window";
 import { storage } from "@/lib/storage";
 
 /** Tool categories that earn streaks and achievements (excludes hypos and reactive tools). */
@@ -53,6 +54,22 @@ export function qualifyingDayKeysForKind(
 ): Set<string> {
   if (kind === "app_check_in") {
     return new Set(storage.getAppCheckInDayKeys());
+  }
+  // Bedtime streaks follow “night belonging”, not strict calendar midnight.
+  if (kind === "bedtime_check") {
+    const keys = new Set<string>();
+    for (const log of storage.getBedtimeLogs()) {
+      const key = toBedtimeStreakDayKey(log.date, log.hoursUntilSleep);
+      if (key) keys.add(key);
+    }
+    // Fallback for activity events that are not mirrored in bedtime logs (tests / imports).
+    if (keys.size === 0) {
+      for (const e of eventsForStreakKind(events, kind)) {
+        const key = toActivityDayKey(e.at);
+        if (key) keys.add(key);
+      }
+    }
+    return keys;
   }
   const keys = new Set<string>();
   for (const e of eventsForStreakKind(events, kind)) {

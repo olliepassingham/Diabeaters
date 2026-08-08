@@ -1018,6 +1018,20 @@ export interface BedtimeLog {
   actionSuggested?: BedtimeActionSuggested;
   /** Manual "how did last night go?" follow-up, added later once the sleep window has passed. */
   outcome?: BedtimeOutcome;
+  /**
+   * Overnight CGM time-in-range for the estimated sleep window (user targets).
+   * Filled when last-night review / outcome check-in / history backfill has enough readings.
+   */
+  overnightCgmSummary?: BedtimeOvernightCgmSummary;
+}
+
+/** Snapshot of overnight CGM stats attached to a bedtime check (local-only). */
+export interface BedtimeOvernightCgmSummary {
+  inRangePercent: number;
+  readingCount: number;
+  hadLow: boolean;
+  hadHigh: boolean;
+  computedAt: string;
 }
 
 export interface SickDayJournalEntry {

@@ -89,6 +89,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         _ = AppIconBadgePlugin.self
         _ = NotificationSettingsPlugin.self
         _ = HealthAuthorizationPlugin.self
+        _ = OsSurfacesPlugin.self
 
         // Categories must exist before remote pushes arrive (IDs match JS + APNs aps.category).
         registerNotificationActionCategories()

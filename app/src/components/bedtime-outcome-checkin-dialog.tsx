@@ -18,7 +18,11 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { dismissBedtimeOutcomePrompt } from "@/lib/bedtime-outcome-prompt";
 import { useBedtimeOutcomeCgmInsight } from "@/hooks/use-bedtime-outcome-cgm-insight";
-import type { BedtimeOvernightInsight } from "@/lib/bedtime-overnight-analysis";
+import {
+  bedtimeOvernightSummaryFromInsight,
+  overnightSummariesDiffer,
+  type BedtimeOvernightInsight,
+} from "@/lib/bedtime-overnight-analysis";
 import { formatTargetBgInput } from "@/lib/hypo-context";
 import type { BgUnits } from "@/lib/cgm/types";
 import { storage, type BedtimeLog, type BedtimeOutcome } from "@/lib/storage";
@@ -114,7 +118,14 @@ export function BedtimeOutcomeCheckinDialog({ open, onOpenChange, log, onSaved }
         morningBgUnits: log.bgUnits === "mg/dL" ? "mg/dL" : "mmol/L",
         followedAction: askFollowed ? followedAction ?? "n_a" : "n_a",
       };
-      storage.updateBedtimeLog(log.id, { outcome });
+      const patch: Partial<BedtimeLog> = { outcome };
+      if (cgmInsight) {
+        const summary = bedtimeOvernightSummaryFromInsight(cgmInsight);
+        if (overnightSummariesDiffer(log.overnightCgmSummary, summary) && summary) {
+          patch.overnightCgmSummary = summary;
+        }
+      }
+      storage.updateBedtimeLog(log.id, patch);
       toast({
         title: "Thanks for the update",
         description: "This helps tailor future bedtime guidance to your own nights.",

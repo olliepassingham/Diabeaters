@@ -73,6 +73,7 @@ export function prefetchToolsHubLinkedChunks(): void {
   void import("@/pages/tools/patterns");
   void import("@/pages/tools/glucose-converter");
   void import("@/pages/tools/correction-help");
+  void import("@/pages/tools/cgm-live");
   void import("@/pages/tools/tips");
   void import("@/pages/adviser");
   void import("@/pages/routines");

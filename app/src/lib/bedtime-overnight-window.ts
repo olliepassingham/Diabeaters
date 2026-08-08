@@ -40,6 +40,37 @@ export function computeBedtimeSleepWindow(
   };
 }
 
+/**
+ * Calendar day a bedtime check counts toward for streaks / “already done tonight”.
+ * Checks after midnight (before 5am local) still belong to the previous evening’s night —
+ * so a late check before sleep does not break the streak.
+ */
+export const BEDTIME_STREAK_DAY_CUTOFF_HOUR = 5;
+
+export function toBedtimeStreakDayKey(
+  atIso: string,
+  hoursUntilSleep?: number | null,
+): string | null {
+  const checkMs = new Date(atIso).getTime();
+  if (!Number.isFinite(checkMs)) return null;
+
+  const until =
+    typeof hoursUntilSleep === "number" && Number.isFinite(hoursUntilSleep)
+      ? Math.max(0, hoursUntilSleep)
+      : 0;
+  const sleepStart = new Date(checkMs + until * 60 * 60 * 1000);
+  if (!Number.isFinite(sleepStart.getTime())) return null;
+
+  if (sleepStart.getHours() < BEDTIME_STREAK_DAY_CUTOFF_HOUR) {
+    sleepStart.setDate(sleepStart.getDate() - 1);
+  }
+
+  const y = sleepStart.getFullYear();
+  const m = String(sleepStart.getMonth() + 1).padStart(2, "0");
+  const d = String(sleepStart.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 /** Most recent log whose estimated sleep window has fully ended (for morning review). */
 export function findReviewableBedtimeLog(logs: BedtimeLog[], nowMs = Date.now()): BedtimeLog | null {
   const sorted = [...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());

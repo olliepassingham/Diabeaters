@@ -1,12 +1,12 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 /**
- * Default: load production from Vercel so GitHub → Vercel deploy updates
- * installed iOS/Android apps without a new store binary.
+ * Store default: **bundled** `webDir` (set CAPACITOR_BUNDLE_WEB=1 via release scripts).
+ * Fast cold start + offline UI. See docs/operations/native-shipping-mode.md.
  *
- * Override URL: CAPACITOR_SERVER_URL=https://…
- * Bundle web into the binary (offline cold start, no live deploy):
- *   CAPACITOR_BUNDLE_WEB=1 npm run ios:release:sync:bundled
+ * Remote Vercel WebView (TestFlight live-iteration only):
+ *   CAPACITOR_SERVER_URL=https://… or omit CAPACITOR_BUNDLE_WEB with sync:remote
+ *   npm run ios:release:sync:remote
  *
  * Do not point CAPACITOR_SERVER_URL at staging for store archives.
  */
@@ -14,7 +14,8 @@ const PRODUCTION_SERVER_URL = "https://diabeaters.vercel.app";
 const bundleWeb = process.env.CAPACITOR_BUNDLE_WEB === "1";
 const remoteServerUrl = bundleWeb
   ? undefined
-  : process.env.CAPACITOR_SERVER_URL?.trim() || PRODUCTION_SERVER_URL;
+  : process.env.CAPACITOR_SERVER_URL?.trim() ||
+    (process.env.CAPACITOR_FORCE_REMOTE === "1" ? PRODUCTION_SERVER_URL : undefined);
 
 const config: CapacitorConfig = {
   appId: "com.passingtime.diabeaters",

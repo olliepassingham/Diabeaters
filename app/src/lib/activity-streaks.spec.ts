@@ -82,4 +82,20 @@ describe("activity-streaks", () => {
     const stats = computeStreakStats(events, "bedtime_check", new Date("2025-06-10T12:00:00"));
     expect(stats.current).toBe(2);
   });
+
+  it("attributes a post-midnight bedtime check to the previous evening for streaks", () => {
+    // Night of 9 Jun: checked at 00:40 on 10 Jun (still before sleep).
+    saveBedtime("2025-06-10T00:40:00", "late");
+    saveBedtime("2025-06-08T22:00:00", "prev");
+
+    const events = collectAllActivityEvents();
+    const keys = qualifyingDayKeysForKind(events, "bedtime_check");
+    expect(keys.has("2025-06-09")).toBe(true);
+    expect(keys.has("2025-06-10")).toBe(false);
+    expect(keys.has("2025-06-08")).toBe(true);
+
+    // Morning of 10 Jun — streak should still include last night (9 Jun), not look broken.
+    const stats = computeStreakStats(events, "bedtime_check", new Date("2025-06-10T10:00:00"));
+    expect(stats.current).toBe(2);
+  });
 });

@@ -1,6 +1,6 @@
 import { addDays, format, startOfDay } from "date-fns";
 
-import { toActivityDayKey } from "@/lib/activity-history";
+import { toBedtimeStreakDayKey } from "@/lib/bedtime-overnight-window";
 import { storage } from "@/lib/storage";
 
 export const DEFAULT_BEDTIME_REMINDER_TIME = "21:30";
@@ -46,7 +46,7 @@ export function reminderAtOnDay(day: Date, time: string): Date | null {
 
 export function hasBedtimeCheckOnDay(day: Date): boolean {
   const key = format(startOfDay(day), "yyyy-MM-dd");
-  return storage.getBedtimeLogs().some((log) => toActivityDayKey(log.date) === key);
+  return storage.getBedtimeLogs().some((log) => toBedtimeStreakDayKey(log.date, log.hoursUntilSleep) === key);
 }
 
 export function hasBedtimeCheckToday(now: Date = new Date()): boolean {

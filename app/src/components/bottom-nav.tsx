@@ -6,6 +6,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { navigateWithViewTransition } from "@/lib/nav-view-transition";
+import { resolveTabNavigationTarget } from "@/lib/tab-path-stacks";
 import { hapticLight } from "@/lib/haptics";
 import { prefetchToolsHubLinkedChunks } from "@/lib/tools-route-prefetch";
 import { prefetchCarerViewRoute, prefetchCommunityFeedChunk, prefetchDemoCriticalRoutes } from "@/lib/demo-route-prefetch";
@@ -423,7 +424,8 @@ export function BottomNav() {
               }
               e.preventDefault();
               void hapticLight();
-              navigateWithViewTransition(setLocation, tab.href);
+              const target = resolveTabNavigationTarget(tab.href, pathname);
+              navigateWithViewTransition(setLocation, target);
             }}
           >
             <tab.icon

@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   analyzeBedtimeOvernight,
   computeOvernightStats,
+  computeOvernightSummaryFromLocalHistory,
+  BEDTIME_TIR_MIN_READINGS,
   entriesToOvernightReadings,
   filterEntriesToSleepWindow,
 } from "./bedtime-overnight-analysis";
-import { computeBedtimeSleepWindow, findReviewableBedtimeLog, resolveOvernightReviewTarget, findMorningHomeBedtimeLog, isBedtimeMorningHomeWindow, bedtimeReadinessLabel } from "./bedtime-overnight-window";
+import { computeBedtimeSleepWindow, findReviewableBedtimeLog, resolveOvernightReviewTarget, findMorningHomeBedtimeLog, isBedtimeMorningHomeWindow, bedtimeReadinessLabel, toBedtimeStreakDayKey } from "./bedtime-overnight-window";
 import type { BedtimeLog } from "@/lib/storage";
 
 function makeLog(overrides: Partial<BedtimeLog> = {}): BedtimeLog {
@@ -34,6 +36,12 @@ describe("bedtime overnight window", () => {
     expect(window).not.toBeNull();
     expect(window!.hoursUntilSleep).toBe(1);
     expect(window!.endMs - window!.startMs).toBe(8 * 60 * 60 * 1000);
+  });
+
+  it("maps post-midnight checks to the previous evening streak day", () => {
+    expect(toBedtimeStreakDayKey("2025-06-10T00:40:00")).toBe("2025-06-09");
+    expect(toBedtimeStreakDayKey("2025-06-09T22:15:00")).toBe("2025-06-09");
+    expect(toBedtimeStreakDayKey("2025-06-09T22:00:00", 3)).toBe("2025-06-09"); // sleep ~01:00 → still night of 9th
   });
 
   it("finds the latest log with a completed sleep window", () => {
@@ -125,6 +133,26 @@ describe("bedtime overnight analysis", () => {
     expect(stats.hadHigh).toBe(true);
     expect(stats.min).toBe(8);
     expect(stats.max).toBe(13.9);
+  });
+
+  it("builds overnight TIR summary from local CGM history points", () => {
+    const log = makeLog({ date: "2026-07-08T22:00:00.000Z", hoursUntilSleep: 0 });
+    const windowStart = new Date("2026-07-08T22:00:00.000Z").getTime();
+    const points = Array.from({ length: BEDTIME_TIR_MIN_READINGS }, (_, i) => ({
+      recordedAtMs: windowStart + (i + 1) * 60 * 60 * 1000,
+      valueMgDl: i % 2 === 0 ? 100 : 200,
+    }));
+    const summary = computeOvernightSummaryFromLocalHistory(
+      log,
+      points,
+      4,
+      10,
+      "mmol/L",
+      windowStart + 10 * 60 * 60 * 1000,
+    );
+    expect(summary).not.toBeNull();
+    expect(summary!.readingCount).toBe(BEDTIME_TIR_MIN_READINGS);
+    expect(summary!.inRangePercent).toBe(50);
   });
 
   it("uses a nuanced headline when part of the night was in range before rising", () => {

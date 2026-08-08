@@ -18,11 +18,17 @@ import { findLogNeedingOutcome } from "@/lib/bedtime-outcome-prompt";
 import { buildOutcomePatternTip, summarizeOutcomeAccuracy } from "@/lib/bedtime-outcome-insights";
 import { rescheduleBedtimeReminders } from "@/lib/bedtime-reminders";
 import {
+  computeOvernightSummaryFromLocalHistory,
+  overnightSummariesDiffer,
+} from "@/lib/bedtime-overnight-analysis";
+import { getCgmLocalHistory } from "@/lib/cgm/cgm-history-store";
+import {
   storage,
   UserSettings,
   ScenarioState,
   BedtimeLog,
   type BedtimeActionSuggested,
+  type BedtimeOvernightCgmSummary,
   DIABEATER_PROFILE_CHANGED_EVENT,
   DIABEATER_SETTINGS_CHANGED_EVENT,
   type UserProfile,
@@ -256,6 +262,22 @@ export default function Bedtime() {
     setBedtimeLogs(storage.getBedtimeLogs());
   };
 
+  // Backfill overnight TIR onto recent logs from on-device CGM history (no network).
+  useEffect(() => {
+    const points = getCgmLocalHistory();
+    if (points.length === 0) return;
+    const { low, high } = resolveUserTargetBgRange(storage.getSettings(), bgUnits);
+    let changed = false;
+    for (const log of storage.getBedtimeLogs()) {
+      const summary = computeOvernightSummaryFromLocalHistory(log, points, low, high, bgUnits);
+      if (overnightSummariesDiffer(log.overnightCgmSummary, summary) && summary) {
+        storage.updateBedtimeLog(log.id, { overnightCgmSummary: summary });
+        changed = true;
+      }
+    }
+    if (changed) setBedtimeLogs(storage.getBedtimeLogs());
+  }, [bgUnits, userSettings]);
+
   useEffect(() => {
     const onProfile = () => setProfile(storage.getProfile());
     window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
@@ -282,6 +304,12 @@ export default function Bedtime() {
     reviewTarget: lastNightReview,
     refresh: refreshLastNight,
   } = useBedtimeLastNight(bedtimeLogs, bgUnits);
+
+  // Keep history rows in sync when last-night review persists a fresh TIR snapshot.
+  useEffect(() => {
+    if (!lastNightInsight || !lastNightReview?.log) return;
+    setBedtimeLogs(storage.getBedtimeLogs());
+  }, [lastNightInsight?.stats.inRangePercent, lastNightInsight?.stats.readingCount, lastNightReview?.log?.id]);
 
   const persistBedtimeCheck = (
     level: ReadinessLevel,
@@ -875,6 +903,12 @@ export default function Bedtime() {
     return date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
   };
 
+  const overnightTirToneClass = (summary: BedtimeOvernightCgmSummary): string => {
+    if (summary.hadLow) return "text-amber-700 dark:text-amber-400";
+    if (summary.hadHigh) return "text-orange-700 dark:text-orange-400";
+    return "text-emerald-700 dark:text-emerald-400";
+  };
+
   const recentLogs = getRecentLogs();
   const patternInsight = getPatternInsight();
 
@@ -1321,55 +1355,101 @@ export default function Bedtime() {
                 </p>
               ) : (
                 <div className="space-y-2">
-                  {recentLogs.map((log) => (
-                    <div
-                      key={log.id}
-                      className="flex items-center justify-between gap-2 p-3 bg-muted/50 rounded-lg"
-                      data-testid={`card-bedtime-log-${log.id}`}
-                    >
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <span className="text-sm text-muted-foreground" data-testid={`text-log-date-${log.id}`}>
-                          {formatLogDate(log.date)}
-                        </span>
-                        <span className="text-sm font-medium" data-testid={`text-log-bg-${log.id}`}>
-                          {log.currentBg} {log.bgUnits}
-                        </span>
-                        {getLevelBadge(log.readinessLevel)}
-                      </div>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {log.exercisedToday && (
-                          <Badge variant="outline" className="text-xs" data-testid={`badge-log-exercise-${log.id}`}>
-                            <Activity className="h-3 w-3 mr-1" />
-                            Exercise
-                          </Badge>
-                        )}
-                        {log.hadAlcohol && (
-                          <Badge variant="outline" className="text-xs" data-testid={`badge-log-alcohol-${log.id}`}>
-                            <Wine className="h-3 w-3 mr-1" />
-                            Alcohol
-                          </Badge>
-                        )}
-                        {log.outcome && (
-                          <Badge variant="outline" className="text-xs" data-testid={`badge-log-outcome-${log.id}`}>
-                            {log.outcome.overnightFeel === "went_low" ? (
-                              <TrendingDown className="h-3 w-3 mr-1" />
-                            ) : log.outcome.overnightFeel === "went_high" ? (
-                              <TrendingUp className="h-3 w-3 mr-1" />
-                            ) : (
-                              <Minus className="h-3 w-3 mr-1" />
+                  {recentLogs.map((log) => {
+                    const tir = log.overnightCgmSummary;
+                    return (
+                      <div
+                        key={log.id}
+                        className="rounded-xl border border-border/50 bg-muted/40 px-3.5 py-3"
+                        data-testid={`card-bedtime-log-${log.id}`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1 space-y-1.5">
+                            <span
+                              className="block text-xs font-medium text-muted-foreground"
+                              data-testid={`text-log-date-${log.id}`}
+                            >
+                              {formatLogDate(log.date)}
+                            </span>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span
+                                className="text-sm font-semibold tabular-nums tracking-tight text-foreground"
+                                data-testid={`text-log-bg-${log.id}`}
+                              >
+                                {log.currentBg} {log.bgUnits}
+                              </span>
+                              {getLevelBadge(log.readinessLevel)}
+                            </div>
+                            {(log.exercisedToday || log.hadAlcohol || log.outcome) && (
+                              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                                {log.exercisedToday && (
+                                  <Badge
+                                    variant="outline"
+                                    className="border-border/60 bg-background/50 text-xs font-medium"
+                                    data-testid={`badge-log-exercise-${log.id}`}
+                                  >
+                                    <Activity className="mr-1 h-3 w-3" aria-hidden />
+                                    Exercise
+                                  </Badge>
+                                )}
+                                {log.hadAlcohol && (
+                                  <Badge
+                                    variant="outline"
+                                    className="border-border/60 bg-background/50 text-xs font-medium"
+                                    data-testid={`badge-log-alcohol-${log.id}`}
+                                  >
+                                    <Wine className="mr-1 h-3 w-3" aria-hidden />
+                                    Alcohol
+                                  </Badge>
+                                )}
+                                {log.outcome && (
+                                  <Badge
+                                    variant="outline"
+                                    className="border-border/60 bg-background/50 text-xs font-medium"
+                                    data-testid={`badge-log-outcome-${log.id}`}
+                                  >
+                                    {log.outcome.overnightFeel === "went_low" ? (
+                                      <TrendingDown className="mr-1 h-3 w-3" aria-hidden />
+                                    ) : log.outcome.overnightFeel === "went_high" ? (
+                                      <TrendingUp className="mr-1 h-3 w-3" aria-hidden />
+                                    ) : (
+                                      <Minus className="mr-1 h-3 w-3" aria-hidden />
+                                    )}
+                                    {log.outcome.overnightFeel === "went_low"
+                                      ? "Went low"
+                                      : log.outcome.overnightFeel === "went_high"
+                                        ? "Went high"
+                                        : log.outcome.overnightFeel === "steady"
+                                          ? "Steady"
+                                          : "Outcome logged"}
+                                  </Badge>
+                                )}
+                              </div>
                             )}
-                            {log.outcome.overnightFeel === "went_low"
-                              ? "Went low"
-                              : log.outcome.overnightFeel === "went_high"
-                                ? "Went high"
-                                : log.outcome.overnightFeel === "steady"
-                                  ? "Steady"
-                                  : "Outcome logged"}
-                          </Badge>
-                        )}
+                          </div>
+                          {tir ? (
+                            <div
+                              className="shrink-0 rounded-lg bg-background/70 px-2.5 py-1.5 text-right shadow-sm ring-1 ring-border/40"
+                              aria-label={`${tir.inRangePercent}% in range overnight`}
+                              data-testid={`text-log-tir-${log.id}`}
+                            >
+                              <span
+                                className={cn(
+                                  "block text-lg font-semibold tabular-nums tracking-tight leading-none",
+                                  overnightTirToneClass(tir),
+                                )}
+                              >
+                                {tir.inRangePercent}%
+                              </span>
+                              <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                                in range
+                              </span>
+                            </div>
+                          ) : null}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>

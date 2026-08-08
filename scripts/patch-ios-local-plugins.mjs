@@ -14,6 +14,7 @@ const LOCAL_IOS_PLUGINS = [
   "AppIconBadgePlugin",
   "NotificationSettingsPlugin",
   "HealthAuthorizationPlugin",
+  "OsSurfacesPlugin",
 ];
 
 if (!existsSync(configPath)) {

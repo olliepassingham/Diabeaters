@@ -18,8 +18,8 @@ if (!url) {
       "iOS capacitor.config.json has no server.url — Live WebView updates will not work.",
       "Expected production URL:",
       `  ${EXPECTED}`,
-      "Run: npm run ios:release:sync",
-      "For an offline bundled binary instead: npm run ios:release:sync:bundled",
+      "Run: npm run ios:release:sync:remote",
+      "For an offline bundled binary (store default): npm run ios:release:sync",
     ].join("\n"),
   );
   process.exit(1);

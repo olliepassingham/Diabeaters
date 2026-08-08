@@ -1,9 +1,14 @@
 import type { LiveCgmGlucoseEntry } from "@/lib/cgm/live-cgm-history";
 import { convertGlucoseValue } from "@/lib/cgm/units";
 import type { BgUnits } from "@/lib/cgm/types";
-import type { BedtimeLog } from "@/lib/storage";
+import type { CgmHistoryPoint } from "@/lib/cgm/cgm-history-store";
+import type { BedtimeLog, BedtimeOvernightCgmSummary } from "@/lib/storage";
 import { formatTargetBgInput } from "@/lib/hypo-context";
-import { formatSleepWindowLabel, type BedtimeSleepWindow } from "@/lib/bedtime-overnight-window";
+import {
+  computeBedtimeSleepWindow,
+  formatSleepWindowLabel,
+  type BedtimeSleepWindow,
+} from "@/lib/bedtime-overnight-window";
 
 export type BedtimeOvernightReading = {
   timeMs: number;
@@ -368,4 +373,73 @@ export function analyzeBedtimeOvernight(
     targetHigh,
     readings: [...readings].sort((a, b) => a.timeMs - b.timeMs),
   };
+}
+
+/** Minimum overnight samples before we show time-in-range on history rows. */
+export const BEDTIME_TIR_MIN_READINGS = 4;
+
+export function bedtimeOvernightSummaryFromStats(
+  stats: Pick<BedtimeOvernightStats, "inRangePercent" | "readingCount" | "hadLow" | "hadHigh">,
+  computedAt = new Date().toISOString(),
+): BedtimeOvernightCgmSummary | null {
+  if (stats.readingCount < BEDTIME_TIR_MIN_READINGS) return null;
+  return {
+    inRangePercent: stats.inRangePercent,
+    readingCount: stats.readingCount,
+    hadLow: stats.hadLow,
+    hadHigh: stats.hadHigh,
+    computedAt,
+  };
+}
+
+export function bedtimeOvernightSummaryFromInsight(
+  insight: BedtimeOvernightInsight,
+  computedAt = new Date().toISOString(),
+): BedtimeOvernightCgmSummary | null {
+  return bedtimeOvernightSummaryFromStats(insight.stats, computedAt);
+}
+
+/**
+ * Compute overnight TIR for a bedtime log from on-device CGM history (no network).
+ * Returns null when the sleep window is incomplete or there aren't enough readings.
+ */
+export function computeOvernightSummaryFromLocalHistory(
+  log: Pick<BedtimeLog, "date" | "hoursUntilSleep" | "bgUnits">,
+  points: CgmHistoryPoint[],
+  targetLow: number,
+  targetHigh: number,
+  units: BgUnits,
+  nowMs = Date.now(),
+): BedtimeOvernightCgmSummary | null {
+  const window = computeBedtimeSleepWindow(log);
+  if (!window || window.endMs > nowMs) return null;
+
+  const inWindow = points.filter((p) => p.recordedAtMs >= window.startMs && p.recordedAtMs <= window.endMs);
+  if (inWindow.length < BEDTIME_TIR_MIN_READINGS) return null;
+
+  const readings: BedtimeOvernightReading[] = inWindow.map((p) => ({
+    timeMs: p.recordedAtMs,
+    recordedAt: new Date(p.recordedAtMs).toISOString(),
+    value: units === "mmol/L" ? convertGlucoseValue(p.valueMgDl, "mg/dL", "mmol/L") : Math.round(p.valueMgDl),
+    units,
+  }));
+
+  const stats = computeOvernightStats(readings, targetLow, targetHigh);
+  if (!stats) return null;
+  return bedtimeOvernightSummaryFromStats(stats);
+}
+
+/** True when we should rewrite the stored summary (missing, or materially different). */
+export function overnightSummariesDiffer(
+  a: BedtimeOvernightCgmSummary | undefined,
+  b: BedtimeOvernightCgmSummary | null,
+): boolean {
+  if (!b) return false;
+  if (!a) return true;
+  return (
+    a.inRangePercent !== b.inRangePercent ||
+    a.readingCount !== b.readingCount ||
+    a.hadLow !== b.hadLow ||
+    a.hadHigh !== b.hadHigh
+  );
 }
