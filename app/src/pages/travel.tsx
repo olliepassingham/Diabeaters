@@ -16,7 +16,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { InlineInfoHint } from "@/components/ui/field-label-with-info";
+import { InlineInfoHint, StaticLabelWithInfo } from "@/components/ui/field-label-with-info";
 import { 
   Plane, 
   MapPin, 
@@ -167,6 +167,14 @@ type BasalAdjustmentRow = {
 };
 
 type TravelPlanBasalSlice = Pick<TravelPlan, "timezoneHours" | "timezoneDirection" | "timezoneChange">;
+
+const TRAVEL_DURATION_PRESETS = [
+  { label: "Weekend (3 days)", days: 3 },
+  { label: "1 Week", days: 7 },
+  { label: "2 Weeks", days: 14 },
+  { label: "3 Weeks", days: 21 },
+  { label: "1 Month", days: 30 },
+] as const;
 
 type ClimateGuidanceSection = {
   title: string;
@@ -969,6 +977,7 @@ export default function Travel() {
   const TRAVEL_INPUT_STEPS = 3;
   const INPUT_STEP_TITLES = ["Trip details", "Timezone & style", "Conditions"] as const;
   const [travelWizardStep, setTravelWizardStep] = useState(0);
+  const [customDurationOpen, setCustomDurationOpen] = useState(false);
   const [isTravelModeActive, setIsTravelModeActive] = useState(false);
   const [isSickDayAlsoActive, setIsSickDayAlsoActive] = useState(false);
   const [sickDaySeverity, setSickDaySeverity] = useState<string | undefined>();
@@ -2384,6 +2393,7 @@ export default function Travel() {
   }
 
   if (step === "inputs") {
+    const matchedDurationPreset = TRAVEL_DURATION_PRESETS.find((preset) => preset.days === plan.duration);
     return (
       <PageShell variant="narrow" density="compact" className="space-y-4 pb-24">
         <PageHeader
@@ -2430,35 +2440,42 @@ export default function Travel() {
             </div>
 
             <div className="space-y-2">
-              <Label>Duration</Label>
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { label: "Weekend", days: 3 },
-                  { label: "1 Week", days: 7 },
-                  { label: "2 Weeks", days: 14 },
-                  { label: "3 Weeks", days: 21 },
-                  { label: "1 Month", days: 30 },
-                ].map((preset) => (
-                  <Button
-                    key={preset.days}
-                    type="button"
-                    variant={plan.duration === preset.days ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => updateDuration(preset.days)}
-                    data-testid={`button-duration-${preset.days}`}
-                  >
-                    {preset.label}
-                  </Button>
-                ))}
-              </div>
-              <div className="flex items-center gap-2 mt-2">
-                <span className="text-sm text-muted-foreground">Or enter custom:</span>
-                <div className="flex items-center gap-1">
+              <Label htmlFor="duration-preset">Duration</Label>
+              <Select
+                value={!customDurationOpen && matchedDurationPreset ? String(plan.duration) : "custom"}
+                onValueChange={(value) => {
+                  if (value === "custom") {
+                    setCustomDurationOpen(true);
+                    return;
+                  }
+                  setCustomDurationOpen(false);
+                  updateDuration(parseInt(value, 10));
+                }}
+              >
+                <SelectTrigger id="duration-preset" data-testid="select-duration">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TRAVEL_DURATION_PRESETS.map((preset) => (
+                    <SelectItem key={preset.days} value={String(preset.days)} data-testid={`option-duration-${preset.days}`}>
+                      {preset.label}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="custom" data-testid="option-duration-custom">
+                    Custom…
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+
+              {(customDurationOpen || !matchedDurationPreset) && (
+                <div className="flex items-center gap-2 pt-1">
                   <Button
                     type="button"
                     variant="outline"
                     size="icon"
+                    className="shrink-0"
                     onClick={() => updateDuration(Math.max(1, plan.duration - 1))}
+                    aria-label="Decrease duration"
                     data-testid="button-duration-minus"
                   >
                     -
@@ -2477,18 +2494,20 @@ export default function Travel() {
                     type="button"
                     variant="outline"
                     size="icon"
+                    className="shrink-0"
                     onClick={() => updateDuration(Math.min(365, plan.duration + 1))}
+                    aria-label="Increase duration"
                     data-testid="button-duration-plus"
                   >
                     +
                   </Button>
-                  <span className="text-sm text-muted-foreground ml-1">days</span>
+                  <span className="text-sm text-muted-foreground">days</span>
                 </div>
-              </div>
+              )}
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="min-w-0 space-y-2">
                 <Label htmlFor="start-date">Start Date</Label>
                 <Input
                   id="start-date"
@@ -2508,7 +2527,7 @@ export default function Travel() {
                   data-testid="input-start-date"
                 />
               </div>
-              <div className="space-y-2">
+              <div className="min-w-0 space-y-2">
                 <Label htmlFor="end-date">End Date</Label>
                 <Input
                   id="end-date"
@@ -2844,7 +2863,7 @@ export default function Travel() {
           </TabsTrigger>
           {showClimateTab && (
             <TabsTrigger value="climate" className="text-xs sm:text-sm" data-testid="tab-results-climate">
-              Climate & time
+              Climate
             </TabsTrigger>
           )}
         </TabsList>
@@ -2992,38 +3011,173 @@ export default function Travel() {
 
         {showClimateTab && (
         <TabsContent value="climate" className="mt-4 space-y-3" data-testid="panel-travel-climate">
+          {/* Most-needed info first: when to take long-acting insulin, no scrolling required. */}
+          {!isPumpUser && plan.timezoneChange !== "none" && (() => {
+            const tz = climateTimezoneGuidance(plan);
+            return (
+              <Card className="surface-card border-primary/30 shadow-none" data-testid="card-climate-basal-timing">
+                <CardHeader className="pb-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <CardTitle className="text-base font-semibold flex items-center gap-2">
+                      <Clock className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+                      Long-acting insulin timing
+                    </CardTitle>
+                    <InlineInfoHint
+                      ariaLabel="Why shift long-acting insulin gradually"
+                      content={
+                        <div className="space-y-2">
+                          <p className="font-medium text-foreground">{tz.title}</p>
+                          <ul className="space-y-1.5">
+                            {tz.bullets.map((line) => (
+                              <li key={line} className="flex gap-2">
+                                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-primary/50" aria-hidden />
+                                <span>{line}</span>
+                              </li>
+                            ))}
+                          </ul>
+                          {tz.callout ? <p className="text-muted-foreground">{tz.callout}</p> : null}
+                        </div>
+                      }
+                    />
+                  </div>
+                  <CardDescription className="text-xs leading-snug">
+                    Shift by up to 2h a day, not all at once — enter your usual time below for a day-by-day plan.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3 pt-0 pb-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="basal-time" className="text-xs">
+                        {usesTwoBasalDoses ? "First long-acting (home time)" : "Long-acting time (home)"}
+                      </Label>
+                      <Input
+                        id="basal-time"
+                        type="time"
+                        value={basalInjectionTime}
+                        onChange={(e) => {
+                          setBasalInjectionTime(e.target.value);
+                          const current = storage.getSettings();
+                          storage.saveSettings({ ...current, basalInjectionTime: e.target.value });
+                        }}
+                        className="h-10 w-32"
+                        data-testid="input-basal-time"
+                      />
+                    </div>
+                    {usesTwoBasalDoses ? (
+                      <div className="space-y-1.5">
+                        <Label htmlFor="basal-time-2" className="text-xs">
+                          Second long-acting (home time)
+                        </Label>
+                        <Input
+                          id="basal-time-2"
+                          type="time"
+                          value={basalInjectionTime2}
+                          onChange={(e) => {
+                            setBasalInjectionTime2(e.target.value);
+                            const current = storage.getSettings();
+                            storage.saveSettings({ ...current, basalInjectionTime2: e.target.value });
+                          }}
+                          className="h-10 w-32"
+                          data-testid="input-basal-time-2"
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+
+                  {basalSchedules.some((s) => s.rows.length > 0) && (
+                    <div className="space-y-4">
+                      {basalSchedules.map(({ doseLabel, rows }) =>
+                        rows.length === 0 ? null : (
+                          <div key={doseLabel} className="space-y-2">
+                            <p className="text-xs font-medium text-muted-foreground">{doseLabel}</p>
+                            <div className="overflow-x-auto rounded-lg border border-border/60">
+                              <table className="w-full min-w-[260px] text-sm">
+                                <thead>
+                                  <tr className="bg-muted/40 text-left text-xs text-muted-foreground">
+                                    <th className="px-3 py-2 font-medium">Day</th>
+                                    <th className="px-3 py-2 font-medium">Home</th>
+                                    <th className="px-3 py-2 font-medium">Local</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {rows.map((row, idx) => (
+                                    <tr
+                                      key={`${doseLabel}-${idx}`}
+                                      className={idx % 2 === 0 ? "bg-muted/15" : undefined}
+                                    >
+                                      <td className="px-3 py-2 font-medium">{row.label}</td>
+                                      <td className="px-3 py-2 font-mono text-xs tabular-nums">{row.homeTime}</td>
+                                      <td className="px-3 py-2 font-mono text-xs tabular-nums">{row.localTime}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        ),
+                      )}
+                    </div>
+                  )}
+
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    Guide only — agree your plan with your diabetes team before you go.
+                  </p>
+                </CardContent>
+              </Card>
+            );
+          })()}
+
           {(() => {
             const weather = climateWeatherGuidance(plan, isPumpUser);
             if (!weather) return null;
+            const visibleBullets = weather.bullets.slice(0, 2);
+            const moreBullets = weather.bullets.slice(2);
             return (
               <Card className="surface-card border-border/60 shadow-none">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base font-semibold flex items-center gap-2">
-                    {plan.weatherChange === "warmer" ? (
-                      <Sun className="h-4 w-4 shrink-0 text-red-500 dark:text-red-400" aria-hidden />
-                    ) : plan.weatherChange === "colder" ? (
-                      <Snowflake className="h-4 w-4 shrink-0 text-blue-500 dark:text-blue-400" aria-hidden />
-                    ) : (
-                      <Thermometer className="h-4 w-4 shrink-0" aria-hidden />
+                  <div className="flex items-start justify-between gap-2">
+                    <CardTitle className="text-base font-semibold flex items-center gap-2">
+                      {plan.weatherChange === "warmer" ? (
+                        <Sun className="h-4 w-4 shrink-0 text-red-500 dark:text-red-400" aria-hidden />
+                      ) : plan.weatherChange === "colder" ? (
+                        <Snowflake className="h-4 w-4 shrink-0 text-blue-500 dark:text-blue-400" aria-hidden />
+                      ) : (
+                        <Thermometer className="h-4 w-4 shrink-0" aria-hidden />
+                      )}
+                      {weather.title}
+                    </CardTitle>
+                    {(moreBullets.length > 0 || weather.callout) && (
+                      <InlineInfoHint
+                        ariaLabel="More weather guidance"
+                        content={
+                          <div className="space-y-2">
+                            {moreBullets.length > 0 && (
+                              <ul className="space-y-1.5">
+                                {moreBullets.map((line) => (
+                                  <li key={line} className="flex gap-2">
+                                    <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-primary/50" aria-hidden />
+                                    <span>{line}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                            {weather.callout ? <p className="text-muted-foreground">{weather.callout}</p> : null}
+                          </div>
+                        }
+                      />
                     )}
-                    {weather.title}
-                  </CardTitle>
+                  </div>
                   <CardDescription className="text-xs">{weather.subtitle}</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-3 pt-0 pb-4">
-                  <ul className="space-y-2.5 text-sm leading-snug text-foreground/90">
-                    {weather.bullets.map((line) => (
+                <CardContent className="pt-0 pb-4">
+                  <ul className="space-y-2 text-sm leading-snug text-foreground/90">
+                    {visibleBullets.map((line) => (
                       <li key={line} className="flex gap-2.5">
                         <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-primary/50" aria-hidden />
                         <span>{line}</span>
                       </li>
                     ))}
                   </ul>
-                  {weather.callout ? (
-                    <p className="rounded-lg border border-border/60 bg-muted/25 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
-                      {weather.callout}
-                    </p>
-                  ) : null}
                 </CardContent>
               </Card>
             );
@@ -3032,127 +3186,49 @@ export default function Travel() {
           {plan.timezoneChange !== "none" && (() => {
             const tz = climateTimezoneGuidance(plan);
             return (
-            <Card className="surface-card border-border/60 shadow-none">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base font-semibold flex items-center gap-2">
-                  <Clock className="h-4 w-4 shrink-0 text-primary" aria-hidden />
-                  {tz.title}
-                </CardTitle>
-                <CardDescription className="text-xs leading-snug">{tz.subtitle}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4 pt-0 pb-4">
-                <ul className="space-y-2.5 text-sm leading-snug text-foreground/90">
-                  {tz.bullets.map((line) => (
-                    <li key={line} className="flex gap-2.5">
-                      <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-primary/50" aria-hidden />
-                      <span>{line}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                <div className="grid gap-2 sm:grid-cols-3">
-                  {tz.phases.map((phase) => (
-                    <div
-                      key={phase.label}
-                      className="rounded-lg border border-border/50 bg-muted/20 px-3 py-2.5"
-                    >
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        {phase.label}
-                      </p>
-                      <p className="mt-1 text-xs leading-relaxed text-foreground/85">{phase.text}</p>
-                    </div>
-                  ))}
-                </div>
-
-                {tz.callout ? (
-                  <p className="rounded-lg border border-border/60 bg-muted/25 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
-                    {tz.callout}
-                  </p>
-                ) : null}
-
-                {!isPumpUser && (
-                  <div className="space-y-3 border-t border-border/50 pt-3">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-                      <div className="space-y-1.5">
-                        <Label htmlFor="basal-time" className="text-xs">
-                          {usesTwoBasalDoses ? "First long-acting (home time)" : "Long-acting time (home)"}
-                        </Label>
-                        <Input
-                          id="basal-time"
-                          type="time"
-                          value={basalInjectionTime}
-                          onChange={(e) => {
-                            setBasalInjectionTime(e.target.value);
-                            const current = storage.getSettings();
-                            storage.saveSettings({ ...current, basalInjectionTime: e.target.value });
-                          }}
-                          className="h-10 w-32"
-                          data-testid="input-basal-time"
-                        />
-                      </div>
-                      {usesTwoBasalDoses ? (
-                        <div className="space-y-1.5">
-                          <Label htmlFor="basal-time-2" className="text-xs">
-                            Second long-acting (home time)
-                          </Label>
-                          <Input
-                            id="basal-time-2"
-                            type="time"
-                            value={basalInjectionTime2}
-                            onChange={(e) => {
-                              setBasalInjectionTime2(e.target.value);
-                              const current = storage.getSettings();
-                              storage.saveSettings({ ...current, basalInjectionTime2: e.target.value });
-                            }}
-                            className="h-10 w-32"
-                            data-testid="input-basal-time-2"
-                          />
+              <Card className="surface-card border-border/60 shadow-none">
+                <CardHeader className="pb-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <CardTitle className="text-base font-semibold flex items-center gap-2">
+                      <Globe className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+                      Body clock adjustment
+                    </CardTitle>
+                    <InlineInfoHint
+                      ariaLabel="Timezone adjustment details"
+                      content={
+                        <div className="space-y-2">
+                          <p className="font-medium text-foreground">{tz.title}</p>
+                          <ul className="space-y-1.5">
+                            {tz.bullets.map((line) => (
+                              <li key={line} className="flex gap-2">
+                                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-primary/50" aria-hidden />
+                                <span>{line}</span>
+                              </li>
+                            ))}
+                          </ul>
+                          {tz.callout ? <p className="text-muted-foreground">{tz.callout}</p> : null}
                         </div>
-                      ) : null}
-                    </div>
-
-                    {basalSchedules.some((s) => s.rows.length > 0) && (
-                      <div className="space-y-4">
-                        {basalSchedules.map(({ doseLabel, rows }) =>
-                          rows.length === 0 ? null : (
-                            <div key={doseLabel} className="space-y-2">
-                              <p className="text-xs font-medium text-muted-foreground">{doseLabel}</p>
-                              <div className="overflow-hidden rounded-lg border border-border/60">
-                                <table className="w-full text-sm">
-                                  <thead>
-                                    <tr className="bg-muted/40 text-left text-xs text-muted-foreground">
-                                      <th className="px-3 py-2 font-medium">Day</th>
-                                      <th className="px-3 py-2 font-medium">Home</th>
-                                      <th className="px-3 py-2 font-medium">Local</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {rows.map((row, idx) => (
-                                      <tr
-                                        key={`${doseLabel}-${idx}`}
-                                        className={idx % 2 === 0 ? "bg-muted/15" : undefined}
-                                      >
-                                        <td className="px-3 py-2 font-medium">{row.label}</td>
-                                        <td className="px-3 py-2 font-mono text-xs tabular-nums">{row.homeTime}</td>
-                                        <td className="px-3 py-2 font-mono text-xs tabular-nums">{row.localTime}</td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </div>
-                          ),
-                        )}
-                      </div>
-                    )}
-
-                    <p className="text-[11px] leading-snug text-muted-foreground">
-                      Schedule is a guide only — agree your plan with your diabetes team before you go.
-                    </p>
+                      }
+                    />
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                  <CardDescription className="text-xs leading-snug">{tz.subtitle}</CardDescription>
+                </CardHeader>
+                <CardContent className="pt-0 pb-4">
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    {tz.phases.map((phase) => (
+                      <div
+                        key={phase.label}
+                        className="rounded-lg border border-border/50 bg-muted/20 px-3 py-2.5"
+                      >
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          {phase.label}
+                        </p>
+                        <p className="mt-1 text-xs leading-relaxed text-foreground/85">{phase.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
             );
           })()}
 
