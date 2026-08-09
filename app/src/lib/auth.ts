@@ -90,6 +90,12 @@ export async function signup(
   email: string,
   password: string,
   captchaToken?: string,
+  /**
+   * Durable signup-time intent (e.g. { onboarding_account_path: "community" }).
+   * Stored on the Supabase auth user itself, so it survives even if the device's
+   * session storage is lost during the email-verification round trip.
+   */
+  metadata?: Record<string, string>,
 ): Promise<AuthResult<{ user: User | null; session: Session | null }>> {
   const supabase = getSupabase();
   if (!supabase) return { data: null, error: NOT_CONFIGURED };
@@ -101,6 +107,7 @@ export async function signup(
       options: {
         emailRedirectTo: getEmailAuthRedirectUrl(),
         ...(captchaToken ? { captchaToken } : {}),
+        ...(metadata && Object.keys(metadata).length > 0 ? { data: metadata } : {}),
       },
     });
     return { data, error };

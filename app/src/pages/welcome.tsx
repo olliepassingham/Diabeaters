@@ -33,6 +33,9 @@ export default function Welcome() {
     return false;
   }
 
+  /** First-time path → create account. Returning users use the Log in button below. */
+  const goCreateAccount = () => setLocation("/signup");
+
   const onPatient = () => {
     clearOnboardingAccountPath();
     setOnboardingAccountPath("patient");
@@ -45,7 +48,7 @@ export default function Welcome() {
       })();
       return;
     }
-    setLocation("/login");
+    goCreateAccount();
   };
 
   const onSupporter = () => {
@@ -53,7 +56,7 @@ export default function Welcome() {
     setOnboardingAccountPath("supporter");
     setPrimaryAppRole("carer");
     setPendingCarer();
-    setLocation(alreadySignedIn ? "/carer-setup" : "/login");
+    setLocation(alreadySignedIn ? "/carer-setup" : "/signup");
   };
 
   const onCommunityMember = () => {
@@ -70,21 +73,26 @@ export default function Welcome() {
       })();
       return;
     }
-    setLocation("/login");
+    goCreateAccount();
   };
 
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col px-4 py-10 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]">
         <div className="flex flex-col items-center gap-3 pt-2">
-          <FaceLogo size={56} />
-          <h1 className="text-balance text-2xl font-semibold tracking-tight text-center">Welcome to Diabeaters</h1>
-          <p className="text-pretty text-sm text-muted-foreground text-center max-w-sm">
-            Choose a path. You can change later.
+          <FaceLogo size={64} />
+          <h1 className="text-balance text-center font-display text-3xl font-bold tracking-tight">
+            Welcome to Diabeaters
+          </h1>
+          <p className="max-w-sm text-pretty text-center text-base leading-relaxed text-muted-foreground">
+            New here? Pick how you&apos;ll use the app, then create your account.
           </p>
         </div>
 
         <div className="mt-8 flex flex-col gap-3">
+          <p className="px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Get started
+          </p>
           <Card className="rounded-2xl border-border/60 shadow-sm">
             <CardContent className="p-4">
               <button
@@ -164,17 +172,22 @@ export default function Welcome() {
           </Card>
         </div>
 
-        <div className="mt-auto pt-8">
+        <div className="mt-auto space-y-3 pt-8">
           <Button
-            variant="ghost"
-            className="w-full text-muted-foreground hover:text-foreground"
+            type="button"
+            variant="outline"
+            className="min-h-12 w-full rounded-xl text-base font-semibold"
             onClick={() => {
               clearOnboardingAccountPath();
               setLocation("/login");
             }}
+            data-testid="welcome-login"
           >
             Already have an account? Log in
           </Button>
+          <p className="text-center text-xs text-muted-foreground">
+            Creating an account takes about a minute.
+          </p>
         </div>
       </div>
     </div>

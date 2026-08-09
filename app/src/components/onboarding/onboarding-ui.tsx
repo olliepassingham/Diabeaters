@@ -57,15 +57,31 @@ const accentMap: Record<
   },
 };
 
+/** Id of the onboarding scroll container — used to reset scroll position between steps. */
+export const ONBOARDING_SCROLL_MAIN_ID = "onboarding-scroll-main";
+
+/**
+ * Onboarding renders outside the authenticated shell, so it doesn't get `#app-scroll-main`.
+ * On native Capacitor WebViews `html`/`body`/`#root` all get `overflow: hidden` (see index.css)
+ * so the document never scrolls — without its own scroll container here, tall steps (long
+ * forms, disclaimers) get clipped and users can't reach the content below the fold or the
+ * Next button. Pin this shell to the viewport and scroll only inside the inner container,
+ * matching the same pattern `#app-scroll-main` uses for the rest of the app.
+ */
 export function OnboardingBackdrop({ children }: { children: ReactNode }) {
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background text-foreground">
+    <div className="relative flex h-dvh min-h-0 w-full flex-col overflow-hidden bg-background text-foreground">
       <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
         <div className="absolute -top-28 left-1/2 h-80 w-[min(100%,32rem)] -translate-x-1/2 rounded-full bg-primary/[0.08] blur-3xl dark:bg-primary/12" />
         <div className="absolute -bottom-20 -left-16 h-56 w-56 rounded-full bg-primary/[0.05] blur-3xl" />
         <div className="absolute top-1/3 -right-20 h-48 w-48 rounded-full bg-muted/40 blur-3xl dark:bg-muted/20" />
       </div>
-      {children}
+      <div
+        id={ONBOARDING_SCROLL_MAIN_ID}
+        className="relative z-[1] min-h-0 flex-1 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]"
+      >
+        {children}
+      </div>
     </div>
   );
 }

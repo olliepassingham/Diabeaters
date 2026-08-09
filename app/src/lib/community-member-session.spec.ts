@@ -90,6 +90,33 @@ describe("community-member-session", () => {
     expect(localStorage.getItem("diabeater_onboarding_completed")).toBe("true");
   });
 
+  it("finalizes community session from durable signup metadata when session storage was lost", async () => {
+    // No sessionStorage markers set — simulates a new tab/app process after email verification.
+    getProfile.mockResolvedValue({
+      profile: {
+        id: "u1",
+        full_name: null,
+        avatar_url: null,
+        bio: null,
+        public_handle: null,
+        is_public: false,
+        onboarding_complete: false,
+        account_type: null,
+        primary_app_role: null,
+      },
+    });
+
+    const { ensureCommunityMemberSessionReady } = await import("@/lib/community-member-session");
+    const { getPrimaryAppRole, getOnboardingAccountPath } = await import("@/lib/carer-session");
+
+    await ensureCommunityMemberSessionReady("u1", { metadataAccountPath: "community" });
+    expect(getPrimaryAppRole()).toBe("community");
+    expect(getOnboardingAccountPath()).toBe("community");
+    expect(upsertProfile).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "u1", account_type: "community" }),
+    );
+  });
+
   it("does not finalize when profile is an existing patient account", async () => {
     getProfile.mockResolvedValue({
       profile: {

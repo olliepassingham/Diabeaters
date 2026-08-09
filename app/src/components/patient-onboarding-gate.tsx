@@ -8,6 +8,7 @@ import {
   getPrimaryAppRole,
   hasCarerIntent,
   hasPendingCarer,
+  onboardingAccountPathFromUserMetadata,
   setActiveAppMode,
 } from "@/lib/carer-session";
 import Onboarding from "@/pages/onboarding";
@@ -62,16 +63,22 @@ export function PatientOnboardingGate({ onPatientComplete }: PatientOnboardingGa
       const { profile } = await getProfile(user.id);
       if (cancelled) return;
 
+      // Durable signup-time signal — catches accounts whose session storage was lost
+      // between choosing Community Member on /welcome and finishing email verification.
+      const metadataAccountPath = onboardingAccountPathFromUserMetadata(user);
+
       if (
         resolvesAsCommunityMemberAccount({
           profile,
           linkedCarer: isCarer,
           primaryAppRole: getPrimaryAppRole(),
+          metadataAccountPath,
         }) ||
-        shouldUseCommunityMemberSession(profile) ||
-        accountPath === "community"
+        shouldUseCommunityMemberSession(profile, metadataAccountPath) ||
+        accountPath === "community" ||
+        metadataAccountPath === "community"
       ) {
-        await ensureCommunityMemberSessionReady(user.id);
+        await ensureCommunityMemberSessionReady(user.id, { metadataAccountPath });
         setActiveAppMode("community");
         setLocation(getCommunityMemberLandingPath());
         return;

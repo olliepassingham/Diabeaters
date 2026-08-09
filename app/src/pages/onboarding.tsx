@@ -74,6 +74,7 @@ import {
 } from "@/lib/region";
 import { syncRegionToCloud } from "@/lib/clinical-prefs-cloud-sync";
 import {
+  ONBOARDING_SCROLL_MAIN_ID,
   OnboardingBackdrop,
   OnboardingBrandMark,
   OnboardingCard,
@@ -386,6 +387,11 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
 
   const currentStepIndex = steps.indexOf(currentStep);
   const progress = ((currentStepIndex) / (steps.length - 1)) * 100;
+
+  // Start each step at the top instead of wherever the previous step left the scroll position.
+  useEffect(() => {
+    document.getElementById(ONBOARDING_SCROLL_MAIN_ID)?.scrollTo({ top: 0 });
+  }, [currentStep]);
 
   const handleSaveProfile = () => {
     const prev = storage.getProfile();

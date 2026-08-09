@@ -108,6 +108,7 @@ import {
   isCommunityOnlyAccount,
   isCommunitySessionMode,
   isSupporterOnlyAccount,
+  onboardingAccountPathFromUserMetadata,
   setActiveAppMode,
 } from "@/lib/carer-session";
 import { AnimatedRouteOutlet } from "@/components/animated-route-outlet";
@@ -1652,6 +1653,7 @@ function AppContent() {
           profile: profileQuery.data ?? null,
           linkedCarer,
           primaryAppRole: getPrimaryAppRole(),
+          metadataAccountPath: onboardingAccountPathFromUserMetadata(user),
         }),
       }),
     [
@@ -1661,6 +1663,7 @@ function AppContent() {
       profileQuery.data,
       profileQuery.isFetched,
       online,
+      user,
     ],
   );
 

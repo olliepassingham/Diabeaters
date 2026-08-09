@@ -7,6 +7,7 @@ import {
   hasPendingCarer,
   isCommunityOnlyAccount,
   isSupporterOnlyAccount,
+  onboardingAccountPathFromUserMetadata,
   setActiveAppMode,
 } from "@/lib/carer-session";
 import { getCommunityMemberLandingPath } from "@/lib/community-landing";
@@ -115,16 +116,18 @@ export async function completeAuthAndNavigate(
   session: Session | null | undefined,
 ): Promise<void> {
   const userId = session?.user?.id ?? null;
+  const metadataAccountPath = onboardingAccountPathFromUserMetadata(session?.user);
   let welcomeReconcileDestination: string | undefined;
   // Reconcile before auth sync so PostLoginToast does not miss the message on first paint.
   if (userId) {
     const wrongPath = await reconcileWrongWelcomePathForSignedInUser(userId);
     if (wrongPath.reconciled) welcomeReconcileDestination = wrongPath.destination;
-    else await restoreAccountSessionFromCloud(userId);
+    else await restoreAccountSessionFromCloud(userId, metadataAccountPath);
     const { profile } = await getProfile(userId);
     cacheCloudPrimaryAppRoleFromProfile(profile);
     await ensureCommunityMemberSessionReady(userId, {
       email: session?.user?.email ?? undefined,
+      metadataAccountPath,
     });
     void syncLocalPrimaryAppRoleToCloud(userId);
   }

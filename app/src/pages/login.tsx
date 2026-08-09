@@ -17,7 +17,6 @@ import { useToast } from "@/hooks/use-toast";
 import { PageShell } from "@/components/layout";
 import {
   authFieldActionClass,
-  authInlineLinkClass,
   authMutedNavLinkClass,
 } from "@/components/auth/auth-link-styles";
 import { Eye, EyeOff } from "lucide-react";
@@ -140,8 +139,9 @@ export default function Login() {
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-10 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]">
         <PageShell variant="narrow" className="w-full max-w-md">
       <Card className="w-full rounded-2xl border-border/60 shadow-sm">
-        <CardHeader>
+        <CardHeader className="space-y-1.5">
           <CardTitle className="text-xl">Log in to Diabeaters</CardTitle>
+          <p className="text-sm text-muted-foreground">Welcome back — enter your email and password.</p>
         </CardHeader>
         <CardContent className="space-y-4">
           {error && (
@@ -208,18 +208,36 @@ export default function Login() {
             </div>
             <Button
               type="submit"
-              className="w-full"
+              className="min-h-11 w-full rounded-xl"
               disabled={submitting}
             >
               {submitting ? "Logging in..." : "Log in"}
             </Button>
           </form>
-          <p className="text-center text-xs text-muted-foreground">
-            Don&apos;t have an account?{" "}
-            <Link href="/signup" className={authInlineLinkClass}>
+
+          <div className="relative py-1">
+            <div className="absolute inset-0 flex items-center" aria-hidden>
+              <span className="w-full border-t border-border/60" />
+            </div>
+            <div className="relative flex justify-center text-[11px] uppercase tracking-wider">
+              <span className="bg-card px-2 text-muted-foreground">New to Diabeaters?</span>
+            </div>
+          </div>
+
+          <Button asChild variant="outline" className="min-h-12 w-full rounded-xl text-base font-semibold">
+            <Link
+              href={(() => {
+                const next = new URLSearchParams(window.location.search).get("next");
+                return next?.startsWith("/") && !next.startsWith("//")
+                  ? `/signup?next=${encodeURIComponent(next)}`
+                  : "/signup";
+              })()}
+              data-testid="login-create-account"
+            >
               Create account
             </Link>
-          </p>
+          </Button>
+
           <p className="pt-1 text-center">
             <Link href="/welcome" className={authMutedNavLinkClass}>
               Back to welcome

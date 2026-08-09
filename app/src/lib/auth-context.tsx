@@ -1,7 +1,7 @@
 import type { Session, User } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { getCurrentUser, onAuthStateChange } from "@/lib/auth";
-import { clearCarerClientSessionKeys } from "@/lib/carer-session";
+import { clearCarerClientSessionKeys, onboardingAccountPathFromUserMetadata } from "@/lib/carer-session";
 import { restoreAccountSessionFromCloud } from "@/lib/account-session-restore";
 import { isOnline } from "@/lib/offline";
 import { setActiveUserIdForLocalStorage } from "@/lib/storage";
@@ -132,7 +132,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         nextSession?.user?.id &&
         (event === "INITIAL_SESSION" || event === "SIGNED_IN" || event === "USER_UPDATED")
       ) {
-        void restoreAccountSessionFromCloud(nextSession.user.id);
+        void restoreAccountSessionFromCloud(
+          nextSession.user.id,
+          onboardingAccountPathFromUserMetadata(nextSession.user),
+        );
       }
       // Avoid hammering GoTrue's storage lock on TOKEN_REFRESHED; only sync when session identity is established.
       if (

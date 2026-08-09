@@ -61,7 +61,13 @@ export default function Signup() {
     setSubmitting(true);
     setError(null);
 
-    const { data, error } = await signup(email, password, captchaToken ?? undefined);
+    const accountPath = getOnboardingAccountPath();
+    const { data, error } = await signup(
+      email,
+      password,
+      captchaToken ?? undefined,
+      accountPath ? { onboarding_account_path: accountPath } : undefined,
+    );
     setSubmitting(false);
 
     if (error) {
@@ -115,8 +121,13 @@ export default function Signup() {
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-10 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]">
         <PageShell variant="narrow" className="w-full max-w-md">
       <Card className="w-full rounded-2xl border-border/60 shadow-sm">
-        <CardHeader>
+        <CardHeader className="space-y-1.5">
           <CardTitle className="text-xl">Create your Diabeaters account</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            {communitySignup
+              ? "Set up your Community Member account to learn, explore, and join the feed."
+              : "One account for your tools, guides, and personalised setup."}
+          </p>
         </CardHeader>
         <CardContent className="space-y-4">
           {error && (
@@ -189,17 +200,18 @@ export default function Signup() {
             )}
             <Button
               type="submit"
-              className="w-full"
+              className="min-h-12 w-full rounded-xl text-base font-semibold"
               disabled={
                 submitting ||
                 (captchaRequired && !captchaToken) ||
                 (communitySignup && !acceptedTerms)
               }
+              data-testid="button-create-account"
             >
               {submitting ? "Creating account..." : "Create account"}
             </Button>
           </form>
-          <p className="text-center text-xs text-muted-foreground">
+          <p className="text-center text-sm text-muted-foreground">
             Already have an account?{" "}
             <Link href="/login" className={authInlineLinkClass}>
               Log in

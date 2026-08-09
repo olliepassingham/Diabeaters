@@ -176,6 +176,21 @@ export function getOnboardingAccountPath(): OnboardingAccountPath | null {
   return null;
 }
 
+/**
+ * Read the signup-time account path from Supabase auth `user_metadata`.
+ * Durable across devices/tabs/app restarts — unlike the sessionStorage markers above —
+ * because it is written once at sign-up and stored on the auth user record itself.
+ * Use as a fallback when session/profile signals are missing (e.g. right after email
+ * verification, when the original browser tab/session may be gone).
+ */
+export function onboardingAccountPathFromUserMetadata(
+  user: { user_metadata?: Record<string, unknown> | null } | null | undefined,
+): OnboardingAccountPath | null {
+  const raw = user?.user_metadata?.onboarding_account_path;
+  if (raw === "patient" || raw === "supporter" || raw === "both" || raw === "community") return raw;
+  return null;
+}
+
 export function clearOnboardingAccountPath(): void {
   try {
     sessionStorage.removeItem(ONBOARDING_ACCOUNT_PATH_KEY);

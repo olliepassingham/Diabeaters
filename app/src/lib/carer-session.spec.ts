@@ -16,6 +16,7 @@ import {
   isPersistedCommunityAccount,
   isPersistedSupporterAccount,
   isSupporterOnlyAccount,
+  onboardingAccountPathFromUserMetadata,
   setOnboardingAccountPath,
   setPrimaryAppRole,
   getOnboardingAccountPath,
@@ -174,6 +175,22 @@ describe("carer-session community-only accounts", () => {
     expect(canSwitchAppMode()).toBe(true);
     expect(isCarerSessionMode(true, "patient")).toBe(false);
     expect(isCarerSessionMode(true, "carer")).toBe(true);
+  });
+});
+
+describe("onboardingAccountPathFromUserMetadata", () => {
+  it("reads a valid onboarding_account_path from user_metadata", () => {
+    expect(
+      onboardingAccountPathFromUserMetadata({ user_metadata: { onboarding_account_path: "community" } }),
+    ).toBe("community");
+  });
+
+  it("returns null for missing, unrecognised, or absent metadata", () => {
+    expect(onboardingAccountPathFromUserMetadata(null)).toBeNull();
+    expect(onboardingAccountPathFromUserMetadata({ user_metadata: {} })).toBeNull();
+    expect(
+      onboardingAccountPathFromUserMetadata({ user_metadata: { onboarding_account_path: "not-a-path" } }),
+    ).toBeNull();
   });
 });
 

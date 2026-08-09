@@ -4,6 +4,7 @@ import {
   isCommunityOnlyAccount,
   isPersistedCommunityAccount,
   setActiveAppMode,
+  type OnboardingAccountPath,
   type PrimaryAppRole,
 } from "@/lib/carer-session";
 import { syncAccountTypeToCloud } from "@/lib/clinical-prefs-cloud-sync";
@@ -21,6 +22,13 @@ export type CommunityMemberSessionParams = {
   linkedCarer: boolean;
   primaryAppRole?: PrimaryAppRole | null;
   localCommunityProfile?: boolean;
+  /**
+   * Durable signup-time intent read from Supabase auth `user_metadata` (see
+   * `onboardingAccountPathFromUserMetadata`). Catches the case where session-storage
+   * markers were lost between choosing "Community Member" on /welcome and completing
+   * email verification — without it, those accounts fall through to patient onboarding.
+   */
+  metadataAccountPath?: OnboardingAccountPath | null;
 };
 
 /** Whether this account should skip patient onboarding and use Community Member mode. */
@@ -33,6 +41,7 @@ export function resolvesAsCommunityMemberAccount(params: CommunityMemberSessionP
   if (params.primaryAppRole === "community") return true;
   if (params.primaryAppRole == null && getPrimaryAppRole() === "community") return true;
   if (isCommunityOnlyAccount() || isPersistedCommunityAccount()) return true;
+  if (params.metadataAccountPath === "community") return true;
   return false;
 }
 
@@ -41,9 +50,13 @@ export function hasCommunityMemberIntent(): boolean {
   return isCommunityMemberAccount();
 }
 
-export function shouldUseCommunityMemberSession(profile: ProfileRow | null | undefined): boolean {
+export function shouldUseCommunityMemberSession(
+  profile: ProfileRow | null | undefined,
+  metadataAccountPath?: OnboardingAccountPath | null,
+): boolean {
   if (profileIndicatesExistingPatientAccount(profile)) return false;
   if (profile?.account_type === "community" || profile?.primary_app_role === "community") return true;
+  if (metadataAccountPath === "community") return true;
   return hasCommunityMemberIntent();
 }
 
@@ -131,11 +144,11 @@ export async function finalizeCommunityMemberSession(
 /** Restore community markers and local completion after login on a new device. */
 export async function ensureCommunityMemberSessionReady(
   userId: string,
-  opts?: { email?: string },
+  opts?: { email?: string; metadataAccountPath?: OnboardingAccountPath | null },
 ): Promise<void> {
   if (!userId.trim()) return;
   const { profile } = await getProfile(userId);
-  if (!shouldUseCommunityMemberSession(profile)) return;
+  if (!shouldUseCommunityMemberSession(profile, opts?.metadataAccountPath)) return;
   await finalizeCommunityMemberSession(userId, {
     email: opts?.email,
     fullName: profile?.full_name ?? null,

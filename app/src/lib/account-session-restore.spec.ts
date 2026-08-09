@@ -102,6 +102,54 @@ describe("account-session-restore", () => {
     expect(getOnboardingAccountPath()).toBe("patient");
   });
 
+  it("falls back to signup-time metadata path when the cloud profile is brand new (lost session storage)", async () => {
+    // Fresh profile row (only `id` set by the DB trigger) — no cloud signal yet, and this
+    // device has no session-storage markers either (e.g. verified email in a different tab).
+    getProfile.mockResolvedValue({
+      profile: {
+        id: "u1",
+        full_name: null,
+        avatar_url: null,
+        bio: null,
+        public_handle: null,
+        is_public: false,
+        onboarding_complete: false,
+        account_type: null,
+        primary_app_role: null,
+      },
+    });
+
+    const { restoreAccountSessionFromCloud } = await import("@/lib/account-session-restore");
+    const { getPrimaryAppRole, getOnboardingAccountPath } = await import("@/lib/carer-session");
+
+    await restoreAccountSessionFromCloud("u1", "community");
+    expect(getPrimaryAppRole()).toBe("community");
+    expect(getOnboardingAccountPath()).toBe("community");
+  });
+
+  it("ignores the metadata path once the cloud profile shows an existing patient account", async () => {
+    getProfile.mockResolvedValue({
+      profile: {
+        id: "u1",
+        full_name: "Pat",
+        avatar_url: null,
+        bio: null,
+        public_handle: null,
+        is_public: false,
+        onboarding_complete: true,
+        account_type: "patient",
+        primary_app_role: "patient",
+      },
+    });
+
+    const { restoreAccountSessionFromCloud } = await import("@/lib/account-session-restore");
+    const { getPrimaryAppRole, getOnboardingAccountPath } = await import("@/lib/carer-session");
+
+    await restoreAccountSessionFromCloud("u1", "community");
+    expect(getPrimaryAppRole()).toBe("patient");
+    expect(getOnboardingAccountPath()).toBe("patient");
+  });
+
   it("restores supporter-only mode when cloud role is carer despite completed patient onboarding", async () => {
     getLinkedPatientForCarer.mockResolvedValue({
       data: { linkId: "l1", patientId: "p1", carerId: "u1", scopes: {} },
