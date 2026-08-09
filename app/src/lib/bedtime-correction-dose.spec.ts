@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  bedtimeExtraCautionMultiplier,
   bedtimeTrendReduction,
   calculateBedtimeCorrectionDose,
   classifyBedtimeHighSeverity,
@@ -72,6 +73,38 @@ describe("resolveBedtimeCorrectionAim", () => {
   });
 });
 
+describe("bedtimeExtraCautionMultiplier", () => {
+  it("returns a multiplier of 1 and no note when nothing is selected", () => {
+    const result = bedtimeExtraCautionMultiplier({ exercisedToday: false, hadAlcohol: false, recentHypos: false });
+    expect(result.multiplier).toBe(1);
+    expect(result.note).toBe("");
+  });
+
+  it("reduces the multiplier for each factor and stacks them multiplicatively", () => {
+    const exerciseOnly = bedtimeExtraCautionMultiplier({ exercisedToday: true, hadAlcohol: false, recentHypos: false });
+    const alcoholOnly = bedtimeExtraCautionMultiplier({ exercisedToday: false, hadAlcohol: true, recentHypos: false });
+    const hypoOnly = bedtimeExtraCautionMultiplier({ exercisedToday: false, hadAlcohol: false, recentHypos: true });
+    const all = bedtimeExtraCautionMultiplier({ exercisedToday: true, hadAlcohol: true, recentHypos: true });
+
+    expect(exerciseOnly.multiplier).toBeCloseTo(0.85);
+    expect(alcoholOnly.multiplier).toBeCloseTo(0.85);
+    expect(hypoOnly.multiplier).toBeCloseTo(0.8);
+    expect(all.multiplier).toBeCloseTo(0.85 * 0.85 * 0.8);
+    expect(all.multiplier).toBeLessThan(Math.min(exerciseOnly.multiplier, alcoholOnly.multiplier, hypoOnly.multiplier));
+  });
+
+  it("names every active factor in the note, in a readable list", () => {
+    const one = bedtimeExtraCautionMultiplier({ exercisedToday: true, hadAlcohol: false, recentHypos: false });
+    expect(one.note).toBe("Made more cautious for exercise today.");
+
+    const two = bedtimeExtraCautionMultiplier({ exercisedToday: true, hadAlcohol: true, recentHypos: false });
+    expect(two.note).toBe("Made more cautious for exercise today and alcohol.");
+
+    const three = bedtimeExtraCautionMultiplier({ exercisedToday: true, hadAlcohol: true, recentHypos: true });
+    expect(three.note).toBe("Made more cautious for exercise today, alcohol, and a recent hypo.");
+  });
+});
+
 describe("calculateBedtimeCorrectionDose", () => {
   const base = {
     bgMmol: 17,
@@ -83,6 +116,7 @@ describe("calculateBedtimeCorrectionDose", () => {
     overnightUsualTrend: "not_sure" as const,
     exercisedToday: false,
     hadAlcohol: false,
+    recentHypos: false,
     sickDayActive: false,
   };
 
@@ -142,6 +176,7 @@ describe("calculateBedtimeCorrectionDose", () => {
       bgTrend: "falling" as const,
       exercisedToday: false,
       hadAlcohol: false,
+      recentHypos: false,
       sickDayActive: false,
     };
 
@@ -170,6 +205,98 @@ describe("calculateBedtimeCorrectionDose", () => {
     });
   });
 
+  describe("every 'Extras' switch actually adjusts the suggested dose", () => {
+    // Severity is "very_high" here (excess 12 > 6), so the severity floor is in play — this is
+    // deliberate: it lets us confirm both that each switch reduces the dose, AND that stacking
+    // all three still doesn't crush a genuinely severe high via the floor rescuing it.
+    const highBg = {
+      bgMmol: 20,
+      targetLowMmol: 4,
+      targetHighMmol: 8,
+      correctionFactor: 1,
+      bgUnits: "mmol/L" as const,
+      insulinHours: 5,
+      bgTrend: "steady" as const,
+      overnightUsualTrend: "not_sure" as const,
+      sickDayActive: false,
+    };
+
+    it("has no effect on the dose when none of the extras are selected", () => {
+      const baseline = calculateBedtimeCorrectionDose({
+        ...highBg,
+        exercisedToday: false,
+        hadAlcohol: false,
+        recentHypos: false,
+      });
+      expect(doseOf(baseline)).toBe(8);
+    });
+
+    it("exercise alone lowers the suggested dose", () => {
+      const result = calculateBedtimeCorrectionDose({
+        ...highBg,
+        exercisedToday: true,
+        hadAlcohol: false,
+        recentHypos: false,
+      });
+      expect(doseOf(result)).toBe(7);
+    });
+
+    it("alcohol alone lowers the suggested dose", () => {
+      const result = calculateBedtimeCorrectionDose({
+        ...highBg,
+        exercisedToday: false,
+        hadAlcohol: true,
+        recentHypos: false,
+      });
+      expect(doseOf(result)).toBe(7);
+    });
+
+    it("recent hypos alone lowers the suggested dose (more than exercise or alcohol alone)", () => {
+      const result = calculateBedtimeCorrectionDose({
+        ...highBg,
+        exercisedToday: false,
+        hadAlcohol: false,
+        recentHypos: true,
+      });
+      expect(doseOf(result)).toBe(6);
+    });
+
+    it("stacks all three for an even more cautious dose, while the severity floor still keeps it well above zero", () => {
+      const result = calculateBedtimeCorrectionDose({
+        ...highBg,
+        exercisedToday: true,
+        hadAlcohol: true,
+        recentHypos: true,
+      });
+      expect(doseOf(result)).toBe(5);
+      expect(doseOf(result)).toBeGreaterThan(0);
+      if (result.status !== "dose") throw new Error("expected a dose");
+      expect(result.exerciseWarning).toMatch(/exercise/i);
+      expect(result.alcoholWarning).toMatch(/alcohol/i);
+      expect(result.hypoWarning).toMatch(/hypo/i);
+      expect(result.extraCautionNote).toBe("Made more cautious for exercise today, alcohol, and a recent hypo.");
+    });
+
+    it("mentions the active extras in the dose_too_small note when they push a small dose to zero", () => {
+      const reported = {
+        bgMmol: 13.4,
+        targetLowMmol: 4,
+        targetHighMmol: 10,
+        correctionFactor: 3,
+        bgUnits: "mmol/L" as const,
+        insulinHours: 6,
+        bgTrend: "falling" as const,
+        overnightUsualTrend: "not_sure" as const,
+        exercisedToday: false,
+        sickDayActive: false,
+      };
+      const withAlcohol = calculateBedtimeCorrectionDose({ ...reported, hadAlcohol: true, recentHypos: false });
+      expect(withAlcohol.status).toBe("dose_too_small");
+      if (withAlcohol.status !== "dose_too_small") return;
+      expect(withAlcohol.note).toMatch(/alcohol/i);
+    });
+  });
+
   describe("severe high overnight no longer gets crushed to almost nothing by stacked caution", () => {
     // The exact scenario reported: BG 16.4 mmol/L, flat trend, target 4-10, usual overnight
     // rise, and insulin given less than an hour ago. Previously: 0.6 (trend) × 0.4 (IOB) = 24%
@@ -185,6 +312,7 @@ describe("calculateBedtimeCorrectionDose", () => {
       overnightUsualTrend: "rise" as const,
       exercisedToday: true,
       hadAlcohol: false,
+      recentHypos: false,
       sickDayActive: false,
     };
 
@@ -204,11 +332,14 @@ describe("calculateBedtimeCorrectionDose", () => {
     });
 
     it("a moderately-high reading (not severe) is unaffected by the new floor", () => {
+      // exercisedToday is turned off here since this test is isolating the severity-floor
+      // behaviour, not the extra-caution reduction (covered separately above).
       const mild = calculateBedtimeCorrectionDose({
         ...severe,
         bgMmol: 12,
         insulinHours: 5,
         overnightUsualTrend: "not_sure" as const,
+        exercisedToday: false,
       });
       expect(mild.status).toBe("dose");
       if (mild.status !== "dose") return;

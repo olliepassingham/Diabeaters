@@ -1,4 +1,4 @@
-import { Activity, AlertCircle, ChevronDown, Clock, Thermometer, Wine } from "lucide-react";
+import { Activity, AlertCircle, AlertTriangle, ChevronDown, Clock, Thermometer, Wine } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
@@ -16,9 +16,11 @@ export type BedtimeCorrectionData = {
   bgUnits: string;
   trendNote: string;
   overnightTrendNote: string;
+  extraCautionNote: string;
   iobWarning: string;
   exerciseWarning: string;
   alcoholWarning: string;
+  hypoWarning: string;
   sickDayWarning: string;
 };
 
@@ -60,6 +62,15 @@ function buildWarnings(
       tone: "red",
       icon: Wine,
       testId: "text-correction-alcohol-warning",
+    });
+  }
+  if (correction.hypoWarning) {
+    warnings.push({
+      id: "hypo",
+      text: correction.hypoWarning,
+      tone: "orange",
+      icon: AlertTriangle,
+      testId: "text-correction-hypo-warning",
     });
   }
   if (correction.sickDayWarning) {
@@ -142,6 +153,11 @@ function CalculationDetails({
             ? ` → ${correction.suggestedDose}u suggested (full would be ${correction.fullDose}u).`
             : "."}
         </p>
+        {correction.extraCautionNote ? (
+          <p className="text-sm leading-relaxed text-foreground/90" data-testid="text-correction-extra-caution-note">
+            {correction.extraCautionNote}
+          </p>
+        ) : null}
         {isPumpUser ? (
           <p className="text-sm text-muted-foreground" data-testid="text-pump-correction-tip">
             Check your pump&apos;s IOB — active insulin may already be working on this high.

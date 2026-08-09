@@ -766,6 +766,7 @@ export default function Bedtime() {
       overnightUsualTrend,
       exercisedToday,
       hadAlcohol,
+      recentHypos,
       sickDayActive: scenarioState.sickDayActive,
     });
     const action = resolveBedtimeAction(correctionResult, personalized.snack);

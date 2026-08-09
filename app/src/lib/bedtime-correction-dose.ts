@@ -39,6 +39,8 @@ export type BedtimeCorrectionSuggestion = {
   pctOfFullDose: number;
   bedtimeReduction: number;
   iobReduction: number;
+  /** Combined multiplier from the exercise/alcohol/recent-hypo "Extras" switches (1 = none active). */
+  extraCautionMultiplier: number;
   currentBg: number;
   targetBg: number;
   correctionFactor: number;
@@ -46,9 +48,12 @@ export type BedtimeCorrectionSuggestion = {
   hasIOB: boolean;
   trendNote: string;
   overnightTrendNote: string;
+  /** Summary of which "Extras" switches made this dose more cautious, e.g. "Made more cautious for alcohol." Empty when none apply. */
+  extraCautionNote: string;
   iobWarning: string;
   exerciseWarning: string;
   alcoholWarning: string;
+  hypoWarning: string;
   sickDayWarning: string;
 };
 
@@ -167,6 +172,51 @@ function baseTrendTier(
   }
 }
 
+/**
+ * How much smaller a bedtime correction should be when specific overnight risk factors from the
+ * "Extras" switches are present. Each one makes a *smaller* correction more appropriate — never a
+ * larger one — because they all raise the risk of an overnight low, never a high:
+ *  - exercise increases insulin sensitivity for hours afterwards;
+ *  - alcohol can cause delayed lows;
+ *  - a recent hypo raises the chance of another one and can blunt hypo awareness.
+ * These stack multiplicatively with the trend/IOB reduction above. The severity floor in
+ * `calculateBedtimeCorrectionDose` still applies afterwards, so a genuinely severe high is not
+ * crushed to almost nothing just because several caution factors are selected at once.
+ */
+export const BEDTIME_EXERCISE_CAUTION_MULTIPLIER = 0.85;
+export const BEDTIME_ALCOHOL_CAUTION_MULTIPLIER = 0.85;
+export const BEDTIME_RECENT_HYPO_CAUTION_MULTIPLIER = 0.8;
+
+function joinReasons(reasons: string[]): string {
+  if (reasons.length === 0) return "";
+  if (reasons.length === 1) return reasons[0]!;
+  if (reasons.length === 2) return `${reasons[0]} and ${reasons[1]}`;
+  return `${reasons.slice(0, -1).join(", ")}, and ${reasons[reasons.length - 1]}`;
+}
+
+export function bedtimeExtraCautionMultiplier(ctx: {
+  exercisedToday: boolean;
+  hadAlcohol: boolean;
+  recentHypos: boolean;
+}): { multiplier: number; reasons: string[]; note: string } {
+  let multiplier = 1;
+  const reasons: string[] = [];
+  if (ctx.exercisedToday) {
+    multiplier *= BEDTIME_EXERCISE_CAUTION_MULTIPLIER;
+    reasons.push("exercise today");
+  }
+  if (ctx.hadAlcohol) {
+    multiplier *= BEDTIME_ALCOHOL_CAUTION_MULTIPLIER;
+    reasons.push("alcohol");
+  }
+  if (ctx.recentHypos) {
+    multiplier *= BEDTIME_RECENT_HYPO_CAUTION_MULTIPLIER;
+    reasons.push("a recent hypo");
+  }
+  const note = reasons.length > 0 ? `Made more cautious for ${joinReasons(reasons)}.` : "";
+  return { multiplier, reasons, note };
+}
+
 function iobReductionForHours(insulinHours: number): number {
   if (insulinHours < 1) return 0.6;
   if (insulinHours < 2) return 0.4;
@@ -220,6 +270,7 @@ export function calculateBedtimeCorrectionDose(params: {
   overnightUsualTrend: OvernightUsualTrend;
   exercisedToday: boolean;
   hadAlcohol: boolean;
+  recentHypos: boolean;
   sickDayActive: boolean;
 }): BedtimeCorrectionResult {
   const {
@@ -233,6 +284,7 @@ export function calculateBedtimeCorrectionDose(params: {
     overnightUsualTrend,
     exercisedToday,
     hadAlcohol,
+    recentHypos,
     sickDayActive,
   } = params;
 
@@ -277,11 +329,16 @@ export function calculateBedtimeCorrectionDose(params: {
     severity,
     overnightUsualTrend,
   });
+  const { multiplier: extraCautionMultiplier, note: extraCautionNote } = bedtimeExtraCautionMultiplier({
+    exercisedToday,
+    hadAlcohol,
+    recentHypos,
+  });
 
   // Don't let a severe-high floor override genuine falling-trend caution — only raise the floor
   // when nothing already suggests glucose is on its way down on its own.
   const expectingDrop = bgTrend === "falling" || overnightUsualTrend === "fall";
-  const rawMultiplier = bedtimeReduction * (1 - iobReduction);
+  const rawMultiplier = bedtimeReduction * (1 - iobReduction) * extraCautionMultiplier;
   const effectiveMultiplier = expectingDrop
     ? rawMultiplier
     : Math.max(rawMultiplier, correctionSeverityFloor(severity));
@@ -291,6 +348,7 @@ export function calculateBedtimeCorrectionDose(params: {
   const pctOfFullDose = fullDose > 0 ? Math.round((rawEffective / fullDose) * 100) : 0;
 
   if (suggestedDose <= 0) {
+    const extraSuffix = extraCautionNote ? ` ${extraCautionNote}` : "";
     return {
       status: "dose_too_small",
       currentBg: toDisplay(bgMmol),
@@ -298,19 +356,26 @@ export function calculateBedtimeCorrectionDose(params: {
       bgUnits,
       rawDose: Math.round(rawEffective * 10) / 10,
       note:
-        "A cautious bedtime correction here works out to less than half a unit. Many people either round up to 1 unit if that fits their plan, or hold off and recheck glucose within an hour.",
+        `A cautious bedtime correction here works out to less than half a unit.${extraSuffix} Many people either round up to 1 unit if that fits their plan, or hold off and recheck glucose within an hour.`,
     };
   }
 
   let exerciseWarning = "";
   if (exercisedToday) {
     exerciseWarning =
-      "Exercise increases your sensitivity to insulin, especially overnight. Be extra cautious with any correction.";
+      "Exercise increases your sensitivity to insulin, especially overnight, so we've made this suggestion more cautious.";
   }
 
   let alcoholWarning = "";
   if (hadAlcohol) {
-    alcoholWarning = "Alcohol can cause delayed lows. Correcting at bedtime after drinking carries extra risk.";
+    alcoholWarning =
+      "Alcohol can cause delayed lows, so we've made this suggestion more cautious. Correcting at bedtime after drinking carries extra risk.";
+  }
+
+  let hypoWarning = "";
+  if (recentHypos) {
+    hypoWarning =
+      "A recent hypo raises the chance of another low overnight, so we've made this suggestion more cautious.";
   }
 
   let sickDayWarning = "";
@@ -326,6 +391,8 @@ export function calculateBedtimeCorrectionDose(params: {
     pctOfFullDose,
     bedtimeReduction,
     iobReduction,
+    extraCautionMultiplier,
+    extraCautionNote,
     currentBg: toDisplay(bgMmol),
     targetBg: toDisplay(aimMmol),
     correctionFactor,
@@ -336,6 +403,7 @@ export function calculateBedtimeCorrectionDose(params: {
     iobWarning: iobWarningForHours(insulinHours),
     exerciseWarning,
     alcoholWarning,
+    hypoWarning,
     sickDayWarning,
   };
 }
