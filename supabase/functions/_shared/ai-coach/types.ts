@@ -47,6 +47,14 @@ export type CoachAudience = "patient" | "supporter";
 export type CoachTravelTripStyle = "relax" | "active" | "city" | "remote" | "family";
 
 export type AllowedHref =
+  | "/"
+  | "/tools"
+  | "/scenarios"
+  | "/community"
+  | "/community/setup"
+  | "/community/messages"
+  | "/account"
+  | "/appointments"
   | "/adviser"
   | "/adviser?tab=meal"
   | "/adviser?tab=meal&split=1"
@@ -61,13 +69,34 @@ export type AllowedHref =
   | "/tools/hypo-help"
   | "/tools/correction"
   | "/tools/tips"
+  | "/tools/activity"
+  | "/tools/patterns"
+  | "/tools/hypo-history"
+  | "/tools/glucose-converter"
+  | "/tools/achievements"
+  | "/tools/cgm-live"
   | "/education"
+  | "/settings"
+  | "/settings/usage"
+  | "/settings/ratios"
+  | "/settings/cgm"
+  | "/settings/notifications"
+  | "/settings/pharmacy"
+  | "/settings/emergency"
   | "/help-now"
   | "/emergency-card"
   | "/supplies"
   | "/routines";
 
 export const ALLOWED_HREFS: ReadonlyArray<AllowedHref> = [
+  "/",
+  "/tools",
+  "/scenarios",
+  "/community",
+  "/community/setup",
+  "/community/messages",
+  "/account",
+  "/appointments",
   "/adviser",
   "/adviser?tab=meal",
   "/adviser?tab=meal&split=1",
@@ -82,7 +111,20 @@ export const ALLOWED_HREFS: ReadonlyArray<AllowedHref> = [
   "/tools/hypo-help",
   "/tools/correction",
   "/tools/tips",
+  "/tools/activity",
+  "/tools/patterns",
+  "/tools/hypo-history",
+  "/tools/glucose-converter",
+  "/tools/achievements",
+  "/tools/cgm-live",
   "/education",
+  "/settings",
+  "/settings/usage",
+  "/settings/ratios",
+  "/settings/cgm",
+  "/settings/notifications",
+  "/settings/pharmacy",
+  "/settings/emergency",
   "/help-now",
   "/emergency-card",
   "/supplies",

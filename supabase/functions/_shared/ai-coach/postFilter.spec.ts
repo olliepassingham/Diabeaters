@@ -255,6 +255,25 @@ describe("applyPostFilter", () => {
     expect(r.reply.suggestedNextActions[0].href).toBe("/help-now");
   });
 
+  it("keeps navigation hubs and settings leaves on the allow-list", () => {
+    const r = applyPostFilter(
+      reply({
+        reply: "You can open Tools, Community setup, or Personal & usage from here.",
+        suggestedNextActions: [
+          { label: "Open Tools", href: "/tools" },
+          { label: "Community setup", href: "/community/setup" },
+          { label: "Personal & usage", href: "/settings/usage" },
+        ],
+      }),
+    );
+    expect(r.status).toBe("pass");
+    expect(r.reply.suggestedNextActions.map((a) => a.href)).toEqual([
+      "/tools",
+      "/community/setup",
+      "/settings/usage",
+    ]);
+  });
+
   it("rewrites /education to /routines when the label implies the routines tool (#routine-href)", () => {
     const r = applyPostFilter(
       reply({
