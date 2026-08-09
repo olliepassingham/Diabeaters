@@ -80,7 +80,7 @@ export function PatientOnboardingGate({ onPatientComplete }: PatientOnboardingGa
       ) {
         await ensureCommunityMemberSessionReady(user.id, { metadataAccountPath });
         setActiveAppMode("community");
-        setLocation(getCommunityMemberLandingPath());
+        setLocation(getCommunityMemberLandingPath(profile ?? null));
         return;
       }
 

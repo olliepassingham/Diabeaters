@@ -142,7 +142,7 @@ import {
 import { AskAnythingProvider } from "@/components/ai-coach/ask-anything-context";
 import { isCommunityAccountProfile, storage } from "@/lib/storage";
 import { cn } from "@/lib/utils";
-import { getCommunityMemberLandingPath } from "@/lib/community-landing";
+import { getCommunityMemberLandingPath, resolveCommunityMemberLandingPath } from "@/lib/community-landing";
 import NotFound from "@/pages/not-found";
 import ShotsPage from "@/pages/shots";
 import Privacy from "@/pages/privacy";
@@ -150,6 +150,7 @@ import Support from "@/pages/support";
 import MedicalSourcesPage from "@/pages/medical-sources";
 const Account = lazy(() => import("@/pages/account"));
 const CommunityHome = lazy(() => import("@/pages/community/index"));
+const CommunitySetup = lazy(() => import("@/pages/community/setup"));
 const CommunityPost = lazy(() => import("@/pages/community/post"));
 const CommunityMessages = lazy(() => import("@/pages/community/messages"));
 const CommunityThread = lazy(() => import("@/pages/community/thread"));
@@ -543,6 +544,7 @@ function isCommunityMemberAllowedPath(pathOnly: string): boolean {
   if (p === "/settings/about") return true;
   if (p === "/settings/feedback") return true;
   if (p === "/privacy" || p === "/support") return true;
+  if (p === "/community/setup") return true;
   if (isCommunityPath(p)) return true;
   return false;
 }
@@ -558,6 +560,7 @@ function resolveCommunityMode(
 
 function PatientRouteGuard({ children }: { children: React.ReactNode }) {
   const isOffline = useOffline();
+  const { user } = useAuth();
   const { isCarer: hasCarerLink, loading } = useLinkedCarer();
   const [location, setLocation] = useLocation();
   const pathOnly = location.split("?")[0] ?? location;
@@ -578,11 +581,15 @@ function PatientRouteGuard({ children }: { children: React.ReactNode }) {
     if (loading) return;
     if (isCommunityMode) {
       if (pathOnly === "/" || pathOnly === "") {
-        setLocation(getCommunityMemberLandingPath());
+        void resolveCommunityMemberLandingPath(user?.id).then((dest) => {
+          setLocation(dest);
+        });
         return;
       }
       if (!isCommunityMemberAllowedPath(pathOnly)) {
-        setLocation(getCommunityMemberLandingPath());
+        void resolveCommunityMemberLandingPath(user?.id).then((dest) => {
+          setLocation(dest);
+        });
         return;
       }
     }
@@ -593,7 +600,7 @@ function PatientRouteGuard({ children }: { children: React.ReactNode }) {
     if (!isCarerMode && !isCommunityMode && (hasCarerIntent() || hasPendingCarer())) {
       setLocation("/carer-setup");
     }
-  }, [loading, isCarerMode, isCommunityMode, pathOnly, setLocation]);
+  }, [loading, isCarerMode, isCommunityMode, pathOnly, setLocation, user?.id]);
 
   if (loading && !isOffline) {
     return (
@@ -769,7 +776,16 @@ function InnerRouter() {
         </PatientRouteGuard>
       </Route>
       <Route path="/community/settings">
-        <Redirect to="/account#profile" replace />
+        <Redirect to="/community/setup" replace />
+      </Route>
+      <Route path="/community/setup">
+        <PatientRouteGuard>
+          <CommunityFeatureGate requirePublicProfile={false}>
+            <Suspense fallback={<RouteFallback />}>
+              <CommunitySetup />
+            </Suspense>
+          </CommunityFeatureGate>
+        </PatientRouteGuard>
       </Route>
       <Route path="/community/u/:handle">
         <PatientRouteGuard>
@@ -1250,8 +1266,9 @@ function AuthenticatedShell() {
       return;
     }
     if (isCommunityMode) {
-      const home = getCommunityMemberLandingPath();
-      if (location.split("?")[0] !== home) setLocation(home);
+      const home = getCommunityMemberLandingPath(profile ?? null);
+      const homePath = home.split("#")[0] ?? home;
+      if (location.split("?")[0] !== homePath) setLocation(home);
       return;
     }
     if (location.split("?")[0] !== "/") setLocation("/");
@@ -1348,14 +1365,34 @@ function AuthenticatedShell() {
 
   useEffect(() => {
     if (!isCommunityMode) return;
+    let cancelled = false;
+    const goHome = () => {
+      void resolveCommunityMemberLandingPath(user?.id).then((dest) => {
+        if (!cancelled) setLocation(dest);
+      });
+    };
     if (pathOnly === "/mode" && isCommunityOnlyAccount()) {
-      setLocation(getCommunityMemberLandingPath());
-      return;
+      goHome();
+      return () => {
+        cancelled = true;
+      };
+    }
+    if (pathOnly === "/" || pathOnly === "") {
+      goHome();
+      return () => {
+        cancelled = true;
+      };
     }
     if (!isCommunityMemberAllowedPath(pathOnly) && pathOnly !== "/mode") {
-      setLocation(getCommunityMemberLandingPath());
+      goHome();
+      return () => {
+        cancelled = true;
+      };
     }
-  }, [isCommunityMode, pathOnly, setLocation]);
+    return () => {
+      cancelled = true;
+    };
+  }, [isCommunityMode, pathOnly, setLocation, user?.id]);
 
   useEffect(() => {
     const onSupplySyncToast = (ev: Event) => {

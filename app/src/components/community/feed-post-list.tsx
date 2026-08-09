@@ -829,8 +829,8 @@ export function FeedPostList(props: {
         />
       ) : followingOnboardingEmpty ? (
         <EmptyState
-          title="Build your Following feed"
-          description="Follow a few people to personalise this tab. Until then, browse Everyone to discover posts and topics."
+          title="Your Following feed is ready when you are"
+          description="Find a few people to follow for a personalised stream — or browse Everyone to see what’s happening now."
           icon={Users}
         >
           <div className="flex flex-wrap justify-center gap-2">

@@ -6,12 +6,14 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageHeader, PageShell } from "@/components/layout";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { getActiveAppMode, isCarerSessionMode, isCommunityOnlyAccount, isSupporterOnlyAccount, setActiveAppMode, type ActiveAppMode } from "@/lib/carer-session";
-import { getCommunityMemberLandingPath } from "@/lib/community-landing";
+import { resolveCommunityMemberLandingPath } from "@/lib/community-landing";
 import { isCommunityAccountProfile, storage } from "@/lib/storage";
+import { useAuth } from "@/lib/auth-context";
 import { ArrowRight, Eye, User as UserIcon } from "lucide-react";
 
 export default function ModeChooserPage() {
   const [location, setLocation] = useLocation();
+  const { user } = useAuth();
   const { isCarer: hasCarerLink, loading } = useLinkedCarer();
 
   useEffect(() => {
@@ -20,15 +22,15 @@ export default function ModeChooserPage() {
       return;
     }
     if (isCommunityOnlyAccount()) {
-      setLocation(getCommunityMemberLandingPath());
+      void resolveCommunityMemberLandingPath(user?.id).then(setLocation);
     }
-  }, [setLocation]);
+  }, [setLocation, user?.id]);
 
   useEffect(() => {
     if (isCommunityAccountProfile(storage.getProfile())) {
-      setLocation(getCommunityMemberLandingPath());
+      void resolveCommunityMemberLandingPath(user?.id).then(setLocation);
     }
-  }, [setLocation]);
+  }, [setLocation, user?.id]);
   const [mode, setMode] = useState<ActiveAppMode | null>(() => {
     try {
       return getActiveAppMode();

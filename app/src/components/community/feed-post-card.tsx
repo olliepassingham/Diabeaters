@@ -455,7 +455,7 @@ export function FeedPostCard({
 
   const engagementRow = (
     <div
-      className="flex items-center justify-between gap-1 px-1.5 pt-0.5"
+      className="flex items-center justify-between gap-1 px-2 pt-0.5 sm:px-3"
       data-testid="post-engagement-row"
     >
       <div className="flex min-w-0 items-center">
@@ -540,8 +540,8 @@ export function FeedPostCard({
 
   return (
     <>
-    <article className="border-b border-border/70 bg-background py-4 last:border-b-0 dark:border-border/80">
-      <div className="flex items-center gap-3 px-3 py-2.5">
+    <article className="animate-soft-in border-b border-border/35 bg-transparent py-3.5 last:border-b-0 sm:mx-1 sm:mb-3 sm:rounded-2xl sm:border sm:border-border/50 sm:bg-card/70 sm:py-3.5 sm:shadow-sm sm:ring-1 sm:ring-border/30 sm:last:border sm:backdrop-blur-sm dark:sm:bg-card/50">
+      <div className="flex items-center gap-3 px-3 py-1 sm:px-4">
         <CommunityAuthorAvatar
           displayName={authorDisplayName}
           avatarPath={authorAvatarPath}
@@ -742,7 +742,7 @@ export function FeedPostCard({
       ) : null}
 
       {expanded ? (
-        <div className="mt-2 space-y-2 border-t border-border/20 px-3 pt-3">
+        <div className="mt-2 space-y-2.5 border-t border-border/25 px-3 pt-3 sm:px-4">
           {loadingComments ? (
             <div className="space-y-1.5" aria-busy="true">
               <Skeleton className="h-11 w-full rounded-lg" />
@@ -795,11 +795,11 @@ export function FeedPostCard({
                   ))}
                 </ul>
               ) : (
-                <p className="py-0.5 text-[11px] text-muted-foreground">No comments yet.</p>
+                <p className="py-0.5 text-[11px] text-muted-foreground">No comments yet — say hello.</p>
               )}
             </div>
           )}
-          <div className="text-composer-shell">
+          <div className="text-composer-shell px-3 py-1">
             <div className="min-w-0 flex-1">
               <MentionTextarea
                 textareaRef={commentInputRef}

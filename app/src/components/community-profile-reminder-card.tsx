@@ -50,7 +50,7 @@ export function CommunityProfileReminderCard({ onDismiss }: Props) {
               <li>· Show your name on posts and messages</li>
             </ul>
             <Button asChild size="sm" className="mt-1 rounded-xl">
-              <Link href="/account#profile">
+              <Link href="/community/setup">
                 Complete profile
                 <ArrowRight className="ml-1.5 h-4 w-4" aria-hidden />
               </Link>

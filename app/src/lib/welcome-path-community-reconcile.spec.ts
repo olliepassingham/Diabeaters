@@ -3,9 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const getProfile = vi.fn();
 const getLinkedPatientForCarer = vi.fn();
 
-vi.mock("@/lib/profile", () => ({
-  getProfile: (...args: unknown[]) => getProfile(...args),
-}));
+vi.mock("@/lib/profile", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/profile")>();
+  return {
+    ...actual,
+    getProfile: (...args: unknown[]) => getProfile(...args),
+  };
+});
 
 vi.mock("@/lib/carers", () => ({
   getLinkedPatientForCarer: () => getLinkedPatientForCarer(),
@@ -48,7 +52,7 @@ describe("welcome-path-community-reconcile", () => {
     const result = await reconcileUserWelcomeWithExistingCommunityAccount("u1");
     expect(result.reconciled).toBe(true);
     if (!result.reconciled) return;
-    expect(result.destination).toMatch(/^\/(community|tools)/);
+    expect(result.destination).toBe("/community/setup");
     expect(getPrimaryAppRole()).toBe("community");
     expect(getOnboardingAccountPath()).toBe("community");
   });

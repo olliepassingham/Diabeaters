@@ -33,16 +33,19 @@ export function FeedFollowSuggestionsStrip({
 
   return (
     <section
-      className={cn("rounded-xl border border-border/40 bg-muted/10 px-3 py-2.5", className)}
+      className={cn(
+        "animate-soft-in overflow-hidden rounded-2xl border border-border/45 bg-gradient-to-b from-muted/30 to-card/70 px-3 py-3 shadow-sm ring-1 ring-border/25",
+        className,
+      )}
       data-testid="feed-follow-suggestions-strip"
       aria-label="Suggested people to follow"
     >
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold text-foreground">Suggested for you</p>
+      <div className="mb-2.5 flex items-center justify-between gap-2">
+        <p className="text-xs font-semibold tracking-wide text-foreground">People to follow</p>
         <div className="flex items-center gap-0.5">
           {onFindPeople ? (
             <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={onFindPeople}>
-              Find people
+              See all
             </Button>
           ) : null}
           {onDismiss ? (

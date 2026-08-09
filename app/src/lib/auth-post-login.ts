@@ -10,7 +10,7 @@ import {
   onboardingAccountPathFromUserMetadata,
   setActiveAppMode,
 } from "@/lib/carer-session";
-import { getCommunityMemberLandingPath } from "@/lib/community-landing";
+import { resolveCommunityMemberLandingPath } from "@/lib/community-landing";
 import { ensureCommunityMemberSessionReady } from "@/lib/community-member-session";
 import { restoreAccountSessionFromCloud } from "@/lib/account-session-restore";
 import { cacheCloudPrimaryAppRoleFromProfile } from "@/lib/carer-session";
@@ -104,7 +104,7 @@ export async function navigateAfterLoginSuccess(
   }
   if (isCommunityOnlyAccount() || role === "community") {
     setActiveAppMode("community");
-    setLocation(getCommunityMemberLandingPath());
+    setLocation(await resolveCommunityMemberLandingPath(userId));
     return;
   }
   setLocation("/");

@@ -28,15 +28,20 @@ import {
 import {
   getProfileIdByPublicHandle,
   getProfilesByIds,
+  needsCommunityProfileSetup,
   normalizePublicHandleInput,
   searchProfilesByHandlePrefix,
   useProfile,
 } from "@/lib/profile";
+import { COMMUNITY_PROFILE_SETUP_PATH } from "@/lib/community-landing";
 import { CommunityProfileSetupPrompt } from "@/components/community-profile-setup-prompt";
 import { dmThreadQueryKey, fetchDmThreadBundle } from "@/lib/dm-thread-query";
 import { DM_INBOX_QK, type DmInboxPayload as DmInboxQueryPayload } from "@/lib/dm-inbox-query";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { formatDistanceToNow } from "date-fns";
+import { getActiveAppMode, isCommunitySessionMode } from "@/lib/carer-session";
+import { isCommunityAccountProfile, storage } from "@/lib/storage";
+import { useLinkedCarer } from "@/hooks/use-linked-carer";
 
 function shortId(id: string) {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
@@ -221,6 +226,27 @@ export default function CommunityMessagesPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const userId = user?.id ?? "";
+  const { isCarer: hasCarerLink } = useLinkedCarer();
+  const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
+  const isCommunityMode = isCommunitySessionMode(hasCarerLink, activeMode, {
+    localCommunityProfile: isCommunityAccountProfile(storage.getProfile()),
+    cloudCommunityProfile: profile?.account_type === "community",
+  });
+  const needsProfileSetup = !profileLoading && needsCommunityProfileSetup(profile);
+
+  useEffect(() => {
+    const onMode = (ev: Event) => {
+      const ce = ev as CustomEvent<{ mode?: "patient" | "carer" | "community" | null }>;
+      setActiveMode(ce.detail?.mode ?? getActiveAppMode());
+    };
+    window.addEventListener("diabeater:app-mode", onMode);
+    return () => window.removeEventListener("diabeater:app-mode", onMode);
+  }, []);
+
+  useEffect(() => {
+    if (!needsProfileSetup) return;
+    setLocation(COMMUNITY_PROFILE_SETUP_PATH);
+  }, [needsProfileSetup, setLocation]);
 
   const inboxQuery = useQuery({
     queryKey: [...DM_INBOX_QK, userId],
@@ -621,20 +647,20 @@ export default function CommunityMessagesPage() {
   if (!isSupabaseConfigured()) {
     return (
       <PageShell variant="standard" className="mx-auto max-w-xl space-y-4">
-        <PageHeader leading={<PageBackButton />} title="Messages" />
+        <PageHeader leading={isCommunityMode ? undefined : <PageBackButton />} title="Messages" />
         <p className="text-sm text-muted-foreground">Connect Supabase to use messages.</p>
       </PageShell>
     );
   }
 
-  if (!profileLoading && profile && !profile.is_public) {
+  if (needsProfileSetup) {
     return (
       <PageShell variant="standard" className="mx-auto max-w-xl space-y-4 pb-8">
-        <PageHeader leading={<PageBackButton />} title="Messages" />
+        <PageHeader leading={isCommunityMode ? undefined : <PageBackButton />} title="Messages" />
         <CommunityProfileSetupPrompt
           compact
           title="Set up your profile to message"
-          description="Choose a display name and make your profile public before you can start conversations."
+          description="Choose a display name and @handle so people know who you are before you start conversations."
         />
       </PageShell>
     );
@@ -642,18 +668,42 @@ export default function CommunityMessagesPage() {
 
   return (
     <PageShell variant="standard" className="mx-auto max-w-xl space-y-5 pb-8">
-      <PageHeader
-        leading={<PageBackButton />}
-        title="Messages"
-        actions={
-          <Button variant="outline" size="sm" asChild className="rounded-xl">
-            <Link href="/community">
-              <Users className="mr-1.5 h-4 w-4" />
-              Feed
+      {isCommunityMode ? (
+        <div className="flex items-start justify-between gap-3 pt-0.5">
+          <div className="min-w-0">
+            <h1 className="font-display text-[1.65rem] font-bold leading-none tracking-tight text-foreground sm:text-3xl">
+              Messages
+            </h1>
+            <p className="mt-1.5 text-[13px] leading-snug text-muted-foreground sm:text-sm">
+              Private chats with people on the Feed.
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            asChild
+            className="h-9 shrink-0 rounded-xl px-2.5 text-muted-foreground hover:text-foreground"
+          >
+            <Link href="/community" aria-label="Back to Feed">
+              <Users className="h-4 w-4 sm:mr-1.5" />
+              <span className="hidden sm:inline">Feed</span>
             </Link>
           </Button>
-        }
-      />
+        </div>
+      ) : (
+        <PageHeader
+          leading={<PageBackButton />}
+          title="Messages"
+          actions={
+            <Button variant="outline" size="sm" asChild className="rounded-xl">
+              <Link href="/community">
+                <Users className="mr-1.5 h-4 w-4" />
+                Feed
+              </Link>
+            </Button>
+          }
+        />
+      )}
 
       <form onSubmit={handleStartChat} className="space-y-2.5">
         <div className="relative">
@@ -668,7 +718,7 @@ export default function CommunityMessagesPage() {
             onChange={(e) => setHandleInput(e.target.value)}
             placeholder="Search or @handle…"
             title="Search your conversations and start new chats by @handle."
-            className="h-11 rounded-2xl border-border/50 bg-muted/25 pl-10 text-[15px] shadow-sm ring-1 ring-black/[0.03] dark:ring-white/[0.04]"
+            className="h-11 rounded-2xl border-border/50 bg-muted/20 pl-10 text-[15px] shadow-sm ring-1 ring-border/30"
             autoCapitalize="none"
             autoCorrect="off"
             spellCheck={false}
@@ -750,15 +800,16 @@ export default function CommunityMessagesPage() {
         <EmptyState
           icon={MessageCircle}
           title="No conversations yet"
-          description="Start a chat from a public @handle (above), or head to the Feed to find people."
+          description="Search a public @handle above to start a chat, or find people on the Feed."
         >
-          <Button variant="secondary" size="sm" asChild>
+          <Button variant="secondary" size="sm" asChild className="rounded-xl">
             <Link href="/community">Go to Feed</Link>
           </Button>
           <Button
             variant="outline"
             size="sm"
             type="button"
+            className="rounded-xl"
             onClick={() => handleInputRef.current?.focus()}
           >
             Start a chat
@@ -771,7 +822,7 @@ export default function CommunityMessagesPage() {
               Updating…
             </p>
           ) : null}
-        <ul className="space-y-2">
+        <ul className="space-y-1.5">
           {filteredThreads.map((t) => {
             const other = user?.id ? otherMemberUserId(t.members, user.id) : null;
             const label = other ? labels[other] ?? shortId(other) : "Chat";
@@ -789,8 +840,8 @@ export default function CommunityMessagesPage() {
               <li key={t.id}>
                 <div
                   className={cn(
-                    "overflow-hidden rounded-2xl border border-border/50 bg-card/70 shadow-sm transition-colors",
-                    isUnread && "border-primary/20 bg-primary/[0.04]",
+                    "overflow-hidden rounded-2xl border border-border/45 bg-card/80 shadow-sm ring-1 ring-border/25 transition-colors",
+                    isUnread && "border-primary/25 bg-primary/[0.05] ring-primary/15",
                   )}
                 >
                   <Link
@@ -799,7 +850,7 @@ export default function CommunityMessagesPage() {
                     onMouseEnter={() => userId && prefetchDmThreadRoute(queryClient, t.id, userId)}
                     onFocus={() => userId && prefetchDmThreadRoute(queryClient, t.id, userId)}
                   >
-                    <div className="pressable flex items-center gap-3 px-3 py-3 active:bg-muted/30">
+                    <div className="pressable flex items-center gap-3 px-3 py-3.5 active:bg-muted/30">
                       {other ? (
                         <CommunityAuthorAvatar
                           displayName={label}

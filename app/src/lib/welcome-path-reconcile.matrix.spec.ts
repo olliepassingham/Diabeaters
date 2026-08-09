@@ -4,10 +4,14 @@ const getProfile = vi.fn();
 const getLinkedPatientForCarer = vi.fn();
 const updateProfile = vi.fn();
 
-vi.mock("@/lib/profile", () => ({
-  getProfile: (...args: unknown[]) => getProfile(...args),
-  updateProfile: (...args: unknown[]) => updateProfile(...args),
-}));
+vi.mock("@/lib/profile", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/profile")>();
+  return {
+    ...actual,
+    getProfile: (...args: unknown[]) => getProfile(...args),
+    updateProfile: (...args: unknown[]) => updateProfile(...args),
+  };
+});
 
 vi.mock("@/lib/carers", () => ({
   getLinkedPatientForCarer: () => getLinkedPatientForCarer(),
@@ -165,7 +169,7 @@ async function runNavigateAfterReconcile(): Promise<string> {
     setActiveAppMode,
     cacheCloudPrimaryAppRoleFromProfile,
   } = await import("@/lib/carer-session");
-  const { getCommunityMemberLandingPath } = await import("@/lib/community-landing");
+  const { resolveCommunityMemberLandingPath } = await import("@/lib/community-landing");
   const { getProfile } = await import("@/lib/profile");
   const { resolveSupporterOnlyAccount } = await import("@/lib/profile-primary-role");
 
@@ -198,7 +202,7 @@ async function runNavigateAfterReconcile(): Promise<string> {
   }
   if (isCommunityOnlyAccount() || role === "community") {
     setActiveAppMode("community");
-    setLocation(getCommunityMemberLandingPath());
+    setLocation(await resolveCommunityMemberLandingPath(userId));
     return destinations[0] ?? "";
   }
   setLocation("/");
@@ -272,13 +276,13 @@ describe("welcome path matrix — wrong-path login behaviour", () => {
       expectedDestination: "/carer-view",
     },
 
-    // Community Member account
+    // Community Member account (incomplete public profile → Account setup first)
     {
       account: "community",
       welcome: "user",
       label: "Community → User",
       expectReconcile: true,
-      expectedDestination: "/community",
+      expectedDestination: "/community/setup",
       expectedToast: "Community Member account",
     },
     {
@@ -286,7 +290,7 @@ describe("welcome path matrix — wrong-path login behaviour", () => {
       welcome: "community",
       label: "Community → Community (correct path)",
       expectReconcile: false,
-      expectedDestination: "/community",
+      expectedDestination: "/community/setup",
     },
     {
       account: "community",

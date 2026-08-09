@@ -70,7 +70,7 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
   const canComposeToFeed =
     Boolean(user?.id) && !profileLoading && canEngageWithCommunityFeed(profile);
 
-  const pillPreview = composer.trim() ? composer.trim() : "Share something…";
+  const pillPreview = composer.trim() ? composer.trim() : "Share something with the community…";
   const avatarDisplayName = (profile?.full_name ?? user?.email ?? "You").trim() || "You";
   const avatarPath = profile?.avatar_url ?? null;
   const profileHref = user?.id ? `/community/profile/${encodeURIComponent(user.id)}` : undefined;

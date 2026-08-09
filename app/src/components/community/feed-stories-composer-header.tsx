@@ -197,8 +197,8 @@ export function FeedStoriesComposerHeader({
     <button
       type="button"
       className={cn(
-        "flex w-full min-h-[2.75rem] items-center gap-2.5 text-left outline-none ring-offset-background transition-colors hover:bg-muted/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60",
-        hideComposerAvatar ? "px-4 py-2.5" : "px-3.5 py-2.5",
+        "flex w-full min-h-[3rem] items-center gap-2.5 text-left outline-none ring-offset-background transition-colors hover:bg-muted/25 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60",
+        hideComposerAvatar ? "px-4 py-3" : "px-3.5 py-3",
       )}
       onClick={isMobile ? onComposerClick : undefined}
       disabled={composerDisabled}
@@ -214,7 +214,7 @@ export function FeedStoriesComposerHeader({
           profileHref={profileHref}
         />
       ) : null}
-      <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{composerPreview}</span>
+      <span className="min-w-0 flex-1 truncate text-[15px] text-muted-foreground">{composerPreview}</span>
       {!isMobile ? (
         <ChevronDown
           className={cn(
@@ -228,7 +228,7 @@ export function FeedStoriesComposerHeader({
   );
 
   return (
-    <div className={cn("space-y-1.5", className)} data-testid="feed-stories-composer-header">
+    <div className={cn("space-y-2", className)} data-testid="feed-stories-composer-header">
       {showStoriesRow ? (
         <FeedStoriesStrip>
           {self ? (
@@ -267,7 +267,7 @@ export function FeedStoriesComposerHeader({
 
       <section
         className={cn(
-          "overflow-hidden rounded-2xl border border-border/45 bg-card/90 shadow-sm ring-1 ring-border/25 backdrop-blur-xl supports-[backdrop-filter]:bg-card/80",
+          "overflow-hidden rounded-2xl border border-border/50 bg-card/95 shadow-sm ring-1 ring-border/30 backdrop-blur-xl supports-[backdrop-filter]:bg-card/85",
           composerDisabled && "opacity-90",
         )}
       >
@@ -277,7 +277,7 @@ export function FeedStoriesComposerHeader({
           <Collapsible open={composerExpanded} onOpenChange={onComposerExpandedChange}>
             <CollapsibleTrigger asChild>{composerTrigger}</CollapsibleTrigger>
             <CollapsibleContent className="overflow-hidden">
-              <div className="border-t border-border/20 px-3.5 pb-3.5 pt-3">{composerForm}</div>
+              <div className="border-t border-border/25 px-3.5 pb-3.5 pt-3">{composerForm}</div>
             </CollapsibleContent>
           </Collapsible>
         )}

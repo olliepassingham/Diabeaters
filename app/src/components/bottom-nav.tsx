@@ -158,28 +158,27 @@ function patientTabs(showFeedTab: boolean): TabDef[] {
 }
 
 function communityMemberTabs(showFeedTab: boolean, showMessagesTab: boolean): TabDef[] {
-  const tabs: TabDef[] = [
-    {
-      title: "Tools",
-      href: "/tools",
-      icon: Wrench,
-      testId: "bottomnav-tools",
-      isActive: (pathname) =>
-        pathname === "/tools" ||
-        pathname.startsWith("/tools/") ||
-        pathname === "/education" ||
-        pathname.startsWith("/education/"),
-    },
-  ];
+  const tabs: TabDef[] = [];
   if (showFeedTab) {
     tabs.push({
       title: "Feed",
       href: "/community",
       icon: Users,
       testId: "bottomnav-community",
-      isActive: (pathname) => isCommunityFeedPath(pathname),
+      isActive: (pathname) => isCommunityFeedPath(pathname) || pathname === "/community/setup",
     });
   }
+  tabs.push({
+    title: "Tools",
+    href: "/tools",
+    icon: Wrench,
+    testId: "bottomnav-tools",
+    isActive: (pathname) =>
+      pathname === "/tools" ||
+      pathname.startsWith("/tools/") ||
+      pathname === "/education" ||
+      pathname.startsWith("/education/"),
+  });
   if (showMessagesTab) {
     tabs.push(messagesTab());
   }

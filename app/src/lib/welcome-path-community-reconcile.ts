@@ -15,7 +15,7 @@ import { isUserWelcomePathChosen } from "@/lib/welcome-path-supporter-reconcile"
 export const EXISTING_COMMUNITY_ON_USER_PATH_TOAST: PostLoginToastMessage = {
   title: "You have a Community Member account",
   description:
-    "The User path is for people with Type 1 diabetes. You're signed in to Community Member mode — learn, explore, and use the feed.",
+    "The User path is for people with Type 1 diabetes. You're signed in to Community Member mode — set up your public profile, then join the feed.",
 };
 
 /** Cloud or local markers show a completed community-only account. */
@@ -66,7 +66,7 @@ export async function reconcileUserWelcomeWithExistingCommunityAccount(
   restoreCommunitySessionMarkers();
   return {
     reconciled: true,
-    destination: getCommunityMemberLandingPath(),
+    destination: getCommunityMemberLandingPath(profile ?? null),
     toast: EXISTING_COMMUNITY_ON_USER_PATH_TOAST,
   };
 }

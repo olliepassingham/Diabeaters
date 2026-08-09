@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { Bookmark, MessageCircle, Search as SearchIcon } from "lucide-react";
+import { Bookmark, Search as SearchIcon } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { FeedFollowSuggestionsStrip } from "@/components/community/feed-follow-suggestions-strip";
 import {
@@ -38,12 +38,12 @@ import {
   fetchStoryById,
 } from "@/lib/community";
 import { pickStoryToOpen } from "@/lib/community/stories-supabase";
-import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getProfilesByIds, searchPublicProfilesForFeedQuery, useProfile, canEngageWithCommunityFeed } from "@/lib/profile";
+import { getProfilesByIds, searchPublicProfilesForFeedQuery, useProfile, canEngageWithCommunityFeed, needsCommunityProfileSetup } from "@/lib/profile";
+import { COMMUNITY_PROFILE_SETUP_PATH } from "@/lib/community-landing";
 import { prefetchProfileAvatarUrls } from "@/lib/storage-profile";
 import { CommunityProfileReminderCard } from "@/components/community-profile-reminder-card";
 import { CommunityProfileSetupPrompt } from "@/components/community-profile-setup-prompt";
@@ -81,21 +81,16 @@ function readStoredFeedTab(): FeedTab {
 
 const PAGE_SIZE = MAIN_FEED_PAGE_SIZE;
 
+/** Keep the composer collapsed by default; only expand when a draft is waiting. */
 function initialFeedComposerOpen(): boolean {
-  if (typeof window === "undefined") return true;
+  if (typeof window === "undefined") return false;
   try {
     const draft = readFeedComposerDraft();
     if (draft?.body?.trim()) return true;
   } catch {
     /* ignore */
   }
-  if (
-    typeof window !== "undefined" &&
-    window.matchMedia(`(max-width: 767px)`).matches
-  ) {
-    return false;
-  }
-  return window.matchMedia("(min-width: 768px)").matches;
+  return false;
 }
 
 export default function CommunityHomePage() {
@@ -162,6 +157,12 @@ export default function CommunityHomePage() {
     }
     setSuggestionsDismissed(isFeedSuggestionsDismissed(user.id));
   }, [user?.id]);
+
+  useEffect(() => {
+    if (profileLoading) return;
+    if (!needsCommunityProfileSetup(profile)) return;
+    setLocation(COMMUNITY_PROFILE_SETUP_PATH);
+  }, [profile, profileLoading, setLocation]);
 
   // Preserve scroll position across Everyone / Following toggles (app main scroll container).
   useEffect(() => {
@@ -552,32 +553,21 @@ export default function CommunityHomePage() {
     );
   }
 
-  const needsPublicSetup = !profileLoading && profile && !profile.is_public;
+  const needsPublicSetup = !profileLoading && needsCommunityProfileSetup(profile);
 
   const feedHeaderActions = !needsPublicSetup ? (
-    <div className="flex flex-wrap items-center justify-end gap-1.5">
+    <div className="flex shrink-0 items-center justify-end gap-1" data-testid="feed-toolbar-actions">
       <Button
-        variant="outline"
+        variant="ghost"
         size="sm"
         type="button"
-        className="h-9 shrink-0 rounded-xl px-2.5 sm:px-3"
+        className="h-9 shrink-0 rounded-xl px-2.5 text-muted-foreground hover:text-foreground sm:px-3"
         onClick={() => setPeopleOpen(true)}
         data-testid="button-find-people"
         aria-label="Find people"
       >
         <SearchIcon className="h-4 w-4 shrink-0" aria-hidden />
-        <span className="text-xs font-medium sm:text-sm">Find people</span>
-      </Button>
-      <Button variant="outline" size="icon" className="h-9 w-9 shrink-0 rounded-xl sm:hidden" asChild>
-        <Link href="/community/messages" aria-label="Messages" title="Messages">
-          <MessageCircle className="h-4 w-4" aria-hidden />
-        </Link>
-      </Button>
-      <Button variant="outline" size="sm" className="hidden h-9 shrink-0 rounded-xl sm:inline-flex" asChild>
-        <Link href="/community/messages" aria-label="Messages" title="Open messages">
-          <MessageCircle className="h-4 w-4 mr-1.5" aria-hidden />
-          <span>Messages</span>
-        </Link>
+        <span className="hidden text-sm font-medium sm:inline">Find people</span>
       </Button>
       {user ? <FeedMoreMenu /> : null}
     </div>
@@ -585,6 +575,17 @@ export default function CommunityHomePage() {
 
   return (
     <PageShell variant="full" density="compact" className="pb-2">
+      <div className="mb-2.5 flex items-start justify-between gap-3 px-0.5 pt-0.5">
+        <div className="min-w-0">
+          <h1 className="font-display text-[1.65rem] font-bold leading-none tracking-tight text-foreground sm:text-3xl">
+            Feed
+          </h1>
+          <p className="mt-1.5 text-[13px] leading-snug text-muted-foreground sm:text-sm">
+            Support, ideas, and stories from people like you.
+          </p>
+        </div>
+        {feedHeaderActions}
+      </div>
       <PageHeader title="Community" screenReaderOnly />
 
       {needsPublicSetup ? (
@@ -668,21 +669,7 @@ export default function CommunityHomePage() {
         formTestId="feed-composer-form-sheet"
       />
 
-      <div
-        className={cn(
-          "space-y-2 rounded-2xl border border-border/45 bg-card/90 p-2 shadow-sm backdrop-blur-xl supports-[backdrop-filter]:bg-card/80",
-          // Stay in normal document flow (not sticky). Sticky top-0 used to pin this
-          // over the feed once `#app-scroll-main` became a real scrollport — e.g. when
-          // an active exercise session locks the shell to h-dvh — covering posts as you scroll.
-          "md:border-0 md:bg-transparent md:p-0 md:shadow-none md:backdrop-blur-none",
-        )}
-      >
-        {feedHeaderActions ? (
-          <div className="flex justify-end" data-testid="feed-toolbar-actions">
-            {feedHeaderActions}
-          </div>
-        ) : null}
-
+      <div className="space-y-2.5">
         <Tabs
           value={feedTab}
           onValueChange={(v) => {
@@ -692,16 +679,16 @@ export default function CommunityHomePage() {
           }}
           className="w-full"
         >
-          <TabsList className="grid h-9 w-full grid-cols-2 rounded-full bg-muted/50 p-0.5 dark:bg-muted/35">
+          <TabsList className="grid h-10 w-full grid-cols-2 rounded-full bg-muted/40 p-1 dark:bg-muted/30">
             <TabsTrigger
               value="following"
-              className="rounded-full text-xs font-medium sm:text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              className="rounded-full text-xs font-semibold sm:text-sm data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
             >
               Following
             </TabsTrigger>
             <TabsTrigger
               value="everyone"
-              className="rounded-full text-xs font-medium sm:text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              className="rounded-full text-xs font-semibold sm:text-sm data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
             >
               Everyone
             </TabsTrigger>
@@ -1021,15 +1008,15 @@ export default function CommunityHomePage() {
           setTopicFilter(tid);
           setSavedOnly(false);
         }}
-        emptyStateTitle="Nothing here yet"
+        emptyStateTitle={feedTab === "following" ? "Your Following feed is quiet" : "Be the first to post"}
         emptyStateDescription={
           feedTab === "following"
             ? topicFilter
-              ? "No posts in this topic from people you follow yet. Try All topics or follow more profiles."
-              : "No posts from people you follow yet. Follow profiles from the Everyone tab, or post something yourself."
+              ? "No posts in this topic from people you follow yet. Try All topics or follow a few more people."
+              : "Follow a few people from Everyone, or share something yourself to get things started."
             : topicFilter
-              ? "No posts in this topic yet. Try another topic or be the first to post here."
-              : "No posts yet. Be the first to post."
+              ? "No posts in this topic yet. Switch topics — or start the conversation."
+              : "Share a tip, a win, or a question. The community grows with every post."
         }
         fetchPage={fetchFeedPage}
       />
