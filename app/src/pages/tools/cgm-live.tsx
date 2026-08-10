@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CgmGlucoseChart } from "@/components/cgm-glucose-chart";
+import { CgmNearFutureProjectionCard } from "@/components/cgm-near-future-projection-card";
 import { CgmSuggestedHypoCard } from "@/components/cgm-suggested-hypo-card";
 import { CgmWindowSummaryStrip } from "@/components/cgm-window-summary-strip";
 import { InfoTooltip } from "@/components/info-tooltip";
@@ -233,6 +234,7 @@ export default function CgmLivePage() {
 
           {points.length > 0 ? (
             <>
+              <CgmNearFutureProjectionCard points={points} units={units} />
               <CgmGlucoseChart
                 points={points}
                 units={units}

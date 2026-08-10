@@ -24,7 +24,12 @@ export type CgmChartPoint = {
   timeMs: number;
   timeLabel: string;
   value: number;
+  /** Display units (mmol or mg/dL) — same as `value`. */
   trend: ExerciseBgTrend | null;
+  /** Original mg/dL for calculations (projection, etc.). */
+  valueMgDl?: number;
+  /** Fine Dexcom/Libre trend token before UI collapse (e.g. singleup). */
+  rawTrend?: string | null;
 };
 
 export function dexcomEntriesToChartPoints(
@@ -59,6 +64,8 @@ export function liveCgmEntriesToChartPoints(
       timeLabel: formatChartTimeLabel(timeMs, compactTime),
       value,
       trend: mapTrend(entry.trend),
+      valueMgDl: entry.valueMgDl,
+      rawTrend: entry.trend,
     };
   });
 }
