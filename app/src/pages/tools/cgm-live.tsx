@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CgmGlucoseChart } from "@/components/cgm-glucose-chart";
-import { CgmNearFutureProjectionCard } from "@/components/cgm-near-future-projection-card";
 import { CgmSuggestedHypoCard } from "@/components/cgm-suggested-hypo-card";
 import { CgmWindowSummaryStrip } from "@/components/cgm-window-summary-strip";
 import { InfoTooltip } from "@/components/info-tooltip";
@@ -20,6 +19,7 @@ import {
   resolveSleepChartOverlays,
   type CgmChartOverlay,
 } from "@/lib/cgm/cgm-chart-overlays";
+import { computeNearFutureProjection } from "@/lib/cgm/near-future-projection";
 import { computeGlucoseWindowSummary } from "@/lib/cgm/window-summary";
 import { formatTargetBgInput } from "@/lib/hypo-context";
 import { formatAgeMinutes } from "@/lib/cgm/staleness";
@@ -65,6 +65,18 @@ export default function CgmLivePage() {
   const TrendIcon = trendIcon(latest?.trend ?? null);
 
   const chartWindow = useMemo(() => chartTimeWindowFromPoints(points), [points]);
+
+  const projection = useMemo(() => {
+    if (points.length === 0) return null;
+    const latest = points[points.length - 1]!;
+    return computeNearFutureProjection({
+      points: points
+        .filter((p) => typeof p.valueMgDl === "number" && Number.isFinite(p.valueMgDl))
+        .map((p) => ({ valueMgDl: p.valueMgDl!, recordedAt: p.recordedAt })),
+      latestRawTrend: latest.rawTrend ?? null,
+      units,
+    });
+  }, [points, units]);
 
   const sleepOverlays = useMemo(() => {
     if (!highlightSleep || !chartWindow) return [];
@@ -234,13 +246,13 @@ export default function CgmLivePage() {
 
           {points.length > 0 ? (
             <>
-              <CgmNearFutureProjectionCard points={points} units={units} />
               <CgmGlucoseChart
                 points={points}
                 units={units}
                 targetLow={targetLow}
                 targetHigh={targetHigh}
                 overlays={chartOverlays}
+                projection={projection}
               />
               {showOverlayHints ? (
                 <div className="flex flex-col gap-1.5">

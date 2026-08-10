@@ -93,11 +93,11 @@ function formatChartTimeLabel(timeMs: number, compact: boolean): string {
   });
 }
 
-export function chartYDomain(points: CgmChartPoint[], units: BgUnits): [number, number] {
-  if (points.length === 0) {
+export function chartYDomain(points: CgmChartPoint[], units: BgUnits, extraValues: number[] = []): [number, number] {
+  if (points.length === 0 && extraValues.length === 0) {
     return units === "mmol/L" ? [3, 12] : [54, 216];
   }
-  const values = points.map((p) => p.value);
+  const values = [...points.map((p) => p.value), ...extraValues];
   const min = Math.min(...values);
   const max = Math.max(...values);
   const pad = units === "mmol/L" ? 0.8 : 15;
