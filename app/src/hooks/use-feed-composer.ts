@@ -269,7 +269,7 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
     if (!user || !composerCanSubmit) return;
     if (!canComposeToFeed) {
       toast({
-        title: "Choose a @handle to post",
+        title: "Set up your public profile",
         description: COMMUNITY_FEED_ENGAGE_REQUIRED_MESSAGE,
         variant: "destructive",
       });

@@ -189,7 +189,7 @@ export default function CommunityPostPage() {
     if (!user || !post || pid !== post.id) return;
     if (!canEngageWithFeed) {
       toast({
-        title: "Choose a @handle first",
+        title: "Set up your public profile",
         description: COMMUNITY_FEED_ENGAGE_REQUIRED_MESSAGE,
         variant: "destructive",
       });
@@ -215,7 +215,7 @@ export default function CommunityPostPage() {
     if (!user || !post || pid !== post.id || post.post_kind !== "event") return;
     if (!canEngageWithFeed) {
       toast({
-        title: "Choose a @handle first",
+        title: "Set up your public profile",
         description: COMMUNITY_FEED_ENGAGE_REQUIRED_MESSAGE,
         variant: "destructive",
       });
@@ -251,7 +251,7 @@ export default function CommunityPostPage() {
     if (!user || !post) return;
     if (!canEngageWithFeed) {
       toast({
-        title: "Choose a @handle first",
+        title: "Set up your public profile",
         description: COMMUNITY_FEED_ENGAGE_REQUIRED_MESSAGE,
         variant: "destructive",
       });
@@ -280,7 +280,7 @@ export default function CommunityPostPage() {
     if (!postId || !post) return;
     if (!canEngageWithFeed) {
       toast({
-        title: "Choose a @handle first",
+        title: "Set up your public profile",
         description: COMMUNITY_FEED_ENGAGE_REQUIRED_MESSAGE,
         variant: "destructive",
       });

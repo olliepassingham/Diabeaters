@@ -245,8 +245,9 @@ export default function CommunityMessagesPage() {
 
   useEffect(() => {
     if (!needsProfileSetup) return;
+    if (!isCommunityMode) return;
     setLocation(COMMUNITY_PROFILE_SETUP_PATH);
-  }, [needsProfileSetup, setLocation]);
+  }, [needsProfileSetup, isCommunityMode, setLocation]);
 
   const inboxQuery = useQuery({
     queryKey: [...DM_INBOX_QK, userId],
@@ -654,9 +655,12 @@ export default function CommunityMessagesPage() {
   }
 
   if (needsProfileSetup) {
+    // Community members are redirected to setup; patients/supporters see an in-place prompt
+    // (messaging requires a public identity, but we don't yank them off this route).
+    if (isCommunityMode) return null;
     return (
       <PageShell variant="standard" className="mx-auto max-w-xl space-y-4 pb-8">
-        <PageHeader leading={isCommunityMode ? undefined : <PageBackButton />} title="Messages" />
+        <PageHeader leading={<PageBackButton />} title="Messages" />
         <CommunityProfileSetupPrompt
           compact
           title="Set up your profile to message"

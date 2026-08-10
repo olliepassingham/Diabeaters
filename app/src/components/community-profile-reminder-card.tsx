@@ -2,7 +2,6 @@ import { Link } from "wouter";
 import { ArrowRight, UserCircle2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { AI_ASSISTANT_NAME } from "@/lib/ai-coach/persona";
 import { Card, CardContent } from "@/components/ui/card";
 
 type Props = {
@@ -40,10 +39,8 @@ export function CommunityProfileReminderCard({ onDismiss }: Props) {
               </Button>
             </div>
             <p className="text-sm leading-relaxed text-muted-foreground">
-              Tools and <span className="font-medium text-foreground">{AI_ASSISTANT_NAME}</span> work without this. To join
-              the{" "}
-              <span className="font-medium text-foreground">Feed</span>, add your display name, choose a public
-              @handle, and turn your profile public in Account.
+              You can browse the Feed without this. To post, follow, or message, add a display name, choose a
+              public @handle, and turn your profile public.
             </p>
             <ul className="space-y-1 text-xs leading-relaxed text-muted-foreground">
               <li>· Post, comment, and follow others in the community</li>
@@ -51,7 +48,7 @@ export function CommunityProfileReminderCard({ onDismiss }: Props) {
             </ul>
             <Button asChild size="sm" className="mt-1 rounded-xl">
               <Link href="/community/setup">
-                Complete profile
+                Set up profile
                 <ArrowRight className="ml-1.5 h-4 w-4" aria-hidden />
               </Link>
             </Button>

@@ -10,7 +10,7 @@ type CommunityFeatureGateProps = {
   requirePublicProfile?: boolean;
 };
 
-/** Community routes: build flag; optionally `profiles.is_public` for feed and messaging. */
+/** Community routes: build flag; optionally `profiles.is_public` when participation requires it. */
 export function CommunityFeatureGate({
   children,
   requirePublicProfile = true,
@@ -23,6 +23,8 @@ export function CommunityFeatureGate({
     return <FeedLoadingSkeleton rows={4} />;
   }
 
+  // Soft-browse routes pass requirePublicProfile={false} so patients can read the Feed
+  // before finishing a public profile. Engagement is gated separately in-page.
   if (requirePublicProfile && !profile?.is_public) {
     return <CommunityProfileSetupPrompt />;
   }

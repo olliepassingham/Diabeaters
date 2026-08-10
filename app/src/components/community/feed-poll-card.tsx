@@ -74,7 +74,7 @@ export function FeedPollCard({
     }
     if (!canEngageWithFeed) {
       toast({
-        title: "Choose a @handle first",
+        title: "Set up your public profile",
         description: COMMUNITY_FEED_ENGAGE_REQUIRED_MESSAGE,
         variant: "destructive",
       });

@@ -27,7 +27,7 @@ import { cn } from "@/lib/utils";
  */
 export default function CommunitySetupPage() {
   const { user } = useAuth();
-  const { profile, loading, refresh } = useProfile();
+  const { profile, loading, refresh, error: profileError } = useProfile();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -57,6 +57,9 @@ export default function CommunitySetupPage() {
 
   const savedHandleSlug = (profile?.public_handle ?? "").replace(/^@/, "").trim().toLowerCase();
   const handleSlug = handleInput.replace(/^@/, "").trim().toLowerCase();
+  // Prefer the loaded profile id; fall back to the signed-in user id so Join still works when
+  // the profiles row is missing or failed to load (upsert will create/repair it).
+  const profileId = profile?.id ?? user?.id ?? null;
 
   useEffect(() => {
     if (!isPublic) {
@@ -82,7 +85,7 @@ export default function CommunitySetupPage() {
           if (!cancelled) setHandleAvailability("invalid");
           return;
         }
-        const res = await isPublicHandleAvailable(handleSlug, { excludeUserId: profile?.id });
+        const res = await isPublicHandleAvailable(handleSlug, { excludeUserId: profileId ?? undefined });
         if (cancelled) return;
         if (res.error && !res.available) {
           setHandleAvailability("invalid");
@@ -96,7 +99,7 @@ export default function CommunitySetupPage() {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [handleSlug, savedHandleSlug, profile?.id, isPublic]);
+  }, [handleSlug, savedHandleSlug, profileId, isPublic]);
 
   const handleHint = useMemo(() => {
     if (!handleSlug) return "3–30 characters · letters, numbers, underscore";
@@ -108,18 +111,29 @@ export default function CommunitySetupPage() {
   }, [handleSlug, handleAvailability]);
 
   const canSubmit =
-    Boolean(user?.id && profile?.id) &&
+    Boolean(profileId) &&
     isPublic &&
     fullName.trim().length > 0 &&
     handleSlug.length > 0 &&
-    handleAvailability !== "taken" &&
-    handleAvailability !== "invalid" &&
-    handleAvailability !== "checking" &&
+    handleAvailability === "available" &&
     !saving;
+
+  const submitBlockedReason = useMemo(() => {
+    if (canSubmit || saving) return null;
+    if (!profileId) return "Sign in again to finish setting up your profile.";
+    if (!isPublic) return "Turn on Public on the Feed to join.";
+    if (!fullName.trim()) return "Add a display name to continue.";
+    if (!handleSlug) return "Choose a handle to continue.";
+    if (handleAvailability === "checking") return "Checking your handle…";
+    if (handleAvailability === "taken") return PUBLIC_HANDLE_TAKEN_MESSAGE;
+    if (handleAvailability === "invalid") return "Use 3–30 characters: letters, numbers, underscore.";
+    if (handleAvailability !== "available") return "Wait for your handle to be checked.";
+    return null;
+  }, [canSubmit, saving, profileId, isPublic, fullName, handleSlug, handleAvailability]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!profile?.id || !canSubmit) return;
+    if (!profileId || !canSubmit) return;
 
     let normalizedHandle = "";
     try {
@@ -157,7 +171,7 @@ export default function CommunitySetupPage() {
     setSaving(true);
     if (normalizedHandle !== savedHandleSlug) {
       const availability = await isPublicHandleAvailable(normalizedHandle, {
-        excludeUserId: profile.id,
+        excludeUserId: profileId,
       });
       if (!availability.available) {
         setSaving(false);
@@ -172,7 +186,7 @@ export default function CommunitySetupPage() {
     }
 
     const { error } = await updateProfile({
-      id: profile.id,
+      id: profileId,
       full_name: nameVal,
       bio: bio.trim() || null,
       public_handle: normalizedHandle,
@@ -263,6 +277,12 @@ export default function CommunitySetupPage() {
             </p>
           ) : null}
 
+          {profileError && !profile ? (
+            <p className="rounded-xl border border-amber-500/25 bg-amber-500/5 px-3 py-2.5 text-xs leading-relaxed text-amber-900 dark:text-amber-100">
+              Couldn&apos;t load your profile ({profileError.message}). You can still join — we&apos;ll create it when you save.
+            </p>
+          ) : null}
+
           <div className="space-y-2">
             <Label htmlFor="community-setup-name" className="inline-flex items-center gap-1.5">
               <UserRound className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
@@ -292,7 +312,14 @@ export default function CommunitySetupPage() {
               <Input
                 id="community-setup-handle"
                 value={handleInput.replace(/^@/, "")}
-                onChange={(e) => setHandleInput(e.target.value.replace(/^@/, ""))}
+                onChange={(e) =>
+                  setHandleInput(
+                    e.target.value
+                      .replace(/^@/, "")
+                      .replace(/\s+/g, "")
+                      .toLowerCase(),
+                  )
+                }
                 placeholder="your_handle"
                 autoComplete="username"
                 className="rounded-xl pl-8"
@@ -329,21 +356,28 @@ export default function CommunitySetupPage() {
             />
           </div>
 
-          <Button
-            type="submit"
-            className="min-h-12 w-full rounded-xl text-base font-semibold"
-            disabled={!canSubmit}
-            data-testid="community-setup-join"
-          >
-            {saving ? (
-              "Saving…"
-            ) : (
-              <>
-                Join the Feed
-                <ArrowRight className="ml-2 h-4 w-4" aria-hidden />
-              </>
-            )}
-          </Button>
+          <div className="space-y-2">
+            <Button
+              type="submit"
+              className="min-h-12 w-full rounded-xl text-base font-semibold"
+              disabled={!canSubmit}
+              data-testid="community-setup-join"
+            >
+              {saving ? (
+                "Saving…"
+              ) : (
+                <>
+                  Join the Feed
+                  <ArrowRight className="ml-2 h-4 w-4" aria-hidden />
+                </>
+              )}
+            </Button>
+            {submitBlockedReason ? (
+              <p className="text-center text-xs text-muted-foreground" data-testid="community-setup-blocked-reason">
+                {submitBlockedReason}
+              </p>
+            ) : null}
+          </div>
 
           <div className="flex flex-col items-center gap-2 pt-1">
             <Button asChild type="button" variant="ghost" size="sm" className="text-muted-foreground">

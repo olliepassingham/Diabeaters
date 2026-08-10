@@ -46,7 +46,6 @@ import { getProfilesByIds, searchPublicProfilesForFeedQuery, useProfile, canEnga
 import { COMMUNITY_PROFILE_SETUP_PATH } from "@/lib/community-landing";
 import { prefetchProfileAvatarUrls } from "@/lib/storage-profile";
 import { CommunityProfileReminderCard } from "@/components/community-profile-reminder-card";
-import { CommunityProfileSetupPrompt } from "@/components/community-profile-setup-prompt";
 import {
   dismissCommunityFeedProfileReminder,
   shouldShowCommunityFeedProfileReminder,
@@ -59,6 +58,9 @@ import { buildMainFeedScopeKey, COMMUNITY_FEED_QUERY_ROOT, MAIN_FEED_PAGE_SIZE }
 import { getAppScrollMain, getAppScrollTop, setAppScrollTop } from "@/lib/app-scroll";
 import { CommunityPushPromptDialog } from "@/components/community-push-prompt-dialog";
 import { useCommunityPushPromptAfterOnboarding } from "@/hooks/use-community-push-prompt-after-onboarding";
+import { getActiveAppMode, isCommunitySessionMode } from "@/lib/carer-session";
+import { isCommunityAccountProfile, storage } from "@/lib/storage";
+import { useLinkedCarer } from "@/hooks/use-linked-carer";
 
 function shortId(id: string) {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
@@ -101,6 +103,12 @@ export default function CommunityHomePage() {
   const [pathname, setLocation] = useLocation();
   const search = useSearch();
   const queryClient = useQueryClient();
+  const { isCarer: hasCarerLink } = useLinkedCarer();
+  const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
+  const isCommunityMode = isCommunitySessionMode(hasCarerLink, activeMode, {
+    localCommunityProfile: isCommunityAccountProfile(storage.getProfile()),
+    cloudCommunityProfile: profile?.account_type === "community",
+  });
   const [feedTab, setFeedTab] = useState<FeedTab>(() => readStoredFeedTab());
   /** `null` = all topics. */
   const [topicFilter, setTopicFilter] = useState<CommunityTopicId | null>(null);
@@ -143,12 +151,27 @@ export default function CommunityHomePage() {
   const [storyCreateOpen, setStoryCreateOpen] = useState(false);
 
   useEffect(() => {
+    const onMode = (ev: Event) => {
+      const ce = ev as CustomEvent<{ mode?: "patient" | "carer" | "community" | null }>;
+      setActiveMode(ce.detail?.mode ?? getActiveAppMode());
+    };
+    window.addEventListener("diabeater:app-mode", onMode);
+    return () => window.removeEventListener("diabeater:app-mode", onMode);
+  }, []);
+
+  useEffect(() => {
     if (!user?.id || profileLoading) {
       setShowProfileReminder(false);
       return;
     }
+    // Patients/supporters may browse the Feed without a public profile; show a soft reminder.
+    // Community members are redirected to setup instead (below).
+    if (isCommunityMode) {
+      setShowProfileReminder(false);
+      return;
+    }
     setShowProfileReminder(shouldShowCommunityFeedProfileReminder(user.id, profile));
-  }, [user?.id, profile, profileLoading]);
+  }, [user?.id, profile, profileLoading, isCommunityMode]);
 
   useEffect(() => {
     if (!user?.id) {
@@ -160,9 +183,10 @@ export default function CommunityHomePage() {
 
   useEffect(() => {
     if (profileLoading) return;
+    if (!isCommunityMode) return;
     if (!needsCommunityProfileSetup(profile)) return;
     setLocation(COMMUNITY_PROFILE_SETUP_PATH);
-  }, [profile, profileLoading, setLocation]);
+  }, [profile, profileLoading, setLocation, isCommunityMode]);
 
   // Preserve scroll position across Everyone / Following toggles (app main scroll container).
   useEffect(() => {
@@ -511,6 +535,14 @@ export default function CommunityHomePage() {
       toast({ title: "Sign in to follow", variant: "destructive" });
       return;
     }
+    if (!canEngageWithFeed) {
+      toast({
+        title: "Set up your public profile",
+        description: "Add a display name and @handle before following people.",
+      });
+      setLocation(COMMUNITY_PROFILE_SETUP_PATH);
+      return;
+    }
     if (followeeIds.has(id)) return;
     setFollowBusyIds((prev) => ({ ...prev, [id]: true }));
     const res = await followUser(id);
@@ -554,8 +586,12 @@ export default function CommunityHomePage() {
   }
 
   const needsPublicSetup = !profileLoading && needsCommunityProfileSetup(profile);
+  // Community members must finish profile before the Feed; patients can browse with a soft prompt.
+  if (isCommunityMode && needsPublicSetup) {
+    return null;
+  }
 
-  const feedHeaderActions = !needsPublicSetup ? (
+  const feedHeaderActions = (
     <div className="flex shrink-0 items-center justify-end gap-1" data-testid="feed-toolbar-actions">
       <Button
         variant="ghost"
@@ -571,7 +607,7 @@ export default function CommunityHomePage() {
       </Button>
       {user ? <FeedMoreMenu /> : null}
     </div>
-  ) : null;
+  );
 
   return (
     <PageShell variant="full" density="compact" className="pb-2">
@@ -588,10 +624,6 @@ export default function CommunityHomePage() {
       </div>
       <PageHeader title="Community" screenReaderOnly />
 
-      {needsPublicSetup ? (
-        <CommunityProfileSetupPrompt compact />
-      ) : (
-        <>
       {user && !savedOnly && !feedSearch.trim() ? (
         <FeedStoriesComposerHeader
           self={selfStoryPerson}
@@ -604,7 +636,17 @@ export default function CommunityHomePage() {
           avatarDisplayName={feedComposer.avatarDisplayName}
           avatarPath={feedComposer.avatarPath}
           profileHref={feedComposer.profileHref}
-          onComposerClick={() => feedComposer.setSheetOpen(true)}
+          onComposerClick={() => {
+            if (!canComposeToFeed) {
+              toast({
+                title: "Set up your public profile",
+                description: "Add a display name and @handle to post on the Feed.",
+              });
+              setLocation(COMMUNITY_PROFILE_SETUP_PATH);
+              return;
+            }
+            feedComposer.setSheetOpen(true);
+          }}
           composerDisabled={!canComposeToFeed}
           isMobile={isMobile}
           composerExpanded={composerPanelOpen}
@@ -1025,8 +1067,6 @@ export default function CommunityHomePage() {
         open={communityPushPromptOpen}
         onOpenChange={setCommunityPushPromptOpen}
       />
-        </>
-      )}
     </PageShell>
   );
 }

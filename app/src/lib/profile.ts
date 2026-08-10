@@ -312,7 +312,7 @@ export function canEngageWithCommunityFeed(
 }
 
 export const COMMUNITY_FEED_ENGAGE_REQUIRED_MESSAGE =
-  "Choose a display name and @handle on your public profile before posting, liking, or commenting.";
+  "Set up your public profile (display name + @handle) before posting, liking, or commenting.";
 
 function mapPublicProfileSupportedPersonRow(
   row: Record<string, unknown> | null | undefined,

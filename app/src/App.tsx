@@ -807,7 +807,7 @@ function InnerRouter() {
       </Route>
       <Route path="/community/post/:postId">
         <PatientRouteGuard>
-          <CommunityFeatureGate>
+          <CommunityFeatureGate requirePublicProfile={false}>
             <Suspense fallback={<RouteFallback />}>
               <CommunityPost />
             </Suspense>
