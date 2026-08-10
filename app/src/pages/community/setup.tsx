@@ -20,6 +20,9 @@ import {
 } from "@/lib/profile";
 import { applyDisplayNameToLocalProfile } from "@/lib/user-display-name";
 import { cn } from "@/lib/utils";
+import { getActiveAppMode, isCommunitySessionMode } from "@/lib/carer-session";
+import { isCommunityAccountProfile, storage } from "@/lib/storage";
+import { useLinkedCarer } from "@/hooks/use-linked-carer";
 
 /**
  * Focused first-run setup for Community Members: name + @handle (+ public),
@@ -30,6 +33,12 @@ export default function CommunitySetupPage() {
   const { profile, loading, refresh, error: profileError } = useProfile();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const { isCarer: hasCarerLink } = useLinkedCarer();
+  const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
+  const isCommunityMode = isCommunitySessionMode(hasCarerLink, activeMode, {
+    localCommunityProfile: isCommunityAccountProfile(storage.getProfile()),
+    cloudCommunityProfile: profile?.account_type === "community",
+  });
 
   const [fullName, setFullName] = useState("");
   const [handleInput, setHandleInput] = useState("");
@@ -39,6 +48,15 @@ export default function CommunitySetupPage() {
   const [handleAvailability, setHandleAvailability] = useState<
     "idle" | "checking" | "available" | "taken" | "invalid"
   >("idle");
+
+  useEffect(() => {
+    const onMode = (ev: Event) => {
+      const ce = ev as CustomEvent<{ mode?: "patient" | "carer" | "community" | null }>;
+      setActiveMode(ce.detail?.mode ?? getActiveAppMode());
+    };
+    window.addEventListener("diabeater:app-mode", onMode);
+    return () => window.removeEventListener("diabeater:app-mode", onMode);
+  }, []);
 
   useEffect(() => {
     if (!profile) return;
@@ -191,6 +209,9 @@ export default function CommunitySetupPage() {
       bio: bio.trim() || null,
       public_handle: normalizedHandle,
       is_public: true,
+      ...(isCommunityMode
+        ? { account_type: "community" as const, primary_app_role: "community" as const }
+        : {}),
     });
     setSaving(false);
 

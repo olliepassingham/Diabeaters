@@ -221,6 +221,62 @@ export async function getProfile(userId: string): Promise<{ profile: ProfileRow 
   }
 }
 
+/** Server-validated auth user id (rejects stale local sessions). */
+export async function resolveAuthenticatedUserId(): Promise<{ userId: string | null; error: Error | null }> {
+  const supabase = getSupabase();
+  if (!supabase) return { userId: null, error: new Error("Supabase not configured") };
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (error || !data.user?.id) {
+      return {
+        userId: null,
+        error: new Error("Please sign in again to save your profile."),
+      };
+    }
+    return { userId: data.user.id, error: null };
+  } catch (e) {
+    return {
+      userId: null,
+      error: e instanceof Error ? e : new Error(String(e)),
+    };
+  }
+}
+
+function mapProfileWriteError(message: string): Error {
+  if (/profiles_id_fkey|foreign key constraint.*profiles/i.test(message)) {
+    return new Error("Your sign-in session is out of date. Sign out and sign back in, then try again.");
+  }
+  return new Error(message);
+}
+
+/**
+ * Ensures the signed-in user has a `profiles` row (bootstrap trigger can miss older accounts).
+ * Always uses `auth.getUser()` so we never insert a stale client session id.
+ */
+export async function ensureOwnProfileRow(): Promise<{ userId: string | null; error: Error | null }> {
+  const { userId, error } = await resolveAuthenticatedUserId();
+  if (!userId) return { userId: null, error };
+
+  const supabase = getSupabase();
+  if (!supabase) return { userId: null, error: new Error("Supabase not configured") };
+
+  const existing = await getProfile(userId);
+  if (existing.profile) return { userId, error: null };
+
+  try {
+    const { error: insertError } = await supabase.from("profiles").insert({ id: userId });
+    if (!insertError) return { userId, error: null };
+    // Concurrent create — treat unique violation as success.
+    if (insertError.code === "23505") return { userId, error: null };
+    return { userId: null, error: mapProfileWriteError(insertError.message) };
+  } catch (e) {
+    return {
+      userId: null,
+      error: e instanceof Error ? e : new Error(String(e)),
+    };
+  }
+}
+
 /** Batch fetch for timelines / lists (RLS: public profiles visible to authenticated users). */
 export async function getProfilesByIds(userIds: string[]): Promise<Map<string, ProfileRow>> {
   const supabase = getSupabase();
@@ -588,8 +644,12 @@ export async function updateProfile(
   const supabase = getSupabase();
   if (!supabase) return { data: null, error: new Error("Supabase not configured") };
 
+  const ensured = await ensureOwnProfileRow();
+  if (!ensured.userId) return { data: null, error: ensured.error };
+  // Always write as the verified auth user — never trust a stale client-supplied id for inserts.
+  const id = ensured.userId;
+
   const {
-    id,
     full_name,
     avatar_url,
     bio,
@@ -611,7 +671,7 @@ export async function updateProfile(
     carb_source_prefs,
     show_supported_person_on_profile,
   } = payload;
-  const update: Record<string, unknown> = { id };
+  const update: Record<string, unknown> = {};
   if (full_name !== undefined) update.full_name = full_name ?? null;
   if (avatar_url !== undefined) update.avatar_url = avatar_url ?? null;
   if (bio !== undefined) update.bio = bio ?? null;
@@ -722,10 +782,16 @@ export async function updateProfile(
     update.show_supported_person_on_profile = Boolean(show_supported_person_on_profile);
   }
 
+  if (Object.keys(update).length === 0) {
+    const existing = await getProfile(id);
+    return { data: existing.profile, error: null };
+  }
+
   try {
     const { data, error } = await supabase
       .from("profiles")
-      .upsert(update, { onConflict: "id" })
+      .update(update)
+      .eq("id", id)
       .select()
       .single();
 
@@ -733,7 +799,7 @@ export async function updateProfile(
       if (isProfileHandleUniqueViolation(error)) {
         return { data: null, error: new Error(PUBLIC_HANDLE_TAKEN_MESSAGE) };
       }
-      return { data: null, error: new Error(error.message) };
+      return { data: null, error: mapProfileWriteError(error.message) };
     }
     return {
       data: data ? rowFromData(data as Record<string, unknown>) : null,
@@ -745,7 +811,7 @@ export async function updateProfile(
     }
     return {
       data: null,
-      error: e instanceof Error ? e : new Error(String(e)),
+      error: e instanceof Error ? mapProfileWriteError(e.message) : new Error(String(e)),
     };
   }
 }
@@ -767,8 +833,17 @@ export async function upsertProfile(payload: {
   const supabase = getSupabase();
   if (!supabase) return { data: null, error: new Error("Supabase not configured") };
 
+  const ensured = await ensureOwnProfileRow();
+  if (!ensured.userId) return { data: null, error: ensured.error };
+  const id = ensured.userId;
+  if (payload.id && payload.id !== id) {
+    return {
+      data: null,
+      error: new Error("Please sign in again to save your profile."),
+    };
+  }
+
   const {
-    id,
     full_name,
     avatar_url,
     bio,
@@ -781,7 +856,7 @@ export async function upsertProfile(payload: {
     primary_app_role,
   } = payload;
 
-  const update: Record<string, unknown> = { id };
+  const update: Record<string, unknown> = {};
   if (full_name !== undefined) update.full_name = full_name ?? null;
   if (avatar_url !== undefined) update.avatar_url = avatar_url ?? null;
   if (bio !== undefined) update.bio = bio ?? null;
@@ -805,14 +880,20 @@ export async function upsertProfile(payload: {
     }
   }
 
+  if (Object.keys(update).length === 0) {
+    const existing = await getProfile(id);
+    return { data: existing.profile, error: null };
+  }
+
   try {
     const { data, error } = await supabase
       .from("profiles")
-      .upsert(update, { onConflict: "id" })
+      .update(update)
+      .eq("id", id)
       .select()
       .single();
 
-    if (error) return { data: null, error: new Error(error.message) };
+    if (error) return { data: null, error: mapProfileWriteError(error.message) };
     return {
       data: data ? rowFromData(data as Record<string, unknown>) : null,
       error: null,
@@ -820,7 +901,7 @@ export async function upsertProfile(payload: {
   } catch (e) {
     return {
       data: null,
-      error: e instanceof Error ? e : new Error(String(e)),
+      error: e instanceof Error ? mapProfileWriteError(e.message) : new Error(String(e)),
     };
   }
 }
