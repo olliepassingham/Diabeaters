@@ -1676,6 +1676,19 @@ function AppContent() {
 
   const linkedCarer = Boolean(linkQuery.data);
 
+  const isCommunityMemberForGate = useMemo(
+    () =>
+      resolvesAsCommunityMemberAccount({
+        profile: profileQuery.data ?? null,
+        linkedCarer,
+        primaryAppRole: getPrimaryAppRole(),
+        metadataAccountPath: onboardingAccountPathFromUserMetadata(user),
+      }) ||
+      getActiveAppMode() === "community" ||
+      isCommunityAccountProfile(storage.getProfile()),
+    [linkedCarer, profileQuery.data, user],
+  );
+
   const patientOnboardingSatisfied = useMemo(
     () =>
       isPatientOnboardingSatisfied({
@@ -1686,12 +1699,7 @@ function AppContent() {
         onboardingCompleteFromDb: profileQuery.data?.onboarding_complete === true,
         onboardingCompleteFromLocalStorage: readOnboardingCompleteFromLocalStorage(),
         online,
-        isCommunityMemberAccount: resolvesAsCommunityMemberAccount({
-          profile: profileQuery.data ?? null,
-          linkedCarer,
-          primaryAppRole: getPrimaryAppRole(),
-          metadataAccountPath: onboardingAccountPathFromUserMetadata(user),
-        }),
+        isCommunityMemberAccount: isCommunityMemberForGate,
       }),
     [
       userId,
@@ -1700,7 +1708,7 @@ function AppContent() {
       profileQuery.data,
       profileQuery.isFetched,
       online,
-      user,
+      isCommunityMemberForGate,
     ],
   );
 
@@ -1769,6 +1777,9 @@ function AppContent() {
     if (getPrimaryAppRole() !== "community" && (hasCarerIntent() || hasPendingCarer())) return;
     if (patientOnboardingSatisfied) return;
     if (pathOnly === "/onboarding" || pathOnly === "/account") return;
+    // Community setup / feed must not be yanked into clinical onboarding (redirect loop).
+    if (pathOnly === "/community/setup" || pathOnly.startsWith("/community/")) return;
+    if (isCommunityMemberForGate) return;
     const role = getPrimaryAppRole();
     if (role === null) {
       if (pathOnly !== "/welcome") setLocation("/welcome");
@@ -1785,6 +1796,7 @@ function AppContent() {
     publicEntry,
     location,
     setLocation,
+    isCommunityMemberForGate,
   ]);
 
   if (location.startsWith("/_shots")) {
@@ -1826,7 +1838,10 @@ function AppContent() {
     !carerPendingBlocksOnboarding &&
     !patientOnboardingSatisfied &&
     pathOnly !== "/onboarding" &&
-    pathOnly !== "/account"
+    pathOnly !== "/account" &&
+    pathOnly !== "/community/setup" &&
+    !pathOnly.startsWith("/community/") &&
+    !isCommunityMemberForGate
   ) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-foreground">

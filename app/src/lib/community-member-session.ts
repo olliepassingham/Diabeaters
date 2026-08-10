@@ -149,6 +149,8 @@ export async function ensureCommunityMemberSessionReady(
   if (!userId.trim()) return;
   const { profile } = await getProfile(userId);
   if (!shouldUseCommunityMemberSession(profile, opts?.metadataAccountPath)) return;
+  // Finalize always restores local markers first, then syncs cloud — even if the cloud
+  // write fails, the session is usable for /community/setup.
   await finalizeCommunityMemberSession(userId, {
     email: opts?.email,
     fullName: profile?.full_name ?? null,

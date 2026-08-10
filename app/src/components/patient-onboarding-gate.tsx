@@ -9,7 +9,6 @@ import {
   hasCarerIntent,
   hasPendingCarer,
   onboardingAccountPathFromUserMetadata,
-  setActiveAppMode,
 } from "@/lib/carer-session";
 import Onboarding from "@/pages/onboarding";
 import { getPostOnboardingPath } from "@/lib/onboarding-routes";
@@ -21,6 +20,7 @@ import {
 } from "@/lib/community-member-session";
 import { isPatientUpgradeOnboarding } from "@/lib/patient-upgrade-onboarding";
 import { reconcileWrongWelcomePathForSignedInUser } from "@/lib/welcome-path-reconcile";
+import { restoreCommunitySessionMarkers } from "@/lib/welcome-path-community-reconcile";
 
 type PatientOnboardingGateProps = {
   onPatientComplete: () => void;
@@ -78,8 +78,11 @@ export function PatientOnboardingGate({ onPatientComplete }: PatientOnboardingGa
         accountPath === "community" ||
         metadataAccountPath === "community"
       ) {
+        // Always restore local community markers before navigating — otherwise AppContent can
+        // treat the session as an unfinished patient onboarding and bounce /community/setup ↔
+        // /onboarding forever on "Redirecting…".
+        restoreCommunitySessionMarkers();
         await ensureCommunityMemberSessionReady(user.id, { metadataAccountPath });
-        setActiveAppMode("community");
         setLocation(getCommunityMemberLandingPath(profile ?? null));
         return;
       }

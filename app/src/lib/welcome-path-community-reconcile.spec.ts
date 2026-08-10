@@ -55,6 +55,16 @@ describe("welcome-path-community-reconcile", () => {
     expect(result.destination).toBe("/community/setup");
     expect(getPrimaryAppRole()).toBe("community");
     expect(getOnboardingAccountPath()).toBe("community");
+    expect(localStorage.getItem("diabeater_onboarding_completed")).toBe("true");
+  });
+
+  it("restoreCommunitySessionMarkers marks clinical onboarding complete locally", async () => {
+    const { restoreCommunitySessionMarkers } = await import("@/lib/welcome-path-community-reconcile");
+    const { getPrimaryAppRole, getActiveAppMode } = await import("@/lib/carer-session");
+    restoreCommunitySessionMarkers();
+    expect(getPrimaryAppRole()).toBe("community");
+    expect(getActiveAppMode()).toBe("community");
+    expect(localStorage.getItem("diabeater_onboarding_completed")).toBe("true");
   });
 
   it("does not reconcile linked community members upgrading via supporter flow", async () => {

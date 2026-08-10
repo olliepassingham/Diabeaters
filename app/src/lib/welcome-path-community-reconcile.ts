@@ -31,6 +31,13 @@ export function restoreCommunitySessionMarkers(): void {
   setOnboardingAccountPath("community");
   setActiveAppMode("community");
   markPersistedCommunityAccount();
+  // Community members skip clinical onboarding — mark complete so AppContent does not
+  // trap them on "Redirecting…" while bouncing /onboarding ↔ /community/setup.
+  try {
+    localStorage.setItem("diabeater_onboarding_completed", "true");
+  } catch {
+    /* ignore */
+  }
 }
 
 export type CommunityUserWelcomeReconcileResult =
