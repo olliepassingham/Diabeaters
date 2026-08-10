@@ -1,6 +1,6 @@
 # Google Play / Android release checklist
 
-Operational steps to ship the Capacitor Android shell. Default release sync (`npm run android:release:sync`) bundles `dist/` for offline cold start. Optional remote mode: `npm run android:release:sync:remote` sets `CAPACITOR_SERVER_URL` in [`capacitor.config.ts`](../capacitor.config.ts).
+Operational steps to ship the Capacitor Android shell. **Default** release sync (`npm run android:release:sync`) points the WebView at **https://diabeaters.vercel.app** so pushes to `main` update the app the same way as iOS. Use `npm run android:release:sync:bundled` only for offline Play Store archives.
 
 **Start here for a phased launch plan:** [play_store_launch_runbook.md](./play_store_launch_runbook.md) (tickable Week 1–3 runbook + owner one-pager).
 
@@ -40,15 +40,18 @@ APNs secrets (`APNS_*`) remain required for iOS; Android uses FCM only.
 
 ---
 
-## 3. Capacitor + production URL
+## 3. Capacitor + production URL (live updates)
 
-- [ ] [`capacitor.config.ts`](../capacitor.config.ts) `server.url` is your **final production** origin
-- [ ] After each web release intended for a store build:
+- [ ] Default sync uses remote WebView → **`https://diabeaters.vercel.app`** (same as iOS)
+- [ ] After changing native plugins / first device install:
 
   ```bash
   npm run android:release:sync
+  npm run cap:android
   ```
 
+  Then **Run** on a device. Later **web-only** pushes to `main` update via Vercel — no Android rebuild needed.
+- [ ] For a Play Store **offline** archive instead: `npm run android:release:sync:bundled`
 - [ ] Open Android Studio: **File → Open** → `android/`
 - [ ] Build **debug APK** for device smoke test, then **signed release AAB** for Play upload
 

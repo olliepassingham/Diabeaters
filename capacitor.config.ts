@@ -1,21 +1,18 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 /**
- * Store default: **bundled** `webDir` (set CAPACITOR_BUNDLE_WEB=1 via release scripts).
- * Fast cold start + offline UI. See docs/operations/native-shipping-mode.md.
- *
- * Remote Vercel WebView (TestFlight live-iteration only):
- *   CAPACITOR_SERVER_URL=https://… or omit CAPACITOR_BUNDLE_WEB with sync:remote
- *   npm run ios:release:sync:remote
+ * Day-to-day: Capacitor loads https://diabeaters.vercel.app so pushes to main update the
+ * native WebView (iOS + Android). Opt out with CAPACITOR_BUNDLE_WEB=1 for offline store archives.
+ * See docs/operations/native-shipping-mode.md.
  *
  * Do not point CAPACITOR_SERVER_URL at staging for store archives.
  */
 const PRODUCTION_SERVER_URL = "https://diabeaters.vercel.app";
 const bundleWeb = process.env.CAPACITOR_BUNDLE_WEB === "1";
+/** Default remote unless explicitly bundling. CAPACITOR_FORCE_REMOTE=1 kept for script clarity. */
 const remoteServerUrl = bundleWeb
   ? undefined
-  : process.env.CAPACITOR_SERVER_URL?.trim() ||
-    (process.env.CAPACITOR_FORCE_REMOTE === "1" ? PRODUCTION_SERVER_URL : undefined);
+  : process.env.CAPACITOR_SERVER_URL?.trim() || PRODUCTION_SERVER_URL;
 
 const config: CapacitorConfig = {
   appId: "com.passingtime.diabeaters",

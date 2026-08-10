@@ -75,7 +75,8 @@ if (isStaging) {
 |----------------|--------|
 | Frontend dev   | `cd app && npm run dev` or `npm run web:dev` |
 | Frontend build | `cd app && npm run build` or `npm run web:build` |
-| iOS (store build sync) | `npm run ios:release:sync` then Archive in Xcode |
+| iOS (live WebView sync) | `npm run ios:release:sync` then Run/Archive in Xcode |
+| Android (live WebView sync) | `npm run android:release:sync` then Run in Android Studio |
 | Backend dev    | `npm run dev:server` |
 
 ---
@@ -167,7 +168,7 @@ The email link opens in the system browser (SFSafariViewController). The WebView
 
 Cloud features are designed to be usable when connectivity is unreliable.
 
-- **Native apps (iOS/Android)**: Release builds bundle the production web app from `dist/` (see `npm run ios:release:sync`). The shell opens **without network**; home, guides, and tools use on-device storage. To ship the legacy remote-WebView mode instead, use `npm run ios:release:sync:remote` (`CAPACITOR_SERVER_URL`).
+- **Native apps (iOS/Android)**: Default release sync loads **https://diabeaters.vercel.app** in the WebView — push to `main` updates the app after Vercel deploys (see [native-shipping-mode.md](docs/operations/native-shipping-mode.md)). For an offline Play/App Store archive, use `npm run ios:release:sync:bundled` / `npm run android:release:sync:bundled`.
 - **Web/PWA**: The service worker precaches the built JS/CSS shell after `npm run web:build` for faster offline reloads.
 - **Cloud supplies**: Uses a small *read-through cache* of the last successful server list.
 - **When offline**:

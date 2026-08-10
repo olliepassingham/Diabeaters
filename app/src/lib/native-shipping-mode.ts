@@ -1,16 +1,15 @@
 /**
- * Store shipping mode (decision recorded 2026-08).
+ * Native shipping mode.
  *
- * Default for App Store / production archives: **bundled** `webDir`
- * (fast cold start, offline UI). Live Vercel WebView remains available via
- * `npm run ios:release:sync:remote` for TestFlight iteration only.
+ * Default day-to-day sync (`ios:release:sync` / `android:release:sync`) is **remote**:
+ * Capacitor `server.url` → https://diabeaters.vercel.app so pushes to main update the
+ * WebView without a new binary (same on iOS and Android).
  *
- * Capgo / OTA: optional later — keep store binaries bundled and push JS
- * packages when a Capgo app id is configured. Do not re-enable remote
- * `server.url` for store archives once bundled is the default.
+ * Store / Play archives that must work offline: use `*:release:sync:bundled`.
+ * Capgo OTA can later patch bundled binaries without resubmitting.
  *
  * @see docs/operations/native-shipping-mode.md
  */
-export const NATIVE_STORE_SHIPPING_MODE = "bundled" as const;
+export const NATIVE_STORE_SHIPPING_MODE = "remote" as const;
 
 export type NativeStoreShippingMode = typeof NATIVE_STORE_SHIPPING_MODE;
