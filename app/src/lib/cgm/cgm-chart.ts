@@ -85,12 +85,10 @@ function formatChartTimeLabel(timeMs: number, compact: boolean): string {
   if (compact) {
     return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
   }
-  return d.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  // Avoid locale forms like "9 Aug at 16:58" which collide on narrow charts.
+  const day = d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  const time = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return `${day} ${time}`;
 }
 
 export function chartYDomain(points: CgmChartPoint[], units: BgUnits, extraValues: number[] = []): [number, number] {

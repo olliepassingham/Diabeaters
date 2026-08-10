@@ -20,9 +20,9 @@ type CgmGlucoseChartProps = {
 
 const WIDTH = 320;
 const HEIGHT = 200;
-const PAD = { top: 12, right: 8, bottom: 28, left: 36 };
+const PAD = { top: 12, right: 10, bottom: 28, left: 36 };
 /** Share of the plot width reserved for the projected (+15/+30 min) segment. */
-const FUTURE_ZONE_RATIO = 0.22;
+const FUTURE_ZONE_RATIO = 0.26;
 
 function scaleX(index: number, count: number, width: number, offset = PAD.left): number {
   if (count <= 1) return offset + width / 2;
@@ -83,9 +83,18 @@ export function CgmGlucoseChart({
 
   const xLabelIndices = useMemo(() => {
     if (points.length <= 1) return [0];
-    if (points.length <= 4) return points.map((_, i) => i);
+    if (points.length <= 4) {
+      // When projecting, skip the last history tick — it sits on the "now" divider
+      // and collides with +15m / +30m on narrow screens.
+      return hasProjection
+        ? points.map((_, i) => i).filter((i) => i < points.length - 1)
+        : points.map((_, i) => i);
+    }
+    if (hasProjection) {
+      return [0, Math.floor(points.length / 2)];
+    }
     return [0, Math.floor(points.length / 2), points.length - 1];
-  }, [points]);
+  }, [points, hasProjection]);
 
   const refLines = [targetLow, targetHigh].filter((v): v is number => typeof v === "number" && Number.isFinite(v));
   const hasTargetBand =
@@ -291,14 +300,18 @@ export function CgmGlucoseChart({
         {xLabelIndices.map((i) => {
           const p = points[i];
           if (!p) return null;
+          const x = scaleX(i, points.length, historyWidth);
+          // Keep the first label from clipping off the left; mid labels stay centred.
+          const anchor = i === 0 ? "start" : "middle";
           return (
             <text
               key={`${p.recordedAt}-x`}
-              x={scaleX(i, points.length, historyWidth)}
+              x={x}
               y={HEIGHT - 8}
-              textAnchor="middle"
-              fontSize="9"
+              textAnchor={anchor}
+              fontSize="8.5"
               fill="currentColor"
+              fillOpacity={0.85}
             >
               {p.timeLabel}
             </text>
@@ -307,11 +320,25 @@ export function CgmGlucoseChart({
 
         {future ? (
           <>
-            <text x={future.x15} y={HEIGHT - 8} textAnchor="middle" fontSize="8.5" fill="currentColor" fillOpacity={0.6}>
-              +15m
+            <text
+              x={future.x15}
+              y={HEIGHT - 8}
+              textAnchor="middle"
+              fontSize="8"
+              fill="currentColor"
+              fillOpacity={0.55}
+            >
+              +15
             </text>
-            <text x={future.x30} y={HEIGHT - 8} textAnchor="middle" fontSize="8.5" fill="currentColor" fillOpacity={0.6}>
-              +30m
+            <text
+              x={Math.min(future.x30, WIDTH - PAD.right)}
+              y={HEIGHT - 8}
+              textAnchor="end"
+              fontSize="8"
+              fill="currentColor"
+              fillOpacity={0.55}
+            >
+              +30
             </text>
           </>
         ) : null}
