@@ -4,7 +4,12 @@ import { CGM_CHART_OVERLAY_COLORS, type CgmChartOverlay } from "@/lib/cgm/cgm-ch
 import type { NearFutureProjectionResult } from "@/lib/cgm/near-future-projection";
 import type { BgUnits } from "@/lib/cgm/types";
 import { formatTargetBgInput } from "@/lib/hypo-context";
-import { computeGlucoseRangeStatus, glucoseRangeChartStroke, type GlucoseRangeStatus } from "@/lib/live-glucose-range";
+import {
+  buildGlucoseRangePathSegments,
+  computeGlucoseRangeStatus,
+  glucoseRangeChartStroke,
+  type GlucoseRangeStatus,
+} from "@/lib/live-glucose-range";
 import { cn } from "@/lib/utils";
 
 type CgmGlucoseChartProps = {
@@ -23,6 +28,7 @@ const HEIGHT = 200;
 const PAD = { top: 12, right: 10, bottom: 28, left: 36 };
 /** Share of the plot width reserved for the projected (+15/+30 min) segment. */
 const FUTURE_ZONE_RATIO = 0.26;
+const FALLBACK_STROKE = "hsl(var(--chart-2))";
 
 function scaleX(index: number, count: number, width: number, offset = PAD.left): number {
   if (count <= 1) return offset + width / 2;
@@ -67,16 +73,20 @@ export function CgmGlucoseChart({
     return chartYDomain(points, units, extras);
   }, [points, units, projection]);
 
-  const linePath = useMemo(() => {
-    if (points.length === 0) return "";
-    return points
-      .map((p, i) => {
-        const x = scaleX(i, points.length, historyWidth);
-        const y = scaleY(p.value, yMin, yMax, innerHeight);
-        return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
-      })
-      .join(" ");
+  const historyCoords = useMemo(() => {
+    return points.map((p, i) => ({
+      x: scaleX(i, points.length, historyWidth),
+      y: scaleY(p.value, yMin, yMax, innerHeight),
+      value: p.value,
+    }));
   }, [points, yMin, yMax, historyWidth, innerHeight]);
+
+  const linePath = useMemo(() => {
+    if (historyCoords.length === 0) return "";
+    return historyCoords
+      .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`)
+      .join(" ");
+  }, [historyCoords]);
 
   const yTicks = useMemo(() => {
     const steps = 4;
@@ -107,10 +117,15 @@ export function CgmGlucoseChart({
     return points.map((p) => computeGlucoseRangeStatus(p.value, targetLow!, targetHigh!));
   }, [points, hasTargetBand, targetLow, targetHigh]);
 
+  const historyStrokeSegments = useMemo(() => {
+    if (!hasTargetBand || historyCoords.length < 2) return null;
+    return buildGlucoseRangePathSegments(historyCoords, targetLow!, targetHigh!);
+  }, [hasTargetBand, historyCoords, targetLow, targetHigh]);
+
   const latestStatus = pointStatuses[pointStatuses.length - 1] ?? "in_range";
   const chartStartMs = points[0]?.timeMs ?? 0;
   const chartEndMs = points[points.length - 1]?.timeMs ?? chartStartMs;
-  const futureStroke = hasTargetBand ? glucoseRangeChartStroke(latestStatus) : "hsl(var(--chart-2))";
+  const areaStroke = hasTargetBand ? glucoseRangeChartStroke(latestStatus) : FALLBACK_STROKE;
 
   const future = useMemo(() => {
     if (!hasProjection || !projection) return null;
@@ -125,23 +140,59 @@ export function CgmGlucoseChart({
             { minutesAhead: 30, value: projection.at30Min },
           ];
     const maxAhead = Math.max(...samples.map((s) => s.minutesAhead), 30);
-    const coords = samples.map((s) => {
-      const x = xNow + (s.minutesAhead / maxAhead) * futureWidth;
-      const y = scaleY(s.value, yMin, yMax, innerHeight);
-      return { x, y, minutesAhead: s.minutesAhead, value: s.value };
-    });
+    const coords = [
+      { x: xNow, y: yNow, value: lastValue, minutesAhead: 0 },
+      ...samples.map((s) => {
+        const x = xNow + (s.minutesAhead / maxAhead) * futureWidth;
+        const y = scaleY(s.value, yMin, yMax, innerHeight);
+        return { x, y, minutesAhead: s.minutesAhead, value: s.value };
+      }),
+    ];
     const x15 = coords.find((c) => c.minutesAhead === 15)?.x ?? xNow + futureWidth * 0.5;
     const y15 = coords.find((c) => c.minutesAhead === 15)?.y ?? scaleY(projection.at15Min, yMin, yMax, innerHeight);
+    const status15 = hasTargetBand
+      ? computeGlucoseRangeStatus(projection.at15Min, targetLow!, targetHigh!)
+      : ("in_range" as const);
     const last = coords[coords.length - 1]!;
     const x30 = last.x;
     const y30 = last.y;
-    const futureLinePath = [
-      `M${xNow.toFixed(1)},${yNow.toFixed(1)}`,
-      ...coords.map((c) => `L${c.x.toFixed(1)},${c.y.toFixed(1)}`),
-    ].join(" ");
+    const status30 = hasTargetBand
+      ? computeGlucoseRangeStatus(last.value, targetLow!, targetHigh!)
+      : ("in_range" as const);
+    const futureLinePath = coords.map((c, i) => `${i === 0 ? "M" : "L"}${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(" ");
     const areaPath = `${futureLinePath} L${x30.toFixed(1)},${(PAD.top + innerHeight).toFixed(1)} L${xNow.toFixed(1)},${(PAD.top + innerHeight).toFixed(1)} Z`;
-    return { xNow, yNow, x15, y15, x30, y30, linePath: futureLinePath, areaPath };
-  }, [hasProjection, projection, historyWidth, futureWidth, points, yMin, yMax, innerHeight]);
+    const strokeSegments =
+      hasTargetBand && coords.length >= 2
+        ? buildGlucoseRangePathSegments(coords, targetLow!, targetHigh!)
+        : null;
+    const endStroke = hasTargetBand ? glucoseRangeChartStroke(status30) : FALLBACK_STROKE;
+    return {
+      xNow,
+      yNow,
+      x15,
+      y15,
+      x30,
+      y30,
+      status15,
+      status30,
+      linePath: futureLinePath,
+      areaPath,
+      strokeSegments,
+      endStroke,
+    };
+  }, [
+    hasProjection,
+    projection,
+    historyWidth,
+    futureWidth,
+    points,
+    yMin,
+    yMax,
+    innerHeight,
+    hasTargetBand,
+    targetLow,
+    targetHigh,
+  ]);
 
   return (
     <div className={cn("w-full", className)} data-testid="cgm-glucose-chart">
@@ -153,27 +204,14 @@ export function CgmGlucoseChart({
       >
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="hsl(var(--chart-2))" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="hsl(var(--chart-2))" stopOpacity="0.02" />
+            <stop offset="0%" stopColor={areaStroke} stopOpacity="0.28" />
+            <stop offset="100%" stopColor={areaStroke} stopOpacity="0.02" />
           </linearGradient>
           {future ? (
-            <>
-              <linearGradient
-                id={futureGradientId}
-                x1={future.xNow}
-                y1="0"
-                x2={future.x30}
-                y2="0"
-                gradientUnits="userSpaceOnUse"
-              >
-                <stop offset="0%" stopColor={futureStroke} stopOpacity="0.65" />
-                <stop offset="100%" stopColor={futureStroke} stopOpacity="0.18" />
-              </linearGradient>
-              <linearGradient id={`${futureGradientId}-fill`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={futureStroke} stopOpacity="0.14" />
-                <stop offset="100%" stopColor={futureStroke} stopOpacity="0" />
-              </linearGradient>
-            </>
+            <linearGradient id={`${futureGradientId}-fill`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={future.endStroke} stopOpacity="0.14" />
+              <stop offset="100%" stopColor={future.endStroke} stopOpacity="0" />
+            </linearGradient>
           ) : null}
         </defs>
 
@@ -250,15 +288,30 @@ export function CgmGlucoseChart({
           />
         ) : null}
 
-        <path
-          d={linePath}
-          fill="none"
-          stroke={hasTargetBand ? glucoseRangeChartStroke(latestStatus) : "hsl(var(--chart-2))"}
-          strokeWidth={2.5}
-          strokeLinejoin="round"
-          strokeLinecap="round"
-          strokeOpacity={0.85}
-        />
+        {historyStrokeSegments ? (
+          historyStrokeSegments.map((seg) => (
+            <path
+              key={`hist-${seg.status}`}
+              d={seg.d}
+              fill="none"
+              stroke={glucoseRangeChartStroke(seg.status)}
+              strokeWidth={2.5}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              strokeOpacity={0.9}
+            />
+          ))
+        ) : (
+          <path
+            d={linePath}
+            fill="none"
+            stroke={FALLBACK_STROKE}
+            strokeWidth={2.5}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            strokeOpacity={0.85}
+          />
+        )}
 
         {future ? (
           <g data-testid="cgm-chart-projection">
@@ -273,18 +326,57 @@ export function CgmGlucoseChart({
               strokeWidth={1}
             />
             <path d={future.areaPath} fill={`url(#${futureGradientId}-fill)`} stroke="none" />
-            <path
-              d={future.linePath}
-              fill="none"
-              stroke={`url(#${futureGradientId})`}
-              strokeWidth={2}
-              strokeDasharray="4.5 4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+            {future.strokeSegments ? (
+              future.strokeSegments.map((seg) => (
+                <path
+                  key={`proj-${seg.status}`}
+                  d={seg.d}
+                  fill="none"
+                  stroke={glucoseRangeChartStroke(seg.status)}
+                  strokeWidth={2}
+                  strokeDasharray="4.5 4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeOpacity={0.9}
+                />
+              ))
+            ) : (
+              <path
+                d={future.linePath}
+                fill="none"
+                stroke={FALLBACK_STROKE}
+                strokeWidth={2}
+                strokeDasharray="4.5 4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeOpacity={0.75}
+              />
+            )}
+            <circle
+              cx={future.x15}
+              cy={future.y15}
+              r={2.75}
+              fill="hsl(var(--background))"
+              stroke={hasTargetBand ? glucoseRangeChartStroke(future.status15) : FALLBACK_STROKE}
+              strokeOpacity={0.7}
+              strokeWidth={1.5}
             />
-            <circle cx={future.x15} cy={future.y15} r={2.75} fill="hsl(var(--background))" stroke={futureStroke} strokeOpacity={0.55} strokeWidth={1.5} />
-            <circle cx={future.x30} cy={future.y30} r={7} fill={futureStroke} fillOpacity={0.1} />
-            <circle cx={future.x30} cy={future.y30} r={3.25} fill="hsl(var(--background))" stroke={futureStroke} strokeOpacity={0.6} strokeWidth={1.5} />
+            <circle
+              cx={future.x30}
+              cy={future.y30}
+              r={7}
+              fill={hasTargetBand ? glucoseRangeChartStroke(future.status30) : FALLBACK_STROKE}
+              fillOpacity={0.12}
+            />
+            <circle
+              cx={future.x30}
+              cy={future.y30}
+              r={3.25}
+              fill="hsl(var(--background))"
+              stroke={hasTargetBand ? glucoseRangeChartStroke(future.status30) : FALLBACK_STROKE}
+              strokeOpacity={0.75}
+              strokeWidth={1.5}
+            />
             <text
               x={(future.xNow + future.x30) / 2}
               y={PAD.top + 8}
@@ -309,7 +401,7 @@ export function CgmGlucoseChart({
               cx={scaleX(i, points.length, historyWidth)}
               cy={scaleY(p.value, yMin, yMax, innerHeight)}
               r={r}
-              fill={hasTargetBand ? glucoseRangeChartStroke(status) : "hsl(var(--chart-2))"}
+              fill={hasTargetBand ? glucoseRangeChartStroke(status) : FALLBACK_STROKE}
               stroke={isLatest ? "hsl(var(--background))" : "none"}
               strokeWidth={isLatest ? 2 : 0}
             />

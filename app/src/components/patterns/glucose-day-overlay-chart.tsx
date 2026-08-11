@@ -1,6 +1,11 @@
 import { useMemo } from "react";
 import type { GlucoseDaySeries } from "@/lib/cgm/glucose-day-overlay";
 import type { BgUnits } from "@/lib/cgm/types";
+import {
+  buildGlucoseRangePathSegments,
+  glucoseRangeChartStroke,
+  GLUCOSE_RANGE_CHART_COLORS,
+} from "@/lib/live-glucose-range";
 import { cn } from "@/lib/utils";
 
 type GlucoseDayOverlayChartProps = {
@@ -146,16 +151,36 @@ export function GlucoseDayOverlayChart({
             <g key={day.dateKey} data-testid={`glucose-overlay-day-${day.dateKey}`}>
               {day.segments.map((segment, segIndex) => {
                 if (segment.length < 2) return null;
-                const path = segment
-                  .map((p, i) => `${i === 0 ? "M" : "L"}${xFor(p.minuteOfDay).toFixed(1)},${yFor(p.value).toFixed(1)}`)
+                const coords = segment.map((p) => ({
+                  x: xFor(p.minuteOfDay),
+                  y: yFor(p.value),
+                  value: p.value,
+                }));
+                if (day.isMostRecent) {
+                  const colored = buildGlucoseRangePathSegments(coords, targetRange.low, targetRange.high);
+                  return colored.map((seg) => (
+                    <path
+                      key={`${segIndex}-${seg.status}`}
+                      d={seg.d}
+                      fill="none"
+                      stroke={glucoseRangeChartStroke(seg.status)}
+                      strokeOpacity={1}
+                      strokeWidth={strokeWidth}
+                      strokeLinejoin="round"
+                      strokeLinecap="round"
+                    />
+                  ));
+                }
+                const path = coords
+                  .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`)
                   .join(" ");
                 return (
                   <path
                     key={segIndex}
                     d={path}
                     fill="none"
-                    stroke={day.isMostRecent ? "hsl(var(--chart-2))" : "currentColor"}
-                    strokeOpacity={day.isMostRecent ? 1 : opacity}
+                    stroke="currentColor"
+                    strokeOpacity={opacity}
                     strokeWidth={strokeWidth}
                     strokeLinejoin="round"
                     strokeLinecap="round"
@@ -182,8 +207,16 @@ export function GlucoseDayOverlayChart({
 
       <div className="mt-1.5 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
         <span className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "hsl(var(--chart-2))" }} aria-hidden />
-          Today
+          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: GLUCOSE_RANGE_CHART_COLORS.in_range }} aria-hidden />
+          In range
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: GLUCOSE_RANGE_CHART_COLORS.high }} aria-hidden />
+          High
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: GLUCOSE_RANGE_CHART_COLORS.low }} aria-hidden />
+          Low
         </span>
         <span className="flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full bg-muted-foreground/30" aria-hidden />

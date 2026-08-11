@@ -336,7 +336,7 @@ export default function CgmLivePage() {
                 <div className="flex justify-end">
                   <InfoTooltip
                     term="Chart key"
-                    explanation="Green band: your target range. Optional indigo (sleep) and blue (exercise) bands come from bedtime checks and logged workouts on this device. Dots use green (in range), amber (low), or orange (high)."
+                    explanation="Green band: your target range. Optional indigo (sleep) and blue (exercise) bands come from bedtime checks and logged workouts on this device. Line and dots: green (in range), red (low), orange (high). The dashed future line uses the same colours."
                   />
                 </div>
               )}

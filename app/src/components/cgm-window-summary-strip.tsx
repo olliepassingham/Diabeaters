@@ -13,18 +13,18 @@ import { cn } from "@/lib/utils";
 
 const BAND_BAR_CLASS: Record<GlucoseTirBand, string> = {
   very_high: "bg-orange-600 dark:bg-orange-500",
-  high: "bg-amber-400 dark:bg-amber-400",
+  high: "bg-orange-400 dark:bg-orange-400",
   in_range: "bg-emerald-500 dark:bg-emerald-400",
-  low: "bg-rose-300 dark:bg-rose-400/80",
-  very_low: "bg-rose-700 dark:bg-rose-500",
+  low: "bg-red-400 dark:bg-red-400/90",
+  very_low: "bg-red-700 dark:bg-red-500",
 };
 
 const BAND_DOT_CLASS: Record<GlucoseTirBand, string> = {
   very_high: "bg-orange-600 dark:bg-orange-500",
-  high: "bg-amber-400",
+  high: "bg-orange-400",
   in_range: "bg-emerald-500 dark:bg-emerald-400",
-  low: "bg-rose-300 dark:bg-rose-400",
-  very_low: "bg-rose-700 dark:bg-rose-500",
+  low: "bg-red-400 dark:bg-red-400",
+  very_low: "bg-red-700 dark:bg-red-500",
 };
 
 type CgmWindowSummaryStripProps = {
