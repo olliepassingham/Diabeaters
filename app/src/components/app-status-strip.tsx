@@ -42,6 +42,7 @@ import {
   DIABEATER_SCENARIO_STATE_CHANGED_EVENT,
   DIABEATER_PROFILE_CHANGED_EVENT,
   DIABEATER_POST_EXERCISE_NUDGE_CHANGED_EVENT,
+  DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT,
   type UserProfile,
 } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
@@ -61,7 +62,7 @@ import {
   type ExerciseReadinessResult,
 } from "@/lib/exercise-readiness";
 import { useExerciseSessionActions } from "@/hooks/use-exercise-session-actions";
-import { requestOpenExerciseMode } from "@/lib/exercise-mode-deep-link";
+import { requestOpenExerciseMode, EXERCISE_STRIP_EXPAND_EVENT } from "@/lib/exercise-mode-deep-link";
 import { reconcileExerciseFuelLines } from "@/lib/exercise-recommendation";
 import { CgmLiveBgChip } from "@/components/cgm-live-bg-chip";
 import { cgmTrendForExercise } from "@/lib/cgm/apply-cgm-trend";
@@ -355,8 +356,27 @@ export function AppStatusStrip() {
   }, []);
 
   useEffect(() => {
+    const onExercise = () => setEx(storage.getActiveExercise());
+    window.addEventListener(DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT, onExercise);
+    return () => window.removeEventListener(DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT, onExercise);
+  }, []);
+
+  useEffect(() => {
     if (ex) setPostExerciseOpen(false);
   }, [ex]);
+
+  /** Quick Exercise (and similar) asks the strip to open the real home exercise panel. */
+  useEffect(() => {
+    const onExpand = () => {
+      const active = storage.getActiveExercise();
+      if (!active) return;
+      if (storage.getScenarioState().travelModeActive) return;
+      setEx(active);
+      setExerciseExpanded(true);
+    };
+    window.addEventListener(EXERCISE_STRIP_EXPAND_EVENT, onExpand);
+    return () => window.removeEventListener(EXERCISE_STRIP_EXPAND_EVENT, onExpand);
+  }, []);
 
   /** Combined travel + exercise strip has no "Check" toggle — keep the expanded panel closed. */
   useEffect(() => {
