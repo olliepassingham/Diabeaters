@@ -60,10 +60,12 @@ export function CgmGlucoseChart({
   const futureWidth = hasProjection ? innerWidth * FUTURE_ZONE_RATIO : 0;
   const historyWidth = innerWidth - futureWidth;
 
-  const [yMin, yMax] = useMemo(
-    () => chartYDomain(points, units, projection ? [projection.at15Min, projection.at30Min] : []),
-    [points, units, projection],
-  );
+  const [yMin, yMax] = useMemo(() => {
+    const extras = projection
+      ? [projection.at15Min, projection.at30Min, ...(projection.path?.map((p) => p.value) ?? [])]
+      : [];
+    return chartYDomain(points, units, extras);
+  }, [points, units, projection]);
 
   const linePath = useMemo(() => {
     if (points.length === 0) return "";
@@ -115,11 +117,28 @@ export function CgmGlucoseChart({
     const xNow = PAD.left + historyWidth;
     const lastValue = points[points.length - 1]?.value ?? projection.currentDisplay;
     const yNow = scaleY(lastValue, yMin, yMax, innerHeight);
-    const x15 = xNow + futureWidth * 0.5;
-    const y15 = scaleY(projection.at15Min, yMin, yMax, innerHeight);
-    const x30 = xNow + futureWidth;
-    const y30 = scaleY(projection.at30Min, yMin, yMax, innerHeight);
-    const futureLinePath = `M${xNow.toFixed(1)},${yNow.toFixed(1)} L${x15.toFixed(1)},${y15.toFixed(1)} L${x30.toFixed(1)},${y30.toFixed(1)}`;
+    const samples =
+      projection.path?.length
+        ? projection.path
+        : [
+            { minutesAhead: 15, value: projection.at15Min },
+            { minutesAhead: 30, value: projection.at30Min },
+          ];
+    const maxAhead = Math.max(...samples.map((s) => s.minutesAhead), 30);
+    const coords = samples.map((s) => {
+      const x = xNow + (s.minutesAhead / maxAhead) * futureWidth;
+      const y = scaleY(s.value, yMin, yMax, innerHeight);
+      return { x, y, minutesAhead: s.minutesAhead, value: s.value };
+    });
+    const x15 = coords.find((c) => c.minutesAhead === 15)?.x ?? xNow + futureWidth * 0.5;
+    const y15 = coords.find((c) => c.minutesAhead === 15)?.y ?? scaleY(projection.at15Min, yMin, yMax, innerHeight);
+    const last = coords[coords.length - 1]!;
+    const x30 = last.x;
+    const y30 = last.y;
+    const futureLinePath = [
+      `M${xNow.toFixed(1)},${yNow.toFixed(1)}`,
+      ...coords.map((c) => `L${c.x.toFixed(1)},${c.y.toFixed(1)}`),
+    ].join(" ");
     const areaPath = `${futureLinePath} L${x30.toFixed(1)},${(PAD.top + innerHeight).toFixed(1)} L${xNow.toFixed(1)},${(PAD.top + innerHeight).toFixed(1)} Z`;
     return { xNow, yNow, x15, y15, x30, y30, linePath: futureLinePath, areaPath };
   }, [hasProjection, projection, historyWidth, futureWidth, points, yMin, yMax, innerHeight]);
