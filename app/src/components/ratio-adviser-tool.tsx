@@ -36,6 +36,7 @@ import {
   parseRatioToGramsPerUnit,
   calculateDoseFromCarbs,
 } from "@/lib/ratio-utils";
+import { STARTER_ICR_GRAMS_PER_UNIT } from "@/lib/starter-ratios";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { InlineInfoHint } from "@/components/ui/field-label-with-info";
@@ -364,7 +365,7 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
   };
 
   const handleUseDefaults = () => {
-    setEstimatedRatios({ breakfast: 8, lunch: 10, dinner: 9, snack: 10 });
+    setEstimatedRatios({ ...STARTER_ICR_GRAMS_PER_UNIT });
     setMode("scratch_result");
   };
 

@@ -6,17 +6,22 @@ import { hapticLight } from "@/lib/haptics";
 import {
   canNavigateBack,
   getBackLabel,
+  getInAppNavPrev,
   hasInAppNavHistory,
+  isGuidesDrilldownPath,
   isRootTabRoute,
   normalizeNavPath,
   resolveBackFallback,
   trackNavHistory,
 } from "@/lib/nav-back-routes";
+import { clearTabStackPath } from "@/lib/tab-path-stacks";
 
 export {
   canNavigateBack,
   getBackLabel,
+  getInAppNavPrev,
   hasInAppNavHistory,
+  isGuidesDrilldownPath,
   isRootTabRoute,
   normalizeNavPath,
   resolveBackFallback,
@@ -33,8 +38,19 @@ export function navigateBack(
   const fallback = explicitFallback ?? resolveBackFallback(pathname);
   void hapticLight();
 
+  // Guides always pop to the Guides list (not prior history / home / tools).
+  if (isGuidesDrilldownPath(pathname) && !explicitFallback) {
+    clearTabStackPath("scenarios");
+    navigateWithViewTransition(setLocation, "/scenarios", {
+      replace: true,
+      direction: "back",
+    });
+    return;
+  }
+
   // Prefer the real previous in-app page when we have one (e.g. Exercise → Routines).
-  // Falling back first caused a no-op loop for /routines → /tools/routines → /routines.
+  // history.back() is immediate (see historyBackWithViewTransition) — do not await
+  // popstate inside startViewTransition (that stalled ~280ms).
   if (hasInAppNavHistory(pathname)) {
     historyBackWithViewTransition();
     return;

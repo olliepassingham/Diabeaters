@@ -23,6 +23,8 @@ import {
 import { useBgPrefill } from "@/hooks/use-bg-prefill";
 import { EXERCISE_CGM_POLL_MS } from "@/hooks/use-exercise-cgm-bg";
 import { cgmTrendForExercise } from "@/lib/cgm/apply-cgm-trend";
+import { isStarterExerciseRoutine, seedStarterExerciseRoutineIfNeeded } from "@/lib/starter-exercise-routine";
+import { Badge } from "@/components/ui/badge";
 
 const EXERCISE_ICONS: Record<ExerciseType, typeof Dumbbell> = {
   cardio: Flame,
@@ -49,6 +51,7 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
 
   const load = useCallback(() => {
     try {
+      seedStarterExerciseRoutineIfNeeded();
       setExercises(storage.getRecentExercises?.(compact ? 3 : 5) ?? []);
       setActiveSession(storage.getActiveExercise?.() ?? null);
       setError(null);
@@ -386,7 +389,18 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
                           <Icon className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                         </span>
                         <span className="min-w-0 text-left">
-                          <span className="block truncate text-sm font-semibold text-foreground">{exercise.name}</span>
+                          <span className="flex min-w-0 items-center gap-1.5">
+                            <span className="block truncate text-sm font-semibold text-foreground">{exercise.name}</span>
+                            {isStarterExerciseRoutine(exercise) ? (
+                              <Badge
+                                variant="secondary"
+                                className="shrink-0 px-1.5 py-0 text-[0.6rem] font-medium"
+                                data-testid="badge-starter-exercise"
+                              >
+                                Example
+                              </Badge>
+                            ) : null}
+                          </span>
                           <span className="block text-xs text-muted-foreground">
                             {exercise.durationMinutes} min · {exercise.intensity}
                           </span>

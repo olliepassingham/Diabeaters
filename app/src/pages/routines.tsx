@@ -19,6 +19,7 @@ import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { hasInAppNavHistory } from "@/lib/nav-back";
+import { isStarterExerciseRoutine, seedStarterExerciseRoutineIfNeeded } from "@/lib/starter-exercise-routine";
 
 const MEAL_TYPES: { value: RoutineMealType; label: string; icon: typeof Utensils }[] = [
   { value: "breakfast", label: "Breakfast", icon: Coffee },
@@ -136,6 +137,7 @@ export function RoutinesContent() {
   };
 
   useEffect(() => {
+    seedStarterExerciseRoutineIfNeeded();
     setRoutines(storage.getRoutines());
     setSettings(storage.getSettings());
     setExerciseRoutines(storage.getExerciseRoutines());
@@ -359,45 +361,31 @@ export function RoutinesContent() {
 
   return (
     <PageShell variant="standard" className="max-w-4xl">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <PageHeader
-            leading={<PageBackButton fallbackHref={routinesBackFallback} />}
-            className="min-w-0 flex-1"
-            title={
-              <span className="flex items-start gap-3">
-                <span className="p-2 rounded-full bg-emerald-100 dark:bg-emerald-900 shrink-0">
-                  {activeSection === "meals" ? (
-                    <Repeat className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
-                  ) : (
-                    <Dumbbell className="h-6 w-6 text-green-600 dark:text-green-400" />
-                  )}
-                </span>
-                <span>My Routines</span>
-              </span>
-            }
-            description={
-              <span data-testid="text-section-subtitle">
-                {activeSection === "meals" ? "Meals and moments that worked well" : "Your scheduled exercise routines"}
-              </span>
-            }
-            actions={
-              <PageInfoDialog title="About Routines" description="Save meals and workouts that worked for you">
-                <InfoSection title="What are Routines?">
-                  <p>Your personal library of meals and workouts that went well. Save the details so you can repeat success with confidence.</p>
-                </InfoSection>
-                <InfoSection title="Pattern recall">
-                  <p>This is not about calculating doses — it is about remembering what worked. When you face a similar meal or workout, you can recall what you did before.</p>
-                </InfoSection>
-                <InfoSection title="Exercise">
-                  <p>Completed workouts appear under Recent. Restart them in the exercise guide and only update today&apos;s BG and meal details.</p>
-                </InfoSection>
-                <InfoSection title="Not medical advice">
-                  <p className="text-xs italic">Educational pattern tracking only. Always use your own judgement and follow your healthcare team&apos;s guidance.</p>
-                </InfoSection>
-              </PageInfoDialog>
-            }
-          />
-        </div>
+        <PageHeader
+          leading={<PageBackButton fallbackHref={routinesBackFallback} />}
+          title={activeSection === "meals" ? "Meal routines" : "Exercise routines"}
+          description={
+            activeSection === "meals"
+              ? "Meals and moments that worked well"
+              : "Your scheduled exercise routines"
+          }
+          actions={
+            <PageInfoDialog title="About Routines" description="Save meals and workouts that worked for you">
+              <InfoSection title="What are Routines?">
+                <p>Your personal library of meals and workouts that went well. Save the details so you can repeat success with confidence.</p>
+              </InfoSection>
+              <InfoSection title="Pattern recall">
+                <p>This is not about calculating doses — it is about remembering what worked. When you face a similar meal or workout, you can recall what you did before.</p>
+              </InfoSection>
+              <InfoSection title="Exercise">
+                <p>Completed workouts appear under Recent. Restart them in the exercise guide and only update today&apos;s BG and meal details.</p>
+              </InfoSection>
+              <InfoSection title="Not medical advice">
+                <p className="text-xs italic">Educational pattern tracking only. Always use your own judgement and follow your healthcare team&apos;s guidance.</p>
+              </InfoSection>
+            </PageInfoDialog>
+          }
+        />
 
         <div className="flex gap-2" data-testid="section-switcher">
           <Button
@@ -1036,12 +1024,23 @@ export function RoutinesContent() {
                     <div className="min-w-0 flex-1 space-y-3">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 space-y-2">
-                          <h3
-                            className="truncate text-[15px] font-semibold leading-snug tracking-tight text-foreground"
-                            data-testid={`text-exercise-name-${routine.id}`}
-                          >
-                            {routine.name}
-                          </h3>
+                          <div className="flex min-w-0 items-center gap-2">
+                            <h3
+                              className="truncate text-[15px] font-semibold leading-snug tracking-tight text-foreground"
+                              data-testid={`text-exercise-name-${routine.id}`}
+                            >
+                              {routine.name}
+                            </h3>
+                            {isStarterExerciseRoutine(routine) ? (
+                              <Badge
+                                variant="secondary"
+                                className="shrink-0 rounded-md px-2 py-0.5 text-[11px] font-medium"
+                                data-testid="badge-starter-exercise"
+                              >
+                                Example
+                              </Badge>
+                            ) : null}
+                          </div>
                           <div className="flex flex-wrap items-center gap-1.5">
                             <Badge variant="outline" className="rounded-md px-2 py-0.5 text-[11px] font-medium">
                               {EXERCISE_TYPES.find((t) => t.value === routine.exerciseType)?.label}

@@ -33,8 +33,11 @@ export function PageHeader({
   stackActionsMaxSm,
 }: PageHeaderProps) {
   const block = (
-    <div className={cn("flex min-w-0 items-start gap-2 sm:gap-3", className)}>
-      {leading ? <div className="flex shrink-0 items-start pt-0.5 sm:pt-1">{leading}</div> : null}
+    <div className={cn("flex min-w-0 items-start gap-1 sm:gap-2", className)}>
+      {/* Match the title line height so the back control sits on the same row, not below it. */}
+      {leading ? (
+        <div className="flex h-7 shrink-0 items-center sm:h-8">{leading}</div>
+      ) : null}
       <div className="min-w-0 flex-1 space-y-1">
         <div
           className={cn(
@@ -44,7 +47,7 @@ export function PageHeader({
         >
           <h1
             className={cn(
-              "min-w-0 font-display text-xl font-semibold tracking-tight text-foreground sm:text-h1 sm:tracking-tight",
+              "min-w-0 font-display text-xl font-semibold leading-7 tracking-tight text-foreground sm:text-h1 sm:leading-8 sm:tracking-tight",
               stackActionsMaxSm ? "max-sm:w-full sm:flex-1" : "flex-1 truncate",
             )}
           >
@@ -53,7 +56,7 @@ export function PageHeader({
           {actions ? (
             <div
               className={cn(
-                "flex flex-wrap items-center gap-1.5 pt-0.5 sm:pt-1",
+                "flex flex-wrap items-center gap-1.5",
                 stackActionsMaxSm
                   ? "max-sm:w-full max-sm:justify-start sm:shrink-0 sm:justify-end"
                   : "shrink-0 justify-end",

@@ -18,7 +18,7 @@ export function PageBackButton({ fallbackHref }: PageBackButtonProps = {}) {
       type="button"
       variant="ghost"
       size="icon"
-      className="mr-2"
+      className="-ml-2 h-9 w-9 shrink-0"
       aria-label="Go back"
       onClick={() => navigateBack(pathOnly, setLocation, fallbackHref)}
     >

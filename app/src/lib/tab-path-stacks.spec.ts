@@ -28,9 +28,15 @@ describe("tab-path-stacks", () => {
     expect(resolveTabNavigationTarget("/tools", "/tools/hypo-help")).toBe("/tools");
   });
 
-  it("remembers scenarios when switching to tools", () => {
+  it("remembers tools when leaving a guide, but Guides always opens the list", () => {
     expect(resolveTabNavigationTarget("/tools", "/scenarios/exercise")).toBe("/tools");
-    expect(resolveTabNavigationTarget("/scenarios", "/tools")).toBe("/scenarios/exercise");
+    expect(resolveTabNavigationTarget("/scenarios", "/tools")).toBe("/scenarios");
+  });
+
+  it("Guides tab always returns to the guides list even when a nested guide was remembered", () => {
+    rememberTabPath("/scenarios/sick-day");
+    expect(resolveTabNavigationTarget("/scenarios", "/")).toBe("/scenarios");
+    expect(resolveTabNavigationTarget("/scenarios", "/scenarios/sick-day")).toBe("/scenarios");
   });
 
   it("hubHrefForTabStack matches bottom nav hubs", () => {

@@ -32,9 +32,18 @@ describe("nav-back", () => {
 
   it("resolves scenario and tool drill-down parents", () => {
     expect(resolveBackFallback("/scenarios/exercise")).toBe("/scenarios");
+    expect(resolveBackFallback("/scenarios/sick-day")).toBe("/scenarios");
+    expect(resolveBackFallback("/sick-day")).toBe("/scenarios");
     expect(resolveBackFallback("/tools/hypo-help")).toBe("/tools");
     // Must not point at /tools/routines (that path redirects back to /routines).
     expect(resolveBackFallback("/routines")).toBe("/tools");
+  });
+
+  it("treats nested guides as hierarchical drill-downs", async () => {
+    const { isGuidesDrilldownPath } = await import("./nav-back-routes");
+    expect(isGuidesDrilldownPath("/scenarios/sick-day")).toBe(true);
+    expect(isGuidesDrilldownPath("/scenarios")).toBe(false);
+    expect(isGuidesDrilldownPath("/tools/hypo-help")).toBe(false);
   });
 
   it("resolves community thread parent", () => {
@@ -46,6 +55,13 @@ describe("nav-back", () => {
     trackNavHistory("/settings");
     trackNavHistory("/settings/notifications");
     expect(hasInAppNavHistory("/settings/notifications")).toBe(true);
+  });
+
+  it("returns the previous in-app path", async () => {
+    const { getInAppNavPrev } = await import("./nav-back-routes");
+    trackNavHistory("/scenarios/exercise");
+    trackNavHistory("/routines");
+    expect(getInAppNavPrev("/routines")).toBe("/scenarios/exercise");
   });
 
   it("allows back on drill-down routes", () => {

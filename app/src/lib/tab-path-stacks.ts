@@ -107,6 +107,14 @@ export function rememberTabPath(pathname: string): void {
   writeStacks(stacks);
 }
 
+/** Clear a remembered nested path for a tab (e.g. after hierarchical Back to Guides). */
+export function clearTabStackPath(id: TabStackId): void {
+  const stacks = readStacks();
+  if (!(id in stacks)) return;
+  delete stacks[id];
+  writeStacks(stacks);
+}
+
 /** Destination when tapping a bottom-nav tab (restore nested path when present). */
 export function resolveTabNavigationTarget(tabHref: string, currentPathname: string): string {
   const current = normalizePath(currentPathname);
@@ -125,11 +133,18 @@ export function resolveTabNavigationTarget(tabHref: string, currentPathname: str
 
   const currentId = tabStackIdForPath(current);
 
+  // Guides: always open the list of guides (never restore Sick day / Exercise / etc.).
+  if (destIdResolved === "scenarios") {
+    if (currentId && currentId !== "scenarios") {
+      rememberTabPath(current);
+    }
+    clearTabStackPath("scenarios");
+    return hub;
+  }
+
   // Re-tap same tab while nested → reset to hub (iOS-like).
   if (currentId === destIdResolved && current !== hub) {
-    const stacks = readStacks();
-    delete stacks[destIdResolved];
-    writeStacks(stacks);
+    clearTabStackPath(destIdResolved);
     return hub;
   }
 

@@ -56,6 +56,12 @@ export default function ScenarioExercisePage() {
                 href="/routines?section=exercise"
                 data-testid="link-exercise-routines-header"
                 aria-label="Exercise routines"
+                onFocus={() => {
+                  void import("@/pages/routines");
+                }}
+                onPointerEnter={() => {
+                  void import("@/pages/routines");
+                }}
               >
                 <span className="sm:hidden">Routines</span>
                 <span className="hidden sm:inline">Exercise routines</span>

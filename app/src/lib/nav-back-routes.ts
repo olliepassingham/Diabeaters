@@ -19,9 +19,10 @@ const EXPLICIT_PARENT: Record<string, string> = {
   "/supplies": "/",
   "/appointments": "/",
   "/adviser": "/",
-  "/bedtime": "/scenarios/bedtime",
-  "/sick-day": "/scenarios/sick-day",
-  "/travel": "/scenarios/travel",
+  // Legacy aliases → Guides hub (not the nested scenario route).
+  "/bedtime": "/scenarios",
+  "/sick-day": "/scenarios",
+  "/travel": "/scenarios",
   "/emergency-card": "/settings/emergency",
   "/medical-sources": "/settings/about",
   "/help-now": "/",
@@ -56,6 +57,12 @@ export function normalizeNavPath(pathname: string): string {
 
 export function isRootTabRoute(pathname: string): boolean {
   return ROOT_TAB_ROUTES.has(normalizeNavPath(pathname));
+}
+
+export function isGuidesDrilldownPath(pathname: string): boolean {
+  const path = normalizeNavPath(pathname);
+  if (path.startsWith("/scenarios/")) return true;
+  return path === "/bedtime" || path === "/sick-day" || path === "/travel";
 }
 
 export function resolveBackFallback(pathname: string): string | null {
@@ -98,15 +105,20 @@ export function trackNavHistory(pathname: string): void {
   }
 }
 
-export function hasInAppNavHistory(pathname: string): boolean {
-  if (typeof window === "undefined") return false;
+export function getInAppNavPrev(pathname: string): string | null {
+  if (typeof window === "undefined") return null;
   try {
     const prev = sessionStorage.getItem(NAV_PREV_KEY);
     const current = normalizeNavPath(pathname);
-    return Boolean(prev && prev !== current);
+    if (prev && prev !== current) return prev;
+    return null;
   } catch {
-    return false;
+    return null;
   }
+}
+
+export function hasInAppNavHistory(pathname: string): boolean {
+  return Boolean(getInAppNavPrev(pathname));
 }
 
 export function canNavigateBack(pathname: string): boolean {

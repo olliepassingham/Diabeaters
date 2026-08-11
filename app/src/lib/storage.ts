@@ -4512,11 +4512,18 @@ export const storage = {
     return this.getExerciseRoutines().find(r => r.id === id) || null;
   },
 
-  addExerciseRoutine(routine: Omit<ExerciseRoutine, "id" | "timesUsed" | "createdAt" | "updatedAt">): ExerciseRoutine {
+  addExerciseRoutine(
+    routine: Omit<ExerciseRoutine, "id" | "timesUsed" | "createdAt" | "updatedAt"> & { id?: string },
+  ): ExerciseRoutine {
     const routines = this.getExerciseRoutines();
+    const requestedId = typeof routine.id === "string" && routine.id.trim() ? routine.id.trim() : null;
+    if (requestedId && routines.some((r) => r.id === requestedId)) {
+      return routines.find((r) => r.id === requestedId)!;
+    }
+    const { id: _ignoreId, ...rest } = routine;
     const newRoutine: ExerciseRoutine = {
-      ...routine,
-      id: generateId(),
+      ...rest,
+      id: requestedId ?? generateId(),
       timesUsed: 0,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

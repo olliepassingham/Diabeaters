@@ -79,33 +79,15 @@ export function navigateWithViewTransition(
 }
 
 /**
- * Pop the browser history inside a View Transition when possible so back
- * (button / edge swipe / Android back) matches stack-pop motion.
+ * Pop the browser history for Back.
+ *
+ * Important: do **not** await `popstate` inside `startViewTransition`. Calling
+ * `history.back()` from the VT update callback often deadlocks until a safety
+ * timeout (~280ms), so Back felt laggy (e.g. Exercise ↔ Routines). Pop
+ * immediately; `data-nav-direction` still drives Framer / CSS when applicable.
  */
 export function historyBackWithViewTransition(): void {
   setNavTransitionDirection("back");
-  if (prefersReducedMotion() || !supportsViewTransition()) {
-    window.history.back();
-    clearNavTransitionDirectionSoon();
-    return;
-  }
-
-  runViewTransition(async () => {
-    await new Promise<void>((resolve) => {
-      let settled = false;
-      const finish = () => {
-        if (settled) return;
-        settled = true;
-        window.removeEventListener("popstate", onPop);
-        // Two frames so React/wouter can commit the previous route before VT snapshots.
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => resolve());
-        });
-      };
-      const onPop = () => finish();
-      window.addEventListener("popstate", onPop);
-      window.history.back();
-      window.setTimeout(finish, 280);
-    });
-  });
+  window.history.back();
+  clearNavTransitionDirectionSoon();
 }

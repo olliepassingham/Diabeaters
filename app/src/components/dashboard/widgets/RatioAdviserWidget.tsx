@@ -16,6 +16,12 @@ import {
 import { Link } from "wouter";
 import { storage, UserSettings, ScenarioState, RatioFormat } from "@/lib/storage";
 import { parseRatioToGramsPerUnit, formatRatioForDisplay } from "@/lib/ratio-utils";
+import {
+  applyStarterRatios,
+  STARTER_ICR_MEALS,
+  starterRatioDisplayValues,
+} from "@/lib/starter-ratios";
+import { useToast } from "@/hooks/use-toast";
 import { WidgetCard } from "./WidgetCard";
 import type { DashboardWidgetLayoutProps } from "./types";
 import { isCompactLayout } from "./types";
@@ -81,6 +87,7 @@ export function adviserMealPlannerHref(mealLabel: string): string {
 
 export function RatioAdviserWidget(props: DashboardWidgetLayoutProps) {
   const compact = isCompactLayout(props);
+  const { toast } = useToast();
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [scenarioState, setScenarioState] = useState<ScenarioState | null>(null);
   const [ratioFormat, setRatioFormat] = useState<RatioFormat>("per10g");
@@ -101,6 +108,23 @@ export function RatioAdviserWidget(props: DashboardWidgetLayoutProps) {
       setScenarioState({ travelModeActive: false, sickDayActive: false });
     }
   }, []);
+
+  const handleUseStarterRatios = () => {
+    try {
+      const next = applyStarterRatios(settings ?? undefined);
+      setSettings(next);
+      toast({
+        title: "Starter ratios saved",
+        description: "Typical clinic starting point — confirm with your diabetes team.",
+      });
+    } catch {
+      toast({
+        title: "Could not save ratios",
+        description: "Try Set up ratios and enter them manually.",
+        variant: "destructive",
+      });
+    }
+  };
 
   if (error) {
     return (
@@ -130,6 +154,7 @@ export function RatioAdviserWidget(props: DashboardWidgetLayoutProps) {
 
   const hasRatios = settings.breakfastRatio || settings.lunchRatio || settings.dinnerRatio;
   const scenario = getScenarioFactor(scenarioState);
+  const starterDisplays = hasRatios ? null : starterRatioDisplayValues(ratioFormat, cpSize);
 
   const ratios = [
     { label: "Breakfast", value: settings.breakfastRatio },
@@ -238,33 +263,71 @@ export function RatioAdviserWidget(props: DashboardWidgetLayoutProps) {
             })}
           </div>
         ) : (
-          <HomeCardEmpty
-            compact
-            icon={Syringe}
-            title="No ratios set yet"
-            description="Set breakfast, lunch, and dinner in one place."
-          />
+          <div className="space-y-2" data-testid="widget-ratio-starter-suggestion">
+            <HomeCardEmpty
+              compact
+              icon={Syringe}
+              title="No ratios set yet"
+              description="Starter example — not your prescription. Confirm with your diabetes team."
+            />
+            <div className="grid grid-cols-2 gap-1.5">
+              {STARTER_ICR_MEALS.map(({ key, label }) => {
+                const RowIcon = ratioRowIcon(label);
+                const display = starterDisplays?.[key] ?? "";
+                return (
+                  <div
+                    key={key}
+                    className="flex min-h-[3.25rem] flex-col rounded-lg border border-dashed border-border/80 bg-muted/20 p-2"
+                    data-testid={`starter-ratio-preview-${key}`}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-sky-500/10 dark:bg-sky-500/15">
+                        <RowIcon className="h-2.5 w-2.5 text-sky-600 dark:text-sky-400" aria-hidden />
+                      </span>
+                      <span className="truncate text-[0.65rem] font-medium text-muted-foreground">{label}</span>
+                    </div>
+                    <span className="mt-auto pt-1 text-sm font-semibold tabular-nums text-foreground/90">{display}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         )}
 
         {!hasRatios && (
-          <div className="flex flex-col gap-1.5 sm:flex-row sm:items-stretch">
-            <Link href="/settings/ratios" className="sm:flex-1">
-              <Button
-                variant="secondary"
-                size="sm"
-                className="h-9 w-full gap-1 text-xs font-medium shadow-sm border border-border/80"
-                data-testid="button-view-ratios"
-              >
-                Set up ratios
-                <ArrowRight className="h-3 w-3" aria-hidden />
-              </Button>
-            </Link>
-            <Link href="/adviser?tab=meal" className="sm:flex-1">
-              <Button variant="outline" size="sm" className="h-9 w-full gap-1 text-xs font-medium" data-testid="button-dashboard-quick-meal-planner">
-                Quick meal planner
-                <ArrowRight className="h-3 w-3" aria-hidden />
-              </Button>
-            </Link>
+          <div className="flex flex-col gap-1.5">
+            <Button
+              type="button"
+              variant="default"
+              size="sm"
+              className="h-9 w-full gap-1 text-xs font-medium"
+              onClick={handleUseStarterRatios}
+              data-testid="button-use-starter-ratios"
+            >
+              Use starter ratios
+            </Button>
+            <p className="text-[0.65rem] leading-snug text-muted-foreground px-0.5">
+              Typical clinic starting point (1u:10g for each meal). Not medical advice.
+            </p>
+            <div className="flex flex-col gap-1.5 sm:flex-row sm:items-stretch">
+              <Link href="/settings/ratios" className="sm:flex-1">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="h-9 w-full gap-1 text-xs font-medium shadow-sm border border-border/80"
+                  data-testid="button-view-ratios"
+                >
+                  Set up ratios
+                  <ArrowRight className="h-3 w-3" aria-hidden />
+                </Button>
+              </Link>
+              <Link href="/adviser?tab=meal" className="sm:flex-1">
+                <Button variant="outline" size="sm" className="h-9 w-full gap-1 text-xs font-medium" data-testid="button-dashboard-quick-meal-planner">
+                  Quick meal planner
+                  <ArrowRight className="h-3 w-3" aria-hidden />
+                </Button>
+              </Link>
+            </div>
           </div>
         )}
 
