@@ -12,8 +12,6 @@ import {
   Dumbbell,
   Syringe,
   Play,
-  Info,
-  CircleCheck,
   Moon,
   Activity,
   Lightbulb,
@@ -24,15 +22,10 @@ import {
   MoreHorizontal,
   Maximize2,
   Pause,
-  TrendingUp,
-  TrendingDown,
-  Minus,
-  Loader2,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import {
   storage,
   type ScenarioState,
@@ -45,48 +38,31 @@ import {
   DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT,
   type UserProfile,
 } from "@/lib/storage";
-import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
-import { usesClosedLoop } from "@/lib/closed-loop";
 import { cn } from "@/lib/utils";
-import { computeExerciseHypoSuggestion, resolveExerciseBgForHypo } from "@/lib/exercise-hypo-auto";
-import { ExerciseFuelPlanSummary, ExerciseHypoTreatmentHint, ExerciseWorkoutProgressBar, formatExerciseElapsedShort } from "@/components/exercise-active-session-extras";
+import { formatExerciseElapsedShort } from "@/components/exercise-active-session-extras";
 import { getWorkoutElapsedMs, isExercisePaused } from "@/lib/exercise-session-timing";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
-import { calculateExercisePlan, getRecoveryInsulinHeadline, type ExercisePlanResult, type LastInsulinTiming } from "@/lib/exercise-plan";
+import { calculateExercisePlan, type LastInsulinTiming } from "@/lib/exercise-plan";
 import {
   getExerciseReadinessVerdict,
   getReadinessToneClasses,
-  getExerciseCarbPlanHintLine,
-  getExerciseFuelPlanLines,
-  type ExerciseReadinessResult,
 } from "@/lib/exercise-readiness";
 import { useExerciseSessionActions } from "@/hooks/use-exercise-session-actions";
-import { requestOpenExerciseMode, EXERCISE_STRIP_EXPAND_EVENT } from "@/lib/exercise-mode-deep-link";
-import { reconcileExerciseFuelLines } from "@/lib/exercise-recommendation";
+import { EXERCISE_GUIDE_HREF, requestOpenExerciseMode } from "@/lib/exercise-mode-deep-link";
 import { CgmLiveBgChip } from "@/components/cgm-live-bg-chip";
-import { cgmTrendForExercise } from "@/lib/cgm/apply-cgm-trend";
 import { isCgmPrefillActive } from "@/lib/cgm/preferences";
 import { useBgPrefill } from "@/hooks/use-bg-prefill";
-import { useExerciseCgmBg } from "@/hooks/use-exercise-cgm-bg";
 import { useLinkedPatient } from "@/hooks/use-linked-patient";
 import { useSupporterLiveBg } from "@/hooks/use-supporter-live-bg";
 import { syncSickDayDeactivatedToCloud } from "@/lib/scenarios-supabase";
 import { cancelSickDayMedReminder } from "@/lib/sick-day-med-reminders";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { EXERCISE_TYPE_OPTIONS } from "@/lib/exercise-catalog";
 import {
   formatLastExerciseSummaryLine,
   getPostExerciseEducationalCopy,
@@ -106,67 +82,10 @@ function exercisePhaseLabel(phase: ExercisePhase): string {
   return phase;
 }
 
-function exerciseTypeDisplayLabel(type: string): string {
-  return EXERCISE_TYPE_OPTIONS.find((o) => o.value === type)?.label ?? type;
-}
-
-function exerciseExtraInfoDialogTitle(phase: ExercisePhase): string {
-  if (phase === "pre") return "Before you start — more detail";
-  if (phase === "active") return "During workout — more detail";
-  return "Recovery — more detail";
-}
-
 function lastInsulinFromStripAnswer(pre: ActiveExerciseSession["preRapidInsulin2h"]): LastInsulinTiming | undefined {
   if (pre === "yes") return "h1_2";
   if (pre === "no") return "none";
   return undefined;
-}
-
-function duringCarbBallpark(during: ExercisePlanResult["during"]): string | null {
-  if (!during.needsCarbs || during.carbsNeeded <= 0) return null;
-  return `Ballpark ~${during.carbsNeeded}g quick carbs if BG drops (${during.carbFrequency}) — confirm with your team.`;
-}
-
-/**
- * @param carbLineMergedAbove when true, the carb ballpark is folded into this copy (separate fuel line hidden).
- */
-function duringQuickStatusBody(
-  v: ExerciseReadinessResult,
-  during: ExercisePlanResult["during"],
-  carbLineMergedAbove: boolean,
-): string {
-  if (v.verdict === "not_recommended") {
-    return v.detail.length > 130 ? `${v.detail.slice(0, 127)}…` : v.detail;
-  }
-  const ballpark = duringCarbBallpark(during);
-  const genericReady = "You look in range to start";
-  if (v.detail && !v.detail.startsWith(genericReady)) {
-    if (v.verdict === "caution" && carbLineMergedAbove && ballpark) {
-      return `${v.detail} ${ballpark}`;
-    }
-    if (ballpark && v.verdict === "ready") {
-      return `${v.detail} ${ballpark}`;
-    }
-    return v.detail;
-  }
-  if (v.verdict === "caution") {
-    if (v.title.toLowerCase().includes("high")) {
-      return "BG is high — follow your team’s correction and ketone plan before you push intensity harder.";
-    }
-    if (v.title.toLowerCase().includes("insulin")) {
-      if (carbLineMergedAbove && ballpark) {
-        return `Insulin may still be active — treat lows early with your usual plan. ${ballpark}`;
-      }
-      const tail = ballpark ?? "Keep fast-acting carbs on you.";
-      return `Insulin may still be active — treat lows early. ${tail}`;
-    }
-    if (carbLineMergedAbove && ballpark) {
-      return `If BG is sliding, ease off a bit and treat lows your usual way. ${ballpark}`;
-    }
-    const tail = ballpark ?? "Keep fast-acting carbs within reach.";
-    return `If BG is sliding, ease off a bit and treat lows your usual way. ${tail}`;
-  }
-  return "Keep fast carbs within reach. Re-check if you push harder or feel off.";
 }
 
 function useOnline(): boolean {
@@ -307,10 +226,7 @@ export function AppStatusStrip() {
     );
   }, [postExerciseRev, inPostExerciseWindow, showPostExerciseEducational, postExerciseSnoozed]);
   const [postExerciseOpen, setPostExerciseOpen] = useState(false);
-  const [exerciseExpanded, setExerciseExpanded] = useState(false);
-  const [exerciseDetailOpen, setExerciseDetailOpen] = useState(false);
   const [exerciseBgInput, setExerciseBgInput] = useState<string>("");
-  const [stripClock, setStripClock] = useState(() => Date.now());
   const lastExPhaseKey = useRef<string>("");
   const exerciseAutoFinishKey = useRef<string | null>(null);
 
@@ -342,7 +258,6 @@ export function AppStatusStrip() {
 
   useEffect(() => {
     const tick = window.setInterval(() => {
-      setStripClock(Date.now());
       setSc(storage.getScenarioState());
       setEx(storage.getActiveExercise());
     }, 1000);
@@ -364,26 +279,6 @@ export function AppStatusStrip() {
   useEffect(() => {
     if (ex) setPostExerciseOpen(false);
   }, [ex]);
-
-  /** Quick Exercise (and similar) asks the strip to open the real home exercise panel. */
-  useEffect(() => {
-    const onExpand = () => {
-      const active = storage.getActiveExercise();
-      if (!active) return;
-      if (storage.getScenarioState().travelModeActive) return;
-      setEx(active);
-      setExerciseExpanded(true);
-    };
-    window.addEventListener(EXERCISE_STRIP_EXPAND_EVENT, onExpand);
-    return () => window.removeEventListener(EXERCISE_STRIP_EXPAND_EVENT, onExpand);
-  }, []);
-
-  /** Combined travel + exercise strip has no "Check" toggle — keep the expanded panel closed. */
-  useEffect(() => {
-    if (sc.travelModeActive && ex) {
-      setExerciseExpanded(false);
-    }
-  }, [sc.travelModeActive, ex?.id]);
 
   useEffect(() => {
     if (!ex) {
@@ -409,7 +304,6 @@ export function AppStatusStrip() {
       if (!current || current.phase !== "active") return;
       const updated = exerciseSessionActions.finishWorkout();
       setEx(updated);
-      if (!storage.getScenarioState().travelModeActive) setExerciseExpanded(true);
     };
     toast({
       title: "Planned time is up",
@@ -424,7 +318,6 @@ export function AppStatusStrip() {
 
   useEffect(() => {
     if (!ex) {
-      setExerciseExpanded(false);
       setExerciseBgInput("");
       lastExPhaseKey.current = "";
       return;
@@ -494,57 +387,6 @@ export function AppStatusStrip() {
     toast({ title: "Exercise ended", description: "Session cleared." });
   };
 
-  const handleStartWorkoutFromPre = () => {
-    const s = storage.getActiveExercise();
-    if (!s || s.phase !== "pre") return;
-    const raw = exerciseBgInput.trim().replace(",", ".");
-    if (raw !== "") {
-      const n = parseFloat(raw);
-      if (Number.isNaN(n) || !Number.isFinite(n)) {
-        toast({
-          title: "Check your BG",
-          description: "Enter a number, or clear the field to start without a reading.",
-          variant: "destructive",
-        });
-        return;
-      }
-      storage.updateActiveExercise({
-        preBg: n,
-        preBgAt: new Date().toISOString(),
-        preChecklist: { ...s.preChecklist, bgChecked: true },
-      });
-    } else {
-      storage.updateActiveExercise({ preBgSkipped: true });
-    }
-    const updated = exerciseSessionActions.startWorkout();
-    setEx(updated);
-    if (!sc.travelModeActive) {
-      setExerciseExpanded(true);
-    }
-    toast({
-      title: "Workout in progress",
-      description: sc.travelModeActive
-        ? "You are in During — open Guides → Exercise for the full quick check."
-        : "You are in During — the top bar can show session tips when you open Check.",
-    });
-  };
-
-  const handleFinishWorkoutFromActive = () => {
-    const s = storage.getActiveExercise();
-    if (!s || s.phase !== "active") return;
-    const updated = exerciseSessionActions.finishWorkout();
-    setEx(updated);
-    if (!sc.travelModeActive) {
-      setExerciseExpanded(true);
-    }
-    toast({
-      title: "Recovery phase",
-      description: sc.travelModeActive
-        ? "Post-workout window — open Guides → Exercise for recovery tips, or use your travel dashboard."
-        : "Post-workout window — delayed lows are still possible. Use Check for quick tips.",
-    });
-  };
-
   const handlePauseWorkoutFromActive = () => {
     const s = storage.getActiveExercise();
     if (!s || s.phase !== "active" || s.pausedAt) return;
@@ -575,7 +417,6 @@ export function AppStatusStrip() {
   const btnClass = "h-8 px-2.5 text-xs";
 
   const bgUnits = stripProfile?.bgUnits || "mg/dL";
-  const isPump = isPumpDeliveryMethod(stripProfile?.insulinDeliveryMethod);
   const exercisePhaseTimerLabel =
     ex?.phase === "active" && ex.exerciseStartedAt
       ? formatExerciseElapsedShort(getWorkoutElapsedMs(ex, Date.now()))
@@ -639,232 +480,6 @@ export function AppStatusStrip() {
     });
     return { verdict: v, plan: exercisePlan, bg };
   }, [bgUnits, ex, exerciseBgInput, exercisePlan, sc.sickDayActive, sc.sickDaySeverity, trendForReadiness]);
-
-  const exerciseHypoStrip = useMemo(() => {
-    if (!ex) return null;
-    const u = (bgUnits === "mmol/L" ? "mmol/L" : "mg/dL") as "mmol/L" | "mg/dL";
-    const bg = resolveExerciseBgForHypo(ex, exerciseBgInput);
-    if (bg == null) return null;
-    const lowThreshold = exercisePlan ? parseFloat(exercisePlan.pre.lowThreshold) : undefined;
-    return computeExerciseHypoSuggestion(bg, storage.getSettings(), u, storage.getProfile() ?? {}, {
-      trend: trendForReadiness,
-      phase: ex.phase,
-      exerciseLowThreshold: Number.isFinite(lowThreshold) ? lowThreshold : undefined,
-      carbsIfLow: exercisePlan?.pre.carbsIfLow,
-      symptomSeverity: ex.phase === "active" && (ex.midSymptoms ?? []).some((s) => s !== "fine") ? ex.midSymptomSeverity : undefined,
-    });
-  }, [ex, exerciseBgInput, bgUnits, exercisePlan, trendForReadiness]);
-
-  const preFuelPlanLines = useMemo(() => {
-    if (ex?.phase !== "pre" || !exercisePlan || !readiness?.verdict) return [];
-    if (readiness.bg == null) return [];
-    const lines = getExerciseFuelPlanLines(exercisePlan, readiness.verdict.verdict, stripProfile, {
-      phase: "pre",
-      exerciseType: ex.exerciseType,
-      currentBg: readiness.bg,
-      bgUnits,
-      intensity: ex.intensity,
-      trend: trendForReadiness,
-    });
-    // Avoid showing a second, different "take now" number alongside the hypo hint below.
-    return reconcileExerciseFuelLines(lines, exerciseHypoStrip);
-  }, [bgUnits, ex?.exerciseType, ex?.intensity, ex?.phase, exerciseHypoStrip, exercisePlan, readiness?.bg, readiness?.verdict, stripProfile, trendForReadiness]);
-
-  const activeFuelPlanLines = useMemo(() => {
-    if (ex?.phase !== "active" || !exercisePlan || !readiness?.verdict) return [];
-    if (readiness.bg == null) return [];
-    const lines = getExerciseFuelPlanLines(exercisePlan, readiness.verdict.verdict, stripProfile, {
-      phase: "active",
-      exerciseType: ex.exerciseType,
-      intensity: ex.intensity,
-      currentBg: readiness.bg,
-      bgUnits,
-      trend: trendForReadiness,
-    });
-    return reconcileExerciseFuelLines(lines, exerciseHypoStrip);
-  }, [bgUnits, ex?.exerciseType, ex?.intensity, ex?.phase, exerciseHypoStrip, exercisePlan, readiness?.bg, readiness?.verdict, stripProfile, trendForReadiness]);
-
-  const recoveryFuelPlanLines = useMemo(() => {
-    if (ex?.phase !== "recovery" || !exercisePlan || !readiness?.verdict) return [];
-    if (readiness.bg == null) return [];
-    const lines = getExerciseFuelPlanLines(exercisePlan, readiness.verdict.verdict, stripProfile, {
-      phase: "recovery",
-      exerciseType: ex.exerciseType,
-      currentBg: readiness.bg,
-      bgUnits,
-      trend: trendForReadiness,
-    });
-    return reconcileExerciseFuelLines(lines, exerciseHypoStrip);
-  }, [bgUnits, ex?.exerciseType, ex?.phase, exerciseHypoStrip, exercisePlan, readiness?.bg, readiness?.verdict, stripProfile, trendForReadiness]);
-
-  const recoveryInsulinLine = useMemo(() => {
-    if (!exercisePlan || ex?.phase !== "recovery") return null;
-    return getRecoveryInsulinHeadline(exercisePlan, Boolean(isPump), new Date().getHours() >= 17);
-  }, [ex?.phase, exercisePlan, isPump]);
-
-  const recoveryMinutesLeft = useMemo(() => {
-    if (!ex?.recoveryEndsAt) return null;
-    const t = new Date(ex.recoveryEndsAt).getTime() - Date.now();
-    if (!Number.isFinite(t)) return null;
-    return Math.max(0, Math.round(t / 60_000));
-  }, [ex?.recoveryEndsAt, ex]);
-
-  const exerciseExtraInfoLines = useMemo(() => {
-    if (!ex || !exercisePlan) return [];
-    const lines: string[] = [];
-
-    if (ex.phase === "recovery") {
-      if (recoveryInsulinLine) lines.push(recoveryInsulinLine);
-      lines.push(
-        `Recovery window (~${exercisePlan.recovery.monitorHours}): delayed lows can still happen — keep snacks and your hypo plan close.`,
-      );
-      if (recoveryMinutesLeft != null) {
-        lines.push(`About ${recoveryMinutesLeft} minutes left in your recovery window.`);
-      }
-    }
-
-    if (ex.phase === "active") {
-      lines.push(
-        exercisePlan.during.needsCarbs && exercisePlan.during.carbsNeeded > 0
-          ? `Fuel: ~${exercisePlan.during.carbsNeeded}g if BG falls · ${exercisePlan.during.carbFrequency}.`
-          : "Fuel: keep fast carbs within reach.",
-      );
-      if (exercisePlan.during.checkBg) {
-        lines.push("Long session: one glucose check around halfway is plenty.");
-      }
-    }
-
-    if (preFuelPlanLines.length > 0) {
-      for (const line of preFuelPlanLines) {
-        lines.push(`${line.label}: ${line.text}`);
-      }
-    } else if (ex.phase === "pre" && readiness?.verdict) {
-      const hint = getExerciseCarbPlanHintLine(exercisePlan, readiness.verdict.verdict, {
-        phase: "pre",
-        exerciseType: ex.exerciseType,
-        profile: stripProfile,
-        currentBg: readiness.bg,
-        bgUnits,
-        intensity: ex.intensity,
-      });
-      if (hint) lines.push(hint);
-    }
-
-    return lines;
-  }, [ex, exercisePlan, preFuelPlanLines, readiness?.verdict, recoveryInsulinLine, recoveryMinutesLeft, stripProfile]);
-
-  const onExerciseBgInputChange = (value: string) => {
-    setExerciseBgInput(value);
-    if (!ex) return;
-    const raw = value.trim().replace(",", ".");
-    if (raw === "") {
-      if (ex.phase === "pre") storage.updateActiveExercise({ preBg: undefined, preBgAt: undefined });
-      else if (ex.phase === "active")
-        storage.updateActiveExercise({ midBg: undefined, midBgAt: undefined, midBgSource: undefined });
-      else storage.updateActiveExercise({ recoveryBg: undefined, recoveryBgAt: undefined });
-      setEx(storage.getActiveExercise());
-      return;
-    }
-    const n = parseFloat(raw);
-    if (!Number.isFinite(n)) return;
-    const now = new Date().toISOString();
-    if (ex.phase === "pre") storage.updateActiveExercise({ preBg: n, preBgAt: now });
-    else if (ex.phase === "active")
-      storage.updateActiveExercise({
-        midBg: n,
-        midBgAt: now,
-        midCheckDone: true,
-        midBgSource: "manual",
-      });
-    else storage.updateActiveExercise({ recoveryBg: n, recoveryBgAt: now });
-    setEx(storage.getActiveExercise());
-  };
-
-  const onExerciseTrendPick = (t: "flat" | "rising" | "falling") => {
-    if (!ex) return;
-    const current =
-      ex.phase === "pre" ? ex.preTrend : ex.phase === "active" ? ex.midTrend : ex.recoveryTrend;
-    const next: ExerciseBgTrend | undefined = current === t ? undefined : t;
-    if (ex.phase === "pre") storage.updateActiveExercise({ preTrend: next });
-    else if (ex.phase === "active") storage.updateActiveExercise({ midTrend: next });
-    else storage.updateActiveExercise({ recoveryTrend: next });
-    setEx(storage.getActiveExercise());
-  };
-
-  const applyExerciseCgmPrefill = (value: string) => {
-    setExerciseBgInput(value);
-    if (!ex) return;
-    const raw = value.trim().replace(",", ".");
-    if (raw === "") return;
-    const n = parseFloat(raw);
-    if (!Number.isFinite(n)) return;
-    const now = new Date().toISOString();
-    if (ex.phase === "pre") storage.updateActiveExercise({ preBg: n, preBgAt: now });
-    else if (ex.phase === "active")
-      storage.updateActiveExercise({
-        midBg: n,
-        midBgAt: now,
-        midCheckDone: true,
-        midBgSource: "cgm",
-      });
-    else storage.updateActiveExercise({ recoveryBg: n, recoveryBgAt: now });
-    setEx(storage.getActiveExercise());
-  };
-
-  const applyExerciseCgmTrend = (trend: ExerciseBgTrend) => {
-    const mapped = cgmTrendForExercise(trend);
-    if (mapped) onExerciseTrendPick(mapped);
-  };
-
-  const {
-    prefill: exerciseCgmPrefill,
-    loading: exerciseCgmLoading,
-    refresh: refreshExerciseCgm,
-    emptyHint: exerciseCgmEmptyHint,
-    onBgChange: onExerciseCgmTrackedChange,
-  } = useExerciseCgmBg({
-    bgValue: exerciseBgInput,
-    onApplyBg: applyExerciseCgmPrefill,
-    onChange: onExerciseBgInputChange,
-    onApplyTrend: applyExerciseCgmTrend,
-    autoApplyKey: ex ? `${ex.id}-${ex.phase}` : undefined,
-  });
-
-  // Keep the visible field aligned when background CGM sync updates the session.
-  useEffect(() => {
-    if (!ex) return;
-    if (ex.phase === "active" && ex.midBgSource === "cgm" && typeof ex.midBg === "number") {
-      const next = String(ex.midBg);
-      setExerciseBgInput((prev) => (prev === next ? prev : next));
-      return;
-    }
-    if (ex.phase === "pre" && typeof ex.preBg === "number" && typeof ex.preBgAt === "string") {
-      const next = String(ex.preBg);
-      setExerciseBgInput((prev) => (prev === next ? prev : next));
-      return;
-    }
-    if (ex.phase === "recovery" && typeof ex.recoveryBg === "number" && typeof ex.recoveryBgAt === "string") {
-      const next = String(ex.recoveryBg);
-      setExerciseBgInput((prev) => (prev === next ? prev : next));
-    }
-  }, [
-    ex?.id,
-    ex?.phase,
-    ex?.midBg,
-    ex?.midBgAt,
-    ex?.midBgSource,
-    ex?.preBg,
-    ex?.preBgAt,
-    ex?.recoveryBg,
-    ex?.recoveryBgAt,
-  ]);
-
-  const trendButtonSelected = (t: "flat" | "rising" | "falling") => {
-    if (!ex) return false;
-    const current =
-      ex.phase === "pre" ? ex.preTrend : ex.phase === "active" ? ex.midTrend : ex.recoveryTrend;
-    return current === t;
-  };
 
   if (!show) return null;
 
@@ -1047,6 +662,12 @@ export function AppStatusStrip() {
                         <Plane className="mr-2 h-3.5 w-3.5 opacity-70" aria-hidden />
                         End travel mode
                       </DropdownMenuItem>
+                      <DropdownMenuItem asChild className="cursor-pointer" data-testid="status-exercise-open">
+                        <Link href={EXERCISE_GUIDE_HREF}>
+                          <Dumbbell className="mr-2 h-3.5 w-3.5 opacity-70" aria-hidden />
+                          Open Exercise guide
+                        </Link>
+                      </DropdownMenuItem>
                       {ex.phase === "active" ? (
                         <DropdownMenuItem
                           onClick={() => requestOpenExerciseMode()}
@@ -1070,15 +691,38 @@ export function AppStatusStrip() {
                 </div>
               ) : (
                 <div className="flex items-center gap-2 shrink-0">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className={btnClass}
-                    onClick={() => setExerciseExpanded((v) => !v)}
-                    data-testid="status-exercise-check"
-                  >
-                    {exerciseExpanded ? "Hide" : "Check"}
-                  </Button>
+                  <Link href={EXERCISE_GUIDE_HREF}>
+                    <Button size="sm" variant="outline" className={btnClass} data-testid="status-exercise-open">
+                      Open <ChevronRight className="h-3.5 w-3.5 ml-0.5" aria-hidden />
+                    </Button>
+                  </Link>
+                  {ex.phase === "active" ? (
+                    exercisePaused ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className={cn(btnClass, "px-2")}
+                        onClick={handleResumeWorkoutFromActive}
+                        aria-label="Resume workout"
+                        title="Resume"
+                        data-testid="status-exercise-resume"
+                      >
+                        <Play className="h-3.5 w-3.5" aria-hidden />
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className={cn(btnClass, "px-2")}
+                        onClick={handlePauseWorkoutFromActive}
+                        aria-label="Pause workout"
+                        title="Pause"
+                        data-testid="status-exercise-pause"
+                      >
+                        <Pause className="h-3.5 w-3.5" aria-hidden />
+                      </Button>
+                    )
+                  ) : null}
                   {ex.phase === "active" ? (
                     <Button
                       size="sm"
@@ -1129,6 +773,12 @@ export function AppStatusStrip() {
                       <Plane className="mr-2 h-3.5 w-3.5 opacity-70" aria-hidden />
                       End travel mode
                     </DropdownMenuItem>
+                    <DropdownMenuItem asChild className="cursor-pointer" data-testid="status-exercise-open">
+                      <Link href={EXERCISE_GUIDE_HREF}>
+                        <Dumbbell className="mr-2 h-3.5 w-3.5 opacity-70" aria-hidden />
+                        Open Exercise guide
+                      </Link>
+                    </DropdownMenuItem>
                     {ex.phase === "active" ? (
                       <DropdownMenuItem
                         onClick={() => requestOpenExerciseMode()}
@@ -1149,351 +799,7 @@ export function AppStatusStrip() {
             ) : null}
           </div>
 
-          {exerciseExpanded && !isExerciseScenarioPage ? (
-            <div
-              className="space-y-3 rounded-2xl border border-border/60 bg-background/55 px-3 py-3 backdrop-blur max-h-[min(64vh,34rem)] overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]"
-              data-testid="status-exercise-expanded"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-foreground truncate">{ex.exerciseName}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {ex.durationMinutes} min · {ex.intensity} · {exerciseTypeDisplayLabel(ex.exerciseType)}
-                  </p>
-                </div>
-                {ex.phase === "pre" ? (
-                  <Button
-                    size="sm"
-                    variant="default"
-                    className={cn("h-8 shrink-0 px-2.5 text-xs sm:text-sm", "whitespace-nowrap")}
-                    onClick={handleStartWorkoutFromPre}
-                    data-testid="status-exercise-start"
-                  >
-                    <Play className="h-3.5 w-3.5 mr-1 shrink-0" aria-hidden />
-                    Start workout
-                  </Button>
-                ) : ex.phase === "active" ? (
-                  <div className="flex shrink-0 items-center gap-1">
-                    {exercisePaused ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className={cn("h-8 px-2.5 text-xs sm:text-sm", "whitespace-nowrap")}
-                        onClick={handleResumeWorkoutFromActive}
-                        data-testid="status-exercise-resume"
-                      >
-                        <Play className="h-3.5 w-3.5 mr-1 shrink-0" aria-hidden />
-                        Resume
-                      </Button>
-                    ) : (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className={cn("h-8 px-2.5 text-xs sm:text-sm", "whitespace-nowrap")}
-                        onClick={handlePauseWorkoutFromActive}
-                        data-testid="status-exercise-pause"
-                      >
-                        <Pause className="h-3.5 w-3.5 mr-1 shrink-0" aria-hidden />
-                        Pause
-                      </Button>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="default"
-                      className={cn("h-8 px-2.5 text-xs sm:text-sm", "whitespace-nowrap")}
-                      onClick={handleFinishWorkoutFromActive}
-                      data-testid="status-exercise-finish-active"
-                    >
-                      <CircleCheck className="h-3.5 w-3.5 mr-1 shrink-0" aria-hidden />
-                      Workout done
-                    </Button>
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-medium text-foreground/90">
-                  {ex.phase === "pre"
-                    ? "Before you start"
-                    : ex.phase === "active"
-                      ? exercisePaused
-                        ? "Paused"
-                        : "During"
-                      : "Recovery"}
-                </p>
-                {exercisePhaseTimerLabel ? (
-                  <span
-                    className={cn(
-                      "text-xs tabular-nums",
-                      exercisePaused ? "font-medium text-amber-600 dark:text-amber-400" : "text-muted-foreground",
-                    )}
-                    data-testid={ex.phase === "active" ? "status-exercise-elapsed" : "status-exercise-recovery-elapsed"}
-                    title={
-                      ex.phase === "active"
-                        ? exercisePaused
-                          ? "Workout paused"
-                          : "Workout elapsed"
-                        : "Time since workout ended"
-                    }
-                  >
-                    {exercisePaused ? `Paused · ${exercisePhaseTimerLabel}` : exercisePhaseTimerLabel}
-                  </span>
-                ) : null}
-              </div>
-
-              {ex.phase === "active" && ex.exerciseStartedAt ? (
-                <ExerciseWorkoutProgressBar
-                  phase={ex.phase}
-                  exerciseStartedAt={ex.exerciseStartedAt}
-                  durationMinutes={ex.durationMinutes}
-                  nowMs={stripClock}
-                  pausedAt={ex.pausedAt}
-                  totalPausedMs={ex.totalPausedMs}
-                  compact
-                />
-              ) : null}
-
-              {/* The actual answer — up top, not buried under every input below it. */}
-              {readiness?.verdict && exercisePlan
-                ? (() => {
-                    const v = readiness.verdict;
-                    const fuelLines =
-                      ex.phase === "pre" ? preFuelPlanLines : ex.phase === "active" ? activeFuelPlanLines : recoveryFuelPlanLines;
-                    const fuelVariant = ex.phase === "pre" ? "pre" : ex.phase === "active" ? "active" : "recovery";
-                    const isCaution = v.verdict === "caution";
-                    const isHighCaution = isCaution && v.title.toLowerCase().includes("high");
-                    const mergedCarbCaution =
-                      ex.phase === "active" && isCaution && !isHighCaution && duringCarbBallpark(exercisePlan.during);
-                    const bodyText =
-                      ex.phase === "active"
-                        ? duringQuickStatusBody(v, exercisePlan.during, Boolean(mergedCarbCaution))
-                        : v.detail;
-                    const needsCarbPrompt = ex.phase === "pre" && fuelLines.length === 0;
-                    const needsInsulinPrompt = ex.phase === "pre" && ex.preRapidInsulin2h == null;
-                    return (
-                      <div
-                        className={cn(
-                          "rounded-2xl border px-3.5 py-3 space-y-2 bg-background/80",
-                          getReadinessToneClasses(v.verdict),
-                        )}
-                        data-testid="status-exercise-verdict"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="text-base font-semibold leading-tight text-foreground">{v.title}</p>
-                          {exerciseExtraInfoLines.length > 0 ? (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 shrink-0 -mr-1 -mt-1 text-muted-foreground hover:text-foreground"
-                              onClick={() => setExerciseDetailOpen(true)}
-                              aria-label="More guidance"
-                              data-testid="status-exercise-more-info"
-                            >
-                              <Info className="h-4 w-4" aria-hidden />
-                            </Button>
-                          ) : null}
-                        </div>
-                        <p className="text-sm leading-snug text-foreground/90">{bodyText}</p>
-                        {exerciseHypoStrip ? <ExerciseHypoTreatmentHint suggestion={exerciseHypoStrip} className="mt-1" /> : null}
-                        {fuelLines.length > 0 ? (
-                          <ExerciseFuelPlanSummary lines={fuelLines} variant={fuelVariant} className="mt-1" />
-                        ) : null}
-                        {needsCarbPrompt || needsInsulinPrompt ? (
-                          <div className="pt-2 border-t border-border/50 space-y-1 text-xs text-muted-foreground">
-                            {needsCarbPrompt ? <p>Have fast carbs within reach.</p> : null}
-                            {needsInsulinPrompt ? (
-                              <p>
-                                {usesClosedLoop(storage.getSettings())
-                                  ? "Review IOB and your loop's exercise settings before you push intensity."
-                                  : "Consider insulin on board / recent bolus before you push intensity."}
-                              </p>
-                            ) : null}
-                          </div>
-                        ) : null}
-                      </div>
-                    );
-                  })()
-                : null}
-
-              {/* BG + trend, one row — most of the time this is already right from live CGM. */}
-              <div className="space-y-1.5">
-                <p className="text-xs font-medium text-muted-foreground">
-                  {ex.phase === "pre" ? "Current BG" : ex.phase === "active" ? "BG now" : "BG at end"}
-                </p>
-                <div className="flex items-center gap-2">
-                  <Input
-                    inputMode="decimal"
-                    placeholder={bgUnits === "mmol/L" ? "e.g. 7.2" : "e.g. 130"}
-                    value={exerciseBgInput}
-                    onChange={(e) => onExerciseCgmTrackedChange(e.target.value)}
-                    className="h-9 min-w-0 flex-1"
-                    data-testid="status-exercise-bg"
-                  />
-                  <div className="flex shrink-0 items-center gap-0.5 rounded-lg border border-border/60 bg-background/60 p-0.5">
-                    {(
-                      [
-                        { id: "falling" as const, Icon: TrendingDown, label: "Falling" },
-                        { id: "flat" as const, Icon: Minus, label: "Flat" },
-                        { id: "rising" as const, Icon: TrendingUp, label: "Rising" },
-                      ] as const
-                    ).map(({ id, Icon, label }) => (
-                      <Button
-                        key={id}
-                        type="button"
-                        size="icon"
-                        variant={trendButtonSelected(id) ? "default" : "ghost"}
-                        className="h-7 w-7 rounded-md"
-                        onClick={() => onExerciseTrendPick(id)}
-                        aria-label={label}
-                        aria-pressed={trendButtonSelected(id)}
-                        title={label}
-                        data-testid={`status-exercise-trend-${id}`}
-                      >
-                        <Icon className="h-3.5 w-3.5" aria-hidden />
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-                {(() => {
-                  if (!cgmPrefillActive) return null;
-                  if (exerciseCgmLoading && !exerciseCgmPrefill) {
-                    return (
-                      <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                        <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
-                        Checking recent BG…
-                      </p>
-                    );
-                  }
-                  if (!exerciseCgmPrefill) {
-                    if (!exerciseCgmEmptyHint) return null;
-                    return (
-                      <p className="text-[11px] leading-snug text-muted-foreground">
-                        {exerciseCgmEmptyHint}{" "}
-                        <button
-                          type="button"
-                          className="text-primary underline-offset-2 hover:underline"
-                          onClick={refreshExerciseCgm}
-                        >
-                          Check again
-                        </button>
-                      </p>
-                    );
-                  }
-                  const prefill = exerciseCgmPrefill;
-                  if (!exerciseBgInput.trim()) {
-                    return (
-                      <div className="space-y-0.5">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-7 text-[11px]"
-                          onClick={() => {
-                            applyExerciseCgmPrefill(prefill.value);
-                            const t = cgmTrendForExercise(prefill.reading?.trend);
-                            if (t) applyExerciseCgmTrend(t);
-                          }}
-                          data-testid="button-exercise-cgm-prefill"
-                        >
-                          Use {prefill.value} {bgUnits}
-                        </Button>
-                        <p className="text-[11px] leading-snug text-muted-foreground">{prefill.source}</p>
-                      </div>
-                    );
-                  }
-                  if (exerciseBgInput.trim() === prefill.value) {
-                    return (
-                      <p className="text-[11px] leading-snug text-muted-foreground" data-testid="status-exercise-cgm-synced">
-                        Synced · {prefill.source}
-                      </p>
-                    );
-                  }
-                  return (
-                    <div className="space-y-0.5">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-[11px]"
-                        onClick={() => applyExerciseCgmPrefill(prefill.value)}
-                        data-testid="button-exercise-cgm-prefill-sync"
-                      >
-                        Use {prefill.value} {bgUnits} instead
-                      </Button>
-                      <p className="text-[11px] leading-snug text-muted-foreground">{prefill.source}</p>
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {ex.phase === "pre" ? (
-                <div className="space-y-1.5">
-                  <p className="text-xs font-medium text-muted-foreground">Rapid-acting insulin in the last 2 hours?</p>
-                  <div className="flex gap-2">
-                    {(
-                      [
-                        { id: "yes" as const, label: "Yes" },
-                        { id: "no" as const, label: "No" },
-                      ] as const
-                    ).map((o) => (
-                      <Button
-                        key={o.id}
-                        type="button"
-                        size="sm"
-                        variant={ex.preRapidInsulin2h === o.id ? "default" : "outline"}
-                        className={cn(btnClass, "flex-1")}
-                        onClick={() => {
-                          const togglingOff = ex.preRapidInsulin2h === o.id;
-                          const next = togglingOff ? undefined : o.id;
-                          const patch: Parameters<typeof storage.updateActiveExercise>[0] = {
-                            preRapidInsulin2h: next,
-                          };
-                          if (o.id === "no" && next === "no") {
-                            patch.preChecklist = { ...ex.preChecklist, basalAdjusted: true };
-                          }
-                          storage.updateActiveExercise(patch);
-                          setEx(storage.getActiveExercise());
-                        }}
-                        data-testid={`status-exercise-rapid-insulin-${o.id}`}
-                      >
-                        {o.label}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          ) : null}
         </div>
-      ) : null}
-
-      {ex && exerciseExpanded && !isExerciseScenarioPage ? (
-        <Dialog open={exerciseDetailOpen} onOpenChange={setExerciseDetailOpen}>
-          <DialogContent className="max-w-md" data-testid="dialog-exercise-extra-info">
-            <DialogHeader>
-              <DialogTitle>{exerciseExtraInfoDialogTitle(ex.phase)}</DialogTitle>
-              <DialogDescription>
-                Optional reading — your care team knows your targets and doses best.
-              </DialogDescription>
-            </DialogHeader>
-            <ul className="space-y-2 text-sm leading-snug text-foreground/90">
-              {exerciseExtraInfoLines.map((line) => (
-                <li key={line} className="flex gap-2">
-                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/70" aria-hidden />
-                  <span>{line}</span>
-                </li>
-              ))}
-            </ul>
-            <p className="text-xs text-muted-foreground leading-snug pt-1">
-              For meal timing, pump temp-basal ideas, and longer recovery guidance, open{" "}
-              <Link href="/scenarios/exercise" className="font-medium text-foreground underline-offset-2 hover:underline">
-                Guides → Exercise
-              </Link>
-              .
-            </p>
-          </DialogContent>
-        </Dialog>
       ) : null}
 
       {!ex && inPostExerciseWindow && showPostExerciseEducational ? (

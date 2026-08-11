@@ -7,25 +7,10 @@
  */
 export const EXERCISE_MODE_OPEN_EVENT = "diabeaters:open-exercise-mode";
 
-/** Expand the home status-strip exercise panel (Check) for the active session. */
-export const EXERCISE_STRIP_EXPAND_EVENT = "diabeaters:expand-exercise-strip";
+/** SPA path for the Exercise guide (full check / session tool). */
+export const EXERCISE_GUIDE_HREF = "/scenarios/exercise";
 
 export function requestOpenExerciseMode(): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new Event(EXERCISE_MODE_OPEN_EVENT));
-}
-
-export function requestExpandExerciseStrip(): void {
-  if (typeof window === "undefined") return;
-  window.dispatchEvent(new Event(EXERCISE_STRIP_EXPAND_EVENT));
-}
-
-/**
- * After Quick Exercise (or similar) starts a session on Home: bring the real exercise
- * tool into view — the expanded status strip, not a separate adjust sheet.
- */
-export function revealHomeExerciseTool(): void {
-  requestExpandExerciseStrip();
-  if (typeof window === "undefined") return;
-  window.scrollTo({ top: 0, behavior: "smooth" });
 }

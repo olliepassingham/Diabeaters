@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dumbbell, ArrowRight, Plus, Flame, Zap, Wind, Footprints, Users, Waves, Play, CircleDot } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { storage, ExerciseRoutine, ExerciseType, ActiveExerciseSession, DIABEATER_SCENARIO_STATE_CHANGED_EVENT } from "@/lib/storage";
 import { buildExerciseScenarioPlannerHref, buildExerciseScenarioPlannerHrefFromSession } from "@/lib/exercise-planner-href";
 import { useToast } from "@/hooks/use-toast";
@@ -15,11 +15,16 @@ import { computeExerciseHypoSuggestion, resolveExerciseBgForHypo } from "@/lib/e
 import { calculateExercisePlan } from "@/lib/exercise-plan";
 import { getExerciseReadinessVerdict, getReadinessToneClasses } from "@/lib/exercise-readiness";
 import { ExerciseHypoTreatmentHint, ExerciseWorkoutProgressBar } from "@/components/exercise-active-session-extras";
+import {
+  ExerciseRoutineAdjustSheet,
+  ExerciseRoutineAdjustTrigger,
+  type ExerciseRoutineAdjustValues,
+} from "@/components/exercise-routine-adjust-sheet";
 import { useBgPrefill } from "@/hooks/use-bg-prefill";
 import { EXERCISE_CGM_POLL_MS } from "@/hooks/use-exercise-cgm-bg";
 import { cgmTrendForExercise } from "@/lib/cgm/apply-cgm-trend";
 import { isStarterExerciseRoutine, seedStarterExerciseRoutineIfNeeded } from "@/lib/starter-exercise-routine";
-import { revealHomeExerciseTool } from "@/lib/exercise-mode-deep-link";
+import { EXERCISE_GUIDE_HREF } from "@/lib/exercise-mode-deep-link";
 import { Badge } from "@/components/ui/badge";
 
 const EXERCISE_ICONS: Record<ExerciseType, typeof Dumbbell> = {
@@ -40,7 +45,9 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
   const [activeSession, setActiveSession] = useState<ActiveExerciseSession | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [travelActiveTripHint, setTravelActiveTripHint] = useState(false);
+  const [adjustRoutine, setAdjustRoutine] = useState<ExerciseRoutine | null>(null);
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   const [nowTick, setNowTick] = useState(() => Date.now());
 
@@ -180,14 +187,17 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
     });
   }, [activeSession, cgmPrefill]);
 
-  const handleQuickStart = (exercise: ExerciseRoutine) => {
+  const handleQuickStart = (
+    exercise: ExerciseRoutine,
+    overrides?: Partial<ExerciseRoutineAdjustValues>,
+  ) => {
     try {
       const existing = storage.getActiveExercise?.();
       if (existing) {
-        revealHomeExerciseTool();
+        setLocation(EXERCISE_GUIDE_HREF);
         toast({
           title: "Exercise already active",
-          description: `Continue "${existing.exerciseName}" in the panel at the top.`,
+          description: `Continue "${existing.exerciseName}" in the Exercise guide.`,
         });
         return;
       }
@@ -206,20 +216,18 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
       const session = storage.startExerciseSession({
         routineId: exercise.id,
         exerciseName: exercise.name,
-        exerciseType: exercise.exerciseType,
-        intensity: exercise.intensity,
-        durationMinutes: exercise.durationMinutes,
+        exerciseType: overrides?.exerciseType ?? exercise.exerciseType,
+        intensity: overrides?.intensity ?? exercise.intensity,
+        durationMinutes: overrides?.durationMinutes ?? exercise.durationMinutes,
       });
       setActiveSession(session);
       setExercises(storage.getRecentExercises?.(compact ? 3 : 5) ?? []);
+      setAdjustRoutine(null);
 
-      // Open the real home exercise tool (status strip), not a separate adjust sheet.
-      revealHomeExerciseTool();
+      setLocation(EXERCISE_GUIDE_HREF);
       toast({
         title: `${exercise.name} ready`,
-        description: sc.travelModeActive
-          ? "Session started — open Guides → Exercise for the full check."
-          : "Check BG and start from the exercise panel at the top.",
+        description: "Continue in the Exercise guide — check BG and start when you're ready.",
       });
     } catch {
       toast({
@@ -228,6 +236,20 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
         variant: "destructive",
       });
     }
+  };
+
+  const handleSaveAdjustDefault = (values: ExerciseRoutineAdjustValues) => {
+    if (!adjustRoutine) return;
+    storage.updateExerciseRoutine(adjustRoutine.id, {
+      exerciseType: values.exerciseType,
+      intensity: values.intensity,
+      durationMinutes: values.durationMinutes,
+    });
+    setExercises(storage.getRecentExercises?.(compact ? 3 : 5) ?? []);
+    toast({
+      title: "Routine updated",
+      description: `${adjustRoutine.name} will use these details next time.`,
+    });
   };
 
   if (error) {
@@ -346,56 +368,70 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
                 const Icon = EXERCISE_ICONS[exercise.exerciseType] || Dumbbell;
                 const isActive = activeSession?.routineId === exercise.id;
                 return (
-                  <button
+                  <div
                     key={exercise.id}
-                    type="button"
-                    onClick={() => handleQuickStart(exercise)}
                     className={cn(
-                      "pressable flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border border-border bg-card px-3 py-2.5 text-left shadow-sm transition-colors",
+                      "flex w-full items-center gap-1.5 rounded-xl border border-border bg-card p-1 shadow-sm transition-colors",
                       "hover:border-emerald-500/35 hover:bg-emerald-500/[0.06] dark:hover:border-emerald-500/25 dark:hover:bg-emerald-950/25",
-                      isActive && "border-emerald-500/60 dark:border-emerald-500/50",
+                      isActive && "border-emerald-500/60 dark:border-emerald-500/50 opacity-50",
                     )}
-                    data-testid={`button-quick-exercise-${exercise.id}`}
                   >
-                    <span className="flex min-w-0 flex-1 items-center gap-3">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 dark:bg-emerald-500/15">
-                        <Icon className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                      </span>
-                      <span className="min-w-0 text-left">
-                        <span className="flex min-w-0 items-center gap-1.5">
-                          <span className="block truncate text-sm font-semibold text-foreground">{exercise.name}</span>
-                          {isStarterExerciseRoutine(exercise) ? (
-                            <Badge
-                              variant="secondary"
-                              className="shrink-0 px-1.5 py-0 text-[0.6rem] font-medium"
-                              data-testid="badge-starter-exercise"
-                            >
-                              Example
-                            </Badge>
-                          ) : null}
-                          {isActive ? (
-                            <Badge
-                              variant="secondary"
-                              className="shrink-0 px-1.5 py-0 text-[0.6rem] font-medium text-emerald-700 dark:text-emerald-300"
-                            >
-                              Active
-                            </Badge>
-                          ) : null}
+                    <button
+                      type="button"
+                      onClick={() => handleQuickStart(exercise)}
+                      className={cn(
+                        "pressable flex min-h-11 min-w-0 flex-1 items-center justify-between gap-3 rounded-lg px-2.5 py-2 text-left",
+                        isActive && "pointer-events-none",
+                      )}
+                      disabled={isActive}
+                      data-testid={`button-quick-exercise-${exercise.id}`}
+                    >
+                      <span className="flex min-w-0 flex-1 items-center gap-3">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 dark:bg-emerald-500/15">
+                          <Icon className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                         </span>
-                        <span className="block text-xs text-muted-foreground">
-                          {exercise.durationMinutes} min · {exercise.intensity}
+                        <span className="min-w-0 text-left">
+                          <span className="flex min-w-0 items-center gap-1.5">
+                            <span className="block truncate text-sm font-semibold text-foreground">{exercise.name}</span>
+                            {isStarterExerciseRoutine(exercise) ? (
+                              <Badge
+                                variant="secondary"
+                                className="shrink-0 px-1.5 py-0 text-[0.6rem] font-medium"
+                                data-testid="badge-starter-exercise"
+                              >
+                                Example
+                              </Badge>
+                            ) : null}
+                            {isActive ? (
+                              <Badge
+                                variant="secondary"
+                                className="shrink-0 px-1.5 py-0 text-[0.6rem] font-medium text-emerald-700 dark:text-emerald-300"
+                              >
+                                Active
+                              </Badge>
+                            ) : null}
+                          </span>
+                          <span className="block text-xs text-muted-foreground">
+                            {exercise.durationMinutes} min · {exercise.intensity}
+                          </span>
                         </span>
                       </span>
-                    </span>
-                    <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                  </button>
+                      <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                    </button>
+                    <ExerciseRoutineAdjustTrigger
+                      disabled={isActive || !!activeSession}
+                      onClick={() => setAdjustRoutine(exercise)}
+                      testId={`button-adjust-exercise-${exercise.id}`}
+                      className="mr-0.5"
+                    />
+                  </div>
                 );
               })}
             </div>
 
             {!compact ? (
               <p className="text-xs text-muted-foreground px-0.5">
-                Tap a workout to open the exercise tool at the top of Home.
+                Tap to start · pencil to adjust duration or intensity first.
               </p>
             ) : null}
           </>
@@ -436,6 +472,19 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
         </Link>
         )}
       </CardContent>
+
+      <ExerciseRoutineAdjustSheet
+        open={!!adjustRoutine}
+        onOpenChange={(open) => {
+          if (!open) setAdjustRoutine(null);
+        }}
+        routine={adjustRoutine}
+        onStart={(values) => {
+          if (!adjustRoutine) return;
+          handleQuickStart(adjustRoutine, values);
+        }}
+        onSaveDefault={handleSaveAdjustDefault}
+      />
     </WidgetCard>
   );
 }
