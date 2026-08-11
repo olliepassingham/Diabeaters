@@ -133,12 +133,12 @@ export function resolveTabNavigationTarget(tabHref: string, currentPathname: str
 
   const currentId = tabStackIdForPath(current);
 
-  // Guides: always open the list of guides (never restore Sick day / Exercise / etc.).
-  if (destIdResolved === "scenarios") {
-    if (currentId && currentId !== "scenarios") {
+  // Guides / Tools: always open the hub list (never restore a nested drill-down).
+  if (destIdResolved === "scenarios" || destIdResolved === "tools") {
+    if (currentId && currentId !== destIdResolved) {
       rememberTabPath(current);
     }
-    clearTabStackPath("scenarios");
+    clearTabStackPath(destIdResolved);
     return hub;
   }
 

@@ -33,6 +33,8 @@ type Props = {
   composerExpanded?: boolean;
   onComposerExpandedChange?: (open: boolean) => void;
   composerForm?: ReactNode;
+  /** Trailing controls (e.g. Find people) sit on the stories row to save vertical space. */
+  endActions?: ReactNode;
   className?: string;
 };
 
@@ -171,6 +173,7 @@ export function FeedStoriesComposerHeader({
   composerExpanded,
   onComposerExpandedChange,
   composerForm,
+  endActions,
   className,
 }: Props) {
   const storyEntries = useMemo(() => {
@@ -229,40 +232,49 @@ export function FeedStoriesComposerHeader({
 
   return (
     <div className={cn("space-y-2", className)} data-testid="feed-stories-composer-header">
-      {showStoriesRow ? (
-        <FeedStoriesStrip>
-          {self ? (
-            <SelfStoryCell
-              self={self}
-              selfStories={selfStories}
-              onOpenStory={onOpenStory}
-              onAddStory={onAddStory}
-            />
-          ) : null}
+      {showStoriesRow || endActions ? (
+        <div className="flex items-start gap-1">
+          {showStoriesRow ? (
+            <div className="min-w-0 flex-1">
+              <FeedStoriesStrip>
+                {self ? (
+                  <SelfStoryCell
+                    self={self}
+                    selfStories={selfStories}
+                    onOpenStory={onOpenStory}
+                    onAddStory={onAddStory}
+                  />
+                ) : null}
 
-          {loading
-            ? Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="h-9 w-9 shrink-0 animate-pulse rounded-full bg-muted/25" />
-              ))
-            : storyEntries.map(({ person, stories, story }) => (
-                <div key={person.id} className={cn("flex shrink-0 flex-col items-center gap-0.5", ITEM_WIDTH)}>
-                  <StoryAvatarRing
-                    state={storyRingStateForStories(stories)}
-                    onClick={() => onOpenStory(person.id, story)}
-                    label={`Watch ${person.name}'s story`}
-                    compact
-                  >
-                    <CommunityAuthorAvatar
-                      displayName={person.name}
-                      avatarPath={person.avatar_url}
-                      size="sm"
-                      className={AVATAR_CLASS}
-                    />
-                  </StoryAvatarRing>
-                  <span className={NAME_CLASS}>{person.name.split(" ")[0]}</span>
-                </div>
-              ))}
-        </FeedStoriesStrip>
+                {loading
+                  ? Array.from({ length: 3 }).map((_, i) => (
+                      <div key={i} className="h-9 w-9 shrink-0 animate-pulse rounded-full bg-muted/25" />
+                    ))
+                  : storyEntries.map(({ person, stories, story }) => (
+                      <div key={person.id} className={cn("flex shrink-0 flex-col items-center gap-0.5", ITEM_WIDTH)}>
+                        <StoryAvatarRing
+                          state={storyRingStateForStories(stories)}
+                          onClick={() => onOpenStory(person.id, story)}
+                          label={`Watch ${person.name}'s story`}
+                          compact
+                        >
+                          <CommunityAuthorAvatar
+                            displayName={person.name}
+                            avatarPath={person.avatar_url}
+                            size="sm"
+                            className={AVATAR_CLASS}
+                          />
+                        </StoryAvatarRing>
+                        <span className={NAME_CLASS}>{person.name.split(" ")[0]}</span>
+                      </div>
+                    ))}
+              </FeedStoriesStrip>
+            </div>
+          ) : (
+            <div className="min-w-0 flex-1" />
+          )}
+          {endActions ? <div className="shrink-0 pt-0.5">{endActions}</div> : null}
+        </div>
       ) : null}
 
       <section

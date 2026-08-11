@@ -16,9 +16,9 @@ const EXPLICIT_PARENT: Record<string, string> = {
   "/ratios": "/settings/ratios",
   "/routines": "/tools",
   "/notifications": "/",
-  "/supplies": "/",
-  "/appointments": "/",
-  "/adviser": "/",
+  "/supplies": "/tools",
+  "/appointments": "/tools",
+  "/adviser": "/tools",
   // Legacy aliases → Guides hub (not the nested scenario route).
   "/bedtime": "/scenarios",
   "/sick-day": "/scenarios",
@@ -28,12 +28,12 @@ const EXPLICIT_PARENT: Record<string, string> = {
   "/help-now": "/",
   "/family-carers": "/account",
   "/supporter-profile": "/account",
-  "/coach": "/",
+  "/coach": "/tools",
   "/privacy": "/",
   "/support": "/",
   "/mode": "/account",
   "/carer-setup": "/welcome",
-  "/education": "/tools/education",
+  "/education": "/tools",
 };
 
 const BACK_LABELS: Record<string, string> = {
@@ -63,6 +63,22 @@ export function isGuidesDrilldownPath(pathname: string): boolean {
   const path = normalizeNavPath(pathname);
   if (path.startsWith("/scenarios/")) return true;
   return path === "/bedtime" || path === "/sick-day" || path === "/travel";
+}
+
+/** Tools-tab nested routes — Back should return to the Tools list. */
+export function isToolsDrilldownPath(pathname: string): boolean {
+  const path = normalizeNavPath(pathname);
+  if (path === "/tools") return false;
+  if (path.startsWith("/tools/")) return true;
+  if (path.startsWith("/education")) return true;
+  return (
+    path === "/routines" ||
+    path === "/supplies" ||
+    path === "/appointments" ||
+    path === "/adviser" ||
+    path === "/coach" ||
+    path === "/ratios"
+  );
 }
 
 export function resolveBackFallback(pathname: string): string | null {

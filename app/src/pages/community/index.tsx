@@ -610,18 +610,7 @@ export default function CommunityHomePage() {
   );
 
   return (
-    <PageShell variant="full" density="compact" className="pb-2">
-      <div className="mb-2.5 flex items-start justify-between gap-3 px-0.5 pt-0.5">
-        <div className="min-w-0">
-          <h1 className="font-display text-[1.65rem] font-bold leading-none tracking-tight text-foreground sm:text-3xl">
-            Feed
-          </h1>
-          <p className="mt-1.5 text-[13px] leading-snug text-muted-foreground sm:text-sm">
-            Support, ideas, and stories from people like you.
-          </p>
-        </div>
-        {feedHeaderActions}
-      </div>
+    <PageShell variant="full" density="compact" className="space-y-2 pb-2 pt-0">
       <PageHeader title="Community" screenReaderOnly />
 
       {user && !savedOnly && !feedSearch.trim() ? (
@@ -636,6 +625,7 @@ export default function CommunityHomePage() {
           avatarDisplayName={feedComposer.avatarDisplayName}
           avatarPath={feedComposer.avatarPath}
           profileHref={feedComposer.profileHref}
+          endActions={feedHeaderActions}
           onComposerClick={() => {
             if (!canComposeToFeed) {
               toast({
@@ -657,7 +647,9 @@ export default function CommunityHomePage() {
             </FeedStoriesComposerHeaderForm>
           }
         />
-      ) : null}
+      ) : (
+        <div className="flex justify-end">{feedHeaderActions}</div>
+      )}
 
       {showProfileReminder && user?.id ? (
         <CommunityProfileReminderCard

@@ -18,9 +18,9 @@ describe("tab-path-stacks", () => {
     expect(tabStackIdForPath("/community/post/abc")).toBe("community");
   });
 
-  it("restores nested tools path when returning from Home", () => {
+  it("does not restore nested tools when returning from Home — Tools always opens the list", () => {
     rememberTabPath("/tools/hypo-help");
-    expect(resolveTabNavigationTarget("/tools", "/")).toBe("/tools/hypo-help");
+    expect(resolveTabNavigationTarget("/tools", "/")).toBe("/tools");
   });
 
   it("resets to hub when re-tapping active nested tab", () => {
@@ -28,7 +28,7 @@ describe("tab-path-stacks", () => {
     expect(resolveTabNavigationTarget("/tools", "/tools/hypo-help")).toBe("/tools");
   });
 
-  it("remembers tools when leaving a guide, but Guides always opens the list", () => {
+  it("Guides and Tools hubs always open their lists", () => {
     expect(resolveTabNavigationTarget("/tools", "/scenarios/exercise")).toBe("/tools");
     expect(resolveTabNavigationTarget("/scenarios", "/tools")).toBe("/scenarios");
   });
@@ -37,6 +37,12 @@ describe("tab-path-stacks", () => {
     rememberTabPath("/scenarios/sick-day");
     expect(resolveTabNavigationTarget("/scenarios", "/")).toBe("/scenarios");
     expect(resolveTabNavigationTarget("/scenarios", "/scenarios/sick-day")).toBe("/scenarios");
+  });
+
+  it("Tools tab always returns to the tools list even when a nested tool was remembered", () => {
+    rememberTabPath("/tools/cgm-live");
+    expect(resolveTabNavigationTarget("/tools", "/scenarios")).toBe("/tools");
+    expect(resolveTabNavigationTarget("/tools", "/tools/cgm-live")).toBe("/tools");
   });
 
   it("hubHrefForTabStack matches bottom nav hubs", () => {

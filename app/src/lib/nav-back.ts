@@ -10,6 +10,7 @@ import {
   hasInAppNavHistory,
   isGuidesDrilldownPath,
   isRootTabRoute,
+  isToolsDrilldownPath,
   normalizeNavPath,
   resolveBackFallback,
   trackNavHistory,
@@ -23,12 +24,19 @@ export {
   hasInAppNavHistory,
   isGuidesDrilldownPath,
   isRootTabRoute,
+  isToolsDrilldownPath,
   normalizeNavPath,
   resolveBackFallback,
   trackNavHistory,
 };
 
 type SetLocation = (path: string, options?: { replace?: boolean }) => void;
+
+function shouldUseHubBack(explicitFallback: string | undefined, hub: string): boolean {
+  // Allow a page-specific fallback (e.g. Routines → Exercise) to win over the hub.
+  if (explicitFallback && explicitFallback !== hub) return false;
+  return true;
+}
 
 export function navigateBack(
   pathname: string,
@@ -39,9 +47,19 @@ export function navigateBack(
   void hapticLight();
 
   // Guides always pop to the Guides list (not prior history / home / tools).
-  if (isGuidesDrilldownPath(pathname) && !explicitFallback) {
+  if (isGuidesDrilldownPath(pathname) && shouldUseHubBack(explicitFallback, "/scenarios")) {
     clearTabStackPath("scenarios");
     navigateWithViewTransition(setLocation, "/scenarios", {
+      replace: true,
+      direction: "back",
+    });
+    return;
+  }
+
+  // Tools always pop to the Tools list (same hub pattern as Guides).
+  if (isToolsDrilldownPath(pathname) && shouldUseHubBack(explicitFallback, "/tools")) {
+    clearTabStackPath("tools");
+    navigateWithViewTransition(setLocation, "/tools", {
       replace: true,
       direction: "back",
     });

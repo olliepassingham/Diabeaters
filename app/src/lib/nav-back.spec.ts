@@ -35,15 +35,22 @@ describe("nav-back", () => {
     expect(resolveBackFallback("/scenarios/sick-day")).toBe("/scenarios");
     expect(resolveBackFallback("/sick-day")).toBe("/scenarios");
     expect(resolveBackFallback("/tools/hypo-help")).toBe("/tools");
+    expect(resolveBackFallback("/supplies")).toBe("/tools");
+    expect(resolveBackFallback("/adviser")).toBe("/tools");
+    expect(resolveBackFallback("/education")).toBe("/tools");
     // Must not point at /tools/routines (that path redirects back to /routines).
     expect(resolveBackFallback("/routines")).toBe("/tools");
   });
 
   it("treats nested guides as hierarchical drill-downs", async () => {
-    const { isGuidesDrilldownPath } = await import("./nav-back-routes");
+    const { isGuidesDrilldownPath, isToolsDrilldownPath } = await import("./nav-back-routes");
     expect(isGuidesDrilldownPath("/scenarios/sick-day")).toBe(true);
     expect(isGuidesDrilldownPath("/scenarios")).toBe(false);
     expect(isGuidesDrilldownPath("/tools/hypo-help")).toBe(false);
+    expect(isToolsDrilldownPath("/tools/hypo-help")).toBe(true);
+    expect(isToolsDrilldownPath("/routines")).toBe(true);
+    expect(isToolsDrilldownPath("/tools")).toBe(false);
+    expect(isToolsDrilldownPath("/scenarios/exercise")).toBe(false);
   });
 
   it("resolves community thread parent", () => {
