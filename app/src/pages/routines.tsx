@@ -18,6 +18,7 @@ import { format } from "date-fns";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { hasInAppNavHistory } from "@/lib/nav-back";
 
 const MEAL_TYPES: { value: RoutineMealType; label: string; icon: typeof Utensils }[] = [
   { value: "breakfast", label: "Breakfast", icon: Coffee },
@@ -93,6 +94,14 @@ export function RoutinesContent() {
     const params = new URLSearchParams(window.location.search);
     return params.get("section") === "exercise" ? "exercise" : "meals";
   });
+  /** Set once from the entry URL so Exercise → Routines returns to Exercise when history is empty. */
+  const [openedFromExerciseSection] = useState(
+    () => new URLSearchParams(window.location.search).get("section") === "exercise",
+  );
+  const routinesBackFallback =
+    openedFromExerciseSection && !hasInAppNavHistory("/routines")
+      ? "/scenarios/exercise"
+      : "/tools";
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -352,7 +361,7 @@ export function RoutinesContent() {
     <PageShell variant="standard" className="max-w-4xl">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <PageHeader
-            leading={<PageBackButton />}
+            leading={<PageBackButton fallbackHref={routinesBackFallback} />}
             className="min-w-0 flex-1"
             title={
               <span className="flex items-start gap-3">

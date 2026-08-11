@@ -33,6 +33,8 @@ describe("nav-back", () => {
   it("resolves scenario and tool drill-down parents", () => {
     expect(resolveBackFallback("/scenarios/exercise")).toBe("/scenarios");
     expect(resolveBackFallback("/tools/hypo-help")).toBe("/tools");
+    // Must not point at /tools/routines (that path redirects back to /routines).
+    expect(resolveBackFallback("/routines")).toBe("/tools");
   });
 
   it("resolves community thread parent", () => {

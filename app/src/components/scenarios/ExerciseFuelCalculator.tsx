@@ -1,7 +1,6 @@
 import { useMemo, useRef, useState, useCallback, useEffect, type ReactNode } from "react";
 import { Link } from "wouter";
 import { BookOpen, Calculator, ChevronDown, Dumbbell, RotateCcw, Sparkles, X } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,10 +46,6 @@ import { cn } from "@/lib/utils";
 import { ExerciseCgmBgField } from "@/components/exercise-cgm-bg-field";
 import { CgmReadingSourceNote } from "@/components/cgm-reading-source-note";
 import { useExerciseCgmBg } from "@/hooks/use-exercise-cgm-bg";
-
-/** Shared pill grid so timing/trend controls fit one row on narrow phones. */
-const EFC_PILL_GRID =
-  "grid w-full gap-1 [&_button]:h-9 [&_button]:min-w-0 [&_button]:px-1 [&_button]:text-[11px] sm:[&_button]:px-2 sm:[&_button]:text-xs";
 
 function PlanDetailSection({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -101,12 +96,12 @@ function InsulinResultBadge({
 }) {
   const toneClass =
     tone === "insulin"
-      ? "border-violet-500/30 bg-violet-500/10"
+      ? "border-violet-500/25 bg-violet-500/[0.08]"
       : tone === "caution"
-        ? "border-amber-500/35 bg-amber-500/10"
-        : "border-border/50 bg-muted/15";
+        ? "border-amber-500/30 bg-amber-500/[0.08]"
+        : "border-border/40 bg-muted/20";
   return (
-    <div className={cn("flex items-center gap-1 rounded-xl border px-3 py-2.5", toneClass)} data-testid={testId}>
+    <div className={cn("flex items-center gap-1 rounded-2xl border px-3.5 py-3", toneClass)} data-testid={testId}>
       <div className="min-w-0 flex-1">
         <p className={cn("text-sm", value ? "text-[11px] text-muted-foreground" : "font-medium text-foreground")}>
           {title}
@@ -648,23 +643,34 @@ export function ExerciseFuelCalculator() {
 
   return (
     <div className="space-y-4">
-      <Card className="surface-card border-border/70 shadow-sm overflow-hidden" data-testid="exercise-fuel-calculator">
-        <Collapsible open={formOpen} onOpenChange={setFormOpen} className="group">
+      <div
+        className="relative overflow-hidden rounded-[1.75rem] border border-border/50 bg-card/95 shadow-sm"
+        data-testid="exercise-fuel-calculator"
+      >
+        <div
+          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-primary/[0.05] via-transparent to-muted/20"
+          aria-hidden
+        />
+        <Collapsible open={formOpen} onOpenChange={setFormOpen} className="group relative z-10">
           <CollapsibleTrigger asChild>
             <button
               type="button"
-              className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted/30 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset sm:px-5"
+              className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left outline-none transition-colors hover:bg-muted/20 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-5"
               data-testid="efc-collapsible-trigger"
               aria-expanded={formOpen}
             >
-              <div className="min-w-0 flex-1">
-                <CardTitle className="text-base font-semibold tracking-tight flex items-center gap-2">
-                  <Calculator className="h-4 w-4 text-primary shrink-0" aria-hidden />
-                  Fuel &amp; insulin
-                </CardTitle>
-                {collapsedSummary ? (
-                  <CardDescription className="mt-0.5 truncate">{collapsedSummary}</CardDescription>
-                ) : null}
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/15">
+                  <Calculator className="h-5 w-5" aria-hidden />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-lg font-semibold tracking-tight text-foreground">Fuel &amp; insulin</p>
+                  {collapsedSummary ? (
+                    <p className="truncate text-xs text-muted-foreground">{collapsedSummary}</p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Carbs and meal insulin before you start</p>
+                  )}
+                </div>
               </div>
               <ChevronDown
                 className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180"
@@ -673,14 +679,18 @@ export function ExerciseFuelCalculator() {
             </button>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <CardContent className="space-y-5 border-t border-border/50 px-4 pb-4 pt-3 sm:px-5">
+            <div className="space-y-5 border-t border-border/40 px-4 pb-5 pt-4 sm:px-5">
               <div className="space-y-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your session</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  Your session
+                </p>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="efc-activity">Activity</Label>
+                  <Label htmlFor="efc-activity" className="text-xs font-medium text-muted-foreground">
+                    Activity
+                  </Label>
                   <Select value={exerciseType} onValueChange={(v) => setExerciseType(v as ExerciseType)}>
-                    <SelectTrigger id="efc-activity" data-testid="efc-activity">
+                    <SelectTrigger id="efc-activity" className="h-11 rounded-xl" data-testid="efc-activity">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -695,9 +705,9 @@ export function ExerciseFuelCalculator() {
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <Label>Intensity</Label>
+                    <Label className="text-xs font-medium text-muted-foreground">Intensity</Label>
                     <div
-                      className="flex gap-1 rounded-lg border border-border/60 bg-muted/30 p-0.5"
+                      className="grid grid-cols-3 gap-1 rounded-2xl bg-muted/30 p-1"
                       role="group"
                       aria-label="Intensity"
                     >
@@ -706,8 +716,13 @@ export function ExerciseFuelCalculator() {
                           key={o.value}
                           type="button"
                           size="sm"
-                          variant={intensity === o.value ? "default" : "ghost"}
-                          className="h-9 min-h-0 flex-1 rounded-md px-1 text-[11px] sm:text-xs"
+                          variant="ghost"
+                          className={cn(
+                            "h-10 rounded-xl px-1 text-xs font-medium",
+                            intensity === o.value
+                              ? "bg-background text-foreground shadow-sm"
+                              : "text-muted-foreground hover:text-foreground",
+                          )}
                           onClick={() => setIntensity(o.value)}
                           data-testid={`efc-intensity-${o.value}`}
                         >
@@ -716,27 +731,29 @@ export function ExerciseFuelCalculator() {
                       ))}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="efc-duration" className="shrink-0">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="efc-duration" className="text-xs font-medium text-muted-foreground">
                       Duration
                     </Label>
-                    <Input
-                      id="efc-duration"
-                      type="number"
-                      inputMode="numeric"
-                      value={duration}
-                      onChange={(e) => setDuration(e.target.value)}
-                      className="h-9 w-16 text-center"
-                      data-testid="efc-duration"
-                    />
-                    <span className="text-sm text-muted-foreground">min</span>
+                    <div className="flex h-11 items-center gap-2 rounded-xl border border-border/60 bg-muted/20 px-3">
+                      <Input
+                        id="efc-duration"
+                        type="number"
+                        inputMode="numeric"
+                        value={duration}
+                        onChange={(e) => setDuration(e.target.value)}
+                        className="h-9 border-0 bg-transparent p-0 text-center text-base font-semibold tabular-nums shadow-none focus-visible:ring-0"
+                        data-testid="efc-duration"
+                      />
+                      <span className="text-sm text-muted-foreground">min</span>
+                    </div>
                   </div>
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label>Starting in</Label>
+                  <Label className="text-xs font-medium text-muted-foreground">Starting in</Label>
                   <div
-                    className={cn(EFC_PILL_GRID, "grid-cols-4 sm:grid-cols-8")}
+                    className="flex flex-wrap gap-1.5"
                     role="group"
                     aria-label="Minutes until exercise starts"
                   >
@@ -745,8 +762,13 @@ export function ExerciseFuelCalculator() {
                         key={m}
                         type="button"
                         size="sm"
-                        variant={minutesUntilStart === m ? "default" : "outline"}
-                        className="w-full tabular-nums"
+                        variant="ghost"
+                        className={cn(
+                          "h-9 min-w-[3.25rem] rounded-xl px-2.5 text-xs font-medium tabular-nums",
+                          minutesUntilStart === m
+                            ? "bg-background text-foreground shadow-sm ring-1 ring-border/60"
+                            : "bg-muted/30 text-muted-foreground hover:text-foreground",
+                        )}
                         onClick={() => setMinutesUntilStart(m)}
                         data-testid={`efc-start-${m}`}
                       >
@@ -772,9 +794,9 @@ export function ExerciseFuelCalculator() {
                 />
               </div>
 
-              <div className="space-y-3 border-t border-border/50 pt-4">
+              <div className="space-y-3 border-t border-border/40 pt-4">
                 <div className="flex items-center gap-1">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                     Food before exercise
                   </p>
                   <InlineInfoHint
@@ -790,35 +812,28 @@ export function ExerciseFuelCalculator() {
                 </div>
                 {!mealCarbsTouched && suggestedMealCarbs != null && suggestedMealCarbs > 0 ? (
                   <div
-                    className="relative overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/10 via-primary/[0.04] to-transparent px-4 py-3.5"
+                    className="relative overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/[0.08] via-primary/[0.03] to-transparent px-4 py-4"
                     data-testid="efc-suggested-carbs-card"
                   >
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
-                        <Sparkles className="h-5 w-5" aria-hidden />
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-primary/90">
+                      Suggested for you
+                    </p>
+                    <p className="mt-1 flex items-baseline gap-1.5">
+                      <span
+                        className="text-4xl font-bold tabular-nums tracking-tight text-foreground"
+                        data-testid="efc-suggested-carbs-value"
+                      >
+                        {suggestedMealCarbs}
                       </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">
-                          Suggested for you
-                        </p>
-                        <p className="flex items-baseline gap-1.5 leading-none">
-                          <span
-                            className="text-3xl font-bold tabular-nums text-foreground"
-                            data-testid="efc-suggested-carbs-value"
-                          >
-                            {suggestedMealCarbs}g
-                          </span>
-                          <span className="text-sm font-medium text-muted-foreground">before exercise</span>
-                        </p>
-                        <p className="mt-1 text-xs leading-snug text-muted-foreground">
-                          Based on your session, BG, and trend above
-                        </p>
-                      </div>
-                    </div>
+                      <span className="text-base font-semibold text-muted-foreground">g before exercise</span>
+                    </p>
+                    <p className="mt-1.5 text-xs leading-snug text-muted-foreground">
+                      Based on your session, BG, and trend
+                    </p>
                   </div>
                 ) : !mealCarbsTouched ? (
                   <div
-                    className="flex items-center gap-3 rounded-2xl border border-border/50 bg-muted/20 px-4 py-3"
+                    className="flex items-center gap-3 rounded-2xl border border-border/40 bg-muted/20 px-4 py-3.5"
                     data-testid="efc-suggested-carbs-none"
                   >
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
@@ -826,14 +841,14 @@ export function ExerciseFuelCalculator() {
                     </span>
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-foreground">No carbs suggested right now</p>
-                      <p className="text-xs text-muted-foreground">Enter an amount below if you're planning to eat</p>
+                      <p className="text-xs text-muted-foreground">Enter an amount below if you&apos;re planning to eat</p>
                     </div>
                   </div>
                 ) : null}
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <Label htmlFor="efc-meal-carbs">
+                    <Label htmlFor="efc-meal-carbs" className="text-xs font-medium text-muted-foreground">
                       {!mealCarbsTouched && suggestedMealCarbs != null && suggestedMealCarbs > 0
                         ? "Know your own amount instead?"
                         : "Carbs before exercise (g)"}
@@ -847,12 +862,13 @@ export function ExerciseFuelCalculator() {
                         setMealCarbs(e.target.value);
                         setMealCarbsTouched(true);
                       }}
+                      className="h-11 rounded-xl"
                       data-testid="efc-meal-carbs"
                     />
                     {mealCarbsTouched ? (
                       <button
                         type="button"
-                        className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/40 px-2.5 py-1 text-[11px] font-medium text-foreground transition-colors hover:bg-muted/70 active:scale-[0.98]"
+                        className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-muted/30 px-2.5 py-1 text-[11px] font-medium text-foreground transition-colors hover:bg-muted/60 active:scale-[0.98]"
                         onClick={() => setMealCarbsTouched(false)}
                         data-testid="efc-meal-carbs-reset"
                       >
@@ -862,9 +878,11 @@ export function ExerciseFuelCalculator() {
                     ) : null}
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="efc-meal-type">Meal type</Label>
+                    <Label htmlFor="efc-meal-type" className="text-xs font-medium text-muted-foreground">
+                      Meal type
+                    </Label>
                     <Select value={mealType} onValueChange={setMealType}>
-                      <SelectTrigger id="efc-meal-type" data-testid="efc-meal-type">
+                      <SelectTrigger id="efc-meal-type" className="h-11 rounded-xl" data-testid="efc-meal-type">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -879,11 +897,15 @@ export function ExerciseFuelCalculator() {
                 </div>
               </div>
 
-              <Collapsible open={extrasOpen} onOpenChange={setExtrasOpen} className="group rounded-xl border border-border/50">
+              <Collapsible
+                open={extrasOpen}
+                onOpenChange={setExtrasOpen}
+                className="group overflow-hidden rounded-2xl border border-border/40 bg-muted/15"
+              >
                 <CollapsibleTrigger asChild>
                   <button
                     type="button"
-                    className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm font-medium hover:bg-muted/30 transition-colors"
+                    className="flex w-full items-center justify-between gap-2 px-3.5 py-3 text-left text-sm font-medium transition-colors hover:bg-muted/30"
                     data-testid="efc-extras-toggle"
                   >
                     <span>Extras</span>
@@ -894,9 +916,9 @@ export function ExerciseFuelCalculator() {
                   </button>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
-                  <div className="divide-y divide-border/50 border-t border-border/50">
-                    <div className="flex items-center justify-between px-3 py-2.5">
-                      <Label htmlFor="efc-rapid-insulin" className="text-sm cursor-pointer">
+                  <div className="divide-y divide-border/40 border-t border-border/40">
+                    <div className="flex items-center justify-between px-3.5 py-3">
+                      <Label htmlFor="efc-rapid-insulin" className="cursor-pointer text-sm">
                         Rapid-acting insulin in last 2h
                       </Label>
                       <Switch
@@ -906,8 +928,8 @@ export function ExerciseFuelCalculator() {
                         data-testid="efc-rapid-insulin"
                       />
                     </div>
-                    <div className="flex items-center justify-between px-3 py-2.5">
-                      <Label htmlFor="efc-fasted" className="text-sm cursor-pointer">
+                    <div className="flex items-center justify-between px-3.5 py-3">
+                      <Label htmlFor="efc-fasted" className="cursor-pointer text-sm">
                         Training fasted
                       </Label>
                       <Switch
@@ -924,7 +946,7 @@ export function ExerciseFuelCalculator() {
                       />
                     </div>
                     {!fasted ? (
-                      <div className="grid gap-3 px-3 py-3 sm:grid-cols-2">
+                      <div className="grid gap-3 px-3.5 py-3 sm:grid-cols-2">
                         <div className="space-y-1.5">
                           <Label htmlFor="efc-last-meal">Last meal (min ago)</Label>
                           <Input
@@ -933,6 +955,7 @@ export function ExerciseFuelCalculator() {
                             placeholder="optional"
                             value={lastMealMins}
                             onChange={(e) => setLastMealMins(e.target.value)}
+                            className="h-10 rounded-xl"
                             data-testid="efc-last-meal-mins"
                           />
                         </div>
@@ -944,6 +967,7 @@ export function ExerciseFuelCalculator() {
                             placeholder="optional"
                             value={lastMealCarbs}
                             onChange={(e) => setLastMealCarbs(e.target.value)}
+                            className="h-10 rounded-xl"
                             data-testid="efc-last-meal-carbs"
                           />
                         </div>
@@ -955,7 +979,8 @@ export function ExerciseFuelCalculator() {
 
               <Button
                 type="button"
-                className="w-full gap-2"
+                size="lg"
+                className="h-12 w-full gap-2 rounded-2xl text-base font-semibold"
                 disabled={!canCalculate}
                 onClick={handleCalculate}
                 data-testid="efc-calculate"
@@ -963,25 +988,28 @@ export function ExerciseFuelCalculator() {
                 <Dumbbell className="h-4 w-4" aria-hidden />
                 Calculate
               </Button>
-            </CardContent>
+            </div>
           </CollapsibleContent>
         </Collapsible>
-      </Card>
+      </div>
 
       {result && !hasActiveExercise ? (
-        <Card
+        <div
           ref={resultRef}
-          className="rounded-2xl border-border/60 bg-card shadow-none scroll-mt-4"
+          className="scroll-mt-4 overflow-hidden rounded-[1.75rem] border border-border/50 bg-card/95 shadow-sm"
           data-testid="efc-result"
         >
-          <CardHeader className="space-y-2 pb-2">
+          <div className="space-y-2 border-b border-border/40 px-4 pb-3 pt-4 sm:px-5">
             <div className="flex items-start justify-between gap-2">
-              <CardTitle className="text-lg">Your plan</CardTitle>
+              <div>
+                <p className="text-lg font-semibold tracking-tight text-foreground">Your plan</p>
+                <p className="text-sm text-muted-foreground">{sessionLine}</p>
+              </div>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 shrink-0"
+                className="h-9 w-9 shrink-0 rounded-full"
                 onClick={() => {
                   hasCalculatedRef.current = false;
                   setResult(null);
@@ -993,10 +1021,9 @@ export function ExerciseFuelCalculator() {
                 <X className="h-4 w-4" />
               </Button>
             </div>
-            <p className="text-sm text-muted-foreground">{sessionLine}</p>
             <CgmReadingSourceNote prefill={cgmPrefill} bgValue={currentBg} />
-          </CardHeader>
-          <CardContent className="space-y-4">
+          </div>
+          <div className="space-y-4 px-4 py-4 sm:px-5">
             {result.userEnteredMealCarbs && result.mealCarbs > 0 ? (
               <KnownCarbsPlanHero
                 result={result}
@@ -1040,7 +1067,7 @@ export function ExerciseFuelCalculator() {
             )}
 
             {result.mealCarbsSkipReason && result.mealCarbs <= 0 ? (
-              <p className="rounded-xl border border-border/50 bg-muted/15 px-3 py-2.5 text-sm text-muted-foreground leading-relaxed">
+              <p className="rounded-2xl border border-border/40 bg-muted/20 px-3.5 py-3 text-sm leading-relaxed text-muted-foreground">
                 {preExerciseMealCarbsSkipMessage(result.mealCarbsSkipReason, bgUnits)}
               </p>
             ) : null}
@@ -1114,7 +1141,7 @@ export function ExerciseFuelCalculator() {
               <CollapsibleTrigger asChild>
                 <button
                   type="button"
-                  className="group flex w-full items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-left"
+                  className="group flex w-full items-center justify-between gap-3 rounded-2xl border border-border/40 bg-muted/20 px-3.5 py-3 text-left"
                   data-testid="efc-details-toggle"
                 >
                   <div className="flex min-w-0 items-center gap-2">
@@ -1137,13 +1164,13 @@ export function ExerciseFuelCalculator() {
               </CollapsibleContent>
             </Collapsible>
 
-            <Button variant="outline" size="sm" className="w-full" asChild>
+            <Button variant="outline" size="sm" className="h-11 w-full rounded-xl" asChild>
               <Link href="/adviser?tab=meal&exercise=1&exerciseTiming=before" data-testid="efc-adviser-link">
                 Open full meal calculator
               </Link>
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       ) : null}
     </div>
   );

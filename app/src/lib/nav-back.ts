@@ -33,18 +33,19 @@ export function navigateBack(
   const fallback = explicitFallback ?? resolveBackFallback(pathname);
   void hapticLight();
 
-  // Prefer animated stack-pop to the known parent (Tools/Guides detail → hub).
-  // History.back alone skips view transitions and feels like a remount flash.
+  // Prefer the real previous in-app page when we have one (e.g. Exercise → Routines).
+  // Falling back first caused a no-op loop for /routines → /tools/routines → /routines.
+  if (hasInAppNavHistory(pathname)) {
+    historyBackWithViewTransition();
+    return;
+  }
+
+  // Known parent when history is empty (deep link / cold open).
   if (fallback) {
     navigateWithViewTransition(setLocation, fallback, {
       replace: true,
       direction: "back",
     });
-    return;
-  }
-
-  if (hasInAppNavHistory(pathname)) {
-    historyBackWithViewTransition();
     return;
   }
 

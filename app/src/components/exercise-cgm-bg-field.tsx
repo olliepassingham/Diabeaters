@@ -50,7 +50,7 @@ export function ExerciseCgmBgField({
     <div className={className} data-testid="exercise-cgm-bg-field">
       <div className="space-y-2">
         <div className="space-y-1.5">
-          <Label className="text-xs">BG now</Label>
+          <Label className="text-xs font-medium text-muted-foreground">BG now</Label>
           <div className="relative">
             <Input
               ref={inputRef as React.RefObject<HTMLInputElement>}
@@ -58,19 +58,19 @@ export function ExerciseCgmBgField({
               value={bgValue}
               onChange={(e) => onBgChange(e.target.value)}
               placeholder={bgUnits === "mmol/L" ? "e.g. 7.2" : "e.g. 130"}
-              className="h-12 w-full pr-16 text-xl font-semibold tabular-nums"
+              className="h-14 w-full rounded-2xl border-border/60 bg-muted/20 pr-16 text-2xl font-semibold tabular-nums shadow-none"
               data-testid={inputTestId}
             />
-            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs font-medium text-muted-foreground">
+            <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-sm font-medium text-muted-foreground">
               {bgUnits}
             </span>
           </div>
         </div>
 
         <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Trend</Label>
-          <div className="grid grid-cols-3 rounded-xl border border-border/60 overflow-hidden">
-            {TREND_OPTIONS.map((t, i) => {
+          <Label className="text-xs font-medium text-muted-foreground">Trend</Label>
+          <div className="grid grid-cols-3 gap-1.5 rounded-2xl bg-muted/30 p-1">
+            {TREND_OPTIONS.map((t) => {
               const Icon = t.icon;
               const active = trend === t.value;
               return (
@@ -78,12 +78,17 @@ export function ExerciseCgmBgField({
                   key={t.value}
                   type="button"
                   size="sm"
-                  variant={active ? "default" : "ghost"}
-                  className={cn("h-9 rounded-none px-1.5 text-xs", i > 0 ? "border-l border-border/60" : null)}
+                  variant="ghost"
+                  className={cn(
+                    "h-10 rounded-xl px-1.5 text-xs font-medium",
+                    active
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
                   onClick={() => onTrendChange(active ? ("not_sure" as ExerciseBgTrend) : t.value)}
                   data-testid={`${trendTestIdPrefix}-${t.value}`}
                 >
-                  <Icon className="h-3.5 w-3.5 mr-1" aria-hidden />
+                  <Icon className="mr-1 h-3.5 w-3.5" aria-hidden />
                   {t.label}
                 </Button>
               );

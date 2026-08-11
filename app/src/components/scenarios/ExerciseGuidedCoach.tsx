@@ -41,7 +41,6 @@ import {
   Zap,
 } from "lucide-react";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -252,8 +251,15 @@ const PHASE_STEPS: Array<{ id: ExercisePhase; label: string }> = [
 ];
 
 /** Live progress indicator — replaces a row of always-disabled tabs with a clearer at-a-glance stepper. */
-function ExercisePhaseStepper({ phase }: { phase: ExercisePhase }) {
+function ExercisePhaseStepper({
+  phase,
+  variant = "default",
+}: {
+  phase: ExercisePhase;
+  variant?: "default" | "immersive";
+}) {
   const currentIndex = PHASE_STEPS.findIndex((s) => s.id === phase);
+  const immersive = variant === "immersive";
   return (
     <div className="flex items-center gap-1.5" data-testid="coach-phase-stepper" aria-hidden>
       {PHASE_STEPS.map((step, i) => {
@@ -263,19 +269,30 @@ function ExercisePhaseStepper({ phase }: { phase: ExercisePhase }) {
           <div key={step.id} className="flex flex-1 items-center gap-1.5">
             <div
               className={cn(
-                "flex h-6 min-w-0 flex-1 items-center justify-center gap-1 rounded-full text-[11px] font-medium transition-colors",
-                active
-                  ? "bg-emerald-500/15 text-emerald-800 ring-1 ring-emerald-500/40 dark:text-emerald-200"
-                  : done
-                    ? "bg-muted/50 text-muted-foreground"
-                    : "bg-muted/25 text-muted-foreground/60",
+                "flex h-7 min-w-0 flex-1 items-center justify-center gap-1 rounded-full text-[11px] font-medium transition-colors",
+                immersive
+                  ? active
+                    ? "bg-emerald-400/20 text-emerald-100 ring-1 ring-emerald-400/35"
+                    : done
+                      ? "bg-white/8 text-white/55"
+                      : "bg-white/[0.04] text-white/30"
+                  : active
+                    ? "bg-emerald-500/15 text-emerald-800 ring-1 ring-emerald-500/40 dark:text-emerald-200"
+                    : done
+                      ? "bg-muted/50 text-muted-foreground"
+                      : "bg-muted/25 text-muted-foreground/60",
               )}
             >
               {done ? <Check className="h-3 w-3 shrink-0" /> : null}
               <span className="truncate">{step.label}</span>
             </div>
             {i < PHASE_STEPS.length - 1 ? (
-              <div className={cn("h-px w-2 shrink-0 rounded-full", done ? "bg-emerald-500/40" : "bg-border")} />
+              <div
+                className={cn(
+                  "h-px w-2 shrink-0 rounded-full",
+                  immersive ? (done ? "bg-emerald-400/40" : "bg-white/15") : done ? "bg-emerald-500/40" : "bg-border",
+                )}
+              />
             ) : null}
           </div>
         );
@@ -293,12 +310,16 @@ function getVerdictVisuals(readiness: ExerciseReadinessResult | null): {
   icon: typeof CheckCircle2;
   chipClass: string;
   cardClass: string;
+  immersiveChipClass: string;
+  immersiveTitleClass: string;
 } {
   if (!readiness || readiness.awaitingInput) {
     return {
       icon: CircleHelp,
       chipClass: "bg-muted text-muted-foreground",
       cardClass: "border-border/50 bg-muted/25 dark:bg-muted/10",
+      immersiveChipClass: "bg-white/10 text-white/60",
+      immersiveTitleClass: "text-white/70",
     };
   }
   if (readiness.verdict === "ready") {
@@ -306,6 +327,8 @@ function getVerdictVisuals(readiness: ExerciseReadinessResult | null): {
       icon: CheckCircle2,
       chipClass: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
       cardClass: "border-emerald-200/80 bg-emerald-50/60 dark:border-emerald-800/50 dark:bg-emerald-950/25",
+      immersiveChipClass: "bg-emerald-400/20 text-emerald-200",
+      immersiveTitleClass: "text-emerald-100",
     };
   }
   if (readiness.verdict === "not_recommended") {
@@ -313,12 +336,16 @@ function getVerdictVisuals(readiness: ExerciseReadinessResult | null): {
       icon: AlertOctagon,
       chipClass: "bg-red-500/15 text-red-700 dark:text-red-300",
       cardClass: "border-red-200/80 bg-red-50/60 dark:border-red-800/50 dark:bg-red-950/25",
+      immersiveChipClass: "bg-red-400/20 text-red-200",
+      immersiveTitleClass: "text-red-100",
     };
   }
   return {
     icon: AlertTriangle,
     chipClass: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
     cardClass: "border-amber-200/80 bg-amber-50/60 dark:border-amber-800/50 dark:bg-amber-950/25",
+    immersiveChipClass: "bg-amber-400/20 text-amber-200",
+    immersiveTitleClass: "text-amber-100",
   };
 }
 
@@ -347,7 +374,7 @@ export function ExerciseGuidedCoach() {
   const appliedDefaultsForSessionId = useRef<string | null>(null);
 
   // Quick start form (only relevant when no active session exists)
-  const [planWorkoutOpen, setPlanWorkoutOpen] = useState(false);
+  const [planWorkoutOpen, setPlanWorkoutOpen] = useState(true);
   const [startType, setStartType] = useState<ExerciseType>("cardio");
   const [startIntensity, setStartIntensity] = useState<ExerciseIntensity>("moderate");
   const [startDuration, setStartDuration] = useState<string>("45");
@@ -632,13 +659,6 @@ export function ExerciseGuidedCoach() {
     return reconcileExerciseFuelLines(rawLines, hypoCoachSuggestion);
   }, [activeSession, bgInput, bgUnits, exercisePlan, hypoCoachSuggestion, profile, readiness, trendForReadiness]);
 
-  const fuelPlanVariant =
-    activeSession?.phase === "pre"
-      ? "pre"
-      : activeSession?.phase === "active"
-        ? "active"
-        : "recovery";
-
   // ----- Mutators -----
   const update = (updates: Parameters<typeof storage.updateActiveExercise>[0]) => {
     const next = storage.updateActiveExercise(updates);
@@ -859,22 +879,33 @@ export function ExerciseGuidedCoach() {
 
   // ----- Render -----
   if (!activeSession) {
+    const durationPresets = [30, 45, 60, 90] as const;
+    const durationNum = parseInt(startDuration, 10);
+    const durationIsPreset = durationPresets.includes(durationNum as (typeof durationPresets)[number]);
+
     return (
       <div className="space-y-4 max-sm:space-y-3" data-testid="exercise-guided-coach-start">
-        <Card className="overflow-hidden rounded-2xl border-border/50 shadow-sm ring-1 ring-border/40 dark:ring-border/30">
-          <Collapsible open={planWorkoutOpen} onOpenChange={setPlanWorkoutOpen} className="group">
+        <div className="relative overflow-hidden rounded-[1.75rem] border border-border/50 bg-card/95 shadow-sm">
+          <div
+            className="pointer-events-none absolute inset-0 bg-gradient-to-b from-emerald-500/[0.06] via-transparent to-muted/20"
+            aria-hidden
+          />
+          <Collapsible open={planWorkoutOpen} onOpenChange={setPlanWorkoutOpen} className="group relative z-10">
             <CollapsibleTrigger asChild>
               <button
                 type="button"
-                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted/30 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset sm:px-5"
+                className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left outline-none transition-colors hover:bg-muted/20 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-5"
                 data-testid="coach-plan-workout-trigger"
                 aria-expanded={planWorkoutOpen}
               >
-                <div className="min-w-0 flex-1">
-                  <CardTitle className="text-base font-semibold tracking-tight flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-primary shrink-0" />
-                    Plan a workout
-                  </CardTitle>
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 ring-1 ring-emerald-500/15 dark:text-emerald-400">
+                    <Sparkles className="h-5 w-5" aria-hidden />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-lg font-semibold tracking-tight text-foreground">Plan a workout</p>
+                    <p className="text-xs text-muted-foreground">Type, intensity, and duration — then start guided</p>
+                  </div>
                 </div>
                 <ChevronDown
                   className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180"
@@ -883,94 +914,178 @@ export function ExerciseGuidedCoach() {
               </button>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <CardContent className="space-y-4 border-t border-border/50 px-4 pb-4 pt-3 sm:px-5">
-            <div className="grid gap-3 md:grid-cols-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="start-type">Type</Label>
-                <Select value={startType} onValueChange={(v) => setStartType(v as ExerciseType)}>
-                  <SelectTrigger id="start-type" data-testid="select-start-type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {EXERCISE_TYPE_OPTIONS.map((o) => (
-                      <SelectItem key={o.value} value={o.value}>
-                        {o.label}
-                      </SelectItem>
+              <div className="space-y-5 border-t border-border/40 px-4 pb-5 pt-4 sm:px-5">
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Type</Label>
+                  <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+                    {EXERCISE_TYPE_OPTIONS.map((o) => {
+                      const active = startType === o.value;
+                      return (
+                        <Button
+                          key={o.value}
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className={cn(
+                            "h-10 justify-start rounded-xl px-2.5 text-xs font-medium",
+                            active
+                              ? "bg-background text-foreground shadow-sm ring-1 ring-border/60"
+                              : "bg-muted/30 text-muted-foreground hover:text-foreground",
+                          )}
+                          onClick={() => setStartType(o.value)}
+                          data-testid={`button-start-type-${o.value}`}
+                        >
+                          <ExerciseTypeIcon type={o.value} className="mr-1.5 h-3.5 w-3.5 shrink-0 opacity-80" />
+                          <span className="truncate">{o.label}</span>
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                    Intensity
+                  </Label>
+                  <div className="grid grid-cols-3 gap-1 rounded-2xl bg-muted/30 p-1" role="group" aria-label="Intensity">
+                    {INTENSITY_OPTIONS.map((i) => {
+                      const active = startIntensity === i;
+                      return (
+                        <Button
+                          key={i}
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className={cn(
+                            "h-10 rounded-xl text-sm font-medium capitalize",
+                            active
+                              ? "bg-background text-foreground shadow-sm"
+                              : "text-muted-foreground hover:text-foreground",
+                          )}
+                          onClick={() => setStartIntensity(i)}
+                          data-testid={`button-start-intensity-${i}`}
+                        >
+                          {i}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                    Duration
+                  </Label>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {durationPresets.map((m) => (
+                      <Button
+                        key={m}
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className={cn(
+                          "h-10 min-w-[4.25rem] rounded-xl px-3 text-sm font-medium tabular-nums",
+                          durationNum === m
+                            ? "bg-background text-foreground shadow-sm ring-1 ring-border/60"
+                            : "bg-muted/30 text-muted-foreground hover:text-foreground",
+                        )}
+                        onClick={() => setStartDuration(String(m))}
+                        data-testid={`button-start-duration-${m}`}
+                      >
+                        {m} min
+                      </Button>
                     ))}
-                  </SelectContent>
-                </Select>
+                    <div className="relative">
+                      <Input
+                        id="start-duration"
+                        inputMode="numeric"
+                        value={durationIsPreset ? "" : startDuration}
+                        placeholder="Custom"
+                        onChange={(e) => setStartDuration(e.target.value.replace(/\D/g, ""))}
+                        className="h-10 w-[5.5rem] rounded-xl border-border/60 bg-muted/20 text-center tabular-nums shadow-none"
+                        data-testid="input-start-duration"
+                        aria-label="Custom duration in minutes"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Keep selects for tests that still query them; synced with pill UI above. */}
+                <div className="sr-only" aria-hidden>
+                  <Select value={startType} onValueChange={(v) => setStartType(v as ExerciseType)}>
+                    <SelectTrigger id="start-type" data-testid="select-start-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {EXERCISE_TYPE_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={startIntensity} onValueChange={(v) => setStartIntensity(v as ExerciseIntensity)}>
+                    <SelectTrigger id="start-intensity" data-testid="select-start-intensity">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {INTENSITY_OPTIONS.map((i) => (
+                        <SelectItem key={i} value={i}>
+                          {i.charAt(0).toUpperCase() + i.slice(1)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Button
+                  size="lg"
+                  onClick={onStartFromForm}
+                  className="h-12 w-full rounded-2xl text-base font-semibold"
+                  data-testid="button-start-coach"
+                >
+                  <Play className="mr-2 h-5 w-5" aria-hidden />
+                  Start guided session
+                </Button>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="start-intensity">Intensity</Label>
-                <Select value={startIntensity} onValueChange={(v) => setStartIntensity(v as ExerciseIntensity)}>
-                  <SelectTrigger id="start-intensity" data-testid="select-start-intensity">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {INTENSITY_OPTIONS.map((i) => (
-                      <SelectItem key={i} value={i}>
-                        {i.charAt(0).toUpperCase() + i.slice(1)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="start-duration">Duration (min)</Label>
-                <Input
-                  id="start-duration"
-                  inputMode="numeric"
-                  value={startDuration}
-                  onChange={(e) => setStartDuration(e.target.value.replace(/\D/g, ""))}
-                  data-testid="input-start-duration"
-                />
-              </div>
-            </div>
-            <Button onClick={onStartFromForm} className="w-full" data-testid="button-start-coach">
-              <Play className="h-4 w-4 mr-2" />
-              Start guided session
-            </Button>
-              </CardContent>
             </CollapsibleContent>
           </Collapsible>
-        </Card>
+        </div>
 
         {recentWorkouts.length > 0 ? (
-          <Card
-            className="overflow-hidden rounded-2xl border-border/50 shadow-sm ring-1 ring-border/40 dark:ring-border/30"
+          <div
+            className="overflow-hidden rounded-[1.5rem] border border-border/50 bg-card/90 shadow-sm"
             data-testid="exercise-recent-workouts"
           >
-            <CardHeader className="px-4 py-3 sm:px-5">
-              <CardTitle className="text-base font-semibold tracking-tight flex items-center gap-2">
-                <History className="h-4 w-4 text-muted-foreground" aria-hidden />
-                Recent
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-2 px-4 pb-3 pt-0 sm:px-5">
+            <div className="flex items-center gap-2 px-4 pb-1 pt-4 sm:px-5">
+              <History className="h-4 w-4 text-muted-foreground" aria-hidden />
+              <p className="text-sm font-semibold tracking-tight text-foreground">Recent</p>
+            </div>
+            <div className="grid gap-2 px-4 pb-4 pt-2 sm:px-5">
               {recentWorkouts.map((session) => (
                 <div
                   key={session.id}
-                  className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-border/60 bg-muted/10 px-3 py-2.5"
+                  className="flex flex-col gap-2 rounded-2xl border border-border/40 bg-muted/15 px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between"
                   data-testid={`exercise-recent-workout-${session.id}`}
                 >
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">
+                    <p className="truncate text-sm font-medium text-foreground">
                       {session.exerciseName?.trim() || session.label}
                     </p>
-                    <p className="text-xs text-muted-foreground leading-snug">
+                    <p className="text-xs leading-snug text-muted-foreground">
                       {format(new Date(session.completedAt), "d MMM")} · {session.label}
                     </p>
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex shrink-0 items-center gap-1.5">
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="min-h-9 shrink-0"
+                      className="min-h-9 shrink-0 rounded-xl"
                       onClick={() => onStartFromRepeatable(session)}
                       data-testid={`button-restart-recent-${session.id}`}
                     >
-                      <RotateCcw className="h-4 w-4 mr-2" aria-hidden />
+                      <RotateCcw className="mr-2 h-4 w-4" aria-hidden />
                       Restart
                     </Button>
                     <ExerciseRoutineAdjustTrigger
@@ -980,28 +1095,26 @@ export function ExerciseGuidedCoach() {
                   </div>
                 </div>
               ))}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         ) : null}
 
         {routines.length > 0 ? (
-          <Card className="overflow-hidden rounded-2xl border-border/50 shadow-sm ring-1 ring-border/40 dark:ring-border/30">
-            <CardHeader className="px-4 py-3 sm:px-5">
-              <CardTitle className="text-base font-semibold tracking-tight flex items-center gap-2">
-                <Dumbbell className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                Routines
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-2 px-4 pb-3 pt-0 sm:grid-cols-2 sm:px-5">
+          <div className="overflow-hidden rounded-[1.5rem] border border-border/50 bg-card/90 shadow-sm">
+            <div className="flex items-center gap-2 px-4 pb-1 pt-4 sm:px-5">
+              <Dumbbell className="h-4 w-4 text-emerald-600 dark:text-emerald-400" aria-hidden />
+              <p className="text-sm font-semibold tracking-tight text-foreground">Routines</p>
+            </div>
+            <div className="grid gap-2 px-4 pb-4 pt-2 sm:grid-cols-2 sm:px-5">
               {routines.map((r) => (
                 <div
                   key={r.id}
-                  className="flex items-center gap-1 rounded-xl border border-border bg-card p-1 hover:border-emerald-500/35 hover:bg-emerald-500/[0.06]"
+                  className="flex items-center gap-1 rounded-2xl border border-border/40 bg-muted/10 p-1 transition-colors hover:border-emerald-500/30 hover:bg-emerald-500/[0.05]"
                 >
                   <button
                     type="button"
                     onClick={() => onStartFromRoutine(r)}
-                    className="min-w-0 flex-1 rounded-lg px-2.5 py-2 text-left"
+                    className="min-w-0 flex-1 rounded-xl px-2.5 py-2.5 text-left"
                     data-testid={`button-coach-routine-${r.id}`}
                   >
                     <p className="truncate text-sm font-semibold">{r.name}</p>
@@ -1016,8 +1129,8 @@ export function ExerciseGuidedCoach() {
                   />
                 </div>
               ))}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         ) : null}
 
         <ExerciseRoutineAdjustSheet
@@ -1062,147 +1175,142 @@ export function ExerciseGuidedCoach() {
   const verdictVisuals = getVerdictVisuals(readiness);
   const VerdictIcon = verdictVisuals.icon;
 
+  const fuelPlanVariant =
+    phase === "pre" ? "pre" : phase === "active" ? "active" : "recovery";
+
   return (
     <div className="space-y-4 max-sm:space-y-3" data-testid="exercise-guided-coach">
-      <Card className="overflow-hidden rounded-2xl border-border/40 bg-card/80 shadow-sm">
-        <CardHeader className="pb-2">
-          <div className="space-y-3">
-            {/* Title always gets the full row; actions sit below so Pause/Recovery never crush the name. */}
-            <div className="flex items-start gap-3">
-              <div
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500/12 text-emerald-600 dark:text-emerald-400"
-                aria-hidden
-              >
-                <ExerciseTypeIcon type={activeSession.exerciseType} className="h-5 w-5" />
-              </div>
-              <div className="min-w-0 flex-1 space-y-0.5">
-                <CardTitle className="text-h3 truncate leading-tight">{activeSession.exerciseName}</CardTitle>
-                <p className="text-xs text-muted-foreground" data-testid="text-coach-session-meta">
-                  {sessionMetaLine(activeSession)}
-                </p>
-              </div>
-              {phase === "pre" || phase === "active" ? (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8 shrink-0 rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                      data-testid="button-coach-end-session"
-                      aria-label="End session"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>End this session?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This clears the current {phase === "pre" ? "planned" : "in-progress"} workout and cancels
-                        any scheduled check-in reminders for it.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Keep going</AlertDialogCancel>
-                      <AlertDialogAction onClick={onEndSession} data-testid="button-coach-end-session-confirm">
-                        End session
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              ) : null}
+      <div className="relative overflow-hidden rounded-[1.75rem] border border-border/50 bg-card/95 text-foreground shadow-sm">
+        <div
+          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-muted/40 via-transparent to-muted/20"
+          aria-hidden
+        />
+        <div
+          className={cn(
+            "pointer-events-none absolute -top-28 left-1/2 h-64 w-64 -translate-x-1/2 rounded-full blur-3xl transition-colors duration-700",
+            hypoCoachSuggestion ? "bg-amber-400/15 dark:bg-amber-400/10" : "bg-emerald-400/12 dark:bg-emerald-400/10",
+          )}
+          aria-hidden
+        />
+
+        <div className="relative z-10 space-y-5 p-4 sm:p-5">
+          <div className="flex items-start gap-3">
+            <div
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 ring-1 ring-emerald-500/15 dark:text-emerald-400"
+              aria-hidden
+            >
+              <ExerciseTypeIcon type={activeSession.exerciseType} className="h-5 w-5" />
             </div>
-
-            {phase === "pre" ? (
-              <Button
-                size="sm"
-                variant="default"
-                onClick={onStartWorkout}
-                className="h-10 w-full rounded-xl text-[15px] font-semibold"
-                data-testid="button-coach-start-workout"
-              >
-                <Play className="h-4 w-4 mr-1.5" aria-hidden />
-                Start workout
-              </Button>
-            ) : phase === "active" ? (
-              <div className="grid grid-cols-2 gap-2.5">
-                {workoutPaused ? (
+            <div className="min-w-0 flex-1 space-y-0.5 pt-0.5">
+              <p className="truncate text-lg font-semibold tracking-tight text-foreground">{activeSession.exerciseName}</p>
+              <p className="text-xs text-muted-foreground" data-testid="text-coach-session-meta">
+                {sessionMetaLine(activeSession)}
+              </p>
+            </div>
+            {phase === "pre" || phase === "active" ? (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
                   <Button
-                    size="sm"
-                    variant="default"
-                    onClick={onResumeWorkout}
-                    className="h-11 rounded-xl text-[15px] font-semibold shadow-sm"
-                    data-testid="button-coach-resume-workout"
+                    size="icon"
+                    variant="ghost"
+                    className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                    data-testid="button-coach-end-session"
+                    aria-label="End session"
                   >
-                    <Play className="h-4 w-4 mr-1.5" aria-hidden />
-                    Resume
+                    <X className="h-4 w-4" />
                   </Button>
-                ) : (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={onPauseWorkout}
-                    className="h-11 rounded-xl border-border/60 bg-background/70 text-[15px] font-semibold shadow-sm"
-                    data-testid="button-coach-pause-workout"
-                  >
-                    <Pause className="h-4 w-4 mr-1.5" aria-hidden />
-                    Pause
-                  </Button>
-                )}
-                <Button
-                  size="sm"
-                  variant={workoutPaused ? "outline" : "default"}
-                  onClick={onFinishWorkout}
-                  className={cn(
-                    "h-11 rounded-xl text-[15px] font-semibold shadow-sm",
-                    workoutPaused && "border-border/60 bg-background/70",
-                  )}
-                  data-testid="button-coach-finish-workout"
-                >
-                  <ArrowRight className="h-4 w-4 mr-1.5" aria-hidden />
-                  Recovery
-                </Button>
-              </div>
-            ) : phase === "recovery" ? (
-              <Button
-                size="sm"
-                variant="default"
-                onClick={onEndSession}
-                className="h-10 w-full rounded-xl text-[15px] font-semibold"
-                data-testid="button-coach-finish-session"
-              >
-                <CircleCheck className="h-4 w-4 mr-1.5" aria-hidden />
-                Finish
-              </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>End this session?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This clears the current {phase === "pre" ? "planned" : "in-progress"} workout and cancels
+                      any scheduled check-in reminders for it.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Keep going</AlertDialogCancel>
+                    <AlertDialogAction onClick={onEndSession} data-testid="button-coach-end-session-confirm">
+                      End session
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             ) : null}
-
-            <ExercisePhaseStepper phase={phase} />
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* ----- ONE unified card: recommendation on top, this phase's inputs below a divider.
-              Previously the readiness hero and the phase panel were two separately-tinted
-              nested boxes — merging them removes that "double chrome" and the extra border
-              layer around every phase's questions. ----- */}
-          <div
-            className={cn(
-              "rounded-2xl border p-3.5 sm:p-4 space-y-3.5",
-              phase === "active"
-                ? "border-border/40 bg-muted/20 dark:bg-muted/10"
-                : verdictVisuals.cardClass,
-            )}
-            data-testid="coach-phase-card"
-          >
-            {/* During: elapsed time is the glanceable hero; readiness/fuel sit underneath. */}
+
+          {phase === "pre" ? (
+            <Button
+              size="lg"
+              onClick={onStartWorkout}
+              className="h-12 w-full rounded-2xl text-base font-semibold"
+              data-testid="button-coach-start-workout"
+            >
+              <Play className="mr-2 h-5 w-5" aria-hidden />
+              Start workout
+            </Button>
+          ) : phase === "active" ? (
+            <div className="grid grid-cols-2 gap-2.5">
+              {workoutPaused ? (
+                <Button
+                  size="lg"
+                  onClick={onResumeWorkout}
+                  className="h-12 rounded-2xl text-base font-semibold"
+                  data-testid="button-coach-resume-workout"
+                >
+                  <Play className="mr-2 h-5 w-5" aria-hidden />
+                  Resume
+                </Button>
+              ) : (
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={onPauseWorkout}
+                  className="h-12 rounded-2xl border-border/70 bg-background/60 text-base font-semibold"
+                  data-testid="button-coach-pause-workout"
+                >
+                  <Pause className="mr-2 h-5 w-5" aria-hidden />
+                  Pause
+                </Button>
+              )}
+              <Button
+                size="lg"
+                variant={workoutPaused ? "outline" : "default"}
+                onClick={onFinishWorkout}
+                className={cn(
+                  "h-12 rounded-2xl text-base font-semibold",
+                  workoutPaused && "border-border/70 bg-background/60",
+                )}
+                data-testid="button-coach-finish-workout"
+              >
+                <ArrowRight className="mr-2 h-5 w-5" aria-hidden />
+                Recovery
+              </Button>
+            </div>
+          ) : phase === "recovery" ? (
+            <Button
+              size="lg"
+              onClick={onEndSession}
+              className="h-12 w-full rounded-2xl text-base font-semibold"
+              data-testid="button-coach-finish-session"
+            >
+              <CircleCheck className="mr-2 h-5 w-5" aria-hidden />
+              Finish
+            </Button>
+          ) : null}
+
+          <ExercisePhaseStepper phase={phase} />
+
+          <div className="space-y-4" data-testid="coach-phase-card">
             {phase === "active" && phaseTimerLabel ? (
-              <div className="space-y-2.5" data-testid="coach-active-timer-hero">
-                <div className="text-center pt-0.5 pb-0.5">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              <div className="space-y-3 text-center" data-testid="coach-active-timer-hero">
+                <div>
+                  <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
                     {workoutPaused ? "Paused" : "Elapsed"}
                   </p>
                   <p
                     className={cn(
-                      "mt-1 text-[2.75rem] leading-none font-semibold tabular-nums tracking-tight sm:text-5xl",
+                      "mt-1.5 text-[3.25rem] font-bold leading-none tabular-nums tracking-tight sm:text-6xl",
                       workoutPaused ? "text-amber-600 dark:text-amber-400" : "text-foreground",
                     )}
                     data-testid="coach-phase-timer"
@@ -1226,19 +1334,24 @@ export function ExerciseGuidedCoach() {
 
             {readiness ? (
               <div className="space-y-3" data-testid="coach-readiness-card">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2.5 min-w-0">
+                <div className="flex items-center justify-between gap-2 rounded-2xl border border-border/40 bg-muted/25 px-3.5 py-3">
+                  <div className="flex min-w-0 items-center gap-2.5">
                     <span
-                      className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full", verdictVisuals.chipClass)}
+                      className={cn(
+                        "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
+                        verdictVisuals.chipClass,
+                      )}
                       aria-hidden
                     >
                       <VerdictIcon className="h-4 w-4" />
                     </span>
-                    <p className="text-base font-semibold leading-tight text-foreground truncate">{readiness.title}</p>
+                    <p className="truncate text-sm font-semibold leading-tight text-foreground">
+                      {readiness.title}
+                    </p>
                   </div>
                   {phase !== "active" && phaseTimerLabel ? (
                     <span
-                      className="text-xs tabular-nums shrink-0 text-muted-foreground"
+                      className="shrink-0 text-xs tabular-nums text-muted-foreground"
                       data-testid="coach-phase-timer"
                       title="Time since workout ended"
                     >
@@ -1252,18 +1365,16 @@ export function ExerciseGuidedCoach() {
               </div>
             ) : null}
 
-            {/* Quiet secondary path into full-screen Exercise Mode — Pause/Recovery and the
-                timer stay primary on this page. */}
             {phase === "active" ? (
               <Button
                 type="button"
                 size="sm"
                 variant="ghost"
-                className="h-9 w-full rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground"
+                className="h-10 w-full rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground"
                 onClick={() => requestOpenExerciseMode()}
                 data-testid="button-coach-exercise-mode"
               >
-                <Maximize2 className="h-3.5 w-3.5 mr-1.5 opacity-80" aria-hidden />
+                <Maximize2 className="mr-1.5 h-3.5 w-3.5 opacity-80" aria-hidden />
                 Open Exercise mode
               </Button>
             ) : null}
@@ -1275,14 +1386,14 @@ export function ExerciseGuidedCoach() {
             ) : null}
 
             {closedLoop && phase === "pre" && closedLoopExercisePrePrompt(true) ? (
-              <p className="text-xs text-muted-foreground leading-relaxed" data-testid="coach-closed-loop-pre-prompt">
+              <p className="text-xs leading-relaxed text-muted-foreground" data-testid="coach-closed-loop-pre-prompt">
                 {closedLoopExercisePrePrompt(true)}
               </p>
             ) : null}
 
-            <div className="border-t border-border/50 pt-3.5">
+            <div className="space-y-4 border-t border-border/40 pt-4">
               <Tabs value={phase} className="w-full">
-                <TabsContent value="pre" className="space-y-4 mt-0" data-testid="coach-input-panel-pre">
+                <TabsContent value="pre" className="mt-0 space-y-4" data-testid="coach-input-panel-pre">
                   <PreQuestions
                     session={activeSession}
                     bgUnits={bgUnits}
@@ -1293,7 +1404,7 @@ export function ExerciseGuidedCoach() {
                   />
                 </TabsContent>
 
-                <TabsContent value="active" className="space-y-4 mt-0" data-testid="coach-input-panel-active">
+                <TabsContent value="active" className="mt-0 space-y-4" data-testid="coach-input-panel-active">
                   <DuringQuestions
                     session={activeSession}
                     bgUnits={bgUnits}
@@ -1304,7 +1415,7 @@ export function ExerciseGuidedCoach() {
                   />
                 </TabsContent>
 
-                <TabsContent value="recovery" className="space-y-4 mt-0" data-testid="coach-input-panel-recovery">
+                <TabsContent value="recovery" className="mt-0 space-y-4" data-testid="coach-input-panel-recovery">
                   <RecoveryQuestions
                     session={activeSession}
                     bgUnits={bgUnits}
@@ -1314,13 +1425,11 @@ export function ExerciseGuidedCoach() {
                     showTonightPlanning={recoveryEveningContext}
                     {...cgmPhaseProps}
                   />
-                  {/* Keep recovery lean: one short window line + optional evening Bedtime CTA.
-                      Generic tip lists were clutter — fuel/readiness already carry the action. */}
                   {exercisePlan || recoveryBedtimeCtaInfo ? (
-                    <div className="border-t border-border/50 pt-3.5 space-y-3">
+                    <div className="space-y-3 border-t border-border/50 pt-3.5">
                       {exercisePlan ? (
                         <p
-                          className="text-xs text-muted-foreground leading-snug"
+                          className="text-xs leading-snug text-muted-foreground"
                           data-testid="coach-recovery-window-note"
                         >
                           ~{exercisePlan.recovery.monitorHours}h recovery · watch for delayed lows
@@ -1329,14 +1438,14 @@ export function ExerciseGuidedCoach() {
                       {recoveryBedtimeCtaInfo ? (
                         <div
                           className={cn(
-                            "rounded-xl border px-3.5 py-3 space-y-2",
+                            "space-y-2 rounded-xl border px-3.5 py-3",
                             recoveryBedtimeCtaInfo.urgent
                               ? "border-primary/40 bg-primary/5"
                               : "border-border/50 bg-muted/10",
                           )}
                           data-testid="coach-recovery-bedtime-cta"
                         >
-                          <p className="text-sm font-medium text-foreground flex items-center gap-2">
+                          <p className="flex items-center gap-2 text-sm font-medium text-foreground">
                             <Moon className="h-4 w-4 shrink-0" aria-hidden />
                             {recoveryBedtimeCtaInfo.title}
                           </p>
@@ -1348,7 +1457,7 @@ export function ExerciseGuidedCoach() {
                               data-testid="button-coach-recovery-bedtime"
                             >
                               Open Bedtime tool
-                              <ArrowRight className="h-3.5 w-3.5 ml-auto" />
+                              <ArrowRight className="ml-auto h-3.5 w-3.5" />
                             </Button>
                           </Link>
                         </div>
@@ -1359,8 +1468,8 @@ export function ExerciseGuidedCoach() {
               </Tabs>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1704,12 +1813,9 @@ function DuringQuestions({
 
   return (
     <div className="space-y-4">
-      {/* Compact mid-workout check-in: BG + trend + feel-low, one surface. */}
-      <div
-        className="space-y-3 rounded-xl border border-border/50 bg-background/70 p-3 sm:p-3.5"
-        data-testid="coach-during-checkin"
-      >
-        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">BG check-in</p>
+      {/* Mid-workout check-in: BG + trend + feel-low — sits in the light sheet below the dark stage. */}
+      <div className="space-y-3" data-testid="coach-during-checkin">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">BG check-in</p>
         <ExerciseCgmBgField
           bgUnits={bgUnits}
           bgValue={bgInput}
@@ -2078,14 +2184,19 @@ function YesNoToggle({
   onChange: (v: PreRapidInsulin2h | null) => void;
 }) {
   return (
-    <div className="flex gap-2">
+    <div className="grid grid-cols-2 gap-1.5 rounded-2xl bg-muted/30 p-1">
       {(["yes", "no"] as const).map((v) => (
         <Button
           key={v}
           type="button"
           size="sm"
-          variant={value === v ? "default" : "outline"}
-          className="h-8 px-3 text-xs"
+          variant="ghost"
+          className={cn(
+            "h-10 rounded-xl text-sm font-medium",
+            value === v
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground",
+          )}
           onClick={() => onChange(value === v ? null : v)}
           data-testid={`button-coach-rapid-${v}`}
         >

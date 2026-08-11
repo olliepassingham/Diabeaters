@@ -14,7 +14,7 @@ const ROOT_TAB_ROUTES = new Set([
 const EXPLICIT_PARENT: Record<string, string> = {
   "/settings": "/account",
   "/ratios": "/settings/ratios",
-  "/routines": "/tools/routines",
+  "/routines": "/tools",
   "/notifications": "/",
   "/supplies": "/",
   "/appointments": "/",
