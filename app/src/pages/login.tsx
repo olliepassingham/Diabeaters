@@ -8,13 +8,13 @@ import {
 } from "@/lib/auth";
 import { useAuth } from "@/lib/auth-context";
 import { completeAuthAndNavigate } from "@/lib/auth-post-login";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { PageShell } from "@/components/layout";
+import { FaceLogo } from "@/components/face-logo";
 import {
   authFieldActionClass,
   authMutedNavLinkClass,
@@ -138,12 +138,15 @@ export default function Login() {
     <div className="min-h-screen bg-background text-foreground">
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-10 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]">
         <PageShell variant="narrow" className="w-full max-w-md">
-      <Card className="w-full rounded-2xl border-border/60 shadow-sm">
-        <CardHeader className="space-y-1.5">
-          <CardTitle className="text-xl">Log in to Diabeaters</CardTitle>
-          <p className="text-sm text-muted-foreground">Welcome back — enter your email and password.</p>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          <div className="mb-8 flex flex-col items-center gap-3 text-center">
+            <FaceLogo size={56} />
+            <div className="space-y-1">
+              <h1 className="font-display text-3xl font-bold tracking-tight">Log in to Diabeaters</h1>
+              <p className="text-sm text-muted-foreground">Welcome back</p>
+            </div>
+          </div>
+
+          <div className="space-y-5 rounded-[1.35rem] border border-border/60 bg-card/70 p-5 shadow-sm">
           {error && (
             <Alert variant="destructive">
               <AlertTitle>Login failed</AlertTitle>
@@ -151,9 +154,11 @@ export default function Login() {
             </Alert>
           )}
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between gap-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" className="text-xs font-medium text-muted-foreground">
+                  Email
+                </Label>
                 <button
                   type="button"
                   className={authFieldActionClass}
@@ -175,9 +180,11 @@ export default function Login() {
                 required
               />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password" className="text-xs font-medium text-muted-foreground">
+                  Password
+                </Label>
                 <Link href="/reset-request" className={authFieldActionClass}>
                   Forgot your password?
                 </Link>
@@ -208,7 +215,7 @@ export default function Login() {
             </div>
             <Button
               type="submit"
-              className="min-h-11 w-full rounded-xl"
+              className="h-12 w-full rounded-xl text-base font-semibold"
               disabled={submitting}
             >
               {submitting ? "Logging in..." : "Log in"}
@@ -224,7 +231,7 @@ export default function Login() {
             </div>
           </div>
 
-          <Button asChild variant="outline" className="min-h-12 w-full rounded-xl text-base font-semibold">
+          <Button asChild variant="outline" className="h-12 w-full rounded-xl text-base font-semibold">
             <Link
               href={(() => {
                 const next = new URLSearchParams(window.location.search).get("next");
@@ -237,16 +244,15 @@ export default function Login() {
               Create account
             </Link>
           </Button>
+          </div>
 
-          <p className="pt-1 text-center">
+          <p className="pt-5 text-center">
             <Link href="/welcome" className={authMutedNavLinkClass}>
               Back to welcome
             </Link>
           </p>
-        </CardContent>
-      </Card>
-      </PageShell>
-    </div>
+        </PageShell>
+      </div>
     </div>
   );
 }

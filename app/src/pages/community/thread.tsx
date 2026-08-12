@@ -208,12 +208,12 @@ function DmMessageBubble({
           groupedWithPrevious ? "mt-0.5" : "",
           mine
             ? cn(
-                "rounded-[1.25rem] bg-primary text-primary-foreground",
-                groupedWithPrevious ? "rounded-tr-[0.45rem]" : "rounded-br-[0.45rem]",
+                "rounded-[1.15rem] bg-primary text-primary-foreground",
+                groupedWithPrevious ? "rounded-tr-[0.4rem]" : "rounded-br-[0.4rem]",
               )
             : cn(
-                "rounded-[1.25rem] bg-card text-foreground ring-1 ring-border/40",
-                groupedWithPrevious ? "rounded-tl-[0.45rem]" : "rounded-bl-[0.45rem]",
+                "rounded-[1.15rem] bg-muted text-foreground",
+                groupedWithPrevious ? "rounded-tl-[0.4rem]" : "rounded-bl-[0.4rem]",
               ),
           isShared && "max-w-[min(92%,22rem)] p-2.5",
         ),
@@ -633,7 +633,7 @@ export default function CommunityThreadPage() {
           </div>
         ) : messages.length === 0 ? (
           <div className="flex h-full min-h-[12rem] flex-col items-center justify-center px-6 text-center">
-            <p className="text-sm font-medium text-foreground">No messages yet</p>
+            <p className="text-base font-semibold text-foreground">No messages yet</p>
             <p className="mt-1 text-sm text-muted-foreground">Say hello to start the conversation.</p>
           </div>
         ) : (
@@ -647,7 +647,7 @@ export default function CommunityThreadPage() {
                 <div key={m.id}>
                   {showDivider ? (
                     <div className="my-4 flex justify-center">
-                      <span className="rounded-full border border-border/50 bg-background/80 px-3 py-1 text-[11px] font-medium tracking-wide text-muted-foreground shadow-sm backdrop-blur-sm">
+                      <span className="rounded-full bg-muted/70 px-3 py-1 text-[11px] font-medium tracking-wide text-muted-foreground">
                         {divider}
                       </span>
                     </div>
@@ -805,7 +805,7 @@ export default function CommunityThreadPage() {
             type="button"
             variant="ghost"
             size="icon"
-            className="h-10 w-10 shrink-0 rounded-full text-muted-foreground hover:text-foreground"
+            className="h-11 w-11 shrink-0 rounded-full text-muted-foreground hover:text-foreground"
             disabled={sending || !user || messagingBlocked}
             aria-label="Attach photo"
             onClick={() => fileInputRef.current?.click()}
@@ -823,7 +823,7 @@ export default function CommunityThreadPage() {
             placeholder={messagingBlocked ? "Messaging unavailable" : "Message…"}
             maxLength={8000}
             disabled={sending || !user || messagingBlocked}
-            className="surface-field-bare min-h-10 max-h-28 flex-1 resize-none px-1 py-2.5 text-[16px] leading-snug"
+            className="surface-field-bare min-h-11 max-h-28 flex-1 resize-none px-1 py-2.5 text-[16px] leading-snug"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -837,7 +837,7 @@ export default function CommunityThreadPage() {
             type="submit"
             size="icon"
             className={cn(
-              "h-10 w-10 shrink-0 rounded-full transition-all",
+              "h-11 w-11 shrink-0 rounded-full transition-all",
               body.trim() || pendingImage ? "shadow-md" : "opacity-50",
             )}
             disabled={sending || messagingBlocked || (!body.trim() && !pendingImage) || !user}

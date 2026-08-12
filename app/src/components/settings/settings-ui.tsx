@@ -25,7 +25,7 @@ export function SettingsGroupLabel({ children, className }: { children: ReactNod
 /** Rounded list container for hub links or toggle rows. */
 export function SettingsGroup({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cn("overflow-hidden rounded-2xl border border-border/50 bg-card/40 shadow-sm", className)}>
+    <div className={cn("overflow-hidden rounded-[1.35rem] border border-border/50 bg-card/40 shadow-sm", className)}>
       <div className="divide-y divide-border/40">{children}</div>
     </div>
   );
@@ -47,7 +47,7 @@ export function SettingsPanel({
     <div
       id={id}
       data-testid={testId}
-      className={cn("overflow-hidden rounded-2xl border border-border/50 bg-card/40 shadow-sm", className)}
+      className={cn("overflow-hidden rounded-[1.35rem] border border-border/50 bg-card/40 shadow-sm", className)}
     >
       {children}
     </div>
@@ -72,11 +72,11 @@ export function SettingsHubNavLink({
   dataTestId?: string;
 }) {
   const className =
-    "group flex w-full items-center gap-3 px-3.5 py-3.5 text-left transition-colors hover:bg-muted/30 active:bg-muted/40 sm:px-4";
+    "group flex min-h-14 w-full items-center gap-3 px-3.5 py-3.5 text-left transition-colors hover:bg-muted/30 active:bg-muted/40 sm:px-4";
   const body = (
     <>
       {Icon ? (
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
           <Icon className="h-4 w-4" aria-hidden />
         </span>
       ) : null}
@@ -169,7 +169,7 @@ export function SettingsToggleRow({
   className?: string;
 }) {
   return (
-    <div className={cn("flex items-start justify-between gap-3 px-3.5 py-3.5 sm:px-4", className)}>
+    <div className={cn("flex min-h-14 items-start justify-between gap-3 px-3.5 py-3.5 sm:px-4", className)}>
       <div className="min-w-0 flex-1 space-y-0.5 pr-1">
         <Label htmlFor={id} className="cursor-pointer text-sm font-medium text-foreground">
           {label}
@@ -295,7 +295,7 @@ export function SettingsStickySaveBar({
         <div className="rounded-2xl border border-border/35 bg-background/95 p-1.5 shadow-lg shadow-black/15 backdrop-blur-md supports-[backdrop-filter]:bg-background/85">
           <Button
             type="button"
-            className="h-10 w-full rounded-xl text-sm font-semibold shadow-none"
+            className="h-12 w-full rounded-xl text-base font-semibold shadow-none"
             onClick={() => {
               void hapticLight();
               onSave();

@@ -25,7 +25,9 @@ export function MealCompositionBuilder({ value, onChange, className }: MealCompo
   return (
     <div className={cn("space-y-3", className)} data-testid="meal-composition-builder">
       <div className="space-y-2">
-        <Label htmlFor="meal-carb-type">What's the main carb?</Label>
+        <Label htmlFor="meal-carb-type" className="text-xs font-medium text-muted-foreground">
+          Main carb
+        </Label>
         <Select
           value={value.carbType}
           onValueChange={(v) => onChange({ ...value, carbType: v as MealComposition["carbType"] })}
@@ -44,7 +46,7 @@ export function MealCompositionBuilder({ value, onChange, className }: MealCompo
       </div>
 
       <div className="space-y-2">
-        <Label>Anything else in this meal?</Label>
+        <Label className="text-xs font-medium text-muted-foreground">Also in this meal</Label>
         <div className="grid grid-cols-3 gap-2">
           {TOGGLES.map(({ key, label, icon: Icon }) => {
             const active = value[key];

@@ -200,7 +200,7 @@ function UpcomingAppointmentCard({
 
   return (
     <article
-      className="overflow-hidden rounded-3xl border border-border/60 bg-card shadow-sm transition-colors hover:border-blue-500/25"
+      className="overflow-hidden rounded-[1.35rem] border border-border/60 bg-card shadow-sm transition-colors hover:border-blue-500/25"
       data-testid={`appointment-card-${appointment.id}`}
     >
       <div className="flex gap-3 p-4">
@@ -259,7 +259,7 @@ function UpcomingAppointmentCard({
         <Button
           size="sm"
           variant="outline"
-          className="min-h-9 flex-1 rounded-xl"
+          className="h-11 flex-1 rounded-xl"
           onClick={() => onComplete(appointment.id)}
           data-testid={`button-complete-${appointment.id}`}
         >
@@ -269,7 +269,7 @@ function UpcomingAppointmentCard({
         <Button
           size="sm"
           variant="outline"
-          className="min-h-9 rounded-xl"
+          className="h-11 rounded-xl"
           onClick={() => onEdit(appointment)}
           data-testid={`button-edit-${appointment.id}`}
           aria-label="Edit appointment"
@@ -279,7 +279,7 @@ function UpcomingAppointmentCard({
         <Button
           size="sm"
           variant="ghost"
-          className="min-h-9 rounded-xl text-muted-foreground hover:text-destructive"
+          className="h-11 rounded-xl text-muted-foreground hover:text-destructive"
           onClick={() => onDelete(appointment.id)}
           data-testid={`button-delete-${appointment.id}`}
           aria-label="Delete appointment"
@@ -460,7 +460,6 @@ export default function Appointments() {
           className="min-w-0 flex-1"
           leading={<PageBackButton />}
           title="Appointments"
-          description="Clinic visits, screenings, and check-ups in one place"
           actions={
             <PageInfoDialog title="About Appointments" description="Keep track of your diabetes healthcare visits">
               <InfoSection title="Adding appointments">
@@ -494,7 +493,7 @@ export default function Appointments() {
         >
           <DialogTrigger asChild>
             <Button
-              className="min-h-11 shrink-0 rounded-2xl px-4 shadow-sm"
+              className="h-12 shrink-0 rounded-2xl px-5 text-sm font-semibold shadow-sm"
               data-testid="button-add-appointment"
               onClick={() => resetForm()}
             >
@@ -516,10 +515,10 @@ export default function Appointments() {
             </DialogHeader>
             <div className="space-y-5 pt-2">
               <div className="space-y-2">
-                <Label htmlFor="title">Title</Label>
+                <Label htmlFor="title" className="text-xs font-medium text-muted-foreground">Title</Label>
                 <Input
                   id="title"
-                  className="rounded-xl"
+                  className="h-12 rounded-xl"
                   placeholder="e.g. Annual diabetes review"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
@@ -538,7 +537,7 @@ export default function Appointments() {
                         key={t.value}
                         type="button"
                         className={cn(
-                          "flex min-h-16 flex-col items-center justify-center gap-1 rounded-2xl border px-2 py-2.5 text-center text-xs font-semibold transition-all",
+                          "flex min-h-[4.25rem] flex-col items-center justify-center gap-1 rounded-[1.15rem] border px-2 py-2.5 text-center text-xs font-semibold transition-all",
                           selected
                             ? "border-primary bg-primary/5 text-foreground ring-1 ring-primary/30"
                             : "border-border/70 bg-muted/20 text-muted-foreground hover:border-border hover:bg-muted/40",
@@ -554,23 +553,23 @@ export default function Appointments() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="date">Date</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="date" className="text-xs font-medium text-muted-foreground">Date</Label>
                   <Input
                     id="date"
-                    className="rounded-xl"
+                    className="h-12 rounded-xl"
                     type="date"
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
                     data-testid="input-appointment-date"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="time">Time</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="time" className="text-xs font-medium text-muted-foreground">Time</Label>
                   <Input
                     id="time"
-                    className="rounded-xl"
+                    className="h-12 rounded-xl"
                     type="time"
                     value={time}
                     onChange={(e) => setTime(e.target.value)}
@@ -625,7 +624,7 @@ export default function Appointments() {
             <div className="flex gap-2 px-4 py-3">
               <Button
                 size="sm"
-                className="min-h-9 flex-1 rounded-xl"
+                className="h-11 flex-1 rounded-xl"
                 onClick={() => void handleComplete(nextAppointment.id)}
                 data-testid={`button-complete-${nextAppointment.id}`}
               >
@@ -635,7 +634,7 @@ export default function Appointments() {
               <Button
                 size="sm"
                 variant="outline"
-                className="min-h-9 rounded-xl"
+                className="h-11 rounded-xl"
                 onClick={() => openEditDialog(nextAppointment)}
                 data-testid={`button-edit-${nextAppointment.id}`}
                 aria-label="Edit appointment"
@@ -645,7 +644,7 @@ export default function Appointments() {
               <Button
                 size="sm"
                 variant="outline"
-                className="min-h-9 rounded-xl"
+                className="h-11 rounded-xl"
                 onClick={() => requestDelete(nextAppointment.id)}
                 data-testid={`button-delete-${nextAppointment.id}`}
                 aria-label="Delete appointment"

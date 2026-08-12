@@ -13,7 +13,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import {
   deleteAllInAppNotificationsForUser,
@@ -203,8 +202,7 @@ export default function NotificationsPage() {
     notifyInAppNotificationsChanged({ skipPageRefresh: true });
   };
 
-  const pageDescription =
-    unread > 0 ? `${unread} unread · messages, community, and app updates` : "Messages, community, and app updates";
+  const pageDescription = unread > 0 ? `${unread} unread` : undefined;
 
   return (
     <PageShell variant="narrow" density="compact" className="pb-6">
@@ -220,7 +218,7 @@ export default function NotificationsPage() {
             <Button
               variant="outline"
               size="icon"
-              className="h-9 w-9 shrink-0 rounded-full sm:h-8 sm:w-auto sm:rounded-md sm:px-3"
+              className="h-11 w-11 shrink-0 rounded-xl sm:h-11 sm:w-auto sm:px-3.5"
               onClick={handleMarkAllRead}
               disabled={!configured || unread === 0}
               aria-label="Mark all read"
@@ -231,7 +229,7 @@ export default function NotificationsPage() {
             <Button
               variant="outline"
               size="icon"
-              className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:text-destructive sm:h-8 sm:w-auto sm:rounded-md sm:px-3"
+              className="h-11 w-11 shrink-0 rounded-xl text-muted-foreground hover:text-destructive sm:h-11 sm:w-auto sm:px-3.5"
               type="button"
               onClick={() => setClearDialogOpen(true)}
               disabled={!configured || loading || rows.length === 0}
@@ -245,7 +243,7 @@ export default function NotificationsPage() {
         }
       />
 
-      <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/40 shadow-sm">
+      <div className="-mx-1">
         {!configured ? (
           <div className="px-4 py-10 text-center text-muted-foreground">
             <span className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-muted/50">
@@ -259,8 +257,7 @@ export default function NotificationsPage() {
             </p>
             <Button
               variant="outline"
-              size="sm"
-              className="mt-4 rounded-xl"
+              className="mt-4 h-11 rounded-xl"
               type="button"
               onClick={() => setLocation("/settings/notifications")}
             >
@@ -275,16 +272,15 @@ export default function NotificationsPage() {
           <div className="px-4 py-8 text-center text-muted-foreground">
             <p className="text-sm text-destructive">Could not load notifications</p>
             <p className="mx-auto mt-1 max-w-md break-words text-xs">{fetchError}</p>
-            <Button variant="outline" size="sm" className="mt-4 rounded-xl" type="button" onClick={() => void refresh()}>
+            <Button variant="outline" className="mt-4 h-11 rounded-xl" type="button" onClick={() => void refresh()}>
               Try again
             </Button>
           </div>
         ) : rows.length === 0 ? (
           <NotificationEmptyState />
         ) : (
-          <ScrollArea className="max-h-[min(75dvh,36rem)]">
-            <div>
-              {rows.map((r) => {
+          <div className="divide-y divide-border/40">
+            {rows.map((r) => {
                 const when = r.created_at
                   ? formatDistanceToNowStrict(new Date(r.created_at), { addSuffix: true })
                   : "";
@@ -320,8 +316,7 @@ export default function NotificationsPage() {
                   />
                 );
               })}
-            </div>
-          </ScrollArea>
+          </div>
         )}
       </div>
 

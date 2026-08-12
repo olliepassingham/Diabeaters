@@ -18,12 +18,10 @@ import {
   Sparkles,
   CheckCircle2,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
@@ -111,39 +109,38 @@ type ChoiceProps<T extends string> = {
 };
 
 function ChoiceGroup<T extends string>({ label, value, onChange, options, name }: ChoiceProps<T>) {
+  const compact = options.every((opt) => opt.title.length <= 18);
   return (
     <div className="space-y-2">
-      <Label className="text-sm font-medium">{label}</Label>
-      <RadioGroup value={value} onValueChange={(v) => onChange(v as T)} className="grid gap-2">
+      <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
+      <div
+        className={cn("grid gap-2", compact ? "grid-cols-3" : "grid-cols-1")}
+        role="radiogroup"
+        aria-label={label}
+      >
         {options.map((opt) => {
-          const id = `${name}-${opt.value}`;
+          const selected = value === opt.value;
           return (
-            <div
+            <button
               key={opt.value}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              name={name}
               className={cn(
-                "flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors cursor-pointer",
-                value === opt.value
-                  ? "border-primary bg-primary/5 shadow-sm"
-                  : "border-border/70 hover:bg-muted/40",
+                "min-h-12 rounded-xl border px-3 py-3 text-sm font-medium leading-snug transition-colors",
+                compact ? "text-center" : "text-left",
+                selected
+                  ? "border-primary bg-primary/10 text-foreground shadow-sm"
+                  : "border-border/70 bg-background/70 text-foreground hover:bg-muted/40",
               )}
               onClick={() => onChange(opt.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  onChange(opt.value);
-                }
-              }}
-              role="button"
-              tabIndex={0}
             >
-              <RadioGroupItem value={opt.value} id={id} />
-              <Label htmlFor={id} className="flex-1 font-normal cursor-pointer text-sm leading-snug">
-                {opt.title}
-              </Label>
-            </div>
+              {opt.title}
+            </button>
           );
         })}
-      </RadioGroup>
+      </div>
     </div>
   );
 }
@@ -940,7 +937,9 @@ export default function AlcoholScenarioPage() {
 
         {phase === "situation" ? (
           <section className="space-y-3">
-            <h2 className="text-base font-semibold text-foreground">What&apos;s going on?</h2>
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              What&apos;s going on?
+            </h2>
             <div className="grid gap-2">
               {SITUATION_CARDS.map((c) => {
                 const Icon = c.icon;
@@ -950,16 +949,16 @@ export default function AlcoholScenarioPage() {
                     type="button"
                     onClick={() => pickSituation(c.id)}
                     className={cn(
-                      "group flex w-full items-center gap-3 rounded-xl border border-border/70 bg-card/40 px-3.5 py-3 text-left transition-all",
+                      "group flex min-h-14 w-full items-center gap-3 rounded-[1.35rem] border border-border/70 bg-card/50 px-4 py-3.5 text-left transition-all",
                       "active:scale-[0.99] hover:border-primary/40 hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                       situation === c.id && "border-primary bg-primary/5",
                     )}
                     data-testid={`alcohol-situation-${c.id}`}
                   >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted/60">
-                      <Icon className={cn("h-4 w-4", c.iconClass)} aria-hidden />
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-muted/60">
+                      <Icon className={cn("h-5 w-5", c.iconClass)} aria-hidden />
                     </span>
-                    <span className="min-w-0 flex-1 text-sm font-medium leading-snug text-foreground">{c.title}</span>
+                    <span className="min-w-0 flex-1 text-sm font-semibold leading-snug text-foreground">{c.title}</span>
                     <ChevronRight
                       className="h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform group-hover:translate-x-0.5"
                       aria-hidden
@@ -972,30 +971,28 @@ export default function AlcoholScenarioPage() {
         ) : null}
 
         {phase === "inputs" && situation && activeSituation ? (
-          <Card className="surface-card border-border/60 shadow-none">
-            <CardHeader className="space-y-2 pb-3">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-2">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted/60">
-                    <activeSituation.icon className={cn("h-4 w-4", activeSituation.iconClass)} aria-hidden />
-                  </span>
-                  <CardTitle className="text-base font-semibold leading-snug">{activeSituation.title}</CardTitle>
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 shrink-0 px-2 text-xs text-muted-foreground"
-                  onClick={backToSituation}
-                  data-testid="button-alcohol-change-situation"
-                >
-                  Change
-                </Button>
+          <section className="space-y-4 overflow-hidden rounded-[1.35rem] border border-violet-500/20 bg-gradient-to-b from-violet-500/[0.07] via-card to-card p-4 shadow-none dark:border-violet-400/15 dark:from-violet-950/35 sm:p-5">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-muted/60">
+                  <activeSituation.icon className={cn("h-4 w-4", activeSituation.iconClass)} aria-hidden />
+                </span>
+                <h2 className="text-base font-semibold leading-snug">{activeSituation.title}</h2>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-5 pt-0">
-              {situation === "feels_wrong" ? (
-                <div className="space-y-3 rounded-xl border border-destructive/25 bg-destructive/5 p-3.5">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-9 shrink-0 rounded-xl px-2.5 text-xs text-muted-foreground"
+                onClick={backToSituation}
+                data-testid="button-alcohol-change-situation"
+              >
+                Change
+              </Button>
+            </div>
+
+            {situation === "feels_wrong" ? (
+                <div className="space-y-3 rounded-2xl border border-destructive/25 bg-destructive/5 p-3.5">
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4 text-destructive shrink-0" aria-hidden />
                     <p className="text-sm font-medium">Red flags — tick any that apply</p>
@@ -1019,23 +1016,31 @@ export default function AlcoholScenarioPage() {
 
               {(situation === "meal_with_drinks" || situation === "late_snack") && (
                 <div className="space-y-4">
-                  <div className="space-y-2 max-w-xs">
-                    <Label htmlFor="alcohol-carbs">Carbs ({carbUnit === "cp" ? "CP" : "grams"})</Label>
-                    <Input
-                      id="alcohol-carbs"
-                      type="text"
-                      inputMode="numeric"
-                      placeholder={carbUnit === "cp" ? "e.g. 6" : "e.g. 60"}
-                      value={carbsInput}
-                      onChange={(e) => setCarbsInput(e.target.value)}
-                      autoComplete="off"
-                      data-testid="input-alcohol-carbs"
-                    />
+                  <div className="space-y-1.5">
+                    <Label htmlFor="alcohol-carbs" className="text-xs font-medium text-muted-foreground">
+                      Carbs
+                    </Label>
+                    <div className="flex items-stretch gap-2">
+                      <Input
+                        id="alcohol-carbs"
+                        type="text"
+                        inputMode="numeric"
+                        placeholder={carbUnit === "cp" ? "6" : "60"}
+                        value={carbsInput}
+                        onChange={(e) => setCarbsInput(e.target.value)}
+                        autoComplete="off"
+                        className="h-14 flex-1 rounded-xl border-border/60 bg-background text-2xl font-semibold tabular-nums tracking-tight shadow-none"
+                        data-testid="input-alcohol-carbs"
+                      />
+                      <span className="flex min-w-[4.5rem] items-center justify-center rounded-xl border border-border/60 bg-muted/40 px-3 text-sm font-semibold text-muted-foreground">
+                        {carbUnit === "cp" ? "CP" : "g"}
+                      </span>
+                    </div>
                   </div>
-                  <div className="space-y-2 max-w-xs">
-                    <Label>Meal period</Label>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-muted-foreground">Meal period</Label>
                     <Select value={mealType} onValueChange={setMealType}>
-                      <SelectTrigger data-testid="select-alcohol-meal-type">
+                      <SelectTrigger className="h-12 rounded-xl" data-testid="select-alcohol-meal-type">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1089,7 +1094,7 @@ export default function AlcoholScenarioPage() {
 
               <div className="space-y-2.5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <Label className="text-sm font-medium">Glucose (optional)</Label>
+                  <span className="text-xs font-medium text-muted-foreground">Glucose (optional)</span>
                   <div className="flex items-center gap-2">
                     <Checkbox
                       id="bg-skip"
@@ -1106,43 +1111,49 @@ export default function AlcoholScenarioPage() {
                   </div>
                 </div>
                 {!bgSkipped ? (
-                  <div className="space-y-3">
-                    <div className="space-y-1.5 max-w-xs">
-                      <Label htmlFor="alcohol-bg" className="text-xs text-muted-foreground">
-                        Reading ({bgUnits})
-                      </Label>
+                  <div className="space-y-3 rounded-2xl border border-border/50 bg-background/70 p-3 shadow-sm dark:bg-background/40">
+                    <Label htmlFor="alcohol-bg" className="sr-only">
+                      Reading ({bgUnits})
+                    </Label>
+                    <div className="flex items-stretch gap-2">
                       <Input
                         id="alcohol-bg"
                         type="text"
                         inputMode="decimal"
-                        placeholder={bgUnits === "mmol/L" ? "e.g. 5.6" : "e.g. 100"}
+                        placeholder={bgUnits === "mmol/L" ? "5.6" : "100"}
                         value={bgInput}
                         onChange={(e) => alcoholCgm.onBgChange(e.target.value)}
                         autoComplete="off"
+                        className="h-14 flex-1 rounded-xl border-border/60 bg-background text-2xl font-semibold tabular-nums tracking-tight shadow-none"
                         data-testid="input-alcohol-bg"
                       />
-                      <CgmPrefillButton
-                        prefill={alcoholCgm.prefill}
-                        loading={alcoholCgm.loading}
-                        bgUnits={bgUnits}
-                        currentValue={bgInput}
-                        onApply={alcoholCgm.onBgChange}
-                        onApplyTrend={(trend) => {
-                          const mapped = cgmTrendForAlcohol(trend);
-                          if (mapped) setBgTrend(mapped);
-                        }}
-                        onRefresh={alcoholCgm.refresh}
-                        emptyHint={alcoholCgm.emptyHint}
-                        allowSync
-                        testId="button-alcohol-cgm-prefill"
-                      />
+                      <span className="flex min-w-[4.5rem] items-center justify-center rounded-xl border border-border/60 bg-muted/40 px-3 text-sm font-semibold text-muted-foreground">
+                        {bgUnits}
+                      </span>
                     </div>
+                    <CgmPrefillButton
+                      prefill={alcoholCgm.prefill}
+                      loading={alcoholCgm.loading}
+                      bgUnits={bgUnits}
+                      currentValue={bgInput}
+                      onApply={alcoholCgm.onBgChange}
+                      onApplyTrend={(trend) => {
+                        const mapped = cgmTrendForAlcohol(trend);
+                        if (mapped) setBgTrend(mapped);
+                      }}
+                      onRefresh={alcoholCgm.refresh}
+                      emptyHint={alcoholCgm.emptyHint}
+                      allowSync
+                      testId="button-alcohol-cgm-prefill"
+                    />
                     <BgTrendThreeButtons
-                      label="Trend (if you know it)"
+                      label="Trend"
+                      labelClassName="text-xs font-medium text-muted-foreground"
                       value={bgTrend}
                       onChange={(v) => setBgTrend(v as AlcoholTrend)}
                       unsetValue="unknown"
-                      flatLabel="Flat / stable"
+                      flatLabel="Stable"
+                      buttonClassName="h-11 rounded-xl"
                     />
                   </div>
                 ) : null}
@@ -1153,8 +1164,7 @@ export default function AlcoholScenarioPage() {
                   {carbsError}
                 </p>
               ) : null}
-            </CardContent>
-          </Card>
+          </section>
         ) : null}
 
         {phase === "result" && outcome ? (
@@ -1199,8 +1209,7 @@ export default function AlcoholScenarioPage() {
             <Button
               type="button"
               variant="outline"
-              size="sm"
-              className="gap-1.5 shrink-0"
+              className="h-12 shrink-0 gap-1.5 rounded-xl px-4"
               onClick={backToSituation}
               data-testid="button-alcohol-back-step"
             >
@@ -1209,8 +1218,7 @@ export default function AlcoholScenarioPage() {
             </Button>
             <Button
               type="button"
-              size="sm"
-              className="ml-auto min-w-[9rem] flex-1 gap-1.5 sm:flex-none"
+              className="h-12 min-w-0 flex-1 gap-1.5 rounded-xl text-sm font-semibold"
               onClick={runGuidance}
               data-testid="button-alcohol-show-plan"
             >

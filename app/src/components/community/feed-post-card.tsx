@@ -540,14 +540,14 @@ export function FeedPostCard({
 
   return (
     <>
-    <article className="animate-soft-in border-b border-border/35 bg-transparent py-3.5 last:border-b-0 sm:mx-1 sm:mb-3 sm:rounded-2xl sm:border sm:border-border/50 sm:bg-card/70 sm:py-3.5 sm:shadow-sm sm:ring-1 sm:ring-border/30 sm:last:border sm:backdrop-blur-sm dark:sm:bg-card/50">
+    <article className="animate-soft-in border-b border-border/40 bg-transparent py-3 last:border-b-0 sm:mx-1 sm:mb-3 sm:rounded-[1.35rem] sm:border sm:border-border/50 sm:bg-card/70 sm:py-3.5 sm:shadow-sm sm:last:border dark:sm:bg-card/50">
       <div className="flex items-center gap-3 px-3 py-1 sm:px-4">
         <CommunityAuthorAvatar
           displayName={authorDisplayName}
           avatarPath={authorAvatarPath}
           profileHref={`/community/profile/${post.author_id}`}
-          size="sm"
-          className="!h-9 !w-9 ring-1 ring-border/30"
+          size="md"
+          className="!h-10 !w-10"
           fallbackSrc={showBeatieAvatar ? BEATIE_FEED_AVATAR_FALLBACK_SRC : undefined}
         />
         <div className="min-w-0 flex-1">
@@ -561,7 +561,7 @@ export function FeedPostCard({
               <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
                 <Link
                   href={`/community/profile/${post.author_id}`}
-                  className="truncate text-sm font-semibold leading-tight text-foreground hover:underline underline-offset-2"
+                  className="truncate text-[15px] font-semibold leading-tight text-foreground hover:underline underline-offset-2"
                 >
                   {authorDisplayName}
                 </Link>
@@ -574,15 +574,12 @@ export function FeedPostCard({
                   </Badge>
                 ) : null}
               </div>
-              <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
-                <span
-                  className="inline-flex max-w-full items-center rounded-full bg-muted/55 px-1.5 py-0.5 text-[10px] font-medium leading-tight text-muted-foreground ring-1 ring-border/40"
-                  data-testid="feed-post-topic"
-                  title={topicLabel}
-                >
-                  <span className="truncate">{topicLabel}</span>
+              <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12px] text-muted-foreground">
+                <span data-testid="feed-post-topic" title={topicLabel} className="truncate">
+                  {topicLabel}
                 </span>
-                <time className="text-[11px] text-muted-foreground" title={post.created_at}>
+                <span aria-hidden>·</span>
+                <time title={post.created_at}>
                   {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
                 </time>
               </div>
@@ -595,7 +592,7 @@ export function FeedPostCard({
               type="button"
               variant="ghost"
               size="sm"
-              className="h-8 w-8 p-0 text-muted-foreground"
+              className="h-11 w-11 p-0 text-muted-foreground"
               aria-label="Post options"
             >
               <MoreHorizontal className="h-5 w-5" />
@@ -799,7 +796,7 @@ export function FeedPostCard({
               )}
             </div>
           )}
-          <div className="text-composer-shell px-3 py-1">
+          <div className="text-composer-shell rounded-full px-3.5 py-1">
             <div className="min-w-0 flex-1">
               <MentionTextarea
                 textareaRef={commentInputRef}
@@ -820,7 +817,7 @@ export function FeedPostCard({
             <Button
               type="button"
               size="sm"
-              className="mb-0.5 h-9 shrink-0 rounded-full px-4 text-sm font-semibold shadow-none"
+              className="mb-0.5 h-10 shrink-0 rounded-full px-4 text-sm font-semibold shadow-none"
               disabled={!mayEngage || !commentDraft.trim()}
               onClick={onSubmitComment}
             >

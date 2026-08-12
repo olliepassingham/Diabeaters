@@ -279,7 +279,7 @@ export function FeedStoriesComposerHeader({
 
       <section
         className={cn(
-          "overflow-hidden rounded-2xl border border-border/50 bg-card/95 shadow-sm ring-1 ring-border/30 backdrop-blur-xl supports-[backdrop-filter]:bg-card/85",
+          "overflow-hidden rounded-[1.35rem] border border-border/50 bg-card/95 shadow-sm",
           composerDisabled && "opacity-90",
         )}
       >

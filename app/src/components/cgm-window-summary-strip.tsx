@@ -46,7 +46,7 @@ export function CgmWindowSummaryStrip({
 
   return (
     <div
-      className="space-y-2.5 rounded-xl border border-border/50 bg-muted/15 px-3 py-2.5"
+      className="space-y-2.5"
       data-testid="cgm-window-summary"
     >
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">

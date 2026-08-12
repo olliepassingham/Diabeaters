@@ -65,7 +65,7 @@ export function ProfileMutedCard({
     <Card
       id={id}
       variant="glass-muted"
-      className={cn("animate-soft-in border-0 shadow-sm", id && "scroll-mt-24", className)}
+      className={cn("animate-soft-in rounded-[1.35rem] border-0 shadow-sm", id && "scroll-mt-24", className)}
       data-testid={testId}
     >
       <CardContent className="p-4 sm:p-5">{children}</CardContent>
@@ -504,7 +504,7 @@ export function ProfileActionGrid({ children, compact }: { children: ReactNode; 
         "grid w-full grid-cols-2 gap-2 [&_a]:w-full [&_button]:w-full",
         compact
           ? "gap-1.5 pt-0.5 [&_a]:min-h-9 [&_button]:min-h-9 [&_a]:rounded-lg [&_button]:rounded-lg"
-          : "border-t border-border/40 pt-3 [&_a]:min-h-10 [&_button]:min-h-10 [&_a]:rounded-xl [&_button]:rounded-xl",
+          : "border-t border-border/40 pt-3 [&_a]:min-h-11 [&_button]:min-h-11 [&_a]:rounded-xl [&_button]:rounded-xl",
       )}
     >
       {children}
@@ -513,7 +513,7 @@ export function ProfileActionGrid({ children, compact }: { children: ReactNode; 
 }
 
 export const profileFormCardClass =
-  "animate-soft-in overflow-hidden rounded-2xl border border-border/50 bg-card/40 shadow-sm";
+  "animate-soft-in overflow-hidden rounded-[1.35rem] border border-border/50 bg-card/40 shadow-sm";
 
 /** Settings-style profile editor card (Account tab). */
 export function ProfileFormCard({
@@ -576,7 +576,7 @@ export function ProfileCommunityPreview({
 }) {
   return (
     <div
-      className="rounded-xl bg-muted/20 px-3.5 py-3.5 ring-1 ring-border/40"
+      className="rounded-[1.15rem] bg-muted/20 px-3.5 py-3.5 ring-1 ring-border/40"
       data-testid="account-community-preview"
     >
       {handleSlug ? (
@@ -638,7 +638,7 @@ export function ProfileFormInset({ children, className }: { children: ReactNode;
   return (
     <div
       className={cn(
-        "rounded-xl border border-border/50 bg-background/40 p-3 shadow-sm dark:bg-background/25 sm:p-3.5",
+        "rounded-[1.15rem] border border-border/50 bg-background/40 p-3 shadow-sm dark:bg-background/25 sm:p-3.5",
         className,
       )}
     >
@@ -682,7 +682,7 @@ export function ProfileToggleRow({
   footer?: ReactNode;
 }) {
   return (
-    <div className="flex items-start justify-between gap-3 py-0.5">
+    <div className="flex min-h-14 items-start justify-between gap-3 py-1">
       <div className="min-w-0 flex-1 space-y-0.5">
         <div className="text-sm font-medium text-foreground">{label}</div>
         {description ? <p className="text-xs leading-relaxed text-muted-foreground">{description}</p> : null}

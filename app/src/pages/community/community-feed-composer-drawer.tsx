@@ -39,9 +39,9 @@ export function CommunityFeedComposerDrawer({
               <X className="h-5 w-5" aria-hidden />
               <span className="sr-only">Close</span>
             </Drawer.Close>
-            <Drawer.Title className="font-display pr-11 text-lg tracking-tight text-foreground">New post</Drawer.Title>
+            <Drawer.Title className="font-display pr-11 text-xl tracking-tight text-foreground">New post</Drawer.Title>
             <Drawer.Description className="text-sm text-muted-foreground">
-              Share with the community — text, photos, polls, or events with date and location.
+              Text, photos, polls, or events.
             </Drawer.Description>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[max(1.25rem,env(safe-area-inset-bottom,0px))]">

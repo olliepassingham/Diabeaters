@@ -233,7 +233,7 @@ function StatusPill({ status }: { status: HealthStatus }) {
     <div className={`relative inline-flex ${pulseClass}`} data-testid="status-indicator">
       <div
         ref={pillRef}
-        className="relative inline-flex min-w-[5.5rem] items-center justify-center whitespace-nowrap px-4 py-1 sm:min-w-[6rem] sm:px-4"
+        className="relative inline-flex min-w-[5.5rem] items-center justify-center whitespace-nowrap px-4 py-1.5 sm:min-w-[6rem] sm:px-4"
         style={{ background: fill, borderRadius: `${rx}px` }}
       >
         <span className={`text-xs font-semibold ${textColor}`} data-testid="text-status">
@@ -423,18 +423,32 @@ function HeroCard({
         className={cn(homeDashboardCardClass, "hover:shadow-md")}
         data-testid="card-hero"
       >
-        <CardContent className="p-4 md:p-6 space-y-3 md:space-y-5">
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
-                <span
-                  className="font-display text-lg font-semibold tracking-tight text-foreground text-balance sm:text-xl"
-                  data-testid="text-greeting"
-                >
-                  {greeting()}
-                  {firstName ? `, ${firstName}` : ""}
-                </span>
-                <StagingChip />
+        <CardContent className="space-y-4 p-4 md:p-5">
+          <div className="space-y-3">
+            <div className="flex items-start gap-2 sm:gap-3">
+              <div className="flex min-w-0 flex-1 flex-col gap-2">
+                <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                  <span
+                    className="font-display text-2xl font-semibold tracking-tight text-foreground text-balance sm:text-3xl"
+                    data-testid="text-greeting"
+                  >
+                    {greeting()}
+                    {firstName ? `, ${firstName}` : ""}
+                  </span>
+                  <StagingChip />
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="shrink-0" data-testid="wrap-dashboard-status-pill">
+                    <StatusPill status={status} />
+                  </div>
+                  {showHeroGlanceLine ? (
+                    <HomePrimaryStatusPill
+                      type={glance.type}
+                      message={glance.message}
+                      testId="text-dashboard-glance"
+                    />
+                  ) : null}
+                </div>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <DashboardInfoDialog />
@@ -442,7 +456,7 @@ function HeroCard({
                   variant="outline"
                   size="icon"
                   onClick={onEditWidgets}
-                  className="min-h-10 min-w-10 sm:min-h-11 sm:min-w-11 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-neutral-200"
+                  className="h-11 w-11 rounded-xl focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-neutral-200"
                   data-testid="button-customize"
                   aria-label="Customise dashboard widgets"
                 >
@@ -450,21 +464,6 @@ function HeroCard({
                 </Button>
               </div>
             </div>
-            <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-              <p className="min-w-0 flex-1 truncate text-sm leading-relaxed text-muted-foreground">
-                Here&apos;s your diabetes today
-              </p>
-              <div className="shrink-0" data-testid="wrap-dashboard-status-pill">
-                <StatusPill status={status} />
-              </div>
-            </div>
-            {showHeroGlanceLine ? (
-              <HomePrimaryStatusPill
-                type={glance.type}
-                message={glance.message}
-                testId="text-dashboard-glance"
-              />
-            ) : null}
           </div>
 
           {(scenarioState.sickDayActive ||
@@ -514,9 +513,8 @@ function HeroCard({
             <Link href="/help-now" className="min-w-0 flex-1">
               <Button
                 variant="destructive"
-                size="sm"
                 className={cn(
-                  "min-h-11 w-full min-w-0 rounded-2xl px-3 text-sm",
+                  "h-12 w-full min-w-0 rounded-2xl px-3 text-sm",
                   "bg-gradient-to-r from-red-500 to-red-600 dark:from-red-700 dark:to-red-600",
                   "shadow-sm shadow-red-600/10 ring-1 ring-red-500/20 hover:shadow-md",
                   isUrgent && "glow-pulse-critical",
@@ -530,9 +528,8 @@ function HeroCard({
               </Button>
             </Link>
             <Button
-              size="sm"
               className={cn(
-                "min-h-11 min-w-0 flex-1 rounded-2xl px-3 text-sm text-white",
+                "h-12 min-w-0 flex-1 rounded-2xl px-3 text-sm text-white",
                 "bg-gradient-to-r from-emerald-500 to-green-600 dark:from-emerald-700 dark:to-green-700",
                 "shadow-sm shadow-emerald-600/10 ring-1 ring-emerald-500/20 hover:shadow-md",
               )}

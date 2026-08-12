@@ -4,15 +4,13 @@ import { Link } from "wouter";
 import {
   Activity,
   Calculator,
-  ChevronDown,
   Clock,
-  Droplet,
   History,
   Syringe,
   Timer,
   X,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,7 +40,6 @@ import { ScenarioResultHero } from "@/components/scenarios/scenario-result-hero"
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
 import { StepLadder, type StepLadderStep } from "@/components/visualizations/step-ladder";
 import { useToast } from "@/hooks/use-toast";
@@ -379,18 +376,15 @@ export default function HypoHelpPage() {
         actions={<HypoHelpInfoDialog bgUnits={bgUnits} />}
       />
 
-      <Card className="surface-card overflow-hidden rounded-2xl border-border/70 shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-h3 flex items-center gap-2 text-foreground">
-            <Droplet className="h-5 w-5 shrink-0 text-red-500 dark:text-red-400" aria-hidden />
-            Treatment estimate
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="current-bg" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Current BG ({bgUnits})
+      <Card className="overflow-hidden rounded-[1.35rem] border-red-500/20 bg-gradient-to-b from-red-500/[0.08] via-card to-card shadow-none dark:border-red-400/15 dark:from-red-950/40">
+        <CardContent className="space-y-4 px-4 pb-5 pt-4 sm:px-5">
+          <section className="space-y-2">
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Glucose now</h3>
+            <div className="space-y-2.5 rounded-2xl border border-border/50 bg-background/70 p-3 shadow-sm dark:bg-background/40">
+            <Label htmlFor="current-bg" className="sr-only">
+              Current blood glucose ({bgUnits})
             </Label>
+            <div className="flex items-stretch gap-2">
             <Input
               id="current-bg"
               type="number"
@@ -402,9 +396,13 @@ export default function HypoHelpPage() {
                 hypoCgm.onBgChange(e.target.value);
                 setHypoResult(null);
               }}
-              className="h-16 border-border/60 bg-muted/15 text-center text-3xl font-semibold tabular-nums tracking-tight"
+              className="h-14 flex-1 rounded-xl border-border/60 bg-background text-center text-3xl font-semibold tabular-nums tracking-tight shadow-none"
               data-testid="input-current-bg"
             />
+            <span className="flex min-w-[4.5rem] items-center justify-center rounded-xl border border-border/60 bg-muted/40 px-3 text-sm font-semibold text-muted-foreground">
+              {bgUnits}
+            </span>
+            </div>
             <CgmPrefillButton
               prefill={hypoCgm.prefill}
               loading={hypoCgm.loading}
@@ -435,12 +433,13 @@ export default function HypoHelpPage() {
                 <span className="text-muted-foreground">{severityView.typicalCarbs}</span>
               </div>
             ) : null}
-          </div>
+            </div>
+          </section>
 
-          <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-2.5">
             <div className="space-y-1.5">
-              <Label htmlFor="target-bg" className="text-xs text-muted-foreground">
-                Target ({bgUnits})
+              <Label htmlFor="target-bg" className="text-xs font-medium text-muted-foreground">
+                Target
               </Label>
               <Input
                 id="target-bg"
@@ -458,13 +457,13 @@ export default function HypoHelpPage() {
                 data-testid="input-target-bg"
               />
               {targetPrefilledFromRange ? (
-                <p className="text-[11px] text-muted-foreground">From your Ratios target range</p>
+                <p className="text-[11px] text-muted-foreground">From Ratios</p>
               ) : null}
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="user-weight" className="text-xs text-muted-foreground">
-                Weight {weightRequired ? "(required)" : "(optional)"}
+              <Label htmlFor="user-weight" className="text-xs font-medium text-muted-foreground">
+                Weight {weightRequired ? "" : "(opt.)"}
               </Label>
               {weightRequired ? (
                 <p className="text-[11px] leading-snug text-muted-foreground" data-testid="text-hypo-weight-required-hint">
@@ -557,7 +556,7 @@ export default function HypoHelpPage() {
           <Button
             onClick={calculateHypoTreatment}
             disabled={!currentBg || !targetBg || (weightRequired && !hasResolvableWeight)}
-            className="h-11 w-full rounded-xl text-sm font-semibold"
+            className="h-12 w-full rounded-xl text-sm font-semibold"
             data-testid="button-calculate-hypo"
           >
             <Calculator className="mr-2 h-4 w-4" aria-hidden />
@@ -586,19 +585,39 @@ export default function HypoHelpPage() {
 
               <MedicalNumericOutputDisclaimer compact />
 
-              <div className="flex flex-wrap gap-2">
-                <Button
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-xl border border-border/50 bg-background/70 p-2.5 text-center">
+                  <p className="text-lg font-bold tabular-nums text-foreground">{hypoResult.glucoseTablets}</p>
+                  <p className="text-[11px] text-muted-foreground">tablets</p>
+                </div>
+                <div className="rounded-xl border border-border/50 bg-background/70 p-2.5 text-center">
+                  <p className="text-lg font-bold tabular-nums text-foreground">{hypoResult.juiceMl}ml</p>
+                  <p className="text-[11px] text-muted-foreground">juice</p>
+                </div>
+                <div className="rounded-xl border border-border/50 bg-background/70 p-2.5 text-center">
+                  <p className="text-lg font-bold tabular-nums text-foreground">{hypoResult.jellyBabies}</p>
+                  <p className="text-[11px] text-muted-foreground">jelly babies</p>
+                </div>
+              </div>
+              {!hypoCarbSource ? (
+                <p className="text-center text-xs text-muted-foreground">
+                  <Link href="/settings/carb-sources" className="font-medium text-primary underline-offset-4 hover:underline">
+                    Carb sources
+                  </Link>{" "}
+                  personalises hints.
+                </p>
+              ) : null}
+
+              <Button
                   type="button"
                   variant="outline"
-                  size="sm"
-                  className="h-9 rounded-xl"
+                  className="h-11 w-full rounded-xl"
                   onClick={startRecheckTimer}
                   data-testid="button-hypo-recheck-timer"
                 >
                   <Timer className="mr-1.5 h-4 w-4" aria-hidden />
                   15 min recheck
                 </Button>
-              </div>
 
               {recheckRemainingSec != null ? (
                 <div
@@ -626,37 +645,6 @@ export default function HypoHelpPage() {
                   </div>
                 </div>
               ) : null}
-
-              <Collapsible>
-                <CollapsibleTrigger className="group flex w-full items-center justify-between rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-left text-sm font-medium">
-                  <span>{hypoCarbSource ? "Other options" : "Portion equivalents"}</span>
-                  <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180" aria-hidden />
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="grid gap-2 pt-2 md:grid-cols-3">
-                    <div className="rounded-lg border border-border/60 bg-muted/15 p-2 text-center">
-                      <p className="text-lg font-bold tabular-nums text-foreground">{hypoResult.glucoseTablets}</p>
-                      <p className="text-xs text-muted-foreground">glucose tablets</p>
-                    </div>
-                    <div className="rounded-lg border border-border/60 bg-muted/15 p-2 text-center">
-                      <p className="text-lg font-bold tabular-nums text-foreground">{hypoResult.juiceMl}ml</p>
-                      <p className="text-xs text-muted-foreground">fruit juice</p>
-                    </div>
-                    <div className="rounded-lg border border-border/60 bg-muted/15 p-2 text-center">
-                      <p className="text-lg font-bold tabular-nums text-foreground">{hypoResult.jellyBabies}</p>
-                      <p className="text-xs text-muted-foreground">jelly babies</p>
-                    </div>
-                  </div>
-                  {!hypoCarbSource ? (
-                    <p className="pt-2 text-xs text-muted-foreground">
-                      <Link href="/settings/carb-sources" className="text-primary underline-offset-4 hover:underline">
-                        Carb sources
-                      </Link>{" "}
-                      personalises hints.
-                    </p>
-                  ) : null}
-                </CollapsibleContent>
-              </Collapsible>
             </div>
           )}
         </CardContent>

@@ -1,7 +1,7 @@
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { FaceLogo } from "@/components/face-logo";
-import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import {
   clearOnboardingAccountPath,
   setActiveAppMode,
@@ -79,104 +79,82 @@ export default function Welcome() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col px-4 py-10 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]">
-        <div className="flex flex-col items-center gap-3 pt-2">
-          <FaceLogo size={64} />
-          <h1 className="text-balance text-center font-display text-3xl font-bold tracking-tight">
-            Welcome to Diabeaters
-          </h1>
-          <p className="max-w-sm text-pretty text-center text-base leading-relaxed text-muted-foreground">
-            New here? Pick how you&apos;ll use the app, then create your account.
-          </p>
+        <div className="flex flex-col items-center gap-4 pt-4">
+          <FaceLogo size={72} />
+          <div className="space-y-2 text-center">
+            <h1 className="text-balance font-display text-4xl font-bold tracking-tight">
+              Welcome to Diabeaters
+            </h1>
+            <p className="text-pretty text-base leading-relaxed text-muted-foreground">
+              Pick how you&apos;ll use the app.
+            </p>
+          </div>
         </div>
 
-        <div className="mt-8 flex flex-col gap-3">
-          <p className="px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Get started
-          </p>
-          <Card className="rounded-2xl border-border/60 shadow-sm">
-            <CardContent className="p-4">
-              <button
-                type="button"
-                onClick={onPatient}
-                className="pressable w-full text-left"
-                data-testid="welcome-patient"
-              >
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5 rounded-xl bg-primary/10 p-2.5">
-                    <Users className="h-5 w-5 text-primary" aria-hidden />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="font-semibold text-foreground">I have Type 1 diabetes</div>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground" aria-hidden />
-                    </div>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Full tools: supplies, meal planner, situation guides, and a personalised dashboard.
-                    </p>
-                  </div>
-                </div>
-              </button>
-            </CardContent>
-          </Card>
+        <div className="mt-10 flex flex-col gap-2.5">
+          <button
+            type="button"
+            onClick={onPatient}
+            className={cn(
+              "pressable group flex min-h-[5.5rem] w-full items-center gap-3.5 rounded-[1.35rem] border border-primary/25 bg-gradient-to-b from-primary/[0.10] via-card to-card px-4 py-4 text-left shadow-sm",
+              "active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            )}
+            data-testid="welcome-patient"
+          >
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-primary">
+              <Users className="h-6 w-6" aria-hidden />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-base font-semibold text-foreground">I have Type 1 diabetes</span>
+              <span className="mt-0.5 block text-sm text-muted-foreground">Daily tools, guides, and your dashboard</span>
+            </span>
+            <ArrowRight className="h-5 w-5 shrink-0 text-primary/70 transition-transform group-hover:translate-x-0.5" aria-hidden />
+          </button>
 
-          <Card className="rounded-2xl border-border/60 shadow-sm">
-            <CardContent className="p-4">
-              <button
-                type="button"
-                onClick={onSupporter}
-                className="pressable w-full text-left"
-                data-testid="welcome-supporter"
-              >
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5 rounded-xl bg-blue-500/10 p-2.5 dark:bg-blue-500/20">
-                    <HeartHandshake className="h-5 w-5 text-blue-600 dark:text-blue-400" aria-hidden />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="font-semibold text-foreground">I’m a supporter</div>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground" aria-hidden />
-                    </div>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Link to someone with Type 1 for read‑only views, alerts, and essentials.
-                    </p>
-                  </div>
-                </div>
-              </button>
-            </CardContent>
-          </Card>
+          <button
+            type="button"
+            onClick={onSupporter}
+            className={cn(
+              "pressable group flex min-h-14 w-full items-center gap-3 rounded-[1.35rem] border border-border/70 bg-card/60 px-4 py-3.5 text-left",
+              "active:scale-[0.99] hover:border-primary/30 hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            )}
+            data-testid="welcome-supporter"
+          >
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400">
+              <HeartHandshake className="h-5 w-5" aria-hidden />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold text-foreground">I&apos;m a supporter</span>
+              <span className="mt-0.5 block text-xs text-muted-foreground">Link to someone with Type 1</span>
+            </span>
+            <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform group-hover:translate-x-0.5" aria-hidden />
+          </button>
 
-          <Card className="rounded-2xl border-border/60 shadow-sm">
-            <CardContent className="p-4">
-              <button
-                type="button"
-                onClick={onCommunityMember}
-                className="pressable w-full text-left"
-                data-testid="welcome-community"
-              >
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5 rounded-xl bg-emerald-500/10 p-2.5 dark:bg-emerald-500/20">
-                    <Eye className="h-5 w-5 text-emerald-700 dark:text-emerald-400" aria-hidden />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="font-semibold text-foreground">Community Member</div>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground" aria-hidden />
-                    </div>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Learn and explore: education, tips, coach, and the feed.
-                    </p>
-                  </div>
-                </div>
-              </button>
-            </CardContent>
-          </Card>
+          <button
+            type="button"
+            onClick={onCommunityMember}
+            className={cn(
+              "pressable group flex min-h-14 w-full items-center gap-3 rounded-[1.35rem] border border-border/70 bg-card/60 px-4 py-3.5 text-left",
+              "active:scale-[0.99] hover:border-primary/30 hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            )}
+            data-testid="welcome-community"
+          >
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">
+              <Eye className="h-5 w-5" aria-hidden />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold text-foreground">Community Member</span>
+              <span className="mt-0.5 block text-xs text-muted-foreground">Learn, explore, and join the feed</span>
+            </span>
+            <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform group-hover:translate-x-0.5" aria-hidden />
+          </button>
         </div>
 
-        <div className="mt-auto space-y-3 pt-8">
+        <div className="mt-auto space-y-3 pt-10">
           <Button
             type="button"
             variant="outline"
-            className="min-h-12 w-full rounded-xl text-base font-semibold"
+            className="h-12 w-full rounded-xl text-base font-semibold"
             onClick={() => {
               clearOnboardingAccountPath();
               setLocation("/login");
@@ -185,9 +163,6 @@ export default function Welcome() {
           >
             Already have an account? Log in
           </Button>
-          <p className="text-center text-xs text-muted-foreground">
-            Creating an account takes about a minute.
-          </p>
         </div>
       </div>
     </div>

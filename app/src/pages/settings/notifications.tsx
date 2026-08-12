@@ -172,7 +172,7 @@ export function NotificationsTab({
                     >
                       <SelectTrigger
                         id="supporter-live-bg-alert-low"
-                        className="h-10 rounded-xl"
+                        className="h-12 rounded-xl"
                         data-testid="select-supporter-live-bg-alert-low"
                       >
                         <SelectValue />
@@ -204,7 +204,7 @@ export function NotificationsTab({
                     >
                       <SelectTrigger
                         id="supporter-live-bg-alert-high"
-                        className="h-10 rounded-xl"
+                        className="h-12 rounded-xl"
                         data-testid="select-supporter-live-bg-alert-high"
                       >
                         <SelectValue />
@@ -306,7 +306,7 @@ export function NotificationsTab({
                       >
                         <SelectTrigger
                           id="bedtime-reminder-time"
-                          className="h-10 rounded-xl"
+                          className="h-12 rounded-xl"
                           data-testid="select-bedtime-reminder-time"
                         >
                           <SelectValue />
@@ -364,7 +364,7 @@ export function NotificationsTab({
                     >
                       <SelectTrigger
                         id="exercise-cgm-alert-threshold"
-                        className="h-10 rounded-xl"
+                        className="h-12 rounded-xl"
                         data-testid="select-exercise-cgm-alert-threshold"
                       >
                         <SelectValue />
@@ -419,7 +419,7 @@ export function NotificationsTab({
                     onValueChange={(v) => onThreshold("criticalThresholdDays", v)}
                     disabled={masterOff || !notifSettings.supplyAlerts}
                   >
-                    <SelectTrigger id="critical-days" className="h-10 rounded-xl" data-testid="select-critical-days">
+                    <SelectTrigger id="critical-days" className="h-12 rounded-xl" data-testid="select-critical-days">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -440,7 +440,7 @@ export function NotificationsTab({
                     onValueChange={(v) => onThreshold("lowThresholdDays", v)}
                     disabled={masterOff || !notifSettings.supplyAlerts}
                   >
-                    <SelectTrigger id="low-days" className="h-10 rounded-xl" data-testid="select-low-days">
+                    <SelectTrigger id="low-days" className="h-12 rounded-xl" data-testid="select-low-days">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -539,8 +539,8 @@ export function SettingsNotificationsRoute({
       title="Notifications"
       description={
         supporterMode
-          ? "Alerts from the person you support and for your own community activity."
-          : "Hypo alerts, supply trends, exercise CGM alerts, travel and sick-day guides, and community."
+          ? "Alerts from the person you support."
+          : "Hypos, supplies, exercise, and community."
       }
       actions={<SettingsNotificationsInfoDialog supporterMode={supporterMode} />}
     >

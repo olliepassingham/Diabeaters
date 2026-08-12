@@ -135,7 +135,7 @@ export function RatiosEditPanel({
 
   return (
     <div
-      className="space-y-4 rounded-xl border border-primary/30 bg-primary/[0.04] p-4 dark:bg-primary/10"
+      className="space-y-4 rounded-[1.35rem] border border-primary/30 bg-primary/[0.04] p-4 dark:bg-primary/10"
       data-testid={`${idPrefix}-panel`}
     >
       <div className="flex items-start justify-between gap-2">
@@ -155,7 +155,7 @@ export function RatiosEditPanel({
 
       <div className="grid grid-cols-2 gap-3">
         {MEAL_KEYS.map(({ key, label, icon: Icon }) => (
-          <div key={key} className="space-y-1.5 rounded-lg border border-border/70 bg-background/70 px-2.5 py-2.5 dark:bg-background/40">
+          <div key={key} className="space-y-1.5 rounded-[1.15rem] border border-border/70 bg-background/70 px-2.5 py-2.5 dark:bg-background/40">
             <div className="flex items-center gap-1.5 text-xs font-medium text-foreground/90">
               <Icon className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
               {label}

@@ -15,7 +15,7 @@ export function WidgetCard({
       variant={variant}
       className={cn(
         // Single hairline edge — the glass surface provides the fill; no ring/shadow stacking.
-        "pressable card-interactive dashboard-card-hover flex flex-col overflow-hidden rounded-2xl border border-border/50 shadow-none dark:border-border/40",
+        "pressable card-interactive dashboard-card-hover flex flex-col overflow-hidden rounded-[1.35rem] border border-border/50 shadow-none dark:border-border/40",
         className,
       )}
       {...props}

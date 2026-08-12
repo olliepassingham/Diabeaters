@@ -133,14 +133,14 @@ export function DrivingResultCard({
           </div>
         </div>
 
-        <h2 className="text-xl font-semibold leading-snug tracking-tight text-foreground sm:text-2xl">
+        <h2 className="text-2xl font-semibold leading-snug tracking-tight text-foreground">
           {outcome.headline}
         </h2>
 
         {reading ? (
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-baseline gap-1.5 rounded-xl border border-border/50 bg-background/70 px-3 py-1.5 shadow-sm">
-              <span className="text-lg font-bold tabular-nums leading-none text-foreground">{reading.value}</span>
+            <span className="inline-flex items-baseline gap-1.5 rounded-xl border border-border/50 bg-background/70 px-3.5 py-2 shadow-sm">
+              <span className="text-2xl font-bold tabular-nums leading-none text-foreground">{reading.value}</span>
               {reading.trend ? (
                 <span className="text-xs font-medium capitalize text-muted-foreground">{reading.trend}</span>
               ) : null}

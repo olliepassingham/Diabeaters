@@ -485,7 +485,7 @@ export default function Account() {
             <Button
               variant="outline"
               size="sm"
-              className="shrink-0 min-h-8 h-8 px-3 rounded-full border-border/60 bg-background/70 text-xs shadow-sm backdrop-blur-sm"
+              className="h-11 shrink-0 rounded-xl px-4 text-sm font-medium"
               asChild
             >
               <Link href="/settings" data-testid="link-account-settings">
@@ -503,7 +503,7 @@ export default function Account() {
             <Button
               variant="outline"
               size="sm"
-              className="col-span-2"
+              className="col-span-2 h-11"
               disabled
               data-testid="link-change-view"
               aria-busy="true"
@@ -512,7 +512,7 @@ export default function Account() {
               Change mode
             </Button>
           ) : canOpenModeChooser ? (
-            <Button variant="outline" size="sm" className="col-span-2" asChild data-testid="link-change-view">
+            <Button variant="outline" size="sm" className="col-span-2 h-11" asChild data-testid="link-change-view">
               <Link href="/mode">{modeSwitchLabel}</Link>
             </Button>
           ) : null}
@@ -529,7 +529,7 @@ export default function Account() {
           />
 
           {!inSupporterSession && !isCommunityAccount && (
-            <Button variant="outline" size="sm" className="col-span-2" asChild>
+            <Button variant="outline" size="sm" className="col-span-2 h-11" asChild>
               <Link href="/family-carers" data-testid="link-manage-carers">
                 Manage supporters
               </Link>
@@ -555,7 +555,7 @@ export default function Account() {
         >
           <AlertDescription>
             Your email is not verified. Please verify to secure all features.{" "}
-            <Button variant="outline" size="sm" className="mt-2 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" asChild>
+            <Button variant="outline" className="mt-2 h-11 rounded-xl" asChild>
               <Link href="/check-email">Go to check email</Link>
             </Button>
           </AlertDescription>
@@ -571,12 +571,11 @@ export default function Account() {
       {!inSupporterSession ? <BecomeSupporterCta /> : null}
 
       <ProfileMutedCard testId="account-actions-card">
-        <ProfileSectionHeading title="Account actions" subtitle="Sign-in and security" />
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        <ProfileSectionHeading title="Account actions" />
+        <div className="mt-4 flex flex-col gap-2">
           <Button
             variant="outline"
-            size="default"
-            className="min-h-11 w-full sm:w-auto focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="h-12 w-full rounded-xl"
             onClick={handleSignOut}
             data-testid="btn-sign-out"
           >
@@ -584,8 +583,7 @@ export default function Account() {
           </Button>
           <Button
             variant="outline"
-            size="default"
-            className="min-h-11 w-full sm:w-auto focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="h-12 w-full rounded-xl"
             asChild
           >
             <Link href="/reset-request" data-testid="btn-reset-password">
@@ -595,8 +593,7 @@ export default function Account() {
 
           <Button
             variant="ghost"
-            size="default"
-            className="min-h-11 w-full sm:w-auto text-muted-foreground hover:text-destructive"
+            className="h-12 w-full rounded-xl text-muted-foreground hover:text-destructive"
             type="button"
             data-testid="account-delete-trigger"
             onClick={() => setAccountDeletionOpen(true)}
@@ -618,17 +615,7 @@ export default function Account() {
       )}
     >
       {!showPublicProfileTab ? (
-        <PageHeader
-          title="Account"
-          description={
-            inSupporterSession
-              ? "Your account and sign-in options. Open Supporter Mode to see the people you support."
-              : isCommunityAccount
-                ? "Your community profile and sign-in options."
-                : "Your profile, emergency details, and sign-in options."
-          }
-          className="max-w-xl"
-        />
+        <PageHeader title="Account" className="max-w-xl" />
       ) : null}
 
       {showPublicProfileTab ? (
@@ -639,17 +626,17 @@ export default function Account() {
           data-testid="account-page-tabs"
         >
           <h1 className="sr-only">Account</h1>
-          <TabsList className="grid h-11 w-full grid-cols-2 rounded-xl bg-muted/45 p-1 dark:bg-muted/30">
+          <TabsList className="grid h-11 w-full grid-cols-2 rounded-full bg-muted/45 p-1 dark:bg-muted/30">
             <TabsTrigger
               value="account"
-              className="rounded-lg text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              className="rounded-full text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm"
               data-testid="account-tab-account"
             >
               Account
             </TabsTrigger>
             <TabsTrigger
               value="public"
-              className="rounded-lg text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              className="rounded-full text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm"
               data-testid="account-tab-public"
             >
               Public profile
@@ -726,7 +713,7 @@ export default function Account() {
             <Button
               type="button"
               variant="destructive"
-              className="w-full sm:w-full"
+              className="h-12 w-full rounded-xl"
               data-testid="account-delete-submit"
               disabled={accountDeletionSubmitBusy}
               onClick={() => void submitAccountDeletionRequest()}

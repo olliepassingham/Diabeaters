@@ -1,6 +1,20 @@
 import { useMemo, useRef, useState, useCallback, useEffect, type ReactNode } from "react";
 import { Link } from "wouter";
-import { BookOpen, Calculator, ChevronDown, Dumbbell, RotateCcw, Sparkles, X } from "lucide-react";
+import {
+  Activity,
+  BookOpen,
+  Calculator,
+  ChevronDown,
+  Dumbbell,
+  Flower2,
+  Footprints,
+  RotateCcw,
+  Sparkles,
+  Swords,
+  Waves,
+  X,
+  Zap,
+} from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +60,22 @@ import { cn } from "@/lib/utils";
 import { ExerciseCgmBgField } from "@/components/exercise-cgm-bg-field";
 import { CgmReadingSourceNote } from "@/components/cgm-reading-source-note";
 import { useExerciseCgmBg } from "@/hooks/use-exercise-cgm-bg";
+
+const EXERCISE_TYPE_ICONS: Record<ExerciseType, typeof Dumbbell> = {
+  cardio: Activity,
+  strength: Dumbbell,
+  hiit: Zap,
+  yoga: Flower2,
+  walking: Footprints,
+  court: Swords,
+  field: Swords,
+  swimming: Waves,
+};
+
+function ExerciseTypeIcon({ type, className }: { type: ExerciseType; className?: string }) {
+  const Icon = EXERCISE_TYPE_ICONS[type] ?? Dumbbell;
+  return <Icon className={className} aria-hidden />;
+}
 
 function PlanDetailSection({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -686,21 +716,44 @@ export function ExerciseFuelCalculator() {
                 </p>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="efc-activity" className="text-xs font-medium text-muted-foreground">
-                    Activity
-                  </Label>
-                  <Select value={exerciseType} onValueChange={(v) => setExerciseType(v as ExerciseType)}>
-                    <SelectTrigger id="efc-activity" className="h-11 rounded-xl" data-testid="efc-activity">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {EXERCISE_TYPE_OPTIONS.map((o) => (
-                        <SelectItem key={o.value} value={o.value} data-testid={`efc-type-${o.value}`}>
-                          {o.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label className="text-xs font-medium text-muted-foreground">Activity</Label>
+                  <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+                    {EXERCISE_TYPE_OPTIONS.map((o) => {
+                      const active = exerciseType === o.value;
+                      return (
+                        <Button
+                          key={o.value}
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className={cn(
+                            "h-10 justify-start rounded-xl px-2.5 text-xs font-medium",
+                            active
+                              ? "bg-background text-foreground shadow-sm ring-1 ring-border/60"
+                              : "bg-muted/30 text-muted-foreground hover:text-foreground",
+                          )}
+                          onClick={() => setExerciseType(o.value)}
+                        >
+                          <ExerciseTypeIcon type={o.value} className="mr-1.5 h-3.5 w-3.5 shrink-0 opacity-80" />
+                          <span className="truncate">{o.label}</span>
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  <div className="sr-only" aria-hidden>
+                    <Select value={exerciseType} onValueChange={(v) => setExerciseType(v as ExerciseType)}>
+                      <SelectTrigger id="efc-activity" data-testid="efc-activity">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {EXERCISE_TYPE_OPTIONS.map((o) => (
+                          <SelectItem key={o.value} value={o.value} data-testid={`efc-type-${o.value}`}>
+                            {o.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -846,25 +899,30 @@ export function ExerciseFuelCalculator() {
                   </div>
                 ) : null}
 
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="efc-meal-carbs" className="text-xs font-medium text-muted-foreground">
                       {!mealCarbsTouched && suggestedMealCarbs != null && suggestedMealCarbs > 0
                         ? "Know your own amount instead?"
-                        : "Carbs before exercise (g)"}
+                        : "Carbs before exercise"}
                     </Label>
-                    <Input
-                      id="efc-meal-carbs"
-                      type="number"
-                      placeholder="e.g. 40"
-                      value={mealCarbs}
-                      onChange={(e) => {
-                        setMealCarbs(e.target.value);
-                        setMealCarbsTouched(true);
-                      }}
-                      className="h-11 rounded-xl"
-                      data-testid="efc-meal-carbs"
-                    />
+                    <div className="flex items-stretch gap-2">
+                      <Input
+                        id="efc-meal-carbs"
+                        type="number"
+                        placeholder="40"
+                        value={mealCarbs}
+                        onChange={(e) => {
+                          setMealCarbs(e.target.value);
+                          setMealCarbsTouched(true);
+                        }}
+                        className="h-14 flex-1 rounded-xl border-border/60 bg-background text-2xl font-semibold tabular-nums tracking-tight shadow-none"
+                        data-testid="efc-meal-carbs"
+                      />
+                      <span className="flex min-w-[4.5rem] items-center justify-center rounded-xl border border-border/60 bg-muted/40 px-3 text-sm font-semibold text-muted-foreground">
+                        g
+                      </span>
+                    </div>
                     {mealCarbsTouched ? (
                       <button
                         type="button"
@@ -882,7 +940,7 @@ export function ExerciseFuelCalculator() {
                       Meal type
                     </Label>
                     <Select value={mealType} onValueChange={setMealType}>
-                      <SelectTrigger id="efc-meal-type" className="h-11 rounded-xl" data-testid="efc-meal-type">
+                      <SelectTrigger id="efc-meal-type" className="h-12 rounded-xl" data-testid="efc-meal-type">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>

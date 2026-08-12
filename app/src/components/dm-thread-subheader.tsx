@@ -46,14 +46,14 @@ export function DmThreadSubheader() {
 
   return (
     <header
-      className="relative z-40 flex shrink-0 items-center gap-1 border-b border-border/50 bg-background/95 px-2 py-1.5 shadow-sm backdrop-blur-md [padding-left:max(0.5rem,env(safe-area-inset-left))] [padding-right:max(0.5rem,env(safe-area-inset-right))]"
+      className="relative z-40 flex shrink-0 items-center gap-1 border-b border-border/40 bg-background/95 px-2 py-2 backdrop-blur-md [padding-left:max(0.5rem,env(safe-area-inset-left))] [padding-right:max(0.5rem,env(safe-area-inset-right))]"
       data-testid="dm-thread-subheader"
     >
       <Button
         type="button"
         variant="ghost"
         size="icon"
-        className="h-9 w-9 shrink-0 rounded-full"
+        className="h-11 w-11 shrink-0 rounded-full"
         aria-label="Back to messages"
         onClick={() => backFromDmThread(setLocation)}
         data-testid="dm-thread-back"

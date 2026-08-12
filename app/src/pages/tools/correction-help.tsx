@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { hypoTreatmentsInRollingHours } from "@/lib/hypo-context";
 import { Link } from "wouter";
-import { Calculator } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
@@ -144,82 +143,78 @@ export default function CorrectionHelpPage() {
         }
       />
 
-      {showUnder18IsfCopy && (
-        <Alert className="border-sky-200 dark:border-sky-900/50 bg-sky-50/80 dark:bg-sky-950/25" data-testid="alert-correction-under18">
-          <AlertDescription className="text-sm">
-            For children and young people, correction factors and targets should come from your diabetes team. Enter the
-            values they give you in Ratios — this tool only does the arithmetic.
-          </AlertDescription>
-        </Alert>
-      )}
-
       {isPump ? <PumpDosingBanner /> : null}
 
-      {recentHypoCount >= 2 && (
-        <Alert
-          className="border-amber-200 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/25"
-          data-testid="alert-correction-recent-hypos"
-        >
-          <AlertDescription className="text-sm">
-            You&apos;ve logged <strong>{recentHypoCount}</strong> hypo treatments in the
-            last 7 days. Be extra cautious stacking corrections — check IOB and your team&apos;s plan for lows.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {postExerciseCorrectionCopy && (
-        <Alert
-          className="border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/70 dark:bg-emerald-950/20"
-          data-testid="alert-correction-recent-exercise"
-        >
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-            <AlertDescription className="text-sm sm:min-w-0 sm:flex-1">
-              <strong>Recent exercise:</strong> {postExerciseCorrectionCopy.correctionDetail}
-            </AlertDescription>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8 shrink-0 self-start"
-              onClick={() => {
-                storage.snoozePostExerciseNudges(8);
-                setPostExerciseNudgeRev((n) => n + 1);
-                toast({
-                  title: "Reminders snoozed",
-                  description: "Post-exercise tips are hidden for 8 hours.",
-                });
-              }}
-              data-testid="alert-correction-post-ex-snooze"
-            >
-              Snooze 8h
-            </Button>
-          </div>
-        </Alert>
-      )}
-
-      <Card className="overflow-hidden rounded-[1.35rem] border-border/50 shadow-none" data-testid="card-correction-calculator">
-        <CardHeader className="px-4 pb-3 pt-4">
-          <CardTitle className="flex items-center gap-2 font-display text-lg font-semibold tracking-tight">
-            <Calculator className="h-5 w-5 text-primary" />
-            Correction estimate
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4 px-4 pb-4">
-          {!hasValidIsf ? (
-            <Alert className="rounded-xl border-amber-200 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/25">
-              <AlertDescription className="text-sm space-y-3">
-                <p>Add a correction factor (ISF) in Ratios to see a dose estimate.</p>
-                <Button asChild className="h-11 w-full rounded-xl" data-testid="button-correction-open-ratios">
-                  <Link href="/settings/ratios">Open Ratios</Link>
-                </Button>
+      {showUnder18IsfCopy || recentHypoCount >= 2 || postExerciseCorrectionCopy ? (
+        <div className="space-y-2">
+          {showUnder18IsfCopy ? (
+            <Alert className="rounded-2xl border-sky-200/80 bg-sky-50/70 py-2.5 dark:border-sky-900/50 dark:bg-sky-950/25" data-testid="alert-correction-under18">
+              <AlertDescription className="text-xs leading-snug sm:text-sm">
+                Under 18: use the ISF and targets from your diabetes team. This only does the arithmetic.
               </AlertDescription>
             </Alert>
+          ) : null}
+          {recentHypoCount >= 2 ? (
+            <Alert
+              className="rounded-2xl border-amber-200/80 bg-amber-50/70 py-2.5 dark:border-amber-800 dark:bg-amber-950/25"
+              data-testid="alert-correction-recent-hypos"
+            >
+              <AlertDescription className="text-xs leading-snug sm:text-sm">
+                <strong>{recentHypoCount}</strong> hypos in 7 days — be cautious stacking corrections.
+              </AlertDescription>
+            </Alert>
+          ) : null}
+          {postExerciseCorrectionCopy ? (
+            <Alert
+              className="rounded-2xl border-emerald-200/80 bg-emerald-50/70 py-2.5 dark:border-emerald-900/50 dark:bg-emerald-950/20"
+              data-testid="alert-correction-recent-exercise"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <AlertDescription className="min-w-0 text-xs leading-snug sm:text-sm">
+                  <strong>Recent exercise:</strong> {postExerciseCorrectionCopy.correctionDetail}
+                </AlertDescription>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 shrink-0 rounded-full px-2.5 text-xs"
+                  onClick={() => {
+                    storage.snoozePostExerciseNudges(8);
+                    setPostExerciseNudgeRev((n) => n + 1);
+                    toast({
+                      title: "Reminders snoozed",
+                      description: "Post-exercise tips are hidden for 8 hours.",
+                    });
+                  }}
+                  data-testid="alert-correction-post-ex-snooze"
+                >
+                  Snooze
+                </Button>
+              </div>
+            </Alert>
+          ) : null}
+        </div>
+      ) : null}
+
+      <Card
+        className="overflow-hidden rounded-[1.35rem] border-primary/20 bg-gradient-to-b from-primary/[0.07] via-card to-card shadow-none dark:border-primary/15 dark:from-primary/10"
+        data-testid="card-correction-calculator"
+      >
+        <CardContent className="space-y-4 px-4 pb-5 pt-4 sm:px-5">
+          {!hasValidIsf ? (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">Add a correction factor (ISF) in Ratios to see a dose.</p>
+              <Button asChild className="h-12 w-full rounded-xl" data-testid="button-correction-open-ratios">
+                <Link href="/settings/ratios">Open Ratios</Link>
+              </Button>
+            </div>
           ) : (
             <>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="correction-bg" className="text-xs font-medium text-muted-foreground">
-                    Current BG
+              <section className="space-y-2">
+                <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Glucose now</h3>
+                <div className="space-y-2.5 rounded-2xl border border-border/50 bg-background/70 p-3 shadow-sm dark:bg-background/40">
+                  <Label htmlFor="correction-bg" className="sr-only">
+                    Current blood glucose
                   </Label>
                   <div className="flex items-stretch gap-2">
                     <Input
@@ -229,7 +224,7 @@ export default function CorrectionHelpPage() {
                       placeholder={bgUnits === "mg/dL" ? "180" : "10.5"}
                       value={bgInput}
                       onChange={(e) => correctionCgm.onBgChange(e.target.value)}
-                      className="h-12 flex-1 rounded-xl text-xl font-semibold tabular-nums tracking-tight"
+                      className="h-14 flex-1 rounded-xl border-border/60 bg-background text-2xl font-semibold tabular-nums tracking-tight shadow-none"
                       data-testid="input-correction-bg"
                     />
                     <span className="flex min-w-[4.5rem] items-center justify-center rounded-xl border border-border/60 bg-muted/40 px-3 text-sm font-semibold text-muted-foreground">
@@ -248,7 +243,10 @@ export default function CorrectionHelpPage() {
                     testId="button-correction-cgm-prefill"
                   />
                 </div>
-                <div className="space-y-2">
+              </section>
+
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="space-y-1.5">
                   <Label htmlFor="correction-target" className="text-xs font-medium text-muted-foreground">
                     Target
                   </Label>
@@ -263,18 +261,17 @@ export default function CorrectionHelpPage() {
                     data-testid="input-correction-target"
                   />
                 </div>
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-muted-foreground">ISF</p>
+                  <div className="flex h-12 items-center rounded-xl border border-border/50 bg-background/70 px-3 text-sm font-semibold tabular-nums">
+                    {correctionFactor} {unitLabel}/u
+                  </div>
+                </div>
               </div>
 
-              <div className="rounded-xl border border-border/50 bg-muted/40 px-3.5 py-2.5 text-sm">
-                <span className="font-semibold text-foreground">ISF</span>
-                <span className="ml-2 font-semibold tabular-nums text-foreground">
-                  {correctionFactor} {unitLabel}/u
-                </span>
-              </div>
-
-              {parsedBg != null && result && (
+              {parsedBg != null && result ? (
                 <div className="space-y-3">
-                  {result.status === "dose" && (
+                  {result.status === "dose" ? (
                     <ScenarioResultHero
                       label="Standard correction"
                       value={
@@ -290,20 +287,25 @@ export default function CorrectionHelpPage() {
                         ({result.currentBg} − {result.targetBg}) ÷ {result.correctionFactor} = {result.fullDoseRounded}u
                       </p>
                     </ScenarioResultHero>
-                  )}
-                  {result.status === "no_correction_needed" && (
-                    <Alert data-testid="alert-correction-none">
-                      <AlertDescription className="text-sm">
-                        No correction needed — BG is at or below the correction target ({result.targetBg} {unitLabel}).
-                      </AlertDescription>
-                    </Alert>
-                  )}
+                  ) : null}
+                  {result.status === "no_correction_needed" ? (
+                    <ScenarioResultHero
+                      tone="neutral"
+                      label="No correction needed"
+                      value="0u"
+                      data-testid="alert-correction-none"
+                    >
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        BG is at or below {result.targetBg} {unitLabel}.
+                      </p>
+                    </ScenarioResultHero>
+                  ) : null}
                 </div>
-              )}
+              ) : null}
 
-              {parsedBg == null && bgInput.trim() !== "" && (
+              {parsedBg == null && bgInput.trim() !== "" ? (
                 <p className="text-sm text-amber-800 dark:text-amber-200">Enter a valid number for current BG.</p>
-              )}
+              ) : null}
             </>
           )}
         </CardContent>

@@ -53,12 +53,7 @@ export function FeedCommentItem({
 
   return (
     <li
-      className={cn(
-        "flex gap-2 rounded-lg border px-2 py-1.5 transition-colors",
-        isBeatie
-          ? "border-primary/20 bg-primary/[0.06]"
-          : "border-border/35 bg-background/40",
-      )}
+      className={cn("flex gap-2.5 py-1.5", isBeatie && "rounded-xl bg-primary/[0.05] px-2")}
       data-testid={`feed-comment-${commentId}`}
     >
       <CommunityAuthorAvatar
@@ -67,34 +62,33 @@ export function FeedCommentItem({
         avatarPath={meta.avatar_url}
         profileHref={isBeatie && beatieFeedBotUserId ? `/community/profile/${beatieFeedBotUserId}` : `/community/profile/${authorId}`}
         fallbackSrc={isBeatie ? BEATIE_FEED_AVATAR_FALLBACK_SRC : undefined}
-        className="!h-7 !w-7 shrink-0"
+        className="!h-8 !w-8 shrink-0"
       />
       <div className="min-w-0 flex-1 space-y-0.5">
-        <div className="flex items-center justify-between gap-1">
+        <div className="flex items-start justify-between gap-1">
           <div className="min-w-0">
             {meta.loading ? (
-              <Skeleton className="h-3 w-24 rounded" />
-            ) : (
-              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0">
+              <Skeleton className="mb-1 h-3 w-24 rounded" />
+            ) : null}
+            <p className="text-[13px] leading-snug text-foreground/90 whitespace-pre-wrap">
+              {!meta.loading ? (
                 <Link
                   href={`/community/profile/${authorId}`}
-                  className="text-xs font-semibold text-foreground hover:underline underline-offset-2"
+                  className="mr-1.5 font-semibold text-foreground hover:underline underline-offset-2"
                 >
                   {displayName}
                 </Link>
-                {isBeatie ? (
-                  <Badge
-                    variant="outline"
-                    className="border-primary/35 bg-transparent px-1 py-0 text-[9px] font-medium leading-none text-primary"
-                  >
-                    AI coach
-                  </Badge>
-                ) : null}
-                <span className="text-[10px] text-muted-foreground" title={createdAt}>
-                  {formatDistanceToNow(new Date(createdAt), { addSuffix: true })}
-                </span>
-              </div>
-            )}
+              ) : null}
+              {isBeatie ? (
+                <Badge
+                  variant="outline"
+                  className="mr-1.5 border-primary/35 bg-transparent px-1 py-0 align-middle text-[9px] font-medium leading-none text-primary"
+                >
+                  AI coach
+                </Badge>
+              ) : null}
+              {renderBodyWithMentions(body, mentionMap ?? {})}
+            </p>
           </div>
           <span className="flex shrink-0 items-center">
             {canReport ? (
@@ -102,11 +96,11 @@ export function FeedCommentItem({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 -my-1 text-muted-foreground"
+                className="h-9 w-9 -my-1 text-muted-foreground"
                 onClick={onReport}
                 aria-label="Report comment"
               >
-                <Flag className="h-3 w-3" />
+                <Flag className="h-3.5 w-3.5" />
               </Button>
             ) : null}
             {canDelete ? (
@@ -114,26 +108,26 @@ export function FeedCommentItem({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 -my-1 text-muted-foreground hover:text-destructive"
+                className="h-9 w-9 -my-1 text-muted-foreground hover:text-destructive"
                 onClick={onDelete}
                 aria-label="Delete comment"
                 data-testid={`button-delete-comment-${commentId}`}
               >
-                <Trash2 className="h-3 w-3" />
+                <Trash2 className="h-3.5 w-3.5" />
               </Button>
             ) : null}
           </span>
         </div>
-        <p className="text-[13px] leading-snug text-foreground/90 whitespace-pre-wrap">
-          {renderBodyWithMentions(body, mentionMap ?? {})}
-        </p>
-        {showLikeRow ? (
-          <div className="flex items-center gap-1 pt-0.5">
-            {canLike ? (
+        <div className="flex items-center gap-2.5 pt-0.5">
+          <span className="text-[11px] text-muted-foreground" title={createdAt}>
+            {formatDistanceToNow(new Date(createdAt), { addSuffix: true })}
+          </span>
+          {showLikeRow ? (
+            canLike ? (
               <button
                 type="button"
                 className={cn(
-                  "inline-flex items-center gap-1 rounded-full px-1 py-0.5 text-[11px] transition-colors",
+                  "inline-flex min-h-8 items-center gap-1 rounded-full px-1 text-[11px] font-medium transition-colors",
                   likedByMe ? "text-primary" : "text-muted-foreground hover:text-foreground",
                 )}
                 aria-pressed={likedByMe}
@@ -148,9 +142,9 @@ export function FeedCommentItem({
                 <Heart className="h-3.5 w-3.5" />
                 {likeCount}
               </span>
-            ) : null}
-          </div>
-        ) : null}
+            ) : null
+          ) : null}
+        </div>
       </div>
     </li>
   );

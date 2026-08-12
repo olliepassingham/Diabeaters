@@ -444,7 +444,7 @@ export function AccountCommunityProfileFields({
           />
         </span>
       }
-      description="Visible to signed-in members on the Feed."
+      description="Shown on the Feed."
       control={
         <Switch
           id={pubId}
@@ -479,7 +479,7 @@ export function AccountCommunityProfileFields({
           />
         </span>
       }
-      description="Optional — helps others understand your community context."
+      description="Optional badge on your public card."
       control={
         <Switch
           id={`${idPrefix}-show-supported`}
@@ -525,7 +525,7 @@ export function AccountCommunityProfileFields({
             autoComplete="name"
             placeholder="Your name"
             disabled={loading || savingPublic}
-            className="h-10 rounded-xl border-border/60 bg-background/80"
+            className="h-12 rounded-xl border-border/60 bg-background/80"
             data-testid="account-profile-display-name-input"
           />
           {accountEmail ? (
@@ -559,7 +559,7 @@ export function AccountCommunityProfileFields({
             >
               Feed handle
             </FieldLabelWithInfo>
-            <div className="flex h-10 items-center gap-2 rounded-xl border border-border/60 bg-background/80 px-3 focus-within:ring-2 focus-within:ring-ring">
+            <div className="flex h-12 items-center gap-2 rounded-xl border border-border/60 bg-background/80 px-3.5 focus-within:ring-2 focus-within:ring-ring">
               <span className="text-sm font-medium text-muted-foreground select-none" aria-hidden>
                 @
               </span>
@@ -600,7 +600,7 @@ export function AccountCommunityProfileFields({
                     ? "Use 3–30 characters: letters, numbers, underscores only."
                     : handleAvailability === "available" && handleSlug && handleSlug !== savedHandleSlug
                       ? "This handle is available."
-                      : "Handles are unique — you will need a different one if it is already in use."}
+                      : null}
             </p>
           </div>
 
@@ -618,7 +618,7 @@ export function AccountCommunityProfileFields({
               placeholder="A short intro for the feed (not medical advice)."
               disabled={loading || savingPublic}
               data-testid="account-community-bio-input"
-              className="min-h-[2.75rem] max-h-[200px] resize-none overflow-y-auto rounded-xl border-border/60 bg-background/80 py-2"
+              className="min-h-12 max-h-[200px] resize-none overflow-y-auto rounded-xl border-border/60 bg-background/80 py-3"
             />
           </div>
 
@@ -639,7 +639,7 @@ export function AccountCommunityProfileFields({
                 value={onsetDateInput}
                 onChange={(e) => setOnsetDateInput(e.target.value)}
                 disabled={loading || saving || savingPublic}
-                className="h-10 rounded-xl border-border/60 bg-background/80"
+                className="h-12 rounded-xl border-border/60 bg-background/80"
                 data-testid="account-community-onset-input"
               />
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -661,7 +661,7 @@ export function AccountCommunityProfileFields({
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="h-8 rounded-full px-3 text-xs"
+                    className="h-11 rounded-full px-4"
                     onClick={() => void clearOnsetDate()}
                     disabled={saving || loading || savingPublic}
                     data-testid="account-community-onset-remove"
@@ -675,7 +675,7 @@ export function AccountCommunityProfileFields({
 
           <Button
             type="submit"
-            className="h-11 w-full rounded-xl font-medium"
+            className="h-12 w-full rounded-xl text-base font-semibold"
             disabled={saving || loading || savingPublic || handleSaveBlocked}
             data-testid="account-community-save"
           >
@@ -685,13 +685,12 @@ export function AccountCommunityProfileFields({
       ) : (
         <>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            Turn on <span className="font-medium text-foreground">Public profile</span> to use the Feed and choose your
-            @handle. Bio and diagnosis date are optional.
+            Turn on Public profile to join the Feed.
           </p>
           {showNameInput ? (
             <Button
               type="submit"
-              className="h-11 w-full rounded-xl"
+              className="h-12 w-full rounded-xl text-base font-semibold"
               disabled={saving || loading || savingPublic}
               data-testid="account-community-save"
             >
@@ -777,7 +776,7 @@ export function AccountCommunityProfileFields({
         <Button
           type="button"
           variant="outline"
-          size="sm"
+          className="h-11 rounded-xl"
           onClick={() => setEditing(true)}
           disabled={savingPublic}
           data-testid="account-community-edit"
@@ -831,7 +830,7 @@ export function AccountCommunityProfileFields({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="rounded-full text-xs"
+                  className="h-11 rounded-xl"
                   onClick={() => {
                     resetFromProfile();
                   }}
@@ -845,7 +844,7 @@ export function AccountCommunityProfileFields({
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="rounded-full border-border/60 bg-background/70 text-xs shadow-sm"
+                  className="h-11 rounded-xl"
                   onClick={() => setEditing(true)}
                   disabled={savingPublic}
                   data-testid="account-community-edit"

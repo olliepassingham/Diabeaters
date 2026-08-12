@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Redirect } from "wouter";
-import { Car, ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -71,7 +71,7 @@ function YesNoChoice({
               aria-checked={selected}
               name={name}
               className={cn(
-                "min-h-11 rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors",
+                "min-h-12 rounded-xl border px-3 py-3 text-sm font-medium transition-colors",
                 selected
                   ? "border-primary bg-primary/10 text-foreground shadow-sm"
                   : "border-border/70 bg-card/40 text-foreground hover:bg-muted/40",
@@ -313,18 +313,15 @@ export default function DrivingScenarioPage() {
         ) : null}
 
         {phase === "form" ? (
-          <section className="space-y-4 rounded-2xl border border-border/60 bg-card/40 p-4 shadow-sm">
-            <div className="flex items-center gap-2">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                <Car className="h-4 w-4 text-primary" aria-hidden />
-              </span>
-              <h2 className="text-base font-semibold text-foreground">{STEP_TITLES[wizardStep]}</h2>
-            </div>
+          <section className="space-y-4 overflow-hidden rounded-[1.35rem] border border-sky-500/20 bg-gradient-to-b from-sky-500/[0.07] via-card to-card p-4 shadow-none dark:border-sky-400/15 dark:from-sky-950/35 sm:p-5">
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              {STEP_TITLES[wizardStep]}
+            </h2>
 
             {wizardStep === 0 ? (
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <Label className="text-sm font-medium">Current glucose</Label>
+                  <span className="text-xs font-medium text-muted-foreground">Glucose now</span>
                   <div className="flex items-center gap-2">
                     <Checkbox
                       id="driving-bg-skip"
@@ -341,24 +338,28 @@ export default function DrivingScenarioPage() {
                   </div>
                 </div>
                 {!bgSkipped ? (
-                  <div className="space-y-3">
+                  <div className="space-y-3 rounded-2xl border border-border/50 bg-background/70 p-3 shadow-sm dark:bg-background/40">
                     {targetRangeLine ? (
                       <p className="text-xs text-muted-foreground">{targetRangeLine}</p>
                     ) : null}
-                    <div className="space-y-1.5 max-w-xs">
-                      <Label htmlFor="driving-bg" className="text-xs text-muted-foreground">
-                        Reading ({bgUnits})
-                      </Label>
+                    <Label htmlFor="driving-bg" className="sr-only">
+                      Reading ({bgUnits})
+                    </Label>
+                    <div className="flex items-stretch gap-2">
                       <Input
                         id="driving-bg"
                         type="text"
                         inputMode="decimal"
-                        placeholder={bgUnits === "mmol/L" ? "e.g. 5.6" : "e.g. 100"}
+                        placeholder={bgUnits === "mmol/L" ? "5.6" : "100"}
                         value={bgInput}
                         onChange={(e) => drivingCgm.onBgChange(e.target.value)}
                         autoComplete="off"
+                        className="h-14 flex-1 rounded-xl border-border/60 bg-background text-2xl font-semibold tabular-nums tracking-tight shadow-none"
                         data-testid="input-driving-bg"
                       />
+                      <span className="flex min-w-[4.5rem] items-center justify-center rounded-xl border border-border/60 bg-muted/40 px-3 text-sm font-semibold text-muted-foreground">
+                        {bgUnits}
+                      </span>
                     </div>
                     <CgmPrefillButton
                       prefill={drivingCgm.prefill}
@@ -376,11 +377,13 @@ export default function DrivingScenarioPage() {
                       testId="button-driving-use-prefill"
                     />
                     <BgTrendThreeButtons
-                      label="Trend (if you know it)"
+                      label="Trend"
+                      labelClassName="text-xs font-medium text-muted-foreground"
                       value={bgTrend}
                       onChange={(v) => setBgTrend(v as DrivingTrend)}
                       unsetValue="unknown"
-                      flatLabel="Flat / stable"
+                      flatLabel="Stable"
+                      buttonClassName="h-11 rounded-xl"
                     />
                   </div>
                 ) : null}
@@ -444,8 +447,7 @@ export default function DrivingScenarioPage() {
               <Button
                 type="button"
                 variant="outline"
-                size="sm"
-                className="gap-1.5"
+                className="h-12 gap-1.5 rounded-xl px-4"
                 onClick={goPrevWizard}
                 disabled={wizardStep === 0}
                 data-testid="button-driving-wizard-back"
@@ -453,7 +455,12 @@ export default function DrivingScenarioPage() {
                 <ArrowLeft className="h-4 w-4" />
                 Back
               </Button>
-              <Button type="button" size="sm" className="gap-1.5" onClick={goNextWizard} data-testid="button-driving-check">
+              <Button
+                type="button"
+                className="h-12 gap-1.5 rounded-xl px-5 text-sm font-semibold"
+                onClick={goNextWizard}
+                data-testid="button-driving-check"
+              >
                 {wizardStep === FORM_WIZARD_STEPS - 1 ? "Check readiness" : "Continue"}
                 <ArrowRight className="h-4 w-4" />
               </Button>
@@ -496,8 +503,7 @@ export default function DrivingScenarioPage() {
             <Button
               type="button"
               variant="outline"
-              size="sm"
-              className="gap-1.5 shrink-0"
+              className="h-12 shrink-0 gap-1.5 rounded-xl px-4"
               onClick={goPrevWizard}
               disabled={wizardStep === 0}
               data-testid="button-driving-wizard-back-sticky"
@@ -507,8 +513,7 @@ export default function DrivingScenarioPage() {
             </Button>
             <Button
               type="button"
-              size="sm"
-              className="ml-auto min-w-[9rem] flex-1 gap-1.5 sm:flex-none"
+              className="h-12 min-w-0 flex-1 gap-1.5 rounded-xl text-sm font-semibold"
               onClick={goNextWizard}
               data-testid="button-driving-check-sticky"
             >

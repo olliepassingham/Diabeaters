@@ -10,7 +10,7 @@ const CommunityFeedComposerDrawerLazy = lazy(() =>
 );
 
 export const FEED_COMPOSER_PILL_CLASS =
-  "flex w-full min-h-[2.75rem] items-center gap-2.5 rounded-2xl border border-border/50 bg-gradient-to-br from-card via-card to-muted/25 px-3.5 py-2.5 text-left shadow-sm ring-1 ring-border/45 transition-transform active:scale-[0.99] dark:from-card/95 dark:to-muted/20";
+  "flex w-full min-h-12 items-center gap-2.5 rounded-[1.35rem] border border-border/50 bg-gradient-to-br from-card via-card to-muted/25 px-3.5 py-2.5 text-left shadow-sm transition-transform active:scale-[0.99] dark:from-card/95 dark:to-muted/20";
 
 type FeedComposerSheetProps = {
   open: boolean;

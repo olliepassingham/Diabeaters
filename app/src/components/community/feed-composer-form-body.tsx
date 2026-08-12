@@ -109,7 +109,7 @@ export function FeedComposerFormBody({
   return (
     <>
       <div className="space-y-1.5">
-        <Label htmlFor="feed-topic" className="text-sm font-medium text-foreground">
+        <Label htmlFor="feed-topic" className="text-xs font-medium text-muted-foreground">
           Topic
         </Label>
         <Select
@@ -119,7 +119,7 @@ export function FeedComposerFormBody({
         >
           <SelectTrigger
             id="feed-topic"
-            className="h-11 w-full border-border/60 bg-muted/25 text-foreground dark:bg-muted/30 dark:text-foreground [&>span]:text-foreground"
+            className="h-12 w-full rounded-xl border-border/60 bg-muted/25 text-foreground dark:bg-muted/30 dark:text-foreground [&>span]:text-foreground"
           >
             <SelectValue placeholder="Choose a topic" />
           </SelectTrigger>
@@ -443,7 +443,7 @@ export function FeedComposerFormBody({
           ))}
         </div>
       ) : null}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-1.5">
         <input
           ref={fileInputRef}
           type="file"
@@ -473,6 +473,7 @@ export function FeedComposerFormBody({
           type="button"
           variant="outline"
           size="sm"
+          className="h-11 rounded-full px-3.5"
           disabled={
             submitting ||
             !user ||
@@ -491,6 +492,7 @@ export function FeedComposerFormBody({
             type="button"
             variant="outline"
             size="sm"
+            className="h-11 rounded-full px-3.5"
             disabled={
               submitting ||
               !user ||
@@ -509,6 +511,7 @@ export function FeedComposerFormBody({
           type="button"
           variant={composerPostKind === "poll" ? "default" : "outline"}
           size="sm"
+          className="h-11 rounded-full px-3.5"
           disabled={submitting || !user}
           onClick={onPollModeClick}
           aria-pressed={composerPostKind === "poll"}
@@ -521,6 +524,7 @@ export function FeedComposerFormBody({
           type="button"
           variant={composerPostKind === "event" ? "default" : "outline"}
           size="sm"
+          className="h-11 rounded-full px-3.5"
           disabled={submitting || !user}
           onClick={onEventModeClick}
           aria-pressed={composerPostKind === "event"}
@@ -533,11 +537,15 @@ export function FeedComposerFormBody({
           ariaLabel="Media limits for posts"
           content={`Up to ${MAX_POST_IMAGES} photos (5MB each) or one video (${videoMaxMb}MB, MP4/MOV/WebM).`}
         />
-        <Button type="submit" size="sm" className="ml-auto" disabled={submitting || !composerCanSubmit || !canComposeToFeed}>
-          <Send className="h-4 w-4 mr-1.5" />
-          {composerPostKind === "event" ? "Share event" : composerPostKind === "poll" ? "Share poll" : "Post"}
-        </Button>
       </div>
+      <Button
+        type="submit"
+        className="h-12 w-full rounded-xl text-base font-semibold"
+        disabled={submitting || !composerCanSubmit || !canComposeToFeed}
+      >
+        <Send className="h-4 w-4 mr-1.5" />
+        {composerPostKind === "event" ? "Share event" : composerPostKind === "poll" ? "Share poll" : "Post"}
+      </Button>
     </>
   );
 }

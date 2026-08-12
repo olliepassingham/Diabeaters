@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { BookOpen, ChevronDown, ChevronUp, Plane, Split, Thermometer, Utensils, X } from "lucide-react";
+import { BookOpen, ChevronDown, ChevronUp, Plane, Split, Thermometer, X } from "lucide-react";
 
 import { MealImpactCard } from "@/components/meal-impact-card";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
@@ -33,13 +33,6 @@ export type MealDoseResultCardProps = {
   /** Full-screen result view uses larger dose typography. */
   variant?: "inline" | "page";
 };
-
-function resultTitle(mealResult: MealDoseResult): string {
-  if (mealResult.exerciseContext === "during") return "During-Exercise Fuel";
-  if (mealResult.exerciseContext === "before") return "Pre-Exercise Dose";
-  if (mealResult.exerciseContext === "after") return "Post-Exercise Dose";
-  return "Your dose suggestion";
-}
 
 function MealDoseHero({
   mealResult,
@@ -152,18 +145,19 @@ export function MealDoseResultCard({
   return (
     <Card
       data-testid="card-meal-result"
-      className={cn("border-border/60 shadow-none", isPage && "rounded-2xl")}
+      className={cn("relative border-border/60 shadow-none", isPage && "rounded-2xl")}
     >
+      <Button
+        variant="ghost"
+        size="icon"
+        className="absolute right-2 top-2 z-10 h-9 w-9 rounded-full"
+        onClick={onClose}
+        data-testid="button-clear-meal-result"
+        aria-label="Close"
+      >
+        <X className="h-4 w-4" />
+      </Button>
       <CardContent className={cn("space-y-3", isPage ? "p-4 sm:p-5" : "p-4")}>
-        <div className="flex items-center justify-between gap-2">
-          <h4 className={cn("font-medium flex items-center gap-2", isPage && "text-base")}>
-            {!isPage ? <Utensils className="h-4 w-4 text-primary shrink-0" /> : null}
-            {resultTitle(mealResult)}
-          </h4>
-          <Button variant="ghost" size="icon" onClick={onClose} data-testid="button-clear-meal-result" aria-label="Close">
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
 
         {mealResult.error === "no_ratios" ? (
           <div className="space-y-3" data-testid="meal-result-no-ratios">

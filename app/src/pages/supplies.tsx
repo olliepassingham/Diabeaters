@@ -784,7 +784,7 @@ function SupplyCard({
   return (
     <Card
       className={[
-        "overflow-hidden rounded-xl border-border/70",
+        "overflow-hidden rounded-[1.35rem] border-border/70",
         status === "critical"
           ? "border-red-500/35 bg-red-500/[0.03]"
           : status === "low"
@@ -797,7 +797,7 @@ function SupplyCard({
           <div className="flex min-w-0 flex-1 items-center gap-2.5">
             <div
               className={[
-                "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border",
+                "flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border",
                 status === "critical"
                   ? "border-red-500/30 bg-red-500/10 dark:bg-red-950/30"
                   : status === "low"
@@ -807,7 +807,7 @@ function SupplyCard({
             >
               <Icon
                 className={[
-                  "h-3.5 w-3.5",
+                  "h-4 w-4",
                   status === "critical"
                     ? "text-red-600 dark:text-red-400"
                     : status === "low"
@@ -985,7 +985,7 @@ function SupplyCard({
           <Button
             variant="default"
             size="sm"
-            className="h-9 shrink-0 px-3"
+            className="h-11 shrink-0 rounded-xl px-3.5"
             onClick={() => onLogPickup(supply)}
             data-testid={`button-refill-${supply.id}`}
           >
@@ -1000,7 +1000,7 @@ function SupplyCard({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-9 px-3 text-xs"
+                  className="h-11 w-11 rounded-xl px-0 text-base"
                   aria-label="Decrease quantity"
                   onClick={() => {
                     const nextQuantity = Math.max(0, currentNow - inc.amount);
@@ -1017,7 +1017,7 @@ function SupplyCard({
                   −
                 </Button>
                 <span
-                  className="min-w-[2.5rem] text-center text-xs font-medium tabular-nums"
+                  className="min-w-[2.75rem] text-center text-base font-semibold tabular-nums"
                   data-testid={`text-quantity-${supply.id}`}
                 >
                   {Math.floor(adjustedQuantity)}
@@ -1025,7 +1025,7 @@ function SupplyCard({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-9 px-3 text-xs"
+                  className="h-11 w-11 rounded-xl px-0 text-base"
                   aria-label="Increase quantity"
                   onClick={() => {
                     const nextQuantity = currentNow + inc.amount;
@@ -1266,7 +1266,7 @@ function SupplyDialog({
                         }
                       }}
                     >
-                      <SelectTrigger id="type" className="h-10 rounded-xl" data-testid="select-supply-type">
+                      <SelectTrigger id="type" className="h-12 rounded-xl" data-testid="select-supply-type">
                         <SelectValue placeholder="Select type" />
                       </SelectTrigger>
                       <SelectContent>
@@ -2001,14 +2001,11 @@ export default function Supplies() {
         leading={<PageBackButton />}
         title="Supply Tracker"
         description={
-          <>
-            Monitor and manage your diabetes supplies.
-            {lowStockCount > 0 && (
-              <span className="text-yellow-600 dark:text-yellow-500 ml-2">
-                ({lowStockCount} item{lowStockCount > 1 ? "s" : ""} running low)
-              </span>
-            )}
-          </>
+          lowStockCount > 0 ? (
+            <span className="text-amber-700 dark:text-amber-400">
+              {lowStockCount} item{lowStockCount > 1 ? "s" : ""} running low
+            </span>
+          ) : undefined
         }
         actions={
           <PageInfoDialog title="About Supply Tracker" description="Keep tabs on your diabetes supplies">
@@ -2062,11 +2059,10 @@ export default function Supplies() {
 
       <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:justify-between">
         <div className="w-full">
-          <div className="-mx-1 flex gap-2 overflow-x-auto rounded-xl bg-background/20 px-1 py-1 [scrollbar-width:thin]">
+          <div className="-mx-1 flex gap-2 overflow-x-auto rounded-2xl bg-muted/20 px-1 py-1 [scrollbar-width:thin]">
             <Button
-              size="sm"
               onClick={handleAddNew}
-              className="shrink-0 min-w-0 px-3"
+              className="h-11 shrink-0 min-w-0 rounded-xl px-3.5"
               data-testid="button-add-new-supply"
             >
               <Plus className="h-4 w-4 md:mr-1" />
@@ -2078,7 +2074,7 @@ export default function Supplies() {
                 variant="outline"
                 size="sm"
                 onClick={handleAddUsualPrescription}
-                className="shrink-0 min-w-0 px-3"
+                className="h-11 shrink-0 min-w-0 rounded-xl px-3.5"
                 data-testid="button-add-usual-prescription"
               >
                 <ClipboardList className="h-4 w-4 md:mr-1" />
@@ -2088,9 +2084,8 @@ export default function Supplies() {
 
             <Button
               variant="outline"
-              size="sm"
               onClick={() => setUsualDialogOpen(true)}
-              className="shrink-0 min-w-0 px-3"
+              className="h-11 shrink-0 min-w-0 rounded-xl px-3.5"
               data-testid="button-edit-usual-prescription"
             >
               <Pencil className="h-4 w-4 md:mr-1" />
@@ -2102,7 +2097,7 @@ export default function Supplies() {
               size="sm"
               onClick={handleUndo}
               disabled={!previousSupplies}
-              className="shrink-0 px-3"
+              className="h-11 shrink-0 rounded-xl px-3.5"
               data-testid="button-undo"
               aria-label="Undo"
               title="Undo"
@@ -2115,7 +2110,7 @@ export default function Supplies() {
               <Button
                 variant="outline"
                 size="sm"
-                className="shrink-0 px-3"
+                className="h-11 shrink-0 rounded-xl px-3.5"
                 data-testid="button-usage-settings"
                 aria-label="Habits"
                 title="Habits"
@@ -2128,7 +2123,7 @@ export default function Supplies() {
             <Button
               variant="outline"
               size="sm"
-              className="shrink-0 px-3"
+              className="h-11 shrink-0 rounded-xl px-3.5"
               onClick={() => setReorderDialogOpen(true)}
               data-testid="button-toggle-planning"
             >
@@ -2167,26 +2162,26 @@ export default function Supplies() {
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="-mx-1 flex h-auto w-[calc(100%+0.5rem)] gap-1 overflow-x-auto px-1 py-1 [scrollbar-width:thin]">
-          <TabsTrigger value="all" data-testid="tab-all">
+        <TabsList className="-mx-1 flex h-auto w-[calc(100%+0.5rem)] gap-1 overflow-x-auto rounded-full bg-muted/45 p-1 [scrollbar-width:thin]">
+          <TabsTrigger value="all" className="shrink-0 rounded-full" data-testid="tab-all">
             All ({supplies.length})
           </TabsTrigger>
-          <TabsTrigger value="needle" data-testid="tab-needles">
+          <TabsTrigger value="needle" className="shrink-0 rounded-full" data-testid="tab-needles">
             Needles ({filterByType("needle").length})
           </TabsTrigger>
-          <TabsTrigger value="insulin" data-testid="tab-insulin">
+          <TabsTrigger value="insulin" className="shrink-0 rounded-full" data-testid="tab-insulin">
             Insulin ({filterByType("insulin").length})
           </TabsTrigger>
-          <TabsTrigger value="cgm" data-testid="tab-cgm">
+          <TabsTrigger value="cgm" className="shrink-0 rounded-full" data-testid="tab-cgm">
             CGM ({filterByType("cgm").length})
           </TabsTrigger>
           {showInfusionTab ? (
-            <TabsTrigger value="infusion_set" data-testid="tab-infusion-sets">
+            <TabsTrigger value="infusion_set" className="shrink-0 rounded-full" data-testid="tab-infusion-sets">
               Infusion ({filterByType("infusion_set").length})
             </TabsTrigger>
           ) : null}
           {showReservoirTab ? (
-            <TabsTrigger value="reservoir" data-testid="tab-reservoirs">
+            <TabsTrigger value="reservoir" className="shrink-0 rounded-full" data-testid="tab-reservoirs">
               Reservoirs ({filterByType("reservoir").length})
             </TabsTrigger>
           ) : null}
@@ -2195,13 +2190,13 @@ export default function Supplies() {
         {supplyTabValues.map((tabValue) => (
           <TabsContent key={tabValue} value={tabValue} className="mt-6 animate-fade-in-up">
             {filterByType(tabValue).length === 0 ? (
-              <Card>
+              <Card className="rounded-[1.35rem] border-border/60">
                 <CardContent className="flex flex-col items-center justify-center py-12">
                   <Package className="h-12 w-12 text-muted-foreground mb-4" />
                   <p className="text-muted-foreground text-center">
                     No supplies in this category yet.
                   </p>
-                  <Button variant="outline" className="mt-4" onClick={handleAddNew} data-testid="button-add-supply-empty">
+                  <Button variant="outline" className="mt-4 h-12 rounded-xl" onClick={handleAddNew} data-testid="button-add-supply-empty">
                     <Plus className="h-4 w-4 mr-2" />
                     Add Supply
                   </Button>
@@ -2213,7 +2208,7 @@ export default function Supplies() {
                   <div
                     key={supply.id}
                     id={`supply-card-${supply.id}`}
-                    className={`rounded-lg transition-all duration-500 ${
+                    className={`rounded-[1.35rem] transition-all duration-500 ${
                       highlightedSupplyId === supply.id
                         ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
                         : ""

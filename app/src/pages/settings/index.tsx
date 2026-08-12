@@ -393,10 +393,16 @@ function InsulinTab({
     { id: "snack-ratio", label: "Snack", value: snackRatio, onChange: setSnackRatio, testId: "snack" },
   ];
 
+  const ratioFormatOptions: { value: RatioFormat; label: string; hint: string; testId: string }[] = [
+    { value: "per10g", label: "Units:10g", hint: "Per 10g carbs", testId: "radio-ratio-format-per10g" },
+    { value: "perCP", label: "Units:1 CP", hint: "Per carb portion", testId: "radio-ratio-format-perCP" },
+    { value: "1toXg", label: "1 unit:Xg", hint: "Grams per unit", testId: "radio-ratio-format-1toXg" },
+  ];
+
   return (
     <div className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-1.5">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <div className="space-y-2 rounded-[1.15rem] border border-border/60 bg-muted/15 px-3.5 py-3">
             <FieldLabelWithInfo
               htmlFor="tdd"
               info={diabetesTermInfo(DIABETES_TERMS.tdd, "Enter your typical total units per day.")}
@@ -406,7 +412,7 @@ function InsulinTab({
             <Input id="tdd" type="number" placeholder="e.g., 40" value={tdd} onChange={(e) => setTdd(e.target.value)} data-testid="input-tdd" />
             <ClinicalWarningHint warning={validateTDD(tdd)} />
           </div>
-          <div className="space-y-1.5">
+          <div className="space-y-2 rounded-[1.15rem] border border-border/60 bg-muted/15 px-3.5 py-3">
             <FieldLabelWithInfo
               htmlFor="correction-factor"
               info={diabetesTermInfo(
@@ -419,7 +425,7 @@ function InsulinTab({
             <Input id="correction-factor" type="number" step="0.1" placeholder={bgUnits === "mmol/L" ? "e.g., 3" : "e.g., 50"} value={correctionFactor} onChange={(e) => setCorrectionFactor(e.target.value)} data-testid="input-correction-factor" />
             <ClinicalWarningHint warning={validateCorrectionFactor(correctionFactor, bgUnits)} />
           </div>
-          <div className="space-y-1.5">
+          <div className="space-y-2 rounded-[1.15rem] border border-border/60 bg-muted/15 px-3.5 py-3">
             <StaticLabelWithInfo
               ariaLabel="About target range"
               info={diabetesTermInfo(DIABETES_TERMS.targetRange)}
@@ -440,43 +446,51 @@ function InsulinTab({
         </div>
 
         <div className="space-y-3">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <StaticLabelWithInfo
-              labelClassName="text-sm font-medium"
-              ariaLabel="About ratio format"
-              info={
-                <p>
-                  Choose how you enter carb coverage: units per 10g, units per carb portion (CP), or grams of carbs per
-                  1 unit.
-                </p>
-              }
-            >
-              Ratio format
-            </StaticLabelWithInfo>
-            <RadioGroup value={ratioFormat} onValueChange={(v) => onRatioFormatChange(v as RatioFormat)} className="flex items-center gap-4 flex-wrap">
-              <div className="flex items-center gap-1.5">
-                <RadioGroupItem value="per10g" id="ratio-format-per10g" data-testid="radio-ratio-format-per10g" />
-                <Label htmlFor="ratio-format-per10g" className="text-sm cursor-pointer">
-                  Units:10g
+          <StaticLabelWithInfo
+            labelClassName="text-sm font-medium"
+            ariaLabel="About ratio format"
+            info={
+              <p>
+                Choose how you enter carb coverage: units per 10g, units per carb portion (CP), or grams of carbs per
+                1 unit.
+              </p>
+            }
+          >
+            Ratio format
+          </StaticLabelWithInfo>
+          <RadioGroup
+            value={ratioFormat}
+            onValueChange={(v) => onRatioFormatChange(v as RatioFormat)}
+            className="grid grid-cols-3 gap-2"
+          >
+            {ratioFormatOptions.map((option) => {
+              const selected = ratioFormat === option.value;
+              return (
+                <Label
+                  key={option.value}
+                  htmlFor={`ratio-format-${option.value}`}
+                  className={cn(
+                    "flex min-h-[4.25rem] cursor-pointer flex-col items-center justify-center gap-0.5 rounded-[1.15rem] border px-2 py-2.5 text-center transition-colors",
+                    selected
+                      ? "border-primary bg-primary/5 text-foreground ring-1 ring-primary/30"
+                      : "border-border/70 bg-muted/20 text-muted-foreground hover:border-border hover:bg-muted/40",
+                  )}
+                >
+                  <RadioGroupItem
+                    value={option.value}
+                    id={`ratio-format-${option.value}`}
+                    className="sr-only"
+                    data-testid={option.testId}
+                  />
+                  <span className="text-sm font-semibold leading-tight">{option.label}</span>
+                  <span className="text-[11px] font-medium leading-tight opacity-80">{option.hint}</span>
                 </Label>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <RadioGroupItem value="perCP" id="ratio-format-perCP" data-testid="radio-ratio-format-perCP" />
-                <Label htmlFor="ratio-format-perCP" className="text-sm cursor-pointer">
-                  Units:1 CP
-                </Label>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <RadioGroupItem value="1toXg" id="ratio-format-1toXg" data-testid="radio-ratio-format-1toXg" />
-                <Label htmlFor="ratio-format-1toXg" className="text-sm cursor-pointer">
-                  1 unit:Xg
-                </Label>
-              </div>
-            </RadioGroup>
-          </div>
+              );
+            })}
+          </RadioGroup>
 
           {ratioFormat === "perCP" && (
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="space-y-2">
               <StaticLabelWithInfo
                 labelClassName="text-sm text-muted-foreground font-normal"
                 ariaLabel="About carb portion size"
@@ -484,13 +498,13 @@ function InsulinTab({
               >
                 1 Carb Portion (CP) =
               </StaticLabelWithInfo>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {["10", "12", "15"].map((size) => (
                   <Button
                     key={size}
                     type="button"
                     variant={carbPortionSize === size ? "default" : "outline"}
-                    size="sm"
+                    className="h-11 rounded-full px-4"
                     onClick={() => onCarbPortionSizeChange(size)}
                     data-testid={`button-cp-size-${size}`}
                   >
@@ -502,7 +516,7 @@ function InsulinTab({
                   min="1"
                   max="30"
                   step="1"
-                  className="w-20"
+                  className="w-24"
                   placeholder="Custom"
                   value={!["10", "12", "15"].includes(carbPortionSize) ? carbPortionSize : ""}
                   onChange={(e) => onCarbPortionSizeChange(e.target.value)}
@@ -538,10 +552,10 @@ function InsulinTab({
               <ArrowRight className="h-3 w-3" aria-hidden />
             </Link>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 gap-2.5">
             {mealRatioFields.map((meal) => (
-              <div key={meal.id} className="space-y-1.5">
-                <Label htmlFor={meal.id} className="text-sm">
+              <div key={meal.id} className="space-y-2 rounded-[1.15rem] border border-border/60 bg-muted/15 px-3 py-3">
+                <Label htmlFor={meal.id} className="text-sm font-semibold">
                   {meal.label}
                 </Label>
                 <Input
@@ -564,7 +578,7 @@ function InsulinTab({
 
           {showDesktopSave ? (
             <div className="hidden md:flex justify-end">
-              <Button onClick={onSave} className="rounded-xl" data-testid="button-save-insulin">
+              <Button onClick={onSave} className="h-12 rounded-xl px-5" data-testid="button-save-insulin">
                 <Save className="h-4 w-4 mr-2" />
                 Save ratios
               </Button>
@@ -1950,7 +1964,7 @@ export default function Settings() {
       <div id="settings-ratios" className="scroll-mt-28 space-y-3">
         <SettingsSectionHeader
           title="Insulin ratios"
-          description="TDD, correction factor, targets, and meal ratios used across tools and advisers."
+          description="Used across meal, correction, and adviser tools."
         />
         <InsulinTab
           bgUnits={bgUnits}

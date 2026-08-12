@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,7 +21,6 @@ import {
   BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import { RatioAdviserTool } from "@/components/ratio-adviser-tool";
 import { Switch } from "@/components/ui/switch";
 import { storage, UserSettings, UserProfile, ScenarioState, RatioFormat, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
@@ -607,11 +606,11 @@ export default function Adviser() {
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-1 flex-col">
-        <TabsList className="grid h-11 w-full max-w-md grid-cols-2 rounded-2xl p-1">
-          <TabsTrigger value="meal" className="gap-1.5 rounded-xl text-xs sm:text-sm" data-testid="tab-meal">
+        <TabsList className="grid h-11 w-full max-w-md grid-cols-2 rounded-full border border-border/50 bg-muted/35 p-0.5">
+          <TabsTrigger value="meal" className="gap-1.5 rounded-full text-xs sm:text-sm" data-testid="tab-meal">
             <Utensils className="h-4 w-4" /><span>Meal</span>
           </TabsTrigger>
-          <TabsTrigger value="ratios" className="gap-1.5 rounded-xl text-xs sm:text-sm" data-testid="tab-ratios">
+          <TabsTrigger value="ratios" className="gap-1.5 rounded-full text-xs sm:text-sm" data-testid="tab-ratios">
             <Search className="h-4 w-4" /><span>Ratios</span>
           </TabsTrigger>
         </TabsList>
@@ -681,58 +680,56 @@ export default function Adviser() {
             </Card>
           )}
 
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Utensils className="h-5 w-5 text-primary" />
-                Quick Meal Planner
-              </CardTitle>
-              <CardDescription className="flex flex-wrap items-center gap-1">
-                {isPumpUser
-                  ? "Enter carbs for a bolus estimate to program on your pump"
-                  : "Enter your carbs and get a mealtime dose suggestion"}
-                <InfoTooltip {...DIABETES_TERMS.bolus} />
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="meal-carbs" className="flex items-center">
+          <Card className="overflow-hidden rounded-[1.35rem] border-primary/20 bg-gradient-to-b from-primary/[0.07] via-card to-card shadow-none dark:border-primary/15 dark:from-primary/10">
+            <CardContent className="space-y-4 px-4 pb-5 pt-4 sm:px-5">
+              <section className="space-y-2">
+                <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Carbs</h3>
+                <div className="space-y-2 rounded-2xl border border-border/50 bg-background/70 p-3 shadow-sm dark:bg-background/40">
+                  <Label htmlFor="meal-carbs" className="sr-only">
                     How many carbs? ({carbUnit === "cp" ? "CP" : "grams"})
-                    <InfoTooltip {...DIABETES_TERMS.carbRatio} />
                   </Label>
-                  <Input
-                    id="meal-carbs"
-                    type="number"
-                    placeholder={carbUnit === "cp" ? "e.g., 6" : "e.g., 60"}
-                    value={mealCarbs}
-                    onChange={(e) => setMealCarbs(e.target.value)}
-                    data-testid="input-meal-carbs"
-                  />
+                  <div className="flex items-stretch gap-2">
+                    <Input
+                      id="meal-carbs"
+                      type="number"
+                      inputMode="decimal"
+                      placeholder={carbUnit === "cp" ? "6" : "60"}
+                      value={mealCarbs}
+                      onChange={(e) => setMealCarbs(e.target.value)}
+                      className="h-14 flex-1 rounded-xl border-border/60 bg-background text-2xl font-semibold tabular-nums tracking-tight shadow-none"
+                      data-testid="input-meal-carbs"
+                    />
+                    <span className="flex min-w-[4.5rem] items-center justify-center rounded-xl border border-border/60 bg-muted/40 px-3 text-sm font-semibold text-muted-foreground">
+                      {carbUnit === "cp" ? "CP" : "g"}
+                    </span>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="meal-time">Which meal?</Label>
-                  <Select value={mealTime} onValueChange={setMealTime}>
-                    <SelectTrigger id="meal-time" data-testid="select-meal-time">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="breakfast">Breakfast</SelectItem>
-                      <SelectItem value="lunch">Lunch</SelectItem>
-                      <SelectItem value="dinner">Dinner</SelectItem>
-                      <SelectItem value="snack">Snack</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              </section>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="meal-time" className="text-xs font-medium text-muted-foreground">
+                  Meal
+                </Label>
+                <Select value={mealTime} onValueChange={setMealTime}>
+                  <SelectTrigger id="meal-time" className="h-12 rounded-xl" data-testid="select-meal-time">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="breakfast">Breakfast</SelectItem>
+                    <SelectItem value="lunch">Lunch</SelectItem>
+                    <SelectItem value="dinner">Dinner</SelectItem>
+                    <SelectItem value="snack">Snack</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <MealCompositionBuilder value={mealComposition} onChange={setMealComposition} />
 
-              <div className="flex items-center justify-between p-3 bg-primary/5 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <Dumbbell className="h-4 w-4 text-primary" />
+              <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/50 bg-background/70 px-3 py-2.5 dark:bg-background/40">
+                <div className="flex min-w-0 items-center gap-2">
+                  <Dumbbell className="h-4 w-4 shrink-0 text-primary" />
                   <Label htmlFor="exercise-toggle" className="text-sm font-medium cursor-pointer">
-                    Planning around exercise?
+                    Around exercise?
                   </Label>
                 </div>
                 <Switch
@@ -744,11 +741,11 @@ export default function Adviser() {
               </div>
 
               {planningAroundExercise && (
-                <div className="grid gap-4 md:grid-cols-2 p-3 bg-muted/50 rounded-lg">
-                  <div className="space-y-2">
-                    <Label>Meal timing vs exercise</Label>
+                <div className="grid grid-cols-1 gap-3 rounded-2xl border border-border/50 bg-muted/30 p-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-muted-foreground">Timing</Label>
                     <Select value={exerciseTiming} onValueChange={(v: "before" | "after" | "during") => setExerciseTiming(v)}>
-                      <SelectTrigger data-testid="select-exercise-timing">
+                      <SelectTrigger className="h-12 rounded-xl" data-testid="select-exercise-timing">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -759,10 +756,12 @@ export default function Adviser() {
                     </Select>
                   </div>
                   {exerciseTiming !== "during" && (
-                    <div className="space-y-2">
-                      <Label>How many hours {exerciseTiming === "before" ? "until" : "since"} exercise?</Label>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium text-muted-foreground">
+                        Hours {exerciseTiming === "before" ? "until" : "since"}
+                      </Label>
                       <Select value={exerciseWithin} onValueChange={setExerciseWithin}>
-                        <SelectTrigger data-testid="select-exercise-hours">
+                        <SelectTrigger className="h-12 rounded-xl" data-testid="select-exercise-hours">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -778,11 +777,11 @@ export default function Adviser() {
               )}
 
               <div
-                className="rounded-xl border border-border/70 bg-muted/20 p-3 dark:bg-muted/10"
+                className="rounded-2xl border border-border/50 bg-background/70 p-3 dark:bg-background/40"
                 data-testid="meal-ratios-strip"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your ratios</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Your ratios</p>
                   <Button
                     type="button"
                     variant="ghost"
@@ -795,13 +794,13 @@ export default function Adviser() {
                     <ArrowRight className="h-3 w-3" />
                   </Button>
                 </div>
-                <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="mt-2 grid grid-cols-4 gap-1.5">
                   {(["breakfast", "lunch", "dinner", "snack"] as const).map((m) => (
-                    <div key={m} className="rounded-lg border border-border/60 bg-background/60 px-2 py-1.5">
-                      <p className="text-[11px] capitalize text-muted-foreground">{m}</p>
+                    <div key={m} className="rounded-lg bg-muted/30 px-1.5 py-1.5 text-center">
+                      <p className="text-[10px] capitalize text-muted-foreground">{m.slice(0, 4)}</p>
                       <p
                         className={cn(
-                          "text-sm font-semibold tabular-nums",
+                          "text-xs font-semibold tabular-nums",
                           getRatioForMeal(m) === "Not set" && "font-normal text-muted-foreground",
                         )}
                         data-testid={`meal-ratios-strip-${m}`}
@@ -816,10 +815,10 @@ export default function Adviser() {
               <Button
                 onClick={handleQuickMealPlan}
                 disabled={!mealCarbs}
-                className="w-full"
+                className="h-12 w-full rounded-xl text-sm font-semibold"
                 data-testid="button-get-meal-advice"
               >
-                {isPumpUser ? "Get bolus suggestion" : "Get Dose Suggestion"}
+                {isPumpUser ? "Get bolus suggestion" : "Get dose"}
               </Button>
             </CardContent>
           </Card>

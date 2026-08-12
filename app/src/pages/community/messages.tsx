@@ -678,9 +678,6 @@ export default function CommunityMessagesPage() {
             <h1 className="font-display text-[1.65rem] font-bold leading-none tracking-tight text-foreground sm:text-3xl">
               Messages
             </h1>
-            <p className="mt-1.5 text-[13px] leading-snug text-muted-foreground sm:text-sm">
-              Private chats with people on the Feed.
-            </p>
           </div>
           <Button
             variant="ghost"
@@ -722,7 +719,7 @@ export default function CommunityMessagesPage() {
             onChange={(e) => setHandleInput(e.target.value)}
             placeholder="Search or @handle…"
             title="Search your conversations and start new chats by @handle."
-            className="h-11 rounded-2xl border-border/50 bg-muted/20 pl-10 text-[15px] shadow-sm ring-1 ring-border/30"
+            className="h-12 rounded-full border-0 bg-muted/40 pl-10 text-[15px] shadow-none"
             autoCapitalize="none"
             autoCorrect="off"
             spellCheck={false}
@@ -737,7 +734,7 @@ export default function CommunityMessagesPage() {
         {handleInput.trim() ? (
           <div
             id="messages-handle-suggestions"
-            className="space-y-1.5 rounded-lg border border-border/50 bg-muted/20 p-2 dark:bg-muted/15"
+            className="space-y-1 rounded-[1.15rem] border border-border/40 bg-muted/15 p-1.5"
           >
             {suggestLoading ? <p className="px-1 text-xs text-muted-foreground">Searching…</p> : null}
             {suggestError ? <p className="px-1 text-xs text-destructive">{suggestError}</p> : null}
@@ -749,7 +746,7 @@ export default function CommunityMessagesPage() {
                 {suggestions.map((p) => (
                   <li
                     key={p.id}
-                    className="flex items-center gap-2 rounded-md border border-border/40 bg-card/80 px-2 py-1.5 dark:bg-card/60"
+                    className="flex min-h-12 items-center gap-2.5 rounded-xl px-2 py-2"
                   >
                     <CommunityAuthorAvatar
                       displayName={p.name}
@@ -765,7 +762,7 @@ export default function CommunityMessagesPage() {
                       type="button"
                       size="sm"
                       variant="outline"
-                      className="h-7 shrink-0 px-2 text-xs"
+                      className="h-10 shrink-0 rounded-full px-3 text-xs"
                       disabled={starting || !user}
                       onClick={() => void openChatWithUserId(p.id)}
                     >
@@ -797,7 +794,7 @@ export default function CommunityMessagesPage() {
       {loading ? (
         <div className="space-y-2.5" aria-busy="true" aria-label="Loading conversations">
           {Array.from({ length: 6 }, (_, i) => (
-            <Skeleton key={i} className="h-[4.5rem] w-full rounded-2xl" style={{ animationDelay: `${i * 60}ms` }} />
+            <Skeleton key={i} className="h-16 w-full rounded-none" style={{ animationDelay: `${i * 60}ms` }} />
           ))}
         </div>
       ) : threads.length === 0 ? (
@@ -806,14 +803,13 @@ export default function CommunityMessagesPage() {
           title="No conversations yet"
           description="Search a public @handle above to start a chat, or find people on the Feed."
         >
-          <Button variant="secondary" size="sm" asChild className="rounded-xl">
+          <Button variant="secondary" className="h-11 rounded-xl" asChild>
             <Link href="/community">Go to Feed</Link>
           </Button>
           <Button
             variant="outline"
-            size="sm"
             type="button"
-            className="rounded-xl"
+            className="h-11 rounded-xl"
             onClick={() => handleInputRef.current?.focus()}
           >
             Start a chat
@@ -826,7 +822,7 @@ export default function CommunityMessagesPage() {
               Updating…
             </p>
           ) : null}
-        <ul className="space-y-1.5">
+        <ul className="-mx-1 divide-y divide-border/40">
           {filteredThreads.map((t) => {
             const other = user?.id ? otherMemberUserId(t.members, user.id) : null;
             const label = other ? labels[other] ?? shortId(other) : "Chat";
@@ -842,27 +838,25 @@ export default function CommunityMessagesPage() {
 
             return (
               <li key={t.id}>
-                <div
-                  className={cn(
-                    "overflow-hidden rounded-2xl border border-border/45 bg-card/80 shadow-sm ring-1 ring-border/25 transition-colors",
-                    isUnread && "border-primary/25 bg-primary/[0.05] ring-primary/15",
-                  )}
-                >
                   <Link
                     href={`/community/messages/${t.id}`}
-                    className="block"
+                    className={cn(
+                      "block",
+                      isUnread && "bg-primary/[0.04]",
+                    )}
                     onMouseEnter={() => userId && prefetchDmThreadRoute(queryClient, t.id, userId)}
                     onFocus={() => userId && prefetchDmThreadRoute(queryClient, t.id, userId)}
                   >
-                    <div className="pressable flex items-center gap-3 px-3 py-3.5 active:bg-muted/30">
+                    <div className="pressable flex items-center gap-3 px-2 py-3 active:bg-muted/30 sm:px-3">
                       {other ? (
                         <CommunityAuthorAvatar
                           displayName={label}
                           avatarPath={avatarPath}
                           profileHref={`/community/profile/${other}`}
+                          className="!h-12 !w-12"
                         />
                       ) : (
-                        <div className="h-10 w-10 shrink-0 rounded-full bg-muted" aria-hidden />
+                        <div className="h-12 w-12 shrink-0 rounded-full bg-muted" aria-hidden />
                       )}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2">
@@ -879,7 +873,10 @@ export default function CommunityMessagesPage() {
                             <time
                               dateTime={last?.created_at ?? t.updated_at}
                               title={timeTitle}
-                              className="shrink-0 text-[11px] text-muted-foreground tabular-nums"
+                              className={cn(
+                                "shrink-0 text-[11px] tabular-nums",
+                                isUnread ? "font-semibold text-primary" : "text-muted-foreground",
+                              )}
                             >
                               {timeStr}
                             </time>
@@ -895,7 +892,7 @@ export default function CommunityMessagesPage() {
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:text-foreground"
+                            className="h-11 w-11 shrink-0 rounded-full text-muted-foreground hover:text-foreground"
                             aria-label="Conversation actions"
                             onClick={(e) => {
                               e.preventDefault();
@@ -947,7 +944,6 @@ export default function CommunityMessagesPage() {
                       </DropdownMenu>
                     </div>
                   </Link>
-                </div>
               </li>
             );
           })}

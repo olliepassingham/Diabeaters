@@ -10,7 +10,7 @@ export function SettingsRatiosRoute({ ratiosInner }: SettingsRatiosRouteProps) {
   return (
     <SettingsSubPageShell
       title="Ratios"
-      description="TDD, correction factor, targets, and meal ratios."
+      description="How you cover carbs and correct highs."
       actions={<SettingsRatiosInfoDialog />}
     >
       <SettingsPanel id="settings-ratios-tools" className="scroll-mt-24">

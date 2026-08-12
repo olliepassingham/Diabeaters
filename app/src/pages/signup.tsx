@@ -8,7 +8,6 @@ import {
 } from "@/lib/auth";
 import { useAuth } from "@/lib/auth-context";
 import { completeAuthAndNavigate } from "@/lib/auth-post-login";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -18,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getOnboardingAccountPath, hasCarerIntent, hasPendingCarer } from "@/lib/carer-session";
 import { Disclaimer } from "@/components/disclaimer";
 import { PageShell } from "@/components/layout";
+import { FaceLogo } from "@/components/face-logo";
 import {
   authInlineLinkClass,
   authMutedNavLinkClass,
@@ -120,16 +120,17 @@ export default function Signup() {
     <div className="min-h-screen bg-background text-foreground">
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-10 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]">
         <PageShell variant="narrow" className="w-full max-w-md">
-      <Card className="w-full rounded-2xl border-border/60 shadow-sm">
-        <CardHeader className="space-y-1.5">
-          <CardTitle className="text-xl">Create your Diabeaters account</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            {communitySignup
-              ? "Set up your Community Member account to learn, explore, and join the feed."
-              : "One account for your tools, guides, and personalised setup."}
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          <div className="mb-8 flex flex-col items-center gap-3 text-center">
+            <FaceLogo size={56} />
+            <div className="space-y-1">
+              <h1 className="font-display text-3xl font-bold tracking-tight">Create your Diabeaters account</h1>
+              <p className="text-sm text-muted-foreground">
+                {communitySignup ? "Set up your Community Member account" : "One account for your tools and setup"}
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-5 rounded-[1.35rem] border border-border/60 bg-card/70 p-5 shadow-sm">
           {error && (
             <Alert variant="destructive">
               <AlertTitle>Sign up failed</AlertTitle>
@@ -137,8 +138,10 @@ export default function Signup() {
             </Alert>
           )}
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-1">
-              <Label htmlFor="email">Email</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="email" className="text-xs font-medium text-muted-foreground">
+                Email
+              </Label>
               <Input
                 id="email"
                 type="email"
@@ -148,8 +151,10 @@ export default function Signup() {
                 required
               />
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="password">Password</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="password" className="text-xs font-medium text-muted-foreground">
+                Password
+              </Label>
               <div className="relative">
                 <Input
                   id="password"
@@ -200,7 +205,7 @@ export default function Signup() {
             )}
             <Button
               type="submit"
-              className="min-h-12 w-full rounded-xl text-base font-semibold"
+              className="h-12 w-full rounded-xl text-base font-semibold"
               disabled={
                 submitting ||
                 (captchaRequired && !captchaToken) ||
@@ -211,21 +216,21 @@ export default function Signup() {
               {submitting ? "Creating account..." : "Create account"}
             </Button>
           </form>
-          <p className="text-center text-sm text-muted-foreground">
+          </div>
+
+          <p className="pt-5 text-center text-sm text-muted-foreground">
             Already have an account?{" "}
             <Link href="/login" className={authInlineLinkClass}>
               Log in
             </Link>
           </p>
-          <p className="pt-1 text-center">
+          <p className="pt-2 text-center">
             <Link href="/welcome" className={authMutedNavLinkClass}>
               Back to welcome
             </Link>
           </p>
-        </CardContent>
-      </Card>
-      </PageShell>
-    </div>
+        </PageShell>
+      </div>
     </div>
   );
 }

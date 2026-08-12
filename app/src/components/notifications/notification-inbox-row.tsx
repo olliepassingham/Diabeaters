@@ -99,29 +99,29 @@ export function NotificationInboxRow({
         className={cn(
           "flex min-w-0 flex-1 items-start gap-3 text-left outline-none transition-colors",
           "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
-          isPopover ? "rounded-xl px-3 py-3 hover:bg-muted/35" : "px-3 py-3.5 pl-5 sm:px-4 sm:pl-6",
+          isPopover ? "rounded-xl px-3 py-3 hover:bg-muted/35" : "px-3 py-4 pl-5 sm:px-4 sm:pl-6",
           !row.read && !isPopover && "hover:bg-primary/[0.08]",
         )}
         onClick={onOpen}
       >
         {showAvatar ? (
-          <Avatar className="mt-0.5 h-10 w-10 shrink-0 ring-1 ring-border/50">
+          <Avatar className="mt-0.5 h-12 w-12 shrink-0 ring-1 ring-border/50">
             {actor?.avatarUrl ? <AvatarImage src={actor.avatarUrl} alt="" /> : null}
             <AvatarFallback className="text-[11px] font-semibold">{initialsFromDisplayName(primary)}</AvatarFallback>
           </Avatar>
         ) : (
-          <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted/60 ring-1 ring-border/40">
+          <span className="mt-0.5 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-muted/60 ring-1 ring-border/40">
             <KindIcon className="h-4 w-4 text-muted-foreground" aria-hidden />
           </span>
         )}
 
         <span className="min-w-0 flex-1 space-y-0.5">
           <span className="flex items-start justify-between gap-2">
-            <span className={cn("line-clamp-2 text-sm leading-snug text-foreground", !row.read && "font-semibold")}>
+            <span className={cn("line-clamp-2 text-[15px] leading-snug text-foreground", !row.read && "font-semibold")}>
               {primary}
             </span>
             {when ? (
-              <span className="shrink-0 pt-0.5 text-[10px] tabular-nums text-muted-foreground">{when}</span>
+              <span className="shrink-0 pt-0.5 text-[11px] tabular-nums text-muted-foreground">{when}</span>
             ) : null}
           </span>
           {subtitle ? (
@@ -146,7 +146,7 @@ export function NotificationInboxRow({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 rounded-full text-muted-foreground opacity-80 hover:opacity-100"
+                className="h-11 w-11 rounded-full text-muted-foreground opacity-80 hover:opacity-100"
                 aria-label="Notification actions"
                 onClick={(e) => e.stopPropagation()}
               >

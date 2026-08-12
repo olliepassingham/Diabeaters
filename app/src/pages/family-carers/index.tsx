@@ -159,7 +159,7 @@ function AvatarBubble({
   const { displayUrl } = useResolvedProfileImageUrl(avatarUrl);
   return (
     <div
-      className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-sm font-medium text-primary"
+      className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-sm font-medium text-primary"
       aria-label={`${label} avatar`}
     >
       {displayUrl ? <img src={displayUrl} alt="" className="h-full w-full object-cover" /> : initials}
@@ -315,7 +315,7 @@ export default function FamilyCarersPage() {
             Family &amp; supporters
           </span>
         }
-        description="Invite people you trust to a read-only view you control."
+        description="Invite people you trust."
         actions={
           <InfoTooltip
             term="Family & supporters"
@@ -398,7 +398,7 @@ export default function FamilyCarersPage() {
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="shrink-0 text-muted-foreground"
+                          className="h-11 shrink-0 rounded-xl text-muted-foreground"
                           onClick={() => handleRemove(link.id)}
                           aria-label={`Remove ${label} from linked supporters`}
                         >
@@ -443,7 +443,7 @@ export default function FamilyCarersPage() {
             />
             <Button
               type="button"
-              className="w-full sm:w-auto"
+              className="h-12 w-full rounded-xl text-base font-semibold"
               onClick={handleGenerateInvite}
               disabled={generating || !configured}
               data-testid="invite-generate"
@@ -453,21 +453,20 @@ export default function FamilyCarersPage() {
             </Button>
 
             {activeInvite && (
-              <div className="space-y-3 rounded-xl border border-border/50 bg-muted/30 p-4">
+              <div className="space-y-3 rounded-[1.35rem] border border-border/50 bg-muted/25 p-4">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Active code</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Active code</p>
                   <p className="text-xs text-muted-foreground">
                     Expires {format(new Date(activeInvite.expiresAt), "d MMM yyyy")}
                   </p>
                 </div>
-                <p className="font-mono text-2xl font-semibold tracking-widest" data-testid="invite-code">
+                <p className="font-mono text-4xl font-bold tracking-[0.18em] text-foreground" data-testid="invite-code">
                   {activeInvite.code}
                 </p>
                 <Button
                   type="button"
                   variant="outline"
-                  size="sm"
-                  className="gap-2"
+                  className="h-11 w-full gap-2 rounded-xl"
                   data-testid="invite-copy"
                   onClick={() => handleCopyCode(activeInvite.code)}
                   aria-label="Copy invite code"
@@ -506,7 +505,7 @@ export default function FamilyCarersPage() {
                         : item.descriptionDefault
                       : item.description;
                   return (
-                    <div key={item.key} className="flex items-center justify-between gap-3 px-3.5 py-3.5 sm:px-4">
+                    <div key={item.key} className="flex min-h-14 items-center justify-between gap-3 px-3.5 py-3.5 sm:px-4">
                       <div className="flex min-w-0 flex-1 items-center gap-0.5">
                         <Label htmlFor={item.testId} className="cursor-pointer text-sm font-medium leading-tight">
                           {item.label}
@@ -595,7 +594,7 @@ export default function FamilyCarersPage() {
               <p className="text-muted-foreground">You have not added emergency contact details yet.</p>
             )}
           </div>
-          <Button variant="outline" size="sm" asChild>
+          <Button variant="outline" className="h-11 rounded-xl" asChild>
             <Link href="/account#account-emergency">Edit in Account</Link>
           </Button>
         </SettingsPanelBody>

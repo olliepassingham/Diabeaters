@@ -4,7 +4,6 @@ import { Activity, Loader2, Minus, Moon, RefreshCw, Settings2, TrendingDown, Tre
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CgmGlucoseChart } from "@/components/cgm-glucose-chart";
 import { CgmSuggestedHypoCard } from "@/components/cgm-suggested-hypo-card";
 import { CgmWindowSummaryStrip } from "@/components/cgm-window-summary-strip";
@@ -120,7 +119,7 @@ export default function CgmLivePage() {
         <Alert>
           <AlertDescription className="text-sm space-y-3">
             <p>{liveCgmConnectMessage()}</p>
-            <Button asChild size="sm" data-testid="button-cgm-live-open-settings">
+            <Button asChild className="h-11 rounded-xl" data-testid="button-cgm-live-open-settings">
               <Link href="/settings/cgm">
                 <Settings2 className="mr-2 h-4 w-4" aria-hidden />
                 Open CGM settings
@@ -134,57 +133,31 @@ export default function CgmLivePage() {
         <CgmSuggestedHypoCard points={history24h.points} targetLow={targetLow} units={units} />
       ) : null}
 
-      <Card className={cn("overflow-hidden rounded-2xl shadow-none", latestStatus ? glucoseRangeCardClasses(latestStatus) : undefined)}>
-        <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-2">
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <CardTitle className="text-base font-medium text-muted-foreground">Now</CardTitle>
-              {latestStatus ? (
-                <Badge
-                  variant="secondary"
-                  className="rounded-full border-0 bg-background/60 text-xs font-medium"
-                  data-testid="cgm-live-range-status"
-                >
-                  {glucoseRangeStatusLabel(latestStatus)}
-                </Badge>
-              ) : null}
-            </div>
-            {loading && !latest ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                Loading…
-              </div>
-            ) : latest ? (
-              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                <p
-                  className={cn(
-                    "text-3xl font-semibold tabular-nums tracking-tight",
-                    latestStatus ? glucoseRangeValueClasses(latestStatus) : undefined,
-                  )}
-                  data-testid="cgm-live-current-value"
-                >
-                  {formatTargetBgInput(latest.value, units)}{" "}
-                  <span className="text-lg font-medium text-muted-foreground">{units}</span>
-                </p>
-                {TrendIcon && latest.trend ? (
-                  <span className="inline-flex items-center gap-1 text-sm capitalize text-muted-foreground">
-                    <TrendIcon className="h-4 w-4" aria-hidden />
-                    {latest.trend}
-                  </span>
-                ) : null}
-                <span className="text-xs text-muted-foreground">
-                  {sourceLabel ?? "CGM"} · {formatAgeMinutes(Math.max(0, Math.floor((Date.now() - latest.timeMs) / 60_000)))} ago
-                </span>
-              </div>
+      <section
+        className={cn(
+          "relative overflow-hidden rounded-[1.35rem] border p-5 shadow-none",
+          latestStatus ? glucoseRangeCardClasses(latestStatus) : "border-border/60 bg-card",
+        )}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 space-y-1">
+            {latestStatus ? (
+              <Badge
+                variant="secondary"
+                className="rounded-full border-0 bg-background/60 text-xs font-medium"
+                data-testid="cgm-live-range-status"
+              >
+                {glucoseRangeStatusLabel(latestStatus)}
+              </Badge>
             ) : (
-              <p className="text-sm text-muted-foreground">No recent reading</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Now</p>
             )}
           </div>
           <Button
             type="button"
-            variant="outline"
+            variant="ghost"
             size="icon"
-            className="h-9 w-9 shrink-0"
+            className="h-11 w-11 shrink-0 rounded-xl"
             onClick={refresh}
             disabled={loading || !connected}
             aria-label="Refresh glucose chart"
@@ -192,32 +165,74 @@ export default function CgmLivePage() {
           >
             <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} aria-hidden />
           </Button>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-wrap gap-2" role="tablist" aria-label="Chart time range">
+        </div>
+
+        {loading && !latest ? (
+          <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+            Loading…
+          </div>
+        ) : latest ? (
+          <div className="mt-3 space-y-2">
+            <p
+              className={cn(
+                "font-display text-6xl font-bold tabular-nums tracking-tight leading-none",
+                latestStatus ? glucoseRangeValueClasses(latestStatus) : undefined,
+              )}
+              data-testid="cgm-live-current-value"
+            >
+              {formatTargetBgInput(latest.value, units)}{" "}
+              <span className="text-xl font-semibold text-muted-foreground">{units}</span>
+            </p>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+              {TrendIcon && latest.trend ? (
+                <span className="inline-flex items-center gap-1 capitalize">
+                  <TrendIcon className="h-4 w-4" aria-hidden />
+                  {latest.trend}
+                </span>
+              ) : null}
+              <span>
+                {sourceLabel ?? "CGM"} · {formatAgeMinutes(Math.max(0, Math.floor((Date.now() - latest.timeMs) / 60_000)))} ago
+              </span>
+            </div>
+          </div>
+        ) : (
+          <p className="mt-4 text-sm text-muted-foreground">No recent reading</p>
+        )}
+      </section>
+
+      <section className="space-y-4 overflow-hidden rounded-[1.35rem] border border-border/50 bg-card/80 p-4 shadow-none">
+          <div
+            className="grid grid-cols-3 gap-1 rounded-2xl bg-muted/35 p-1"
+            role="tablist"
+            aria-label="Chart time range"
+          >
             {CGM_HISTORY_RANGES.map((option) => (
               <Button
                 key={option.id}
                 type="button"
                 size="sm"
-                variant={range === option.id ? "default" : "outline"}
-                className="h-8 rounded-full px-3 text-xs"
+                variant="ghost"
+                className={cn(
+                  "h-10 rounded-xl px-2 text-sm font-medium",
+                  range === option.id
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
                 onClick={() => setRange(option.id)}
                 data-testid={`button-cgm-range-${option.id}`}
               >
-                {option.label}
+                {option.id}
               </Button>
             ))}
           </div>
 
-          <div className="space-y-2">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Highlight</p>
-            <div className="flex flex-wrap gap-2" role="group" aria-label="Chart highlights">
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Chart highlights">
               <Button
                 type="button"
                 size="sm"
                 variant={highlightSleep ? "default" : "outline"}
-                className="h-8 rounded-full px-3 text-xs gap-1.5"
+                className="h-9 rounded-full px-3 text-xs gap-1.5"
                 onClick={() => setHighlightSleep((v) => !v)}
                 data-testid="button-cgm-highlight-sleep"
               >
@@ -228,14 +243,13 @@ export default function CgmLivePage() {
                 type="button"
                 size="sm"
                 variant={highlightExercise ? "default" : "outline"}
-                className="h-8 rounded-full px-3 text-xs gap-1.5"
+                className="h-9 rounded-full px-3 text-xs gap-1.5"
                 onClick={() => setHighlightExercise((v) => !v)}
                 data-testid="button-cgm-highlight-exercise"
               >
                 <Dumbbell className="h-3.5 w-3.5" aria-hidden />
                 Exercise
               </Button>
-            </div>
           </div>
 
           {error ? (
@@ -347,8 +361,7 @@ export default function CgmLivePage() {
               Loading chart…
             </div>
           ) : null}
-        </CardContent>
-      </Card>
+      </section>
 
       <div className="flex items-start gap-2 rounded-xl border border-border/60 bg-muted/20 px-3 py-2.5 text-xs text-muted-foreground">
         <Activity className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />

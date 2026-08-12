@@ -9,11 +9,11 @@ import { cn } from "@/lib/utils";
 
 /** Shared surface for home dashboard cards (hero, setup, widgets). */
 export const homeDashboardCardClass =
-  "dashboard-card-hover animate-soft-in overflow-hidden rounded-2xl border border-primary/18 bg-gradient-to-br from-primary-light/80 via-primary-light/45 to-primary/[0.08] shadow-none dark:border-primary/24 dark:from-primary-light/30 dark:via-primary-light/15 dark:to-primary/[0.08]";
+  "dashboard-card-hover animate-soft-in overflow-hidden rounded-[1.35rem] border border-primary/18 bg-gradient-to-br from-primary-light/80 via-primary-light/45 to-primary/[0.08] shadow-none dark:border-primary/24 dark:from-primary-light/30 dark:via-primary-light/15 dark:to-primary/[0.08]";
 
 /** Warm setup / onboarding card tint — single hairline, no ring+glow stack. */
 export const homeSetupCardClass =
-  "dashboard-card-hover animate-soft-in overflow-hidden rounded-2xl border border-amber-400/40 bg-gradient-to-br from-amber-50/90 via-amber-100/45 to-primary-light/55 shadow-none dark:border-amber-500/30 dark:from-amber-950/35 dark:via-amber-950/18 dark:to-primary-light/10";
+  "dashboard-card-hover animate-soft-in overflow-hidden rounded-[1.35rem] border border-amber-400/40 bg-gradient-to-br from-amber-50/90 via-amber-100/45 to-primary-light/55 shadow-none dark:border-amber-500/30 dark:from-amber-950/35 dark:via-amber-950/18 dark:to-primary-light/10";
 
 /** Compact metadata pill used for dates, counts, and setup progress. */
 export function HomeMetaBadge({

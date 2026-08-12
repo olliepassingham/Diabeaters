@@ -7,7 +7,6 @@ import { chatThreadScrollClasses } from "@/components/chat-thread-scenery";
 import { PageBackButton, PageHeader } from "@/components/layout";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth-context";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
@@ -17,7 +16,7 @@ import { getSupabase } from "@/lib/supabase";
 import { storage, isCommunityAccountProfile } from "@/lib/storage";
 import { useProfile } from "@/lib/profile";
 import { getAgeBand } from "@/lib/user-age";
-import { acceptAiCoachConsent, AI_COACH_CONSENT_VERSION, fetchAiCoachConsentAt } from "@/lib/ai-coach/consent";
+import { acceptAiCoachConsent, fetchAiCoachConsentAt } from "@/lib/ai-coach/consent";
 import { sendCoachMessage, AiCoachHttpError } from "@/lib/ai-coach/client";
 import { captureAiCoachSendFailure } from "@/observability/sentry";
 import type { CoachAudience, CoachResponse, CoachTurn } from "@/lib/ai-coach/types";
@@ -482,18 +481,15 @@ export default function CoachPage() {
     return describeCoachProfileVisibility();
   }, [isSupporter]);
 
-  const headerDescription = isSupporter ? (
-    "Education for supporters — UK type 1 diabetes"
-  ) : (
-    <span className="block space-y-1">
-      <span>Education & clinic-prep — UK type 1 diabetes</span>
-      {profileVisibility ? (
-        <span className="block text-[11px] font-normal leading-snug text-muted-foreground" data-testid="coach-profile-visibility">
-          {profileVisibility}
-        </span>
-      ) : null}
-    </span>
-  );
+  const headerDescription =
+    !isSupporter && profileVisibility ? (
+      <span
+        className="block text-[11px] font-normal leading-snug text-muted-foreground"
+        data-testid="coach-profile-visibility"
+      >
+        {profileVisibility}
+      </span>
+    ) : undefined;
 
   const topicHint = useMemo(() => {
     if (effectiveTopic === "general") return null;
@@ -507,14 +503,12 @@ export default function CoachPage() {
     return (
       <div className="mx-auto flex h-full min-h-0 w-full max-w-lg flex-col bg-background px-4 py-3 sm:px-5">
         <PageHeader title={pageTitle} leading={<PageBackButton />} />
-        <Card className="mt-3 border-border/60">
-          <CardContent className="flex gap-3 pt-6">
+        <div className="mt-3 rounded-[1.35rem] border border-border/50 bg-card/40 p-4 shadow-sm">
+          <p className="flex gap-3 text-sm leading-relaxed text-muted-foreground">
             <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              Sign in to chat with {AI_ASSISTANT_NAME}.
-            </p>
-          </CardContent>
-        </Card>
+            Sign in to chat with {AI_ASSISTANT_NAME}.
+          </p>
+        </div>
       </div>
     );
   }
@@ -523,12 +517,10 @@ export default function CoachPage() {
     return (
       <div className="mx-auto flex h-full min-h-0 w-full max-w-lg flex-col bg-background px-4 py-3 sm:px-5">
         <PageHeader title={pageTitle} leading={<PageBackButton />} />
-        <Card className="mt-3 border-border/60">
-          <CardContent className="flex items-center gap-2 pt-6 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
-            Loading…
-          </CardContent>
-        </Card>
+        <div className="mt-3 flex items-center gap-2 rounded-[1.35rem] border border-border/50 bg-card/40 px-4 py-4 text-sm text-muted-foreground shadow-sm">
+          <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+          Loading…
+        </div>
       </div>
     );
   }
@@ -551,14 +543,11 @@ export default function CoachPage() {
             "min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain px-4 py-3 sm:px-5",
           )}
         >
-          <Card className="border-border/60 shadow-sm">
-            <CardHeader>
-              <CardTitle>Before you start</CardTitle>
-              <CardDescription>Consent version {AI_COACH_CONSENT_VERSION}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4 text-sm text-muted-foreground">
+          <div className="space-y-4 rounded-[1.35rem] border border-border/50 bg-card/40 p-4 shadow-sm sm:p-5">
+            <h2 className="font-display text-xl font-semibold tracking-tight text-foreground">Before you start</h2>
+            <div className="space-y-4 text-sm leading-relaxed text-muted-foreground">
               {consentStep === 0 ? (
-                <ul className="list-disc space-y-2 pl-5">
+                <ul className="list-disc space-y-2.5 pl-5">
                   <li>
                     {AI_ASSISTANT_NAME} explains concepts and helps you prepare questions for your care team.
                   </li>
@@ -585,13 +574,13 @@ export default function CoachPage() {
                 </ul>
               ) : (
                 <>
-                  <Alert className="border-border/60 bg-muted/20">
+                  <Alert className="rounded-[1.15rem] border-border/60 bg-muted/20">
                     <Info className="h-4 w-4" aria-hidden />
                     <AlertTitle className="text-foreground">How replies are generated</AlertTitle>
                     <AlertDescription className="text-muted-foreground">{intro}</AlertDescription>
                   </Alert>
                   {acceptMutation.isError ? (
-                    <Alert variant="destructive">
+                    <Alert variant="destructive" className="rounded-[1.15rem]">
                       <AlertTitle>Could not save consent</AlertTitle>
                       <AlertDescription>
                         {acceptMutation.error instanceof Error
@@ -602,8 +591,8 @@ export default function CoachPage() {
                   ) : null}
                 </>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
         <div
           className="z-10 shrink-0 border-t border-border/50 bg-background/95 px-4 pt-3 backdrop-blur-xl sm:px-5 pb-[calc(var(--bottom-nav-height,7.5rem)+var(--keyboard-inset-bottom,0px)+0.5rem)]"
@@ -612,17 +601,17 @@ export default function CoachPage() {
           {consentStep === 0 ? (
             <Button
               type="button"
-              className="w-full sm:w-auto"
+              className="h-12 w-full rounded-xl text-base font-semibold"
               onClick={() => setConsentStep(1)}
               data-testid="button-coach-consent-continue"
             >
               Continue
             </Button>
           ) : (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-col gap-2">
               <Button
                 type="button"
-                className="min-w-[10rem] flex-1 sm:flex-none"
+                className="h-12 w-full rounded-xl text-base font-semibold"
                 onClick={() => void acceptMutation.mutateAsync()}
                 disabled={acceptMutation.isPending}
                 data-testid="button-coach-consent-agree"
@@ -639,6 +628,7 @@ export default function CoachPage() {
               <Button
                 type="button"
                 variant="outline"
+                className="h-12 w-full rounded-xl"
                 onClick={() => setConsentStep(0)}
                 data-testid="button-coach-consent-back"
               >
@@ -719,8 +709,8 @@ export default function CoachPage() {
               className={cn(
                 "max-w-[90%] text-[15px] leading-relaxed shadow-sm",
                 m.role === "user"
-                  ? "ml-auto self-end rounded-[1.25rem] rounded-br-md bg-primary px-3.5 py-2.5 text-primary-foreground"
-                  : "mr-auto self-start rounded-[1.25rem] rounded-bl-md border border-border/40 bg-card px-3.5 py-2.5 text-card-foreground",
+                  ? "ml-auto self-end rounded-[1.15rem] rounded-br-[0.4rem] bg-primary px-3.5 py-2.5 text-primary-foreground"
+                  : "mr-auto self-start rounded-[1.15rem] rounded-bl-[0.4rem] bg-muted px-3.5 py-2.5 text-foreground",
               )}
             >
               <p className="whitespace-pre-wrap">{m.content}</p>
@@ -728,7 +718,7 @@ export default function CoachPage() {
           ))}
 
           {sendMutation.isPending ? (
-            <div className="mr-auto flex max-w-[90%] items-center gap-2 rounded-[1.25rem] rounded-bl-md border border-border/40 bg-card/80 px-3.5 py-2.5 text-sm text-muted-foreground">
+            <div className="mr-auto flex max-w-[90%] items-center gap-2 rounded-[1.15rem] rounded-bl-[0.4rem] bg-muted px-3.5 py-2.5 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
               <span>{AI_ASSISTANT_NAME} is thinking…</span>
             </div>
@@ -746,7 +736,7 @@ export default function CoachPage() {
                   key={`${a.href}-${a.label}`}
                   type="button"
                   variant="secondary"
-                  className="h-auto min-h-10 w-full justify-between gap-2 rounded-xl px-3 py-2.5 text-left text-xs font-normal"
+                  className="h-auto min-h-11 w-full justify-between gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-normal"
                   asChild
                 >
                   <Link href={a.href} className="flex w-full min-w-0 items-center gap-2">
@@ -804,7 +794,7 @@ export default function CoachPage() {
               type="button"
               size="icon"
               className={cn(
-                "h-10 w-10 shrink-0 rounded-full transition-all",
+                "h-11 w-11 shrink-0 rounded-full transition-all",
                 draft.trim() ? "shadow-md" : "opacity-50",
               )}
               onClick={() => void onSend()}
