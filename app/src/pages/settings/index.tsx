@@ -201,7 +201,7 @@ function ProfileTab({
           />
         </div>
       ) : null}
-      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:gap-3">
+      <div className="grid grid-cols-1 gap-3">
         <div className="space-y-1.5">
           <Label htmlFor="bg-units">Blood Glucose Units</Label>
           <Select value={bgUnits} onValueChange={setBgUnits}>

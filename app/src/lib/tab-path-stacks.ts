@@ -1,7 +1,8 @@
 /**
  * Per-tab path stacks for bottom navigation (Tools / Guides / Community / Home / Account).
  * Remembers the last nested route so switching tabs restores depth instead of always
- * wiping to the hub. Re-tapping the active tab’s hub resets that stack.
+ * wiping to the hub — except Guides, Tools, and Account, which always open their hub.
+ * Re-tapping the active tab’s hub resets that stack.
  */
 
 const STORAGE_KEY = "diabeater:tab-path-stacks:v1";
@@ -133,8 +134,8 @@ export function resolveTabNavigationTarget(tabHref: string, currentPathname: str
 
   const currentId = tabStackIdForPath(current);
 
-  // Guides / Tools: always open the hub list (never restore a nested drill-down).
-  if (destIdResolved === "scenarios" || destIdResolved === "tools") {
+  // Guides / Tools / Account: always open the hub (never restore a nested drill-down).
+  if (destIdResolved === "scenarios" || destIdResolved === "tools" || destIdResolved === "account") {
     if (currentId && currentId !== destIdResolved) {
       rememberTabPath(current);
     }

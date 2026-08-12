@@ -372,7 +372,12 @@ export default function Account() {
     activeMode === "carer" ? "Switch to User Mode" : "Switch to Supporter Mode";
 
   useEffect(() => {
-    setAccountTab(accountTabFromHash(typeof window !== "undefined" ? window.location.hash : ""));
+    const syncTabFromHash = () => {
+      setAccountTab(accountTabFromHash(typeof window !== "undefined" ? window.location.hash : ""));
+    };
+    syncTabFromHash();
+    window.addEventListener("hashchange", syncTabFromHash);
+    return () => window.removeEventListener("hashchange", syncTabFromHash);
   }, [location]);
 
   useEffect(() => {
@@ -634,17 +639,17 @@ export default function Account() {
           data-testid="account-page-tabs"
         >
           <h1 className="sr-only">Account</h1>
-          <TabsList className="grid h-10 w-full grid-cols-2 rounded-full bg-muted/50 p-0.5 dark:bg-muted/35">
+          <TabsList className="grid h-11 w-full grid-cols-2 rounded-xl bg-muted/45 p-1 dark:bg-muted/30">
             <TabsTrigger
               value="account"
-              className="rounded-full text-xs font-medium sm:text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              className="rounded-lg text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm"
               data-testid="account-tab-account"
             >
               Account
             </TabsTrigger>
             <TabsTrigger
               value="public"
-              className="rounded-full text-xs font-medium sm:text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              className="rounded-lg text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm"
               data-testid="account-tab-public"
             >
               Public profile

@@ -417,14 +417,18 @@ export function BottomNav() {
             onTouchStart={warmPrefetch}
             onClick={(e) => {
               if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-              if (tab.href === pathname) {
-                e.preventDefault();
-                return;
-              }
               e.preventDefault();
-              void hapticLight();
               const target = resolveTabNavigationTarget(tab.href, pathname);
+              const currentHash = typeof window !== "undefined" ? window.location.hash : "";
+              const alreadyOnHub =
+                target === pathname && (tab.href !== "/account" || currentHash === "" || currentHash === "#");
+              if (alreadyOnHub) return;
+              void hapticLight();
               navigateWithViewTransition(setLocation, target);
+              if (tab.href === "/account" && typeof window !== "undefined" && window.location.hash) {
+                window.history.replaceState(null, "", "/account");
+                window.dispatchEvent(new HashChangeEvent("hashchange"));
+              }
             }}
           >
             <tab.icon

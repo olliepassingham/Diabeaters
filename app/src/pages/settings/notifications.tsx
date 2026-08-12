@@ -153,7 +153,7 @@ export function NotificationsTab({
                   {mmolToDisplayBg(DEFAULT_SUPPORTER_LIVE_GLUCOSE_ALERT_HIGH_MMOL, bgUnits)} {bgUnits}.
                   You&apos;ll only get one check-in per high or low — not a stream of repeats while levels stay there.
                 </p>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3">
                   <div className="space-y-2">
                     <Label htmlFor="supporter-live-bg-alert-low" className="text-xs font-medium text-muted-foreground">
                       Alert below ({bgUnits})

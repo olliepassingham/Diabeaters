@@ -437,7 +437,7 @@ export default function HypoHelpPage() {
             ) : null}
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-3">
             <div className="space-y-1.5">
               <Label htmlFor="target-bg" className="text-xs text-muted-foreground">
                 Target ({bgUnits})
@@ -454,7 +454,7 @@ export default function HypoHelpPage() {
                   setTargetPrefilledFromRange(false);
                   setHypoResult(null);
                 }}
-                className="h-11 tabular-nums"
+                className="h-12 tabular-nums"
                 data-testid="input-target-bg"
               />
               {targetPrefilledFromRange ? (

@@ -554,7 +554,7 @@ export default function Appointments() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3">
                 <div className="space-y-2">
                   <Label htmlFor="date">Date</Label>
                   <Input

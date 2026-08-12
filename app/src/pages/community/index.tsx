@@ -713,16 +713,16 @@ export default function CommunityHomePage() {
           }}
           className="w-full"
         >
-          <TabsList className="grid h-10 w-full grid-cols-2 rounded-full bg-muted/40 p-1 dark:bg-muted/30">
+          <TabsList className="grid h-11 w-full grid-cols-2 rounded-xl bg-muted/45 p-1 dark:bg-muted/30">
             <TabsTrigger
               value="following"
-              className="rounded-full text-xs font-semibold sm:text-sm data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+              className="rounded-lg text-sm font-medium data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
             >
               Following
             </TabsTrigger>
             <TabsTrigger
               value="everyone"
-              className="rounded-full text-xs font-semibold sm:text-sm data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+              className="rounded-lg text-sm font-medium data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
             >
               Everyone
             </TabsTrigger>

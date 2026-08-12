@@ -45,6 +45,14 @@ describe("tab-path-stacks", () => {
     expect(resolveTabNavigationTarget("/tools", "/tools/cgm-live")).toBe("/tools");
   });
 
+  it("Account tab always opens the account hub even when a nested page was remembered", () => {
+    rememberTabPath("/settings");
+    expect(resolveTabNavigationTarget("/account", "/")).toBe("/account");
+    expect(resolveTabNavigationTarget("/account", "/settings")).toBe("/account");
+    expect(resolveTabNavigationTarget("/account", "/family-carers")).toBe("/account");
+    expect(resolveTabNavigationTarget("/account", "/mode")).toBe("/account");
+  });
+
   it("hubHrefForTabStack matches bottom nav hubs", () => {
     expect(hubHrefForTabStack("tools")).toBe("/tools");
     expect(hubHrefForTabStack("scenarios")).toBe("/scenarios");

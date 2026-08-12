@@ -197,37 +197,45 @@ export default function CorrectionHelpPage() {
         </Alert>
       )}
 
-      <Card data-testid="card-correction-calculator">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-h3 flex items-center gap-2">
+      <Card className="overflow-hidden rounded-[1.35rem] border-border/50 shadow-none" data-testid="card-correction-calculator">
+        <CardHeader className="px-4 pb-3 pt-4">
+          <CardTitle className="flex items-center gap-2 font-display text-lg font-semibold tracking-tight">
             <Calculator className="h-5 w-5 text-primary" />
             Correction estimate
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 px-4 pb-4">
           {!hasValidIsf ? (
-            <Alert className="border-amber-200 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/25">
+            <Alert className="rounded-xl border-amber-200 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/25">
               <AlertDescription className="text-sm space-y-3">
                 <p>Add a correction factor (ISF) in Ratios to see a dose estimate.</p>
-                <Button asChild size="sm" data-testid="button-correction-open-ratios">
+                <Button asChild className="h-11 w-full rounded-xl" data-testid="button-correction-open-ratios">
                   <Link href="/settings/ratios">Open Ratios</Link>
                 </Button>
               </AlertDescription>
             </Alert>
           ) : (
             <>
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="correction-bg">Current BG ({unitLabel})</Label>
-                  <Input
-                    id="correction-bg"
-                    type="text"
-                    inputMode="decimal"
-                    placeholder={bgUnits === "mg/dL" ? "e.g., 180" : "e.g., 10.5"}
-                    value={bgInput}
-                    onChange={(e) => correctionCgm.onBgChange(e.target.value)}
-                    data-testid="input-correction-bg"
-                  />
+                  <Label htmlFor="correction-bg" className="text-xs font-medium text-muted-foreground">
+                    Current BG
+                  </Label>
+                  <div className="flex items-stretch gap-2">
+                    <Input
+                      id="correction-bg"
+                      type="text"
+                      inputMode="decimal"
+                      placeholder={bgUnits === "mg/dL" ? "180" : "10.5"}
+                      value={bgInput}
+                      onChange={(e) => correctionCgm.onBgChange(e.target.value)}
+                      className="h-12 flex-1 rounded-xl text-xl font-semibold tabular-nums tracking-tight"
+                      data-testid="input-correction-bg"
+                    />
+                    <span className="flex min-w-[4.5rem] items-center justify-center rounded-xl border border-border/60 bg-muted/40 px-3 text-sm font-semibold text-muted-foreground">
+                      {unitLabel}
+                    </span>
+                  </div>
                   <CgmPrefillButton
                     prefill={correctionCgm.prefill}
                     loading={correctionCgm.loading}
@@ -241,26 +249,27 @@ export default function CorrectionHelpPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="correction-target">
-                    Correction target ({unitLabel}){" "}
-                    <span className="text-muted-foreground font-normal">(optional)</span>
+                  <Label htmlFor="correction-target" className="text-xs font-medium text-muted-foreground">
+                    Target
                   </Label>
                   <Input
                     id="correction-target"
                     type="text"
                     inputMode="decimal"
-                    placeholder={`Default ${defaultTarget}`}
+                    placeholder={`${defaultTarget}`}
                     value={targetOverride}
                     onChange={(e) => setTargetOverride(e.target.value)}
+                    className="h-12 rounded-xl tabular-nums"
                     data-testid="input-correction-target"
                   />
-                  <p className="text-xs text-muted-foreground">Leave blank to use {defaultTarget} {unitLabel}.</p>
                 </div>
               </div>
 
-              <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-                <span className="font-medium text-foreground">ISF (from settings):</span>{" "}
-                {correctionFactor} {unitLabel} per 1 unit
+              <div className="rounded-xl border border-border/50 bg-muted/40 px-3.5 py-2.5 text-sm">
+                <span className="font-semibold text-foreground">ISF</span>
+                <span className="ml-2 font-semibold tabular-nums text-foreground">
+                  {correctionFactor} {unitLabel}/u
+                </span>
               </div>
 
               {parsedBg != null && result && (

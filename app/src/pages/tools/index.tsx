@@ -450,7 +450,7 @@ export function ToolsHubPage({
             </div>
             <ToolsAboutDialog hubVariant={hubVariant} />
           </div>
-          <ul className="grid list-none grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-2" aria-label="Supporter tools">
+          <ul className="grid list-none grid-cols-1 gap-3 md:grid-cols-2 md:gap-5" aria-label="Supporter tools">
             {supporterTools.map((t, idx) => (
               <li
                 key={t.id}
@@ -474,7 +474,7 @@ export function ToolsHubPage({
                 <ToolsAboutDialog hubVariant={hubVariant} />
               </div>
               <ul
-                className="grid list-none grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 lg:gap-6"
+                className="grid list-none grid-cols-1 gap-3 md:grid-cols-2 md:gap-5"
                 aria-label="Act now"
               >
                 {actNow.map((t, idx) => (
@@ -493,7 +493,7 @@ export function ToolsHubPage({
                 <SectionHeader title="Plan" />
               </div>
               <ul
-                className="grid list-none grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 lg:gap-6"
+                className="grid list-none grid-cols-1 gap-3 md:grid-cols-2 md:gap-5"
                 aria-label="Plan"
               >
                 {plan.map((t, idx) => (
