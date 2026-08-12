@@ -68,6 +68,50 @@ export function exerciseSessionSignature(
   return session.exerciseType;
 }
 
+function normalizeExerciseName(name: string | undefined | null): string {
+  return (name ?? "").trim().toLowerCase();
+}
+
+function exerciseNamesMatch(a: string | undefined | null, b: string | undefined | null): boolean {
+  const na = normalizeExerciseName(a);
+  const nb = normalizeExerciseName(b);
+  if (!na || !nb) return false;
+  if (na === "exercise" || nb === "exercise") return false;
+  return na === nb || na.includes(nb) || nb.includes(na);
+}
+
+type SavedExerciseRoutineRef = {
+  exerciseType: ExerciseType;
+  intensity: ExerciseIntensity;
+  name: string;
+};
+
+/**
+ * True when a completed session is already covered by a saved routine template —
+ * used to hide duplicate "Recent workouts" rows on the Routines page.
+ */
+export function recentSessionCoveredBySavedRoutine(
+  session: Pick<RepeatableExerciseSession, "exerciseType" | "intensity" | "exerciseName">,
+  routines: SavedExerciseRoutineRef[],
+): boolean {
+  const sessionName = normalizeExerciseName(session.exerciseName);
+  const sessionNameMissing = !sessionName || sessionName === "exercise";
+
+  return routines.some((routine) => {
+    if (routine.exerciseType !== session.exerciseType) return false;
+    if (exerciseNamesMatch(session.exerciseName, routine.name)) return true;
+    // Unnamed / generic sessions: same type + intensity is enough to treat as covered.
+    if (sessionNameMissing && routine.intensity === session.intensity) return true;
+    return false;
+  });
+}
+
+export function filterRecentSessionsWithoutSavedRoutine<
+  T extends Pick<RepeatableExerciseSession, "exerciseType" | "intensity" | "exerciseName">,
+>(sessions: T[], routines: SavedExerciseRoutineRef[]): T[] {
+  return sessions.filter((session) => !recentSessionCoveredBySavedRoutine(session, routines));
+}
+
 /**
  * Recent unique completed sessions for quick restart (one per exercise type, newest first).
  */

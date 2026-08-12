@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { findLastRepeatableExerciseSession, listRecentRepeatableExerciseSessions } from "@/lib/exercise-session-repeat";
+import {
+  filterRecentSessionsWithoutSavedRoutine,
+  findLastRepeatableExerciseSession,
+  listRecentRepeatableExerciseSessions,
+  recentSessionCoveredBySavedRoutine,
+} from "@/lib/exercise-session-repeat";
 import type { ExerciseOutcome, LastExerciseSummary } from "@/lib/storage";
 
 describe("findLastRepeatableExerciseSession", () => {
@@ -116,5 +121,63 @@ describe("listRecentRepeatableExerciseSessions", () => {
     const recent = listRecentRepeatableExerciseSessions({ outcomes, limit: 5 });
     expect(recent.map((s) => s.id)).toEqual(["tennis-90", "golf"]);
     expect(recent[0]?.durationMinutes).toBe(90);
+  });
+});
+
+describe("recentSessionCoveredBySavedRoutine", () => {
+  it("treats same name + type as covered", () => {
+    expect(
+      recentSessionCoveredBySavedRoutine(
+        { exerciseType: "strength", intensity: "moderate", exerciseName: "Gym" },
+        [{ exerciseType: "strength", intensity: "moderate", name: "Gym" }],
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps a differently named session of the same type", () => {
+    expect(
+      recentSessionCoveredBySavedRoutine(
+        { exerciseType: "cardio", intensity: "moderate", exerciseName: "Spin class" },
+        [{ exerciseType: "cardio", intensity: "moderate", name: "5km Run" }],
+      ),
+    ).toBe(false);
+  });
+
+  it("covers unnamed sessions when type and intensity match a saved routine", () => {
+    expect(
+      recentSessionCoveredBySavedRoutine(
+        { exerciseType: "cardio", intensity: "moderate", exerciseName: "Exercise" },
+        [{ exerciseType: "cardio", intensity: "moderate", name: "5km Run" }],
+      ),
+    ).toBe(true);
+  });
+
+  it("filters overlapping recents from the list", () => {
+    const filtered = filterRecentSessionsWithoutSavedRoutine(
+      [
+        {
+          id: "1",
+          exerciseType: "strength" as const,
+          intensity: "moderate" as const,
+          durationMinutes: 45,
+          exerciseName: "Gym",
+          label: "Gym",
+          source: "outcome" as const,
+          completedAt: "2026-08-11T10:00:00.000Z",
+        },
+        {
+          id: "2",
+          exerciseType: "court" as const,
+          intensity: "moderate" as const,
+          durationMinutes: 60,
+          exerciseName: "Tennis",
+          label: "Tennis",
+          source: "outcome" as const,
+          completedAt: "2026-08-10T10:00:00.000Z",
+        },
+      ],
+      [{ exerciseType: "strength", intensity: "moderate", name: "Gym" }],
+    );
+    expect(filtered.map((s) => s.id)).toEqual(["2"]);
   });
 });

@@ -29,7 +29,7 @@ import {
   Building2,
   Sparkles,
   Cookie,
-  Eye,
+  HeartHandshake,
   MessageSquarePlus,
   ChevronRight,
 } from "lucide-react";
@@ -2085,9 +2085,9 @@ export default function Settings() {
           <SettingsHubGroup title="Account type">
             <SettingsHubNavLink
               href="/carer-setup"
-              label="Support someone with Type 1"
-              description="Enter their invite code to switch to Supporter Mode"
-              icon={Eye}
+              label="Become a supporter"
+              description="Enter their invite code for Supporter Mode — read-only views and alerts"
+              icon={HeartHandshake}
             />
             <SettingsHubNavLink
               href="/onboarding?upgrade=1"
@@ -2114,8 +2114,14 @@ export default function Settings() {
             <SettingsHubNavLink
               href="/family-carers"
               label="Family & supporters"
-              description="Invite, link, and control what they can see"
+              description="Invite people to support you, and control what they can see"
               icon={Users}
+            />
+            <SettingsHubNavLink
+              href="/carer-setup"
+              label="Become a supporter"
+              description="Enter an invite code to support someone else from this account"
+              icon={HeartHandshake}
             />
           </SettingsHubGroup>
         )}

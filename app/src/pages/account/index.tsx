@@ -34,6 +34,7 @@ import { useSupporterSession } from "@/hooks/use-supporter-session";
 import { isCommunityEnabled } from "@/lib/flags";
 import { getFollowCounts, listFollowers, listFollowing } from "@/lib/community";
 import { AccountCommunityProfileFields } from "@/components/account-community-profile-fields";
+import { BecomeSupporterCta } from "@/components/become-supporter-cta";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import heic2any from "heic2any";
 import {
@@ -561,6 +562,8 @@ export default function Account() {
           <SettingsEmergencySection variant="embedded" showSyncButton={false} />
         </ProfileMutedCard>
       )}
+
+      {!inSupporterSession ? <BecomeSupporterCta /> : null}
 
       <ProfileMutedCard testId="account-actions-card">
         <ProfileSectionHeading title="Account actions" subtitle="Sign-in and security" />

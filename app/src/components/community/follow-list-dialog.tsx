@@ -244,9 +244,8 @@ export function FollowListDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} mobileSheet={false}>
       <DialogContent
-        mobileSheet={false}
         className="flex max-h-[min(85dvh,36rem)] flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:max-w-md"
         onOpenAutoFocus={preventDialogAutoFocus}
       >

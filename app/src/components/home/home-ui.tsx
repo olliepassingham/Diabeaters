@@ -305,16 +305,16 @@ export function HomeHypoTimelineItem({
   footer?: React.ReactNode;
 }) {
   return (
-    <li className="relative pl-4 border-l-2 border-primary/25 py-0.5">
+    <li className="relative pl-3.5 border-l-2 border-primary/25 py-0">
       <div className="absolute -left-[5px] top-2 h-2 w-2 rounded-full bg-primary/60 ring-2 ring-background" aria-hidden />
-      <div className="rounded-xl border border-border/50 bg-background/50 px-3 py-2.5 text-sm space-y-1 dark:bg-background/30">
+      <div className="rounded-lg border border-border/50 bg-background/50 px-2.5 py-2 text-sm space-y-0.5 dark:bg-background/30">
         <div className="flex items-center justify-between gap-2">
           <span className="font-semibold tabular-nums">{bgLabel}</span>
           <span className="text-xs text-muted-foreground shrink-0">{whenText}</span>
         </div>
         {treatment ? <p className="text-muted-foreground text-xs">Treatment: {treatment}</p> : null}
         {notes ? <p className="text-muted-foreground text-xs whitespace-pre-wrap">{notes}</p> : null}
-        {footer ? <div className="pt-1.5">{footer}</div> : null}
+        {footer ? <div className="pt-1">{footer}</div> : null}
       </div>
     </li>
   );
@@ -322,7 +322,7 @@ export function HomeHypoTimelineItem({
 
 export function HomeTrustFooter({ children }: { children: ReactNode }) {
   return (
-    <p className="text-center text-[11px] text-muted-foreground px-4 pb-2" data-testid="home-trust-footer">
+    <p className="px-2 pb-1 pt-0.5 text-center text-[10px] leading-snug text-muted-foreground" data-testid="home-trust-footer">
       {children}
     </p>
   );

@@ -618,7 +618,7 @@ export function collectCarerActivityEvents(input: {
             kind: "bedtime_check",
             at: checkedAt,
             title: "Bedtime check",
-            subtitle: ready ? "Readiness: steady" : "Readiness: needs attention",
+            subtitle: ready ? "Overnight looks steady" : "Needs attention",
             source: "cloud",
           });
         }

@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageHeader, PageShell } from "@/components/layout";
+import { BecomeSupporterCta } from "@/components/become-supporter-cta";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { getActiveAppMode, isCarerSessionMode, isCommunityOnlyAccount, isSupporterOnlyAccount, setActiveAppMode, type ActiveAppMode } from "@/lib/carer-session";
 import { resolveCommunityMemberLandingPath } from "@/lib/community-landing";
@@ -123,17 +123,7 @@ export default function ModeChooserPage() {
             </div>
           </button>
 
-          {!canChooseCarer && (
-            <Alert className="rounded-2xl border-border/60">
-              <AlertDescription>
-                This account isn’t linked to support someone yet. If you have an invite code, go to{" "}
-                <Link href="/carer-setup" className="font-medium underline underline-offset-4">
-                  Supporter setup
-                </Link>
-                .
-              </AlertDescription>
-            </Alert>
-          )}
+          {!canChooseCarer && <BecomeSupporterCta compact />}
         </CardContent>
       </Card>
 

@@ -9,9 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link, useLocation } from "wouter";
-import { Repeat, Plus, Utensils, Coffee, Sun, Moon, Cookie, Clock, Syringe, Check, Trash2, Pencil, Star, TrendingUp, History, Tag, Dumbbell, Play, RotateCcw, BookmarkPlus } from "lucide-react";
+import { Repeat, Plus, Utensils, Coffee, Sun, Moon, Cookie, Check, Trash2, Pencil, TrendingUp, History, Tag, Dumbbell, Play, RotateCcw, BookmarkPlus, X } from "lucide-react";
 import { storage, Routine, RoutineMealType, RoutineOutcome, UserSettings, ExerciseRoutine, ExerciseType, ExerciseIntensity, DIABEATER_EXERCISE_OUTCOMES_CHANGED_EVENT } from "@/lib/storage";
-import { listRecentRepeatableExerciseSessions, type RecentRepeatableExerciseSession } from "@/lib/exercise-session-repeat";
+import { listRecentRepeatableExerciseSessions, type RecentRepeatableExerciseSession, filterRecentSessionsWithoutSavedRoutine } from "@/lib/exercise-session-repeat";
 import { EXERCISE_TYPE_OPTIONS, EXERCISE_INTENSITY_OPTIONS } from "@/lib/exercise-catalog";
 import { buildExerciseScenarioRepeatHref } from "@/lib/exercise-planner-href";
 import { format } from "date-fns";
@@ -20,6 +20,25 @@ import { useToast } from "@/hooks/use-toast";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { hasInAppNavHistory } from "@/lib/nav-back";
 import { isStarterExerciseRoutine, seedStarterExerciseRoutineIfNeeded } from "@/lib/starter-exercise-routine";
+
+const MEAL_LOG_HINT_DISMISS_KEY = "diabeaters_routines_meal_log_hint_dismissed_v1";
+const EXERCISE_LOG_HINT_DISMISS_KEY = "diabeaters_routines_exercise_log_hint_dismissed_v1";
+
+function readLogHintDismissed(key: string): boolean {
+  try {
+    return localStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeLogHintDismissed(key: string): void {
+  try {
+    localStorage.setItem(key, "1");
+  } catch {
+    // ignore
+  }
+}
 
 const MEAL_TYPES: { value: RoutineMealType; label: string; icon: typeof Utensils }[] = [
   { value: "breakfast", label: "Breakfast", icon: Coffee },
@@ -53,11 +72,6 @@ function getMealLabel(type: RoutineMealType) {
   return found ? found.label : "Other";
 }
 
-function getOutcomeStyle(outcome: RoutineOutcome) {
-  const found = OUTCOMES.find(o => o.value === outcome);
-  return found ? found.color : "";
-}
-
 function getOutcomeLabel(outcome: RoutineOutcome) {
   const found = OUTCOMES.find(o => o.value === outcome);
   return found ? found.label.split(" - ")[0] : "Okay";
@@ -78,15 +92,6 @@ function formatRoutineInsulinLine(routine: Routine): string | null {
  * one label app-wide (e.g. always "Yoga / Pilates", never just "Yoga" on this page only). */
 const EXERCISE_TYPES = EXERCISE_TYPE_OPTIONS;
 const EXERCISE_INTENSITIES = EXERCISE_INTENSITY_OPTIONS;
-
-/** Emerald-tinted scheme matching the rest of the redesigned exercise tool (status strip, Guided Coach). */
-function getIntensityStyle(intensity: ExerciseIntensity): string {
-  switch (intensity) {
-    case "light": return "bg-sky-500/10 text-sky-700 dark:bg-sky-400/15 dark:text-sky-300";
-    case "moderate": return "bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-300";
-    case "intense": return "bg-amber-500/10 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300";
-  }
-}
 
 export function RoutinesContent() {
   const { toast } = useToast();
@@ -125,6 +130,12 @@ export function RoutinesContent() {
   const [exerciseRoutines, setExerciseRoutines] = useState<ExerciseRoutine[]>([]);
   const [isExerciseAddOpen, setIsExerciseAddOpen] = useState(false);
   const [editingExercise, setEditingExercise] = useState<ExerciseRoutine | null>(null);
+  const [mealLogHintDismissed, setMealLogHintDismissed] = useState(() =>
+    readLogHintDismissed(MEAL_LOG_HINT_DISMISS_KEY),
+  );
+  const [exerciseLogHintDismissed, setExerciseLogHintDismissed] = useState(() =>
+    readLogHintDismissed(EXERCISE_LOG_HINT_DISMISS_KEY),
+  );
   const [exName, setExName] = useState("");
   const [exType, setExType] = useState<ExerciseType>("cardio");
   const [exIntensity, setExIntensity] = useState<ExerciseIntensity>("moderate");
@@ -350,6 +361,34 @@ export function RoutinesContent() {
     };
   }, []);
 
+  const showMealLogHint =
+    !!logHints.meal &&
+    !mealLogHintDismissed &&
+    !routines.some((r) => r.mealType === logHints.meal!.mealType);
+
+  const showExerciseLogHint =
+    !!logHints.exercise &&
+    !exerciseLogHintDismissed &&
+    !exerciseRoutines.some(
+      (r) =>
+        r.exerciseType === logHints.exercise!.type && r.intensity === logHints.exercise!.intensity,
+    );
+
+  const uniqueRecentWorkouts = useMemo(
+    () => filterRecentSessionsWithoutSavedRoutine(recentWorkouts, exerciseRoutines),
+    [recentWorkouts, exerciseRoutines],
+  );
+
+  const dismissMealLogHint = () => {
+    writeLogHintDismissed(MEAL_LOG_HINT_DISMISS_KEY);
+    setMealLogHintDismissed(true);
+  };
+
+  const dismissExerciseLogHint = () => {
+    writeLogHintDismissed(EXERCISE_LOG_HINT_DISMISS_KEY);
+    setExerciseLogHintDismissed(true);
+  };
+
   const mostUsed = storage.getMostUsedRoutines(5);
   const recentlyUsed = storage.getRecentRoutines(5);
 
@@ -408,32 +447,42 @@ export function RoutinesContent() {
 
         {activeSection === "meals" && (
         <>
-        {logHints.meal && (
-          <Card className="rounded-2xl border-border/60 bg-muted/15 shadow-none" data-testid="card-meal-log-hint">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <p className="text-sm text-muted-foreground">
-                  <span className="font-medium text-foreground">From your logs:</span> Meal planner entries often use{" "}
-                  <strong>{getMealLabel(logHints.meal.mealType)}</strong> ({logHints.meal.count} in the last 30 days). Open
-                  a new routine with that meal type?
+        {showMealLogHint && logHints.meal ? (
+          <Card className="rounded-xl border-border/50 bg-muted/15 shadow-none" data-testid="card-meal-log-hint">
+            <CardContent className="relative p-3 pr-10 sm:p-3.5 sm:pr-11">
+              <button
+                type="button"
+                className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                aria-label="Dismiss suggestion"
+                data-testid="button-dismiss-meal-hint"
+                onClick={dismissMealLogHint}
+              >
+                <X className="h-4 w-4" aria-hidden />
+              </button>
+              <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                <p className="text-sm text-muted-foreground leading-snug">
+                  <span className="font-medium text-foreground">{getMealLabel(logHints.meal.mealType)}</span>
+                  {" "}shows up a lot in your logs — save as a routine?
                 </p>
                 <Button
                   type="button"
                   size="sm"
                   variant="secondary"
+                  className="h-9 shrink-0 rounded-full px-3"
                   onClick={() => {
                     resetForm();
                     setMealType(logHints.meal!.mealType);
                     setIsAddOpen(true);
+                    dismissMealLogHint();
                   }}
                   data-testid="button-apply-meal-hint"
                 >
-                  Prefill &amp; save
+                  Save routine
                 </Button>
               </div>
             </CardContent>
           </Card>
-        )}
+        ) : null}
 
         <div className="flex items-center justify-between flex-wrap gap-3">
           <Dialog open={isAddOpen} onOpenChange={(open) => { setIsAddOpen(open); if (!open) resetForm(); }}>
@@ -659,133 +708,112 @@ export function RoutinesContent() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-3.5">
+              <div className="space-y-2.5">
                 {displayRoutines.map((routine) => {
                   const insulinLine = formatRoutineInsulinLine(routine);
+                  const metaParts = [
+                    getMealLabel(routine.mealType),
+                    getOutcomeLabel(routine.outcome),
+                    routine.carbEstimate ? `~${routine.carbEstimate}g` : null,
+                    insulinLine,
+                    routine.timesUsed > 0 ? `Used ${routine.timesUsed}x` : null,
+                  ].filter(Boolean);
                   return (
                   <Card
                     key={routine.id}
-                    className="overflow-hidden border-border/50 shadow-none ring-1 ring-border/40 dark:ring-border/30"
+                    className="overflow-hidden rounded-xl border-border/50 shadow-none ring-1 ring-border/35 dark:ring-border/25"
                     data-testid={`card-routine-${routine.id}`}
                   >
-                    <CardContent className="p-4 sm:p-5">
-                      <div className="flex gap-3.5">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sky-500/10 text-sky-700 dark:bg-sky-400/15 dark:text-sky-300">
-                          {getMealIcon(routine.mealType)}
+                    <CardContent className="p-3">
+                      <div className="flex gap-2.5">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sky-500/10 text-sky-700 dark:bg-sky-400/15 dark:text-sky-300">
+                          {getMealIcon(routine.mealType, "h-4 w-4")}
                         </div>
-                        <div className="min-w-0 flex-1 space-y-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0 space-y-2">
-                              <h3
-                                className="truncate text-[15px] font-semibold leading-snug tracking-tight text-foreground"
-                                data-testid={`text-routine-name-${routine.id}`}
-                              >
-                                {routine.name}
-                              </h3>
-                              <div className="flex flex-wrap items-center gap-1.5">
-                                <Badge variant="outline" className="rounded-md px-2 py-0.5 text-[11px] font-medium">
-                                  {getMealLabel(routine.mealType)}
-                                </Badge>
-                                <Badge className={`rounded-md px-2 py-0.5 text-[11px] font-medium shadow-none ${getOutcomeStyle(routine.outcome)}`}>
-                                  {getOutcomeLabel(routine.outcome)}
-                                </Badge>
-                              </div>
-                            </div>
-                            <div className="flex shrink-0 items-center gap-1">
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                className="h-9 rounded-xl px-3 font-semibold shadow-none"
-                                onClick={() => handleUseRoutine(routine.id)}
-                                data-testid={`button-use-routine-${routine.id}`}
-                              >
-                                <Check className="mr-1.5 h-4 w-4" aria-hidden />
-                                Use
-                              </Button>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-9 w-9 rounded-xl text-muted-foreground"
-                                onClick={() => openEditDialog(routine)}
-                                aria-label="Edit routine"
-                                data-testid={`button-edit-routine-${routine.id}`}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-9 w-9 rounded-xl text-destructive/80 hover:text-destructive"
-                                onClick={() => handleDelete(routine.id)}
-                                aria-label="Delete routine"
-                                data-testid={`button-delete-routine-${routine.id}`}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-
+                        <div className="min-w-0 flex-1">
+                          <h3
+                            className="text-sm font-semibold leading-snug tracking-tight text-foreground line-clamp-2"
+                            data-testid={`text-routine-name-${routine.id}`}
+                          >
+                            {routine.name}
+                          </h3>
+                          {metaParts.length > 0 ? (
+                            <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground truncate">
+                              {metaParts.join(" · ")}
+                            </p>
+                          ) : null}
                           {routine.mealDescription ? (
                             <p
-                              className="text-sm leading-relaxed text-muted-foreground line-clamp-3"
+                              className="mt-1.5 text-xs leading-snug text-muted-foreground line-clamp-2"
                               data-testid={`text-routine-meal-${routine.id}`}
                             >
                               {routine.mealDescription}
                             </p>
                           ) : null}
-
-                          {(routine.carbEstimate || insulinLine || routine.timesUsed > 0) ? (
-                            <div className="flex flex-wrap gap-2">
-                              {routine.carbEstimate ? (
-                                <span className="inline-flex items-center gap-1.5 rounded-lg bg-muted/55 px-2.5 py-1.5 text-xs font-medium text-foreground/80">
-                                  <Utensils className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
-                                  ~{routine.carbEstimate}g carbs
-                                </span>
-                              ) : null}
-                              {insulinLine ? (
-                                <span className="inline-flex items-center gap-1.5 rounded-lg bg-muted/55 px-2.5 py-1.5 text-xs font-medium text-foreground/80">
-                                  <Syringe className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
-                                  {insulinLine}
-                                </span>
-                              ) : null}
-                              {routine.timesUsed > 0 ? (
-                                <span className="inline-flex items-center gap-1.5 rounded-lg bg-muted/55 px-2.5 py-1.5 text-xs font-medium text-foreground/80">
-                                  <Star className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
-                                  Used {routine.timesUsed}x
-                                </span>
-                              ) : null}
-                            </div>
-                          ) : null}
-
                           {routine.tags.length > 0 ? (
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              {routine.tags.map((tag, i) => (
+                            <div className="mt-1.5 flex flex-wrap gap-1">
+                              {routine.tags.slice(0, 3).map((tag, i) => (
                                 <Badge
                                   key={i}
                                   variant="secondary"
-                                  className="rounded-md px-2 py-0.5 text-[11px] font-normal"
+                                  className="h-5 rounded px-1.5 text-[10px] font-normal"
                                   data-testid={`badge-tag-${routine.id}-${i}`}
                                 >
                                   {tag}
                                 </Badge>
                               ))}
+                              {routine.tags.length > 3 ? (
+                                <span className="text-[10px] text-muted-foreground self-center">
+                                  +{routine.tags.length - 3}
+                                </span>
+                              ) : null}
                             </div>
                           ) : null}
-
                           {(routine.context || routine.outcomeNotes) ? (
-                            <div className="space-y-1.5 border-t border-border/50 pt-3 text-sm leading-relaxed text-muted-foreground">
+                            <div className="mt-1.5 space-y-0.5 text-[11px] leading-snug text-muted-foreground">
                               {routine.context ? (
-                                <p>
-                                  <span className="font-medium text-foreground/80">Context:</span> {routine.context}
+                                <p className="line-clamp-1">
+                                  <span className="font-medium text-foreground/75">Context:</span> {routine.context}
                                 </p>
                               ) : null}
                               {routine.outcomeNotes ? (
-                                <p>
-                                  <span className="font-medium text-foreground/80">Notes:</span> {routine.outcomeNotes}
+                                <p className="line-clamp-1">
+                                  <span className="font-medium text-foreground/75">Notes:</span> {routine.outcomeNotes}
                                 </p>
                               ) : null}
                             </div>
                           ) : null}
+                          <div className="mt-2.5 flex items-center gap-1.5">
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              className="h-8 min-w-0 flex-1 rounded-lg px-3 text-xs font-semibold shadow-none"
+                              onClick={() => handleUseRoutine(routine.id)}
+                              data-testid={`button-use-routine-${routine.id}`}
+                            >
+                              <Check className="mr-1 h-3.5 w-3.5 shrink-0" aria-hidden />
+                              Use
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 shrink-0 rounded-lg text-muted-foreground"
+                              onClick={() => openEditDialog(routine)}
+                              aria-label="Edit routine"
+                              data-testid={`button-edit-routine-${routine.id}`}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 shrink-0 rounded-lg text-destructive/80 hover:text-destructive"
+                              onClick={() => handleDelete(routine.id)}
+                              aria-label="Delete routine"
+                              data-testid={`button-delete-routine-${routine.id}`}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </CardContent>
@@ -801,94 +829,106 @@ export function RoutinesContent() {
 
         {activeSection === "exercise" && (
         <>
-        {logHints.exercise && (
-          <Card className="rounded-2xl border-border/60 bg-muted/15 shadow-none" data-testid="card-exercise-log-hint">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <p className="text-sm text-muted-foreground">
-                  <span className="font-medium text-foreground">From your logs:</span> Similar workouts (
-                  {EXERCISE_INTENSITIES.find((i) => i.value === logHints.exercise!.intensity)?.label?.toLowerCase()}{" "}
-                  {EXERCISE_TYPES.find((t) => t.value === logHints.exercise!.type)?.label.toLowerCase()}) appear often (
-                  {logHints.exercise.n} sessions in the last 90 days). Prefill a new exercise routine?
+        {showExerciseLogHint && logHints.exercise ? (
+          <Card className="rounded-xl border-border/50 bg-muted/15 shadow-none" data-testid="card-exercise-log-hint">
+            <CardContent className="relative p-3 pr-10 sm:p-3.5 sm:pr-11">
+              <button
+                type="button"
+                className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                aria-label="Dismiss suggestion"
+                data-testid="button-dismiss-exercise-hint"
+                onClick={dismissExerciseLogHint}
+              >
+                <X className="h-4 w-4" aria-hidden />
+              </button>
+              <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                <p className="text-sm text-muted-foreground leading-snug">
+                  <span className="font-medium text-foreground">
+                    {EXERCISE_INTENSITIES.find((i) => i.value === logHints.exercise!.intensity)?.label ?? "Similar"}{" "}
+                    {EXERCISE_TYPES.find((t) => t.value === logHints.exercise!.type)?.label.toLowerCase() ?? "workouts"}
+                  </span>
+                  {" "}show up a lot — save as a routine?
                 </p>
                 <Button
                   type="button"
                   size="sm"
                   variant="secondary"
+                  className="h-9 shrink-0 rounded-full px-3"
                   onClick={() => {
                     resetExerciseForm();
                     setExType(logHints.exercise!.type);
                     setExIntensity(logHints.exercise!.intensity);
                     setIsExerciseAddOpen(true);
+                    dismissExerciseLogHint();
                   }}
                   data-testid="button-apply-exercise-hint"
                 >
-                  Prefill &amp; save
+                  Save routine
                 </Button>
               </div>
             </CardContent>
           </Card>
-        )}
+        ) : null}
 
-        {recentWorkouts.length > 0 ? (
+        {uniqueRecentWorkouts.length > 0 ? (
           <div className="space-y-3" data-testid="section-recent-workouts">
             <div className="flex items-center gap-2">
               <History className="h-4 w-4 text-muted-foreground" aria-hidden />
               <h3 className="font-medium text-foreground">Recent workouts</h3>
             </div>
             <p className="text-sm text-muted-foreground -mt-1">
-              Restart a completed session in the exercise guide — only update today&apos;s BG and meal details.
+              One-offs not in your saved list — restart or bookmark as a routine.
             </p>
-            <div className="space-y-3">
-              {recentWorkouts.map((session) => (
-                <Card key={session.id} data-testid={`card-recent-workout-${session.id}`}>
-                  <CardContent className="pt-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3 flex-1 min-w-0">
-                        <div className="p-2 rounded-lg bg-muted shrink-0">
-                          <History className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-medium truncate">
-                              {session.exerciseName?.trim() || session.label}
-                            </h3>
-                            <Badge variant="outline" className="text-xs">
-                              {EXERCISE_TYPES.find((t) => t.value === session.exerciseType)?.label}
-                            </Badge>
-                            <Badge className={`text-xs ${getIntensityStyle(session.intensity)}`}>
-                              {EXERCISE_INTENSITIES.find((i) => i.value === session.intensity)?.label}
-                            </Badge>
-                          </div>
-                          <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground flex-wrap">
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {session.durationMinutes} min
-                            </span>
-                            <span>{format(new Date(session.completedAt), "d MMM yyyy")}</span>
-                          </div>
-                        </div>
+            <div className="space-y-2.5">
+              {uniqueRecentWorkouts.map((session) => (
+                <Card
+                  key={session.id}
+                  className="overflow-hidden rounded-xl border-border/50 shadow-none ring-1 ring-border/35 dark:ring-border/25"
+                  data-testid={`card-recent-workout-${session.id}`}
+                >
+                  <CardContent className="p-3">
+                    <div className="flex gap-2.5">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                        <History className="h-4 w-4" aria-hidden />
                       </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <Button
-                          size="sm"
-                          asChild
-                          data-testid={`button-restart-recent-${session.id}`}
-                        >
-                          <Link href={buildExerciseScenarioRepeatHref(session, { from: "routines" })}>
-                            <RotateCcw className="h-4 w-4 mr-1" />
-                            Restart
-                          </Link>
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => handleSaveRecentAsRoutine(session)}
-                          title="Save as routine"
-                          data-testid={`button-save-recent-${session.id}`}
-                        >
-                          <BookmarkPlus className="h-4 w-4" />
-                        </Button>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-sm font-semibold leading-snug text-foreground line-clamp-2">
+                          {session.exerciseName?.trim() || session.label}
+                        </h3>
+                        <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground truncate">
+                          {[
+                            EXERCISE_TYPES.find((t) => t.value === session.exerciseType)?.label,
+                            EXERCISE_INTENSITIES.find((i) => i.value === session.intensity)?.label,
+                            `${session.durationMinutes} min`,
+                            format(new Date(session.completedAt), "d MMM"),
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </p>
+                        <div className="mt-2.5 flex items-center gap-1.5">
+                          <Button
+                            size="sm"
+                            className="h-8 min-w-0 flex-1 rounded-lg px-3 text-xs font-semibold shadow-none"
+                            asChild
+                            data-testid={`button-restart-recent-${session.id}`}
+                          >
+                            <Link href={buildExerciseScenarioRepeatHref(session, { from: "routines" })}>
+                              <RotateCcw className="mr-1 h-3.5 w-3.5 shrink-0" aria-hidden />
+                              Restart
+                            </Link>
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 shrink-0 rounded-lg text-muted-foreground"
+                            onClick={() => handleSaveRecentAsRoutine(session)}
+                            title="Save as routine"
+                            aria-label="Save as routine"
+                            data-testid={`button-save-recent-${session.id}`}
+                          >
+                            <BookmarkPlus className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </CardContent>
@@ -1000,7 +1040,7 @@ export function RoutinesContent() {
                 <Dumbbell className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="font-medium text-lg mb-2">No saved exercise routines yet</h3>
                 <p className="text-muted-foreground text-sm max-w-md mx-auto">
-                  {recentWorkouts.length > 0
+                  {uniqueRecentWorkouts.length > 0
                     ? "Restart a recent workout above, or save one as a routine for quicker access."
                     : "Add your first exercise routine to start tracking your workouts and building healthy habits."}
                 </p>
@@ -1008,104 +1048,91 @@ export function RoutinesContent() {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-3.5">
-            <h3 className="font-medium text-foreground">Saved routines</h3>
-            {exerciseRoutines.map((routine) => (
+          <div className="space-y-2.5">
+            <h3 className="text-sm font-medium text-foreground">Saved routines</h3>
+            {exerciseRoutines.map((routine) => {
+              const metaParts = [
+                EXERCISE_TYPES.find((t) => t.value === routine.exerciseType)?.label,
+                EXERCISE_INTENSITIES.find((i) => i.value === routine.intensity)?.label,
+                `${routine.durationMinutes} min`,
+                routine.timesUsed > 0 ? `Used ${routine.timesUsed}x` : null,
+              ].filter(Boolean);
+              return (
               <Card
                 key={routine.id}
-                className="overflow-hidden border-border/50 shadow-none ring-1 ring-border/40 dark:ring-border/30"
+                className="overflow-hidden rounded-xl border-border/50 shadow-none ring-1 ring-border/35 dark:ring-border/25"
                 data-testid={`card-exercise-routine-${routine.id}`}
               >
-                <CardContent className="p-4 sm:p-5">
-                  <div className="flex gap-3.5">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-300">
-                      <Dumbbell className="h-5 w-5" aria-hidden />
+                <CardContent className="p-3">
+                  <div className="flex gap-2.5">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-300">
+                      <Dumbbell className="h-4 w-4" aria-hidden />
                     </div>
-                    <div className="min-w-0 flex-1 space-y-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 space-y-2">
-                          <div className="flex min-w-0 items-center gap-2">
-                            <h3
-                              className="truncate text-[15px] font-semibold leading-snug tracking-tight text-foreground"
-                              data-testid={`text-exercise-name-${routine.id}`}
-                            >
-                              {routine.name}
-                            </h3>
-                            {isStarterExerciseRoutine(routine) ? (
-                              <Badge
-                                variant="secondary"
-                                className="shrink-0 rounded-md px-2 py-0.5 text-[11px] font-medium"
-                                data-testid="badge-starter-exercise"
-                              >
-                                Example
-                              </Badge>
-                            ) : null}
-                          </div>
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <Badge variant="outline" className="rounded-md px-2 py-0.5 text-[11px] font-medium">
-                              {EXERCISE_TYPES.find((t) => t.value === routine.exerciseType)?.label}
-                            </Badge>
-                            <Badge className={`rounded-md px-2 py-0.5 text-[11px] font-medium shadow-none ${getIntensityStyle(routine.intensity)}`}>
-                              {EXERCISE_INTENSITIES.find((i) => i.value === routine.intensity)?.label}
-                            </Badge>
-                          </div>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-1">
-                          <Button
-                            size="sm"
-                            className="h-9 rounded-xl px-3 font-semibold shadow-none"
-                            onClick={() => handleUseExercise(routine.id)}
-                            data-testid={`button-use-exercise-${routine.id}`}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex min-w-0 items-start gap-1.5">
+                        <h3
+                          className="min-w-0 flex-1 text-sm font-semibold leading-snug tracking-tight text-foreground line-clamp-2"
+                          data-testid={`text-exercise-name-${routine.id}`}
+                        >
+                          {routine.name}
+                        </h3>
+                        {isStarterExerciseRoutine(routine) ? (
+                          <Badge
+                            variant="secondary"
+                            className="mt-0.5 h-5 shrink-0 rounded px-1.5 text-[10px] font-medium"
+                            data-testid="badge-starter-exercise"
                           >
-                            <Play className="mr-1.5 h-4 w-4" aria-hidden />
-                            Start
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-9 w-9 rounded-xl text-muted-foreground"
-                            onClick={() => openExerciseEditDialog(routine)}
-                            aria-label="Edit exercise routine"
-                            data-testid={`button-edit-exercise-${routine.id}`}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-9 w-9 rounded-xl text-destructive/80 hover:text-destructive"
-                            onClick={() => handleExerciseDelete(routine.id)}
-                            aria-label="Delete exercise routine"
-                            data-testid={`button-delete-exercise-${routine.id}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap gap-2">
-                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-muted/55 px-2.5 py-1.5 text-xs font-medium text-foreground/80">
-                          <Clock className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
-                          {routine.durationMinutes} min
-                        </span>
-                        {routine.timesUsed > 0 ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-lg bg-muted/55 px-2.5 py-1.5 text-xs font-medium text-foreground/80">
-                            <Star className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
-                            Used {routine.timesUsed}x
-                          </span>
+                            Example
+                          </Badge>
                         ) : null}
                       </div>
-
-                      {routine.notes ? (
-                        <div className="border-t border-border/50 pt-3 text-sm leading-relaxed text-muted-foreground">
-                          <span className="font-medium text-foreground/80">Notes:</span> {routine.notes}
-                        </div>
+                      {metaParts.length > 0 ? (
+                        <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground truncate">
+                          {metaParts.join(" · ")}
+                        </p>
                       ) : null}
+                      {routine.notes ? (
+                        <p className="mt-1.5 text-xs leading-snug text-muted-foreground line-clamp-2">
+                          {routine.notes}
+                        </p>
+                      ) : null}
+                      <div className="mt-2.5 flex items-center gap-1.5">
+                        <Button
+                          size="sm"
+                          className="h-8 min-w-0 flex-1 rounded-lg px-3 text-xs font-semibold shadow-none"
+                          onClick={() => handleUseExercise(routine.id)}
+                          data-testid={`button-use-exercise-${routine.id}`}
+                        >
+                          <Play className="mr-1 h-3.5 w-3.5 shrink-0" aria-hidden />
+                          Start
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 shrink-0 rounded-lg text-muted-foreground"
+                          onClick={() => openExerciseEditDialog(routine)}
+                          aria-label="Edit exercise routine"
+                          data-testid={`button-edit-exercise-${routine.id}`}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 shrink-0 rounded-lg text-destructive/80 hover:text-destructive"
+                          onClick={() => handleExerciseDelete(routine.id)}
+                          aria-label="Delete exercise routine"
+                          data-testid={`button-delete-exercise-${routine.id}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </CardContent>
               </Card>
-            ))}
+              );
+            })}
           </div>
         )}
         </>

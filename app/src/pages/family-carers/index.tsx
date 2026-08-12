@@ -26,6 +26,7 @@ import { useEmergencyProfile } from "@/hooks/use-emergency-profile";
 import { useResolvedProfileImageUrl } from "@/hooks/use-resolved-profile-image-url";
 import { Link } from "wouter";
 import { PageBackLink, PageHeader, PageShell } from "@/components/layout";
+import { BecomeSupporterCta } from "@/components/become-supporter-cta";
 import {
   SettingsGroup,
   SettingsGroupLabel,
@@ -529,19 +530,7 @@ export default function FamilyCarersPage() {
         </SettingsPanel>
       </section>
 
-      <SettingsPanel>
-        <SettingsPanelBody className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0 space-y-0.5">
-            <p className="text-sm font-semibold text-foreground">Support someone else?</p>
-            <p className="text-xs text-muted-foreground">Enter an invite code to link as a supporter.</p>
-          </div>
-          <Button variant="outline" className="min-h-11 w-full shrink-0 sm:w-auto" asChild>
-            <Link href="/carer-setup" data-testid="link-carer-setup">
-              Open Supporter setup
-            </Link>
-          </Button>
-        </SettingsPanelBody>
-      </SettingsPanel>
+      <BecomeSupporterCta testId="link-carer-setup" />
 
       <SettingsPanel key={syncGeneration}>
         <SettingsPanelBody className="space-y-3">

@@ -75,6 +75,10 @@ import {
   CarerHypoTimelineItem,
   CarerMutedCard,
   CarerUrgentCard,
+  carerCardContentClass,
+  carerCardHeaderClass,
+  carerCardShellClass,
+  carerCardTitleClass,
   sortSuppliesByUrgency,
   SupporterHero,
   SupporterPageFooter,
@@ -82,6 +86,7 @@ import {
   SupplyStockIndicator,
   type CarerGlanceType,
 } from "@/pages/carer-view/supporter-home-ui";
+import { bedtimeSituationDetail } from "@/lib/carer-bedtime-situation";
 import { PageShell } from "@/components/layout";
 import { formatDistanceToNowStrict } from "date-fns";
 import { Input } from "@/components/ui/input";
@@ -239,32 +244,14 @@ type CarerSituationLine = {
   tone: CarerSituationTone;
 };
 
-function bedtimeAttentionDetail(rawState: Record<string, unknown> | null): string | undefined {
-  if (!rawState || rawState.bedtime_ready === true) return undefined;
-
-  const level = typeof rawState.readiness_level === "string" ? rawState.readiness_level.trim() : "";
-  if (level === "alert") return "Higher overnight risk flagged at check-in";
-  if (level === "monitor") return "Worth a closer watch tonight";
-
-  const summary =
-    rawState.inputs_summary && typeof rawState.inputs_summary === "object"
-      ? (rawState.inputs_summary as Record<string, unknown>)
-      : null;
-  if (!summary) return "Something at check-in needs a closer look";
-
-  const bits: string[] = [];
-  if (summary.recent_hypos === true) bits.push("recent hypo");
-  if (summary.had_alcohol === true) bits.push("alcohol");
-  if (summary.trend === "falling") bits.push("falling BG");
-  if (summary.exercised_today === true) bits.push("exercise today");
-  if (bits.length > 0) return bits.slice(0, 2).join(" · ");
-  return "Something at check-in needs a closer look";
-}
-
-function scenarioSituationLines(rows: Record<string, unknown>[]): CarerSituationLine[] {
+function scenarioSituationLines(
+  rows: Record<string, unknown>[],
+  options?: { includeLiveBg?: boolean },
+): CarerSituationLine[] {
   const lines: CarerSituationLine[] = [];
   const now = Date.now();
   const recentlyEndedWindowMs = 24 * 60 * 60 * 1000;
+  const bedtimeOpts = { includeBg: options?.includeLiveBg === true };
 
   for (const [index, row] of rows.slice(0, 8).entries()) {
     const scenarioKey =
@@ -440,7 +427,7 @@ function scenarioSituationLines(rows: Record<string, unknown>[]): CarerSituation
         id: `${rowId}-bedtime`,
         kind: "bedtime",
         title: `Bedtime — ${ready ? "Ready" : "Needs attention"} · Checked ${when}`,
-        detail: ready ? undefined : bedtimeAttentionDetail(rawState),
+        detail: bedtimeSituationDetail(rawState, ready, bedtimeOpts),
         tone: ready ? "calm" : "attention",
       });
       continue;
@@ -879,8 +866,8 @@ function SickDaySupporterCareCard(props: {
 
   return (
     <CarerUrgentCard accent="amber" testId="carer-sick-day-care" id="carer-sick-day-care">
-      <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-base">
+      <CardHeader className={carerCardHeaderClass}>
+        <CardTitle className={carerCardTitleClass}>
           <Thermometer className="h-5 w-5 text-orange-600 dark:text-orange-400" />
           Sick day — temperatures & medication notes
         </CardTitle>
@@ -907,7 +894,7 @@ function SickDaySupporterCareCard(props: {
           </AlertDescription>
         </Alert>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className={cn(carerCardContentClass, "space-y-3")}>
         {formError ? (
           <Alert variant="destructive" className="py-2">
             <AlertDescription className="text-sm">{formError}</AlertDescription>
@@ -1617,7 +1604,9 @@ export default function CarerViewPage() {
       .sort((a, b) => a.t - b.t)
       .map((x) => x.row);
   }, [appointmentRows]);
-  const scenarioLines = scenarioSituationLines(scenarioRows);
+  const scenarioLines = scenarioSituationLines(scenarioRows, {
+    includeLiveBg: scopes.live_glucose === true,
+  });
   const sickDayState = useMemo(() => sickDayScenarioState(scenarioRows), [scenarioRows]);
   const carerActivityEvents = useMemo(
     () =>
@@ -1768,7 +1757,7 @@ export default function CarerViewPage() {
       {devOverlay}
       <PageShell
         variant="standard"
-        className="max-w-3xl space-y-6 py-4"
+        className="max-w-3xl space-y-3.5 py-3 sm:py-4"
         aria-busy={patientBundleLoading || undefined}
       >
         <div className="flex flex-col gap-2.5 sm:gap-3 animate-stagger">
@@ -1826,20 +1815,19 @@ export default function CarerViewPage() {
         </Alert>
       )}
 
-        <div className="space-y-4 sm:space-y-5 animate-stagger">
+        <div className="space-y-3 animate-stagger">
           {(scopes.hypo_alerts ?? false) && (
             <CarerUrgentCard
               testId="carer-view-hypos"
               accent={hypoLogs.length > 0 ? "rose" : "default"}
             >
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Heart className="h-5 w-5 text-primary shrink-0" aria-hidden />
+              <CardHeader className={carerCardHeaderClass}>
+                <CardTitle className={carerCardTitleClass}>
+                  <Heart className="h-4 w-4 text-primary shrink-0" aria-hidden />
                   Recent hypos
                 </CardTitle>
-                <CardDescription>Shared hypo logs, newest first.</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className={carerCardContentClass}>
                 {hypoLogs.length === 0 ? (
                   <CarerCardEmpty
                     compact
@@ -1849,7 +1837,7 @@ export default function CarerViewPage() {
                   />
                 ) : (
                   <div className="space-y-2">
-                    <ul className="space-y-3 m-0 list-none p-0">
+                    <ul className="space-y-2 m-0 list-none p-0">
                       {(recentHyposExpanded
                         ? hypoLogs.slice(0, RECENT_HYPOS_MAX_COUNT)
                         : hypoLogs.slice(0, RECENT_HYPOS_COLLAPSED_COUNT)
@@ -1916,9 +1904,9 @@ export default function CarerViewPage() {
               testId="carer-view-supplies"
               accent={suppliesTone === "critical" ? "amber" : suppliesTone === "low" ? "amber" : "default"}
             >
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Package className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+              <CardHeader className={carerCardHeaderClass}>
+                <CardTitle className={carerCardTitleClass}>
+                  <Package className="h-4 w-4 shrink-0 text-primary" aria-hidden />
                   <span className="min-w-0 flex-1">{displayName}&apos;s supplies</span>
                   <InlineInfoHint
                     ariaLabel="About supplies"
@@ -1927,7 +1915,7 @@ export default function CarerViewPage() {
                   />
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className={carerCardContentClass}>
                 {supplies.length === 0 ? (
                   <CarerCardEmpty
                     compact
@@ -1943,7 +1931,7 @@ export default function CarerViewPage() {
                         <li
                           key={s.id}
                           className={cn(
-                            "flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm",
+                            "flex items-center gap-2.5 rounded-lg border px-2.5 py-2 text-sm",
                             tone === "critical" && "border-destructive/35 bg-destructive/[0.04]",
                             tone === "low" && "border-amber-500/30 bg-amber-500/[0.04]",
                             tone === "ok" && "border-border/60 bg-background/40",
@@ -1980,9 +1968,9 @@ export default function CarerViewPage() {
 
           {(scopes.scenarios ?? false) && (
             <CarerMutedCard id="carer-scenarios" testId="carer-view-scenarios">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Plane className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+              <CardHeader className={carerCardHeaderClass}>
+                <CardTitle className={carerCardTitleClass}>
+                  <Plane className="h-4 w-4 shrink-0 text-primary" aria-hidden />
                   <span className="min-w-0 flex-1">Situations</span>
                   <InlineInfoHint
                     ariaLabel="About situations"
@@ -1993,7 +1981,7 @@ export default function CarerViewPage() {
                   />
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className={cn(carerCardContentClass, "space-y-2.5")}>
                 {scenarioLines.length === 0 ? (
                   <CarerCardEmpty
                     compact
@@ -2025,7 +2013,7 @@ export default function CarerViewPage() {
                       <div
                         key={line.id}
                         className={cn(
-                          "flex items-start gap-2 rounded-lg border px-3 py-2.5 text-sm",
+                          "flex items-start gap-2 rounded-lg border px-2.5 py-2 text-sm",
                           situationRowClass(line.tone),
                         )}
                         data-testid={`carer-situation-${line.kind}-${line.tone}`}
@@ -2055,9 +2043,9 @@ export default function CarerViewPage() {
 
           {showCarerActivityLog ? (
               <CarerMutedCard testId="carer-view-activity">
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <History className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+                <CardHeader className={carerCardHeaderClass}>
+                  <CardTitle className={carerCardTitleClass}>
+                    <History className="h-4 w-4 shrink-0 text-primary" aria-hidden />
                     <span className="min-w-0 flex-1">Activity log</span>
                     <InlineInfoHint
                       ariaLabel="About activity log"
@@ -2066,7 +2054,7 @@ export default function CarerViewPage() {
                     />
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3">
+                <CardContent className={cn(carerCardContentClass, "space-y-2.5")}>
                   {carerActivityWeek.countLast7Days === 0 ? (
                     <CarerCardEmpty
                       compact
@@ -2076,7 +2064,7 @@ export default function CarerViewPage() {
                     />
                   ) : (
                     <p className="text-sm text-muted-foreground">
-                      <span className="text-2xl font-semibold tabular-nums text-foreground">
+                      <span className="text-xl font-semibold tabular-nums text-foreground">
                         {carerActivityWeek.countLast7Days}
                       </span>{" "}
                       {carerActivityWeek.countLast7Days === 1 ? "entry" : "entries"} this week
@@ -2090,10 +2078,10 @@ export default function CarerViewPage() {
           ) : null}
 
           {(scopes.appointments ?? false) && (
-            <Card variant="glass-strong" className="dashboard-card-hover border border-border/60 shadow-sm" data-testid="carer-view-appointments">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+            <Card variant="glass-strong" className={cn(carerCardShellClass, "dashboard-card-hover")} data-testid="carer-view-appointments">
+              <CardHeader className={carerCardHeaderClass}>
+                <CardTitle className={carerCardTitleClass}>
+                  <Calendar className="h-4 w-4 shrink-0 text-primary" aria-hidden />
                   <span className="min-w-0 flex-1">Appointments</span>
                   <InlineInfoHint
                     ariaLabel="About appointments"
@@ -2102,7 +2090,7 @@ export default function CarerViewPage() {
                   />
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className={carerCardContentClass}>
                 {upcomingAppointments.length === 0 ? (
                   <CarerCardEmpty
                     compact
@@ -2119,7 +2107,7 @@ export default function CarerViewPage() {
                             (appt as Record<string, unknown>).id ??
                             appointmentSortTime(appt),
                         )}
-                        className="rounded-lg border border-border/60 px-3 py-3 text-sm space-y-1"
+                        className="rounded-lg border border-border/50 px-2.5 py-2 text-sm space-y-0.5"
                       >
                         <p className="font-medium">{appointmentTitle(appt)}</p>
                         {formatAppointmentWhen(appt) ? (
@@ -2145,12 +2133,12 @@ export default function CarerViewPage() {
             <Card
               id="carer-emergency"
               variant="glass-strong"
-              className="scroll-mt-24 border border-border/60 shadow-sm"
+              className={cn(carerCardShellClass, "scroll-mt-24")}
               data-testid="carer-view-emergency"
             >
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2">
-                  <Phone className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+              <CardHeader className={carerCardHeaderClass}>
+                <CardTitle className={carerCardTitleClass}>
+                  <Phone className="h-4 w-4 shrink-0 text-primary" aria-hidden />
                   <span className="min-w-0 flex-1">Emergency details</span>
                   <InlineInfoHint
                     ariaLabel="About emergency details"
@@ -2164,7 +2152,7 @@ export default function CarerViewPage() {
                   />
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3 text-sm">
+              <CardContent className={cn(carerCardContentClass, "space-y-2 text-sm")}>
                 {profile?.emergency_contact_name ? (
                   <p>
                     <span className="text-muted-foreground">Name: </span>
@@ -2196,9 +2184,6 @@ export default function CarerViewPage() {
         </div>
 
       <SupporterPageFooter />
-      <p className="text-xs text-center text-muted-foreground px-2 pb-2">
-        For peace of mind and coordination — not medical advice or a substitute for their care team.
-      </p>
       </PageShell>
       <SupporterPushPromptDialog
         open={supporterPushPromptOpen}

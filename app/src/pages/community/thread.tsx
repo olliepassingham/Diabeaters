@@ -113,8 +113,8 @@ function DmMessageImage({
           </span>
         ) : null}
       </button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent mobileSheet={false} className="max-w-[min(96vw,48rem)] overflow-hidden border-0 bg-transparent p-0 shadow-none">
+      <Dialog open={open} onOpenChange={setOpen} mobileSheet={false}>
+        <DialogContent className="max-w-[min(96vw,48rem)] overflow-hidden border-0 bg-transparent p-0 shadow-none">
           <img
             src={src}
             alt=""

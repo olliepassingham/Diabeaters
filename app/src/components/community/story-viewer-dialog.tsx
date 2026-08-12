@@ -328,7 +328,7 @@ export function StoryViewerDialog({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog open={open} onOpenChange={onOpenChange} mobileSheet={false}>
         <DialogContent
           className="flex max-h-[100dvh] max-w-[100vw] flex-col gap-0 overflow-hidden border-0 bg-black p-0 sm:max-w-lg sm:rounded-xl"
           aria-describedby={undefined}

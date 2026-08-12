@@ -31,7 +31,7 @@ import { markSupporterCarerOnboarded } from "@/lib/supporter-profile-prompt";
 import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 // Note: we intentionally avoid PageBackButton (history.back) here; we need a safe fallback.
-import { Bell, ChevronDown, ChevronLeft, Eye, Info, Link2, Users } from "lucide-react";
+import { Bell, ChevronDown, ChevronLeft, Eye, HeartHandshake, Info, Link2, Users } from "lucide-react";
 
 const PATIENT_INVITE_INSTRUCTIONS = `To link me as your supporter in Diabeaters:
 1. Open Account → Family & supporters
@@ -283,11 +283,17 @@ export default function CarerSetupPage() {
             </Button>
           </div>
           <Card className="w-full rounded-2xl border-border/60 shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-xl">Family &amp; Supporter Access</CardTitle>
-              <CardDescription>
-                Enter the invite code from the person you support. They generate it in their Diabeaters app.
-              </CardDescription>
+            <CardHeader className="space-y-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-500/15 text-blue-700 ring-1 ring-blue-500/20 dark:text-blue-300">
+                <HeartHandshake className="h-5 w-5" aria-hidden />
+              </div>
+              <div className="space-y-1.5">
+                <CardTitle className="text-xl tracking-tight">Become a supporter</CardTitle>
+                <CardDescription className="text-sm leading-relaxed">
+                  Enter the invite code from the person you support. They create it under{" "}
+                  <span className="font-medium text-foreground">Account → Family &amp; supporters</span>.
+                </CardDescription>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               {!configured && (

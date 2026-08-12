@@ -11,6 +11,13 @@ import { useToast } from "@/hooks/use-toast";
 import { getPatientClinicalPrefsForCarer, updatePatientClinicalPrefsForCarer } from "@/lib/carers";
 import { isPenDeliveryMethod, isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { normalizeDateOfBirthInput } from "@/lib/user-age";
+import { cn } from "@/lib/utils";
+import {
+  carerCardContentClass,
+  carerCardHeaderClass,
+  carerCardShellClass,
+  carerCardTitleClass,
+} from "@/pages/carer-view/supporter-home-ui";
 
 export function CarerClinicalPrefsCard({
   patientId,
@@ -89,12 +96,13 @@ export function CarerClinicalPrefsCard({
   return (
     <Card
       id="carer-clinical-settings"
-      className="border-border/60 shadow-sm scroll-mt-24"
+      variant="glass-strong"
+      className={cn(carerCardShellClass, "scroll-mt-24")}
       data-testid="carer-clinical-prefs"
     >
-      <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-base font-semibold">
-          <Stethoscope className="h-5 w-5 text-primary shrink-0" aria-hidden />
+      <CardHeader className={carerCardHeaderClass}>
+        <CardTitle className={carerCardTitleClass}>
+          <Stethoscope className="h-4 w-4 text-primary shrink-0" aria-hidden />
           <span className="min-w-0 flex-1">Clinical basics</span>
           <InlineInfoHint
             ariaLabel="About clinical basics"
@@ -108,7 +116,7 @@ export function CarerClinicalPrefsCard({
           />
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className={cn(carerCardContentClass, "space-y-3")}>
         {loadErr ? (
           <Alert variant="destructive">
             <AlertDescription>{loadErr}</AlertDescription>

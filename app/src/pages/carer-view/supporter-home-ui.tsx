@@ -20,6 +20,16 @@ import {
   type HomeGlanceType,
 } from "@/components/home/home-ui";
 import { setActiveAppMode } from "@/lib/carer-session";
+import type { ReactNode } from "react";
+
+/** Compact card chrome for Supporter Mode home — more value above the fold. */
+export const carerCardHeaderClass = "space-y-1 p-3.5 pb-1.5 sm:p-4 sm:pb-1.5";
+export const carerCardContentClass = "px-3.5 pb-3.5 pt-0 sm:px-4 sm:pb-4";
+export const carerCardTitleClass =
+  "flex items-center gap-2 text-sm font-semibold tracking-tight text-foreground sm:text-[0.95rem]";
+/** Shared shell for appointments/emergency/clinical — not urgent cards (those keep accent borders). */
+export const carerCardShellClass =
+  "rounded-xl border border-border/50 shadow-sm ring-1 ring-border/15 dark:border-border/40";
 
 export type CarerGlanceType = HomeGlanceType;
 
@@ -27,11 +37,51 @@ export {
   HomeSectionHeading as CarerSectionHeading,
   HomeCardEmpty as CarerCardEmpty,
   HomeHypoTimelineItem as CarerHypoTimelineItem,
-  HomeMutedCard as CarerMutedCard,
-  HomeUrgentCard as CarerUrgentCard,
   SupplyStockIndicator,
   sortSuppliesByUrgency,
 };
+
+export function CarerUrgentCard({
+  children,
+  className,
+  testId,
+  id,
+  accent = "default",
+}: {
+  children: ReactNode;
+  className?: string;
+  testId?: string;
+  id?: string;
+  accent?: "default" | "rose" | "amber";
+}) {
+  return (
+    <HomeUrgentCard id={id} testId={testId} accent={accent} className={cn("rounded-xl", className)}>
+      {children}
+    </HomeUrgentCard>
+  );
+}
+
+export function CarerMutedCard({
+  children,
+  className,
+  testId,
+  id,
+}: {
+  children: ReactNode;
+  className?: string;
+  testId?: string;
+  id?: string;
+}) {
+  return (
+    <HomeMutedCard
+      id={id}
+      testId={testId}
+      className={cn(carerCardShellClass, "bg-muted/20 dark:bg-muted/10", className)}
+    >
+      {children}
+    </HomeMutedCard>
+  );
+}
 
 type LinkedPerson = { patientId: string; label: string; active: boolean };
 
@@ -59,26 +109,31 @@ export function SupporterHero({
   return (
     <Card
       variant="glass-strong"
-      className="dashboard-card-hover animate-soft-in overflow-hidden border border-primary/15 bg-gradient-to-br from-primary/[0.06] via-transparent to-transparent shadow-md ring-1 ring-border/25 dark:border-primary/18 dark:from-primary/[0.09]"
+      className={cn(
+        carerCardShellClass,
+        "dashboard-card-hover animate-soft-in overflow-hidden bg-gradient-to-br from-primary/[0.05] via-transparent to-transparent",
+      )}
       data-testid="carer-view-header"
     >
-      <CardContent className="flex flex-col gap-2.5 p-4 md:p-4">
+      <CardContent className="flex flex-col gap-2 p-3.5 sm:p-4">
         <div className="flex items-start justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-3">
+          <div className="flex min-w-0 items-center gap-2.5">
             <div
-              className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-primary/10 ring-2 ring-background shadow-sm"
+              className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-primary/10 ring-2 ring-background shadow-sm"
               aria-hidden={!avatarUrl}
             >
               {avatarUrl ? (
                 <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
               ) : (
-                <Sparkles className="h-6 w-6 text-primary" aria-hidden />
+                <Sparkles className="h-5 w-5 text-primary" aria-hidden />
               )}
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Supporter mode</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Supporter mode
+              </p>
               <p
-                className="font-display text-lg font-semibold leading-tight tracking-tight text-foreground sm:text-xl"
+                className="font-display text-base font-semibold leading-tight tracking-tight text-foreground sm:text-lg"
                 data-testid="text-carer-view-name"
               >
                 Supporting {displayName}
@@ -107,16 +162,16 @@ export function SupporterHero({
         <HomePrimaryStatusPill type={glance.type} message={glance.message} testId="carer-primary-status" />
 
         {(showSickChip || showTravelChip) && (
-          <div className="flex flex-wrap items-center gap-2" data-testid="wrap-carer-active-chips">
+          <div className="flex flex-wrap items-center gap-1.5" data-testid="wrap-carer-active-chips">
             {showSickChip ? (
               <Button
                 asChild
                 variant="outline"
                 size="sm"
-                className="h-8 rounded-full px-3 text-xs border-amber-500/30 bg-amber-500/[0.06] hover:bg-amber-500/[0.1] dark:bg-amber-950/30 dark:hover:bg-amber-950/45"
+                className="h-7 rounded-full px-2.5 text-[11px] border-amber-500/30 bg-amber-500/[0.06] hover:bg-amber-500/[0.1] dark:bg-amber-950/30 dark:hover:bg-amber-950/45"
               >
                 <a href="#carer-sick-day-care" data-testid="chip-carer-sickday">
-                  <Thermometer className="h-3.5 w-3.5 mr-1.5 text-amber-600 dark:text-amber-400" aria-hidden />
+                  <Thermometer className="h-3.5 w-3.5 mr-1 text-amber-600 dark:text-amber-400" aria-hidden />
                   Sick day
                 </a>
               </Button>
@@ -126,10 +181,10 @@ export function SupporterHero({
                 asChild
                 variant="outline"
                 size="sm"
-                className="h-8 rounded-full px-3 text-xs border-blue-500/30 bg-blue-500/[0.06] hover:bg-blue-500/[0.1] dark:bg-blue-950/30 dark:hover:bg-blue-950/45"
+                className="h-7 rounded-full px-2.5 text-[11px] border-blue-500/30 bg-blue-500/[0.06] hover:bg-blue-500/[0.1] dark:bg-blue-950/30 dark:hover:bg-blue-950/45"
               >
                 <a href="#carer-scenarios" data-testid="chip-carer-travel">
-                  <Plane className="h-3.5 w-3.5 mr-1.5 text-blue-600 dark:text-blue-400" aria-hidden />
+                  <Plane className="h-3.5 w-3.5 mr-1 text-blue-600 dark:text-blue-400" aria-hidden />
                   {travelLabel}
                 </a>
               </Button>
@@ -138,14 +193,14 @@ export function SupporterHero({
         )}
 
         {linkedPeople.length > 1 ? (
-          <div className="flex flex-wrap gap-2 pt-0.5" data-testid="carer-hero-people-switcher">
+          <div className="flex flex-wrap gap-1.5 pt-0.5" data-testid="carer-hero-people-switcher">
             {linkedPeople.map((p) => (
               <Button
                 key={p.patientId}
                 type="button"
                 size="sm"
                 variant={p.active ? "secondary" : "outline"}
-                className="h-8 rounded-full px-3 text-xs"
+                className="h-7 rounded-full px-2.5 text-[11px]"
                 onClick={() => !p.active && onPatientChange(p.patientId)}
                 disabled={p.active}
               >
@@ -265,6 +320,6 @@ export function SupporterQuickActions({
 
 export function SupporterPageFooter() {
   return (
-    <HomeTrustFooter>Shared read-only view · only what they choose to share is visible here.</HomeTrustFooter>
+    <HomeTrustFooter>Read-only · only what they share · not medical advice</HomeTrustFooter>
   );
 }
