@@ -1,6 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useMemo } from "react";
 import { Link } from "wouter";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,7 +16,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { InlineInfoHint, StaticLabelWithInfo } from "@/components/ui/field-label-with-info";
+import { InlineInfoHint } from "@/components/ui/field-label-with-info";
 import { 
   Plane, 
   MapPin, 
@@ -26,7 +26,6 @@ import {
   Syringe, 
   Activity,
   AlertTriangle,
-  AlertCircle,
   CheckCircle2,
   ChevronRight,
   ChevronLeft,
@@ -41,10 +40,8 @@ import {
   Calendar,
   Languages,
   Phone,
-  Navigation,
   Luggage,
   Trash2,
-  Plus,
   Dumbbell,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
@@ -66,9 +63,7 @@ import {
 } from "@/lib/travel-supply-policy";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { FaceLogoWatermark } from "@/components/face-logo";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
-import { ScenarioToolHeroCard } from "@/components/scenarios/scenario-tool-hero-card";
 import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
 import { fetchScenarioStateForUser, upsertScenario } from "@/lib/scenarios-supabase";
 import { invokeNotifyScenarioStarted } from "@/lib/invoke-notify-scenario-started";
@@ -169,12 +164,21 @@ type BasalAdjustmentRow = {
 type TravelPlanBasalSlice = Pick<TravelPlan, "timezoneHours" | "timezoneDirection" | "timezoneChange">;
 
 const TRAVEL_DURATION_PRESETS = [
-  { label: "Weekend (3 days)", days: 3 },
-  { label: "1 Week", days: 7 },
-  { label: "2 Weeks", days: 14 },
-  { label: "3 Weeks", days: 21 },
-  { label: "1 Month", days: 30 },
+  { label: "Weekend", days: 3 },
+  { label: "1 week", days: 7 },
+  { label: "2 weeks", days: 14 },
+  { label: "3 weeks", days: 21 },
+  { label: "1 month", days: 30 },
 ] as const;
+
+const TRIP_STYLE_OPTIONS: { value: TravelTripStyle; label: string }[] = [
+  { value: "relax", label: "Relax" },
+  { value: "active", label: "Active" },
+  { value: "city", label: "City" },
+  { value: "remote", label: "Remote" },
+  { value: "family", label: "Family" },
+  { value: "not_sure", label: "Mixed" },
+];
 
 type ClimateGuidanceSection = {
   title: string;
@@ -380,29 +384,22 @@ function TravelDisclaimerCard({ compact = false }: { compact?: boolean }) {
   if (compact) {
     return (
       <p
-        className="text-center text-[11px] leading-snug text-muted-foreground px-1"
+        className="px-1 text-center text-sm leading-snug text-muted-foreground"
         role="note"
         data-testid="travel-disclaimer-compact"
       >
-        <AlertCircle className="inline h-3 w-3 mr-1 align-[-2px] text-yellow-600/70 dark:text-yellow-500/70" aria-hidden />
-        <span className="font-medium text-foreground/80">Not medical advice.</span> Educational preparation only —
-        follow your care team for travel and insulin planning.
+        <span className="font-medium text-foreground/80">Not medical advice.</span> Follow your care team for travel and insulin planning.
       </p>
     );
   }
 
   return (
-    <Card className="border-yellow-500/50 bg-yellow-50/50 dark:bg-yellow-950/20" data-testid="travel-disclaimer">
+    <Card className="overflow-hidden rounded-[1.35rem] border-amber-500/25 bg-amber-500/[0.06] shadow-none" data-testid="travel-disclaimer">
       <CardContent className="p-4">
-        <div className="flex gap-3">
-          <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-500 shrink-0 mt-0.5" />
-          <div className="text-sm">
-            <p className="font-medium text-yellow-900 dark:text-yellow-100">Not Medical Advice</p>
-            <p className="text-yellow-800 dark:text-yellow-200 mt-1">
-              Educational preparation only — not medical advice. Follow your care team for travel and insulin planning.
-            </p>
-          </div>
-        </div>
+        <p className="text-sm font-semibold text-foreground">Not medical advice</p>
+        <p className="mt-1 text-sm leading-snug text-foreground/85">
+          Educational preparation only. Follow your care team for travel and insulin planning.
+        </p>
       </CardContent>
     </Card>
   );
@@ -871,24 +868,95 @@ function CompactRiskConsiderations({ warnings }: { warnings: RiskWarning[] }) {
   const top = sorted.slice(0, 3);
   const more = sorted.length - top.length;
   return (
-    <Card className="surface-card border-amber-500/25 bg-amber-500/5 shadow-none" data-testid="card-travel-risks-compact">
-      <CardHeader className="py-2.5 px-3 pb-1">
-        <CardTitle className="text-sm font-semibold flex items-center gap-2">
-          <ShieldAlert className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+    <Card className="overflow-hidden rounded-[1.35rem] border-amber-500/25 bg-amber-500/[0.06] shadow-none" data-testid="card-travel-risks-compact">
+      <CardHeader className="px-4 py-3 pb-2">
+        <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+          <ShieldAlert className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
           Heads-up
         </CardTitle>
       </CardHeader>
-      <CardContent className="px-3 pb-3 pt-0 space-y-1.5">
+      <CardContent className="space-y-2 px-4 pb-3.5 pt-0">
         {top.map((w, i) => (
-          <p key={i} className="text-xs leading-snug text-foreground/90">
-            <span className="font-medium">{w.title}.</span> {truncateOneLine(w.description, 100)}
+          <p key={i} className="text-sm leading-snug text-foreground/90">
+            <span className="font-semibold">{w.title}.</span> {truncateOneLine(w.description, 90)}
           </p>
         ))}
         {more > 0 ? (
-          <p className="text-[11px] text-muted-foreground">+{more} more</p>
+          <p className="text-sm text-muted-foreground">+{more} more</p>
         ) : null}
       </CardContent>
     </Card>
+  );
+}
+
+function travelSegmentClass(active: boolean) {
+  return cn(
+    "h-11 min-h-11 min-w-0 flex-1 rounded-lg px-2 text-sm font-medium shadow-none transition-colors",
+    active
+      ? "bg-background text-foreground shadow-sm ring-1 ring-border/60 dark:bg-background/90"
+      : "text-muted-foreground hover:text-foreground",
+  );
+}
+
+function travelTileClass(active: boolean) {
+  return cn(
+    "h-12 min-h-12 min-w-0 w-full rounded-xl px-3 text-sm font-medium shadow-none",
+    active
+      ? "bg-primary text-primary-foreground"
+      : "bg-muted/55 text-foreground ring-1 ring-border/50 hover:bg-muted/80",
+  );
+}
+
+const travelDateInputClass =
+  "h-12 w-full min-w-0 max-w-full rounded-xl text-base tabular-nums [&::-webkit-calendar-picker-indicator]:shrink-0 [&::-webkit-date-and-time-value]:text-left [&::-webkit-datetime-edit]:min-w-0";
+
+function TravelSegmentGroup<T extends string>({
+  labelledBy,
+  value,
+  onChange,
+  options,
+  testId,
+  columns,
+  variant = "segmented",
+}: {
+  labelledBy?: string;
+  value: T;
+  onChange: (v: T) => void;
+  options: { value: T; label: string }[];
+  testId?: string;
+  columns: 2 | 3;
+  variant?: "segmented" | "tiles";
+}) {
+  return (
+    <div
+      className={cn(
+        "grid min-w-0",
+        variant === "tiles"
+          ? "gap-2"
+          : "gap-1 rounded-xl bg-muted/45 p-1 dark:bg-muted/30",
+        columns === 2 && "grid-cols-2",
+        columns === 3 && "grid-cols-3",
+      )}
+      role="group"
+      aria-labelledby={labelledBy}
+      data-testid={testId}
+    >
+      {options.map((opt) => (
+        <Button
+          key={opt.value}
+          type="button"
+          variant="ghost"
+          size="sm"
+          className={cn(
+            variant === "tiles" ? travelTileClass(value === opt.value) : travelSegmentClass(value === opt.value),
+            "w-full",
+          )}
+          onClick={() => onChange(opt.value)}
+        >
+          {opt.label}
+        </Button>
+      ))}
+    </div>
   );
 }
 
@@ -907,10 +975,10 @@ function TravelPackingItemRow({
     <div
       onClick={onToggle}
       className={cn(
-        "flex items-center gap-2 rounded-lg border px-2 py-1.5 cursor-pointer transition-colors hover-elevate",
+        "flex items-center gap-2.5 rounded-xl border px-2.5 py-2 cursor-pointer transition-colors",
         item.checked
-          ? "border-green-200 bg-green-50/80 dark:border-green-800 dark:bg-green-950/25"
-          : "border-border/50 bg-muted/30",
+          ? "border-emerald-500/30 bg-emerald-500/[0.08] dark:bg-emerald-950/30"
+          : "border-border/50 bg-card/70",
       )}
       data-testid={`${dataTestIdPrefix}-${globalIndex}`}
     >
@@ -921,14 +989,14 @@ function TravelPackingItemRow({
         onCheckedChange={onToggle}
         data-testid={`checkbox-${dataTestIdPrefix}-${globalIndex}`}
       />
-      <div className="flex-1 min-w-0">
-        <span className={cn("text-sm leading-tight block", item.checked ? "line-through text-muted-foreground" : "")}>
+      <div className="min-w-0 flex-1">
+        <span className={cn("block text-sm font-medium leading-snug", item.checked ? "line-through text-muted-foreground" : "text-foreground")}>
           {item.name}
         </span>
       </div>
-      <Badge variant="outline" className="shrink-0 h-6 px-1.5 text-[11px] tabular-nums font-medium">
+      <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
         {item.estimatedAmount} {item.unit}
-      </Badge>
+      </span>
       <Popover>
         <PopoverTrigger asChild>
           <Button
@@ -944,11 +1012,9 @@ function TravelPackingItemRow({
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-[min(20rem,calc(100vw-2rem))] text-sm" align="end" sideOffset={6} onClick={(e) => e.stopPropagation()}>
-          <p className="text-xs font-medium text-muted-foreground mb-1.5">Why this quantity</p>
           <p className="text-sm leading-snug">{item.reasoning}</p>
         </PopoverContent>
       </Popover>
-      {item.checked ? <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 shrink-0" /> : null}
     </div>
   );
 }
@@ -1537,82 +1603,93 @@ export default function Travel() {
             )
           : null;
 
-    const tripProgressShort = hasEnded
-      ? "Ended"
-      : hasStarted
-        ? `Day ${daysElapsed + 1}/${totalDays}`
-        : daysUntilStart <= 0
-          ? "Starts today"
-          : `${daysUntilStart}d to go`;
-
     return (
-      <PageShell variant="standard" className="space-y-3">
+      <PageShell variant="narrow" density="compact" className="space-y-3">
         <header className="flex min-w-0 items-start gap-2" data-testid="travel-active-header">
           <div className="shrink-0 pt-0.5">
             <PageBackButton />
           </div>
-          <div className="min-w-0 flex-1 space-y-1">
+          <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-baseline justify-between gap-2">
               <h1
-                className="min-w-0 truncate text-lg font-semibold tracking-tight text-foreground"
+                className="min-w-0 truncate font-display text-xl font-semibold tracking-tight text-foreground"
                 data-testid="text-travel-dashboard-title"
               >
                 {plan.destination || "Travel"}
               </h1>
-              <span className="shrink-0 text-sm font-medium tabular-nums text-foreground" data-testid="text-trip-progress">
-                {tripProgressShort}
-              </span>
             </div>
             {tripProfileChips.length > 0 ? (
-              <div className="flex flex-wrap gap-1" data-testid="travel-trip-profile-chips">
+              <div className="mt-1.5 flex flex-wrap gap-1.5" data-testid="travel-trip-profile-chips">
                 {tripProfileChips.map((chip) => (
-                  <Badge key={chip.label} variant="outline" className="h-5 px-1.5 text-[10px] font-normal">
+                  <span key={chip.label} className="rounded-full bg-muted/50 px-2 py-0.5 text-[11px] font-medium text-foreground ring-1 ring-border/50">
                     {chip.label}
-                  </Badge>
+                  </span>
                 ))}
               </div>
             ) : null}
           </div>
         </header>
 
-        <ScenarioToolHeroCard
-          className="surface-card border-border/60 shadow-none"
-          classNames={{ content: "space-y-2 !pt-3 !pb-3.5 px-4 sm:px-5" }}
-          body={
-            <>
-              <p className="text-xs text-muted-foreground">
-                {formatTripDate(plan.startDate, profile, { day: "numeric", month: "short" }) || "Start"} —{" "}
-                {formatTripDate(plan.endDate, profile, { day: "numeric", month: "short", year: "numeric" }) || "End"}
+        <div className="overflow-hidden rounded-[1.35rem] border border-sky-500/25 bg-gradient-to-br from-sky-500/[0.10] via-card to-card shadow-[0_12px_40px_-24px_rgba(14,165,233,0.45)]">
+          <div className="space-y-3 px-4 py-4 sm:px-5">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                {hasEnded ? "Trip" : hasStarted ? "Day" : "Starts in"}
               </p>
-              <Progress value={progressPercent} className="h-1.5" data-testid="progress-trip" />
-              <p className="text-xs leading-snug text-muted-foreground" data-testid="travel-progress-guidance">
-                {todayFocus}
+              <p
+                className="mt-1 font-display text-[2.5rem] font-bold leading-none tabular-nums tracking-tight text-foreground"
+                data-testid="text-trip-progress"
+              >
+                {hasEnded
+                  ? "Ended"
+                  : hasStarted
+                    ? daysElapsed + 1
+                    : daysUntilStart <= 0
+                      ? "Today"
+                      : daysUntilStart}
+                {hasStarted && !hasEnded ? (
+                  <span className="text-xl font-semibold text-muted-foreground">/{totalDays}</span>
+                ) : !hasStarted && !hasEnded && daysUntilStart > 0 ? (
+                  <span className="ml-1 text-xl font-semibold text-muted-foreground">d</span>
+                ) : null}
               </p>
-              <div className="border-t border-border/50 pt-2">
-                <ScenarioCoachLink
-                  topic="travel"
-                  from="travel-active"
-                  q={activeCoachPrompt}
-                  className="min-h-10 w-full sm:w-auto"
-                />
-              </div>
-            </>
-          }
-        />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <span className="inline-flex items-center rounded-xl bg-background/80 px-3 py-1.5 text-sm font-medium ring-1 ring-border/50">
+                {formatTripDate(plan.startDate, profile, { day: "numeric", month: "short" }) || "Start"} –{" "}
+                {formatTripDate(plan.endDate, profile, { day: "numeric", month: "short" }) || "End"}
+              </span>
+              <span className="inline-flex items-center rounded-xl bg-background/50 px-3 py-1.5 text-sm font-medium capitalize ring-1 ring-border/40">
+                {plan.travelType}
+              </span>
+            </div>
+            <Progress value={progressPercent} className="h-2" data-testid="progress-trip" />
+            <p className="text-sm leading-snug text-foreground/85" data-testid="travel-progress-guidance">
+              {todayFocus}
+            </p>
+            <ScenarioCoachLink
+              topic="travel"
+              from="travel-active"
+              q={activeCoachPrompt}
+              className="min-h-10 w-full"
+            />
+          </div>
+        </div>
 
         {plan.tripStyle === "active" && hasStarted && !hasEnded ? (
           <Card
-            className="surface-card border-border/60 shadow-none"
+            className="overflow-hidden rounded-[1.35rem] border-border/50 shadow-none"
             data-testid="card-travel-active-exercise"
           >
-            <CardContent className="flex flex-col gap-3 p-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 sm:p-4">
+            <CardContent className="flex flex-col gap-3 p-3.5 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
               <div className="min-w-0 flex-1 space-y-2">
-                <div className="space-y-0.5">
-                  <p className="text-sm font-medium text-foreground">Activity on this trip</p>
-                  <p className="text-xs text-muted-foreground" data-testid="text-trip-exercise-count">
-                    {`This trip: ${tripExerciseSessionCount} session${
-                      tripExerciseSessionCount === 1 ? "" : "s"
-                    } logged in Exercise.`}
+                <div className="flex items-baseline justify-between gap-2">
+                  <p className="text-sm font-semibold text-foreground">Activity</p>
+                  <p className="text-sm font-semibold tabular-nums text-foreground" data-testid="text-trip-exercise-count">
+                    {tripExerciseSessionCount}
+                    <span className="ml-1 text-sm font-medium text-muted-foreground">
+                      {tripExerciseSessionCount === 1 ? "session" : "sessions"}
+                    </span>
                   </p>
                 </div>
 
@@ -1624,14 +1701,13 @@ export default function Travel() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-foreground">{liveTripExercise.exerciseName}</p>
-                        <p className="text-[11px] text-muted-foreground leading-snug">
-                          {liveTripExercise.durationMinutes} min · {liveTripExercise.intensity} ·{" "}
-                          {liveTripExercise.exerciseType}
+                        <p className="text-sm text-muted-foreground leading-snug">
+                          {liveTripExercise.durationMinutes} min · {liveTripExercise.intensity}
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs font-medium text-foreground/90">
+                      <p className="text-sm font-medium text-foreground/90">
                         {liveTripExercise.phase === "pre"
                           ? "Before you start"
                           : liveTripExercise.phase === "active"
@@ -1640,7 +1716,7 @@ export default function Travel() {
                       </p>
                       {travelExerciseElapsedLabel ? (
                         <span
-                          className="text-xs tabular-nums text-muted-foreground"
+                          className="text-sm font-semibold tabular-nums text-foreground"
                           data-testid="text-travel-exercise-elapsed"
                           title={
                             liveTripExercise.phase === "active"
@@ -1668,7 +1744,7 @@ export default function Travel() {
               <Button
                 asChild
                 size="sm"
-                className="shrink-0 w-full sm:mt-0.5 sm:w-auto"
+                className="h-10 shrink-0 w-full rounded-xl sm:mt-0.5 sm:w-auto"
                 data-testid="button-travel-log-activity"
               >
                 <Link href={liveTripExercise ? "/scenarios/exercise" : travelExercisePlannerHref}>
@@ -1681,58 +1757,54 @@ export default function Travel() {
         ) : null}
 
         <Tabs value={activeTravelTab} onValueChange={(v) => setActiveTravelTab(v as any)} className="w-full" data-testid="travel-active-tabs">
-          <TabsList className="grid h-9 w-full grid-cols-3">
-            <TabsTrigger value="overview" className="text-xs sm:text-sm" data-testid="tab-travel-overview">Overview</TabsTrigger>
-            <TabsTrigger value="plan" className="text-xs sm:text-sm" data-testid="tab-travel-plan">Plan</TabsTrigger>
-            <TabsTrigger value="checklist" className="text-xs sm:text-sm" data-testid="tab-travel-checklist">Checklist</TabsTrigger>
+          <TabsList className="grid h-11 w-full grid-cols-3 gap-1 rounded-xl bg-muted/45 p-1">
+            <TabsTrigger value="overview" className="rounded-lg text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm" data-testid="tab-travel-overview">Overview</TabsTrigger>
+            <TabsTrigger value="plan" className="rounded-lg text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm" data-testid="tab-travel-plan">Plan</TabsTrigger>
+            <TabsTrigger value="checklist" className="rounded-lg text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm" data-testid="tab-travel-checklist">Checklist</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="mt-3 space-y-3 animate-fade-in-up" data-testid="tabcontent-travel-overview">
-            <Card className="surface-card border-border/60 shadow-none" data-testid="card-travel-overview-glance">
-              <CardContent className="space-y-3 p-3 sm:p-4">
-                <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
-                  <div>
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Return</p>
-                    <p className="font-medium leading-snug">
+          <TabsContent value="overview" className="mt-4 space-y-3 animate-fade-in-up" data-testid="tabcontent-travel-overview">
+            <Card className="overflow-hidden rounded-[1.35rem] border-border/50 shadow-none" data-testid="card-travel-overview-glance">
+              <CardContent className="space-y-3 p-3.5">
+                <div className="grid grid-cols-2 gap-1.5">
+                  <div className="flex min-h-9 items-center gap-1.5 rounded-lg border border-border/70 bg-background/70 px-2 py-1.5">
+                    <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-muted-foreground">Return</span>
+                    <span className="shrink-0 text-sm font-bold tabular-nums">
                       {formatTripDate(plan.endDate, profile, { day: "numeric", month: "short" }) || "—"}
-                    </p>
+                    </span>
                   </div>
-                  <div>
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Timezone</p>
-                    <p className="font-medium leading-snug">
+                  <div className="flex min-h-9 items-center gap-1.5 rounded-lg border border-border/70 bg-background/70 px-2 py-1.5">
+                    <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-muted-foreground">Timezone</span>
+                    <span className="shrink-0 text-sm font-bold tabular-nums">
                       {plan.timezoneChange === "none"
-                        ? "No change"
-                        : `${plan.timezoneHours}h ${plan.timezoneDirection === "east" ? "east" : plan.timezoneDirection === "west" ? "west" : "shift"}`}
-                    </p>
+                        ? "None"
+                        : `${plan.timezoneHours}h ${plan.timezoneDirection === "east" ? "E" : plan.timezoneDirection === "west" ? "W" : ""}`}
+                    </span>
                   </div>
-                  <div>
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Pharmacies</p>
-                    <p className="font-medium leading-snug capitalize">
-                      {plan.accessRisk === "easy" ? "Easy access" : plan.accessRisk === "limited" ? "Limited" : "Unsure"}
-                    </p>
+                  <div className="flex min-h-9 items-center gap-1.5 rounded-lg border border-border/70 bg-background/70 px-2 py-1.5">
+                    <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-muted-foreground">Pharmacies</span>
+                    <span className="shrink-0 text-sm font-bold capitalize">
+                      {plan.accessRisk === "easy" ? "Easy" : plan.accessRisk === "limited" ? "Limited" : "Unsure"}
+                    </span>
                   </div>
-                  <div>
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Packed</p>
-                    <p className="font-medium leading-snug" data-testid="text-overview-packing-progress">
+                  <div className="flex min-h-9 items-center gap-1.5 rounded-lg border border-border/70 bg-background/70 px-2 py-1.5">
+                    <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-muted-foreground">Packed</span>
+                    <span className="shrink-0 text-sm font-bold tabular-nums" data-testid="text-overview-packing-progress">
                       {checkedCount}/{packingList.length}
-                    </p>
+                    </span>
                   </div>
                 </div>
                 {(!plan.tripStyle || plan.tripStyle === "not_sure") && (
-                  <div className="space-y-1.5 border-t border-border/60 pt-2" data-testid="overview-trip-style-nudge">
-                    <p className="text-xs text-muted-foreground">Add trip type for better daily tips.</p>
-                    <Select value={plan.tripStyle ?? "not_sure"} onValueChange={handleActiveTripStyleChange}>
-                      <SelectTrigger className="h-9 text-sm" data-testid="select-overview-trip-style">
-                        <SelectValue placeholder="Choose the closest match" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="relax">Relaxing</SelectItem>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="city">City break</SelectItem>
-                        <SelectItem value="remote">Remote</SelectItem>
-                        <SelectItem value="family">Family visit</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="space-y-2 border-t border-border/60 pt-3" data-testid="overview-trip-style-nudge">
+                    <p className="text-sm font-medium text-foreground">Trip style</p>
+                    <TravelSegmentGroup
+                      value={plan.tripStyle ?? "not_sure"}
+                      onChange={handleActiveTripStyleChange}
+                      options={TRIP_STYLE_OPTIONS}
+                      testId="select-overview-trip-style"
+                      columns={2}
+                      variant="tiles"
+                    />
                   </div>
                 )}
                 <div className="flex flex-wrap gap-2">
@@ -1740,7 +1812,7 @@ export default function Travel() {
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="min-h-9"
+                    className="h-10 min-h-9 rounded-xl"
                     onClick={() => setActiveTravelTab("plan")}
                     data-testid="button-overview-open-plan"
                   >
@@ -1751,20 +1823,20 @@ export default function Travel() {
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="min-h-9"
+                    className="h-10 min-h-9 rounded-xl"
                     onClick={() => setActiveTravelTab("checklist")}
                     data-testid="button-overview-open-checklist"
                   >
                     <Package className="h-3.5 w-3.5 mr-1.5" aria-hidden />
                     Checklist
                   </Button>
-                  <Button asChild variant="outline" size="sm" className="min-h-9" data-testid="button-overview-emergency">
+                  <Button asChild variant="outline" size="sm" className="h-10 min-h-9 rounded-xl" data-testid="button-overview-emergency">
                     <Link href="/emergency-card">
                       <Globe className="h-3.5 w-3.5 mr-1.5 text-red-600 dark:text-red-400" aria-hidden />
                       Emergency card
                     </Link>
                   </Button>
-                  <Button asChild variant="outline" size="sm" className="min-h-9" data-testid="button-overview-supplies">
+                  <Button asChild variant="outline" size="sm" className="h-10 min-h-9 rounded-xl" data-testid="button-overview-supplies">
                     <Link href="/supplies">
                       <Package className="h-3.5 w-3.5 mr-1.5" aria-hidden />
                       Supplies
@@ -1777,51 +1849,39 @@ export default function Travel() {
             <CompactRiskConsiderations warnings={riskWarnings} />
 
             {isSickDayAlsoActive && (
-              <Card className="surface-card border-amber-500/25 shadow-none" data-testid="card-sick-day-also-active">
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/10">
-                      <Thermometer className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                    </span>
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <p className="text-sm font-medium">
-                        Sick day mode is also on{sickDaySeverity ? ` · ${sickDaySeverity}` : ""}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Supply needs may be higher while unwell — confirm care access at your destination.
-                      </p>
-                      <Link href="/scenarios/sick-day">
-                        <Button variant="outline" size="sm" className="min-h-9 rounded-xl" data-testid="button-view-sick-day-from-travel">
-                          View sick day
-                        </Button>
-                      </Link>
-                    </div>
-                  </div>
+              <Card className="overflow-hidden rounded-[1.35rem] border-amber-500/25 bg-amber-500/[0.06] shadow-none dark:bg-amber-950/30" data-testid="card-sick-day-also-active">
+                <CardContent className="flex items-center gap-3 p-3.5">
+                  <Thermometer className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
+                  <p className="min-w-0 flex-1 text-sm font-medium">
+                    Sick day also on{sickDaySeverity ? ` · ${sickDaySeverity}` : ""}
+                  </p>
+                  <Link href="/scenarios/sick-day">
+                    <Button variant="outline" size="sm" className="h-9 rounded-lg" data-testid="button-view-sick-day-from-travel">
+                      Sick day
+                    </Button>
+                  </Link>
                 </CardContent>
               </Card>
             )}
           </TabsContent>
 
-          <TabsContent value="plan" className="mt-3 space-y-3 animate-fade-in-up" data-testid="tabcontent-travel-plan">
+          <TabsContent value="plan" className="mt-4 space-y-3 animate-fade-in-up" data-testid="tabcontent-travel-plan">
             {todayScheduleEntries.length > 0 && !isPumpUser && hasStarted && !hasEnded && (
-              <Card className="surface-card border-border/60 shadow-none">
-                <CardHeader className="pb-2">
+              <Card className="overflow-hidden rounded-[1.35rem] border-border/50 shadow-none">
+                <CardHeader className="px-4 pb-2 pt-4">
                   <CardTitle className="flex items-center gap-2 text-base font-semibold">
                     <Clock className="h-4 w-4 text-primary" aria-hidden />
                     Today&apos;s insulin timing
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3 pt-0">
+                <CardContent className="space-y-3 px-4 pb-4 pt-0">
                   {todayScheduleEntries.map((row, idx) => (
                     <div
                       key={`${row.doseLabel}-${idx}`}
-                      className={cn(
-                        "flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/50 bg-muted/15 px-3 py-2.5",
-                        idx > 0 && "mt-0",
-                      )}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/50 bg-muted/15 px-3 py-3"
                     >
                       <div className="min-w-0">
-                        <p className="text-xs text-muted-foreground">{row.doseLabel}</p>
+                        <p className="text-sm text-muted-foreground">{row.doseLabel}</p>
                         <p
                           className="text-xl font-bold tabular-nums text-foreground"
                           data-testid={idx === 0 ? "text-today-injection-time" : `text-today-injection-time-${idx + 1}`}
@@ -1829,46 +1889,38 @@ export default function Travel() {
                           {row.localTime}
                           <span className="ml-1 text-sm font-normal text-muted-foreground">local</span>
                         </p>
-                        <p className="text-xs text-muted-foreground">{row.homeTime} home</p>
+                        <p className="text-sm text-muted-foreground">{row.homeTime} home</p>
                       </div>
-                      <div className="text-right">
-                        <Badge variant="outline">{row.label}</Badge>
-                        <p className="mt-1 text-xs text-muted-foreground">{row.note}</p>
-                      </div>
+                      <Badge variant="outline" className="rounded-full">{row.label}</Badge>
                     </div>
                   ))}
-                  {plan.timezoneChange === "major" ? (
-                    <p className="text-xs text-muted-foreground">
-                      Shift up to 2h per day until local time ({plan.timezoneHours}h {plan.timezoneDirection}). Check BG more often.
-                    </p>
-                  ) : null}
                 </CardContent>
               </Card>
             )}
 
             {isPumpUser && plan.timezoneChange !== "none" && hasStarted && !hasEnded && (
-              <Card className="surface-card border-border/60 shadow-none">
-                <CardHeader className="pb-2">
+              <Card className="overflow-hidden rounded-[1.35rem] border-border/50 shadow-none">
+                <CardHeader className="px-4 pb-2 pt-4">
                   <CardTitle className="flex items-center gap-2 text-base font-semibold">
                     <Clock className="h-4 w-4 text-primary" aria-hidden />
                     Timezone
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-2 pt-0 text-sm">
-                  <p>
-                    {plan.timezoneHours}h {plan.timezoneDirection === "east" ? "ahead of" : "behind"} home time.
+                <CardContent className="space-y-1 px-4 pb-4 pt-0 text-sm">
+                  <p className="font-semibold tabular-nums">
+                    {plan.timezoneHours}h {plan.timezoneDirection === "east" ? "ahead" : "behind"}
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-sm text-muted-foreground">
                     {daysElapsed < 2
-                      ? "Consider home time on your pump for day one, then switch to local."
+                      ? "Keep pump on home time for day one, then switch to local."
                       : "Pump should be on local time — check basal rates suit."}
                   </p>
                 </CardContent>
               </Card>
             )}
 
-            <Card className="surface-card border-border/60 shadow-none">
-              <CardHeader className="pb-2">
+            <Card className="overflow-hidden rounded-[1.35rem] border-border/50 shadow-none">
+              <CardHeader className="px-4 pb-2 pt-4">
                 <CardTitle className="text-base font-semibold">Emergency</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 pt-0">
@@ -1946,8 +1998,8 @@ export default function Travel() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="checklist" className="mt-3 space-y-3 animate-fade-in-up" data-testid="tabcontent-travel-checklist">
-            <Card className="surface-card border-border/60 shadow-none">
+          <TabsContent value="checklist" className="mt-4 space-y-3 animate-fade-in-up" data-testid="tabcontent-travel-checklist">
+            <Card className="overflow-hidden rounded-[1.35rem] border-border/50 shadow-none">
               <CardHeader className="pb-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <CardTitle className="text-base font-semibold">Packing checklist</CardTitle>
@@ -2010,53 +2062,52 @@ export default function Travel() {
 
         <section className="space-y-3">
           <h2 className="text-base font-semibold text-foreground">What do you need?</h2>
-          <div className="grid gap-2">
+          <div className="grid gap-3">
             <button
               type="button"
               onClick={handleStartPlan}
               className={cn(
-                "group flex w-full items-center gap-3 rounded-xl border border-border/70 bg-card/40 px-3.5 py-3 text-left transition-all",
-                "hover:border-primary/40 hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "group flex w-full items-center gap-3.5 rounded-[1.35rem] border border-sky-500/20 bg-gradient-to-b from-sky-500/[0.07] via-card to-card px-4 py-4 text-left transition-all",
+                "hover:border-sky-500/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               )}
               data-testid="button-start-travel-plan"
             >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                <MapPin className="h-4 w-4 text-primary" aria-hidden />
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500/20 to-indigo-500/10 text-sky-700 ring-1 ring-sky-500/20 dark:text-sky-200">
+                <MapPin className="h-5 w-5" aria-hidden />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-sm font-medium text-foreground">Travel plan</span>
-                <span className="block text-xs text-muted-foreground">Dates, packing list, timezone tips</span>
+                <span className="block font-display text-base font-semibold text-foreground">Travel plan</span>
+                <span className="mt-0.5 block text-sm text-muted-foreground">Dates, packing, timezone</span>
               </span>
-              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/70" aria-hidden />
+              <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground/70" aria-hidden />
             </button>
             <button
               type="button"
               onClick={() => setShowPrepForm(true)}
               className={cn(
-                "group flex w-full items-center gap-3 rounded-xl border border-border/70 bg-card/40 px-3.5 py-3 text-left transition-all",
-                "hover:border-primary/40 hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "group flex w-full items-center gap-3.5 rounded-[1.35rem] border border-border/60 bg-card/70 px-4 py-4 text-left transition-all",
+                "hover:border-primary/40 hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               )}
               data-testid="button-start-holiday-prep"
             >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted/60">
-                <Luggage className="h-4 w-4 text-muted-foreground" aria-hidden />
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-muted/60 text-foreground ring-1 ring-border/50">
+                <Luggage className="h-5 w-5" aria-hidden />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-sm font-medium text-foreground">Holiday prep</span>
-                <span className="block text-xs text-muted-foreground">Countdown and checklist before you go</span>
+                <span className="block font-display text-base font-semibold text-foreground">Holiday prep</span>
+                <span className="mt-0.5 block text-sm text-muted-foreground">Countdown and supplies</span>
               </span>
-              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/70" aria-hidden />
+              <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground/70" aria-hidden />
             </button>
           </div>
         </section>
 
         {(showPrepForm || holidayPrep) && (
-          <Card className="surface-card border-border/60 shadow-none" data-testid="card-travel-entry-hub">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Holiday prep</CardTitle>
-              <CardDescription>Optional countdown and supply check before departure.</CardDescription>
+          <Card className="overflow-hidden rounded-[1.35rem] border-border/50 shadow-none" data-testid="card-travel-entry-hub">
+            <CardHeader className="px-4 pb-2 pt-4">
+              <CardTitle className="font-display text-lg font-semibold tracking-tight">Holiday prep</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4 pt-0">
+            <CardContent className="space-y-4 px-4 pb-4 pt-0">
               {showPrepForm && !holidayPrep ? (
               <div className="space-y-4" data-testid="holiday-prep-form">
                 <div className="space-y-2">
@@ -2065,10 +2116,11 @@ export default function Travel() {
                     placeholder="e.g. Spain, Lake District, Florida"
                     value={prepDestination}
                     onChange={(e) => setPrepDestination(e.target.value)}
+                    className="h-11 rounded-xl"
                     data-testid="input-prep-destination"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3">
                   <div className="space-y-2">
                     <Label>Departure</Label>
                     <Input 
@@ -2076,6 +2128,7 @@ export default function Travel() {
                       value={prepDeparture}
                       onChange={(e) => setPrepDeparture(e.target.value)}
                       min={new Date().toISOString().split("T")[0]}
+                      className={travelDateInputClass}
                       data-testid="input-prep-departure"
                     />
                   </div>
@@ -2086,6 +2139,7 @@ export default function Travel() {
                       value={prepReturn}
                       onChange={(e) => setPrepReturn(e.target.value)}
                       min={prepDeparture || new Date().toISOString().split("T")[0]}
+                      className={travelDateInputClass}
                       data-testid="input-prep-return"
                     />
                   </div>
@@ -2093,17 +2147,18 @@ export default function Travel() {
                 <div className="space-y-2">
                   <Label>Notes (optional)</Label>
                   <Input 
-                    placeholder="e.g. All-inclusive, hiking trip, visiting family"
+                    placeholder="e.g. All-inclusive, hiking trip"
                     value={prepNotes}
                     onChange={(e) => setPrepNotes(e.target.value)}
+                    className="h-11 rounded-xl"
                     data-testid="input-prep-notes"
                   />
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button onClick={handleSaveHolidayPrep} data-testid="button-save-holiday-prep">
-                    Save Trip
+                  <Button onClick={handleSaveHolidayPrep} className="h-11 rounded-xl" data-testid="button-save-holiday-prep">
+                    Save trip
                   </Button>
-                  <Button variant="ghost" onClick={() => setShowPrepForm(false)} data-testid="button-cancel-holiday-prep">
+                  <Button variant="ghost" onClick={() => setShowPrepForm(false)} className="h-11 rounded-xl" data-testid="button-cancel-holiday-prep">
                     Cancel
                   </Button>
                 </div>
@@ -2138,7 +2193,7 @@ export default function Travel() {
                         {" "}({tripDays} days)
                       </p>
                       {holidayPrep.notes && (
-                        <p className="text-xs text-muted-foreground mt-1">{holidayPrep.notes}</p>
+                        <p className="mt-1 text-sm text-muted-foreground">{holidayPrep.notes}</p>
                       )}
                     </div>
                     <Button
@@ -2153,16 +2208,20 @@ export default function Travel() {
                   </div>
 
                   {daysUntil !== null && daysUntil >= 0 && (
-                    <div className={`p-3 rounded-lg text-center ${
-                      daysUntil <= 3
-                        ? "bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800"
-                        : daysUntil <= 7
-                        ? "bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800"
-                        : "bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800"
-                    }`} data-testid="text-prep-countdown">
-                      <p className="text-2xl font-bold">{daysUntil}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {daysUntil === 0 ? "Departing today" : daysUntil === 1 ? "day until departure" : "days until departure"}
+                    <div
+                      className={cn(
+                        "overflow-hidden rounded-[1.35rem] border px-4 py-4 text-center",
+                        daysUntil <= 3
+                          ? "border-orange-500/30 bg-orange-500/[0.08]"
+                          : daysUntil <= 7
+                            ? "border-amber-500/30 bg-amber-500/[0.08]"
+                            : "border-sky-500/25 bg-sky-500/[0.08]",
+                      )}
+                      data-testid="text-prep-countdown"
+                    >
+                      <p className="font-display text-5xl font-bold tabular-nums tracking-tight text-foreground">{daysUntil}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {daysUntil === 0 ? "Departing today" : daysUntil === 1 ? "day to go" : "days to go"}
                       </p>
                     </div>
                   )}
@@ -2179,40 +2238,43 @@ export default function Travel() {
 
                   {coverage.length > 0 && (
                     <div className="space-y-2">
-                      <h4 className="text-sm font-medium flex items-center gap-1.5">
+                      <h4 className="text-sm font-semibold flex items-center gap-1.5">
                         <Package className="h-4 w-4" />
-                        Supply Coverage (~2× {tripDays}-day trip)
+                        Supplies · 2× {tripDays}d
                       </h4>
-                      <p className="text-xs text-muted-foreground">
-                        Bars compare your forecast days of stock to about twice your trip length, in line with usual travel planning advice.
-                      </p>
-                      <div className="space-y-2">
-                        {coverage.map(({ supply, daysRemaining, daysNeeded, shortfall, coveragePercent }) => (
-                          <div key={supply.id} className="space-y-1" data-testid={`prep-supply-${supply.id}`}>
-                            <div className="flex flex-wrap items-center justify-between gap-1 text-sm">
-                              <span>{supply.name}</span>
-                              <span className={`text-xs font-medium ${
-                                shortfall > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"
-                              }`}>
-                                {daysRemaining >= 999 
-                                  ? "N/A" 
-                                  : shortfall > 0 
-                                  ? `${shortfall} days short` 
-                                  : "Covered"}
-                              </span>
-                            </div>
-                            {daysRemaining < 999 && (
-                              <Progress 
-                                value={coveragePercent} 
-                                className={`h-2 ${shortfall > 0 ? "[&>div]:bg-red-500" : "[&>div]:bg-green-500"}`}
-                              />
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {coverage.map(({ supply, daysRemaining, shortfall, coveragePercent }) => (
+                          <div
+                            key={supply.id}
+                            className={cn(
+                              "rounded-xl border px-2.5 py-2",
+                              shortfall > 0 ? "border-red-500/30 bg-red-500/[0.06]" : "border-border/70 bg-background/70",
                             )}
+                            data-testid={`prep-supply-${supply.id}`}
+                          >
+                            <p className="truncate text-[11px] font-medium text-muted-foreground">{supply.name}</p>
+                            <p className={cn(
+                              "mt-0.5 text-sm font-bold tabular-nums",
+                              shortfall > 0 ? "text-red-600 dark:text-red-400" : "text-foreground",
+                            )}>
+                              {daysRemaining >= 999
+                                ? "N/A"
+                                : shortfall > 0
+                                  ? `${shortfall}d short`
+                                  : "Covered"}
+                            </p>
+                            {daysRemaining < 999 ? (
+                              <Progress
+                                value={coveragePercent}
+                                className={`mt-1.5 h-1.5 ${shortfall > 0 ? "[&>div]:bg-red-500" : "[&>div]:bg-emerald-500"}`}
+                              />
+                            ) : null}
                           </div>
                         ))}
                       </div>
                       {hasSupplyShortfall && (
-                        <p className="text-xs text-red-600 dark:text-red-400 mt-1">
-                          Some supplies won't last the trip. Consider ordering a top-up or speaking to your pharmacy.
+                        <p className="text-sm text-red-600 dark:text-red-400">
+                          Some supplies won&apos;t last the trip.
                         </p>
                       )}
                     </div>
@@ -2268,8 +2330,8 @@ export default function Travel() {
                           <CheckCircle2 className="h-4 w-4 shrink-0" />
                           <span>
                             <span className="font-medium text-sm block">Preparation checklist</span>
-                            <span className="text-xs text-muted-foreground font-normal">
-                              {checkedCount} of {totalChecklist} done
+                            <span className="text-sm text-muted-foreground font-normal">
+                              {checkedCount}/{totalChecklist}
                             </span>
                           </span>
                         </span>
@@ -2303,32 +2365,23 @@ export default function Travel() {
                   </Collapsible>
 
                   {isDepartureNear && !isTravelModeActive && (
-                    <Card className="border-green-500/50 bg-green-50/30 dark:bg-green-950/20" data-testid="card-departure-prompt">
-                      <CardContent className="p-4">
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2">
-                            <Plane className="h-5 w-5 text-green-600" />
-                            <p className="font-medium text-green-800 dark:text-green-200">
-                              {daysUntil === 0 ? "Time to go!" : "Nearly time to go!"}
-                            </p>
-                          </div>
-                          <p className="text-sm text-muted-foreground">
-                            Activate Travel Mode to get real-time guidance, timezone adjustments, and emergency support while you're away.
-                          </p>
-                          <Button onClick={handleActivateFromPrep} className="w-full" data-testid="button-activate-from-prep">
-                            Start Travel Plan
-                            <ChevronRight className="h-4 w-4 ml-2" />
-                          </Button>
-                        </div>
+                    <Card className="overflow-hidden rounded-[1.35rem] border-emerald-500/30 bg-emerald-500/[0.08] shadow-none" data-testid="card-departure-prompt">
+                      <CardContent className="flex items-center justify-between gap-3 p-3.5">
+                        <p className="text-sm font-semibold">
+                          {daysUntil === 0 ? "Time to go" : "Nearly time"}
+                        </p>
+                        <Button onClick={handleActivateFromPrep} className="h-10 rounded-xl" data-testid="button-activate-from-prep">
+                          Start travel
+                          <ChevronRight className="h-4 w-4 ml-1.5" />
+                        </Button>
                       </CardContent>
                     </Card>
                   )}
 
                   {!isDepartureNear && !hasDeparted && !isTravelModeActive && (
-                    <Button variant="outline" onClick={handleActivateFromPrep} className="w-full" data-testid="button-start-plan-from-prep">
+                    <Button variant="outline" onClick={handleActivateFromPrep} className="h-11 w-full rounded-xl" data-testid="button-start-plan-from-prep">
                       <Plane className="h-4 w-4 mr-2" />
-                      Start Travel Plan for This Trip
-                      <ChevronRight className="h-4 w-4 ml-2" />
+                      Start travel plan
                     </Button>
                   )}
                 </div>
@@ -2343,10 +2396,10 @@ export default function Travel() {
             Before you go
           </h2>
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-xl border border-border/60 bg-card/40 p-3 space-y-2" data-testid="card-pretravel-appointment">
+            <div className="space-y-2 rounded-[1.35rem] border border-border/50 bg-card/70 p-3.5" data-testid="card-pretravel-appointment">
               <div className="flex flex-wrap items-center gap-1">
                 <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="text-sm font-medium">Appointments</span>
+                <span className="text-sm font-semibold">Appointments</span>
                 <InlineInfoHint
                   ariaLabel="Why book before you travel"
                   content={
@@ -2357,15 +2410,15 @@ export default function Travel() {
                 />
               </div>
               <Link href="/appointments" className="block">
-                <Button variant="secondary" className="w-full rounded-xl" size="sm" data-testid="link-pretravel-appointments">
+                <Button variant="secondary" className="h-10 w-full rounded-xl" size="sm" data-testid="link-pretravel-appointments">
                   View appointments
                 </Button>
               </Link>
             </div>
-            <div className="rounded-xl border border-border/60 bg-card/40 p-3 space-y-2">
+            <div className="space-y-2 rounded-[1.35rem] border border-border/50 bg-card/70 p-3.5">
               <div className="flex flex-wrap items-center gap-1">
                 <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="text-sm font-medium">Emergency card</span>
+                <span className="text-sm font-semibold">Emergency card</span>
                 <InlineInfoHint
                   ariaLabel="About the emergency card"
                   content={
@@ -2376,10 +2429,8 @@ export default function Travel() {
                 />
               </div>
               <Link href="/emergency-card" className="block">
-                <Button variant="secondary" className="w-full rounded-xl" size="sm" data-testid="button-emergency-card">
-                  <AlertTriangle className="h-4 w-4 mr-2" />
+                <Button variant="secondary" className="h-10 w-full rounded-xl" size="sm" data-testid="button-emergency-card">
                   Open emergency card
-                  <ChevronRight className="h-4 w-4 ml-auto" />
                 </Button>
               </Link>
             </div>
@@ -2395,7 +2446,8 @@ export default function Travel() {
   if (step === "inputs") {
     const matchedDurationPreset = TRAVEL_DURATION_PRESETS.find((preset) => preset.days === plan.duration);
     return (
-      <PageShell variant="narrow" density="compact" className="space-y-4 pb-24">
+      <>
+      <PageShell variant="narrow" density="compact" className="space-y-4 pb-28">
         <PageHeader
           leading={
             <Button type="button" variant="ghost" size="icon" className="mr-2" aria-label="Go back" onClick={backTravelWizard}>
@@ -2407,73 +2459,80 @@ export default function Travel() {
         />
 
         <div className="space-y-1.5">
-          <div className="flex items-center justify-between text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          <div className="flex items-center justify-between text-sm font-medium text-muted-foreground">
             <span>
               Step {travelWizardStep + 1} of {TRAVEL_INPUT_STEPS}
             </span>
             <span>{INPUT_STEP_TITLES[travelWizardStep]}</span>
           </div>
-          <Progress value={inputWizardProgressPct} className="h-1" data-testid="travel-input-progress" />
+          <Progress value={inputWizardProgressPct} className="h-1.5" data-testid="travel-input-progress" />
         </div>
 
-        <Card className="surface-card border-border/60 shadow-none">
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted/60">
-                <Plane className="h-4 w-4 text-primary" aria-hidden />
+        <Card className="overflow-hidden rounded-[1.35rem] border-sky-500/20 bg-gradient-to-b from-sky-500/[0.07] via-card to-card shadow-none dark:border-sky-400/15 dark:from-sky-950/40">
+          <CardHeader className="space-y-0 px-4 pb-3 pt-4">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500/20 to-indigo-500/10 text-sky-700 ring-1 ring-sky-500/20 dark:text-sky-200">
+                <Plane className="h-5 w-5" aria-hidden />
               </span>
-              <CardTitle className="text-base font-semibold">{INPUT_STEP_TITLES[travelWizardStep]}</CardTitle>
+              <CardTitle className="font-display text-lg font-semibold tracking-tight">{INPUT_STEP_TITLES[travelWizardStep]}</CardTitle>
             </div>
           </CardHeader>
-          <CardContent className="space-y-5 pt-0">
+          <CardContent className="space-y-6 border-t border-sky-500/10 px-4 pb-5 pt-5">
             {travelWizardStep === 0 ? (
               <>
             <div className="space-y-2">
-              <Label htmlFor="destination">Destination</Label>
+              <Label htmlFor="destination" className="text-xs font-medium text-muted-foreground">Destination</Label>
               <Input
                 id="destination"
                 placeholder="City, country"
                 value={plan.destination}
                 onChange={(e) => setPlan(prev => ({ ...prev, destination: e.target.value }))}
+                className="h-12 rounded-xl text-base"
                 data-testid="input-destination"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="duration-preset">Duration</Label>
-              <Select
-                value={!customDurationOpen && matchedDurationPreset ? String(plan.duration) : "custom"}
-                onValueChange={(value) => {
-                  if (value === "custom") {
-                    setCustomDurationOpen(true);
-                    return;
-                  }
-                  setCustomDurationOpen(false);
-                  updateDuration(parseInt(value, 10));
-                }}
-              >
-                <SelectTrigger id="duration-preset" data-testid="select-duration">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {TRAVEL_DURATION_PRESETS.map((preset) => (
-                    <SelectItem key={preset.days} value={String(preset.days)} data-testid={`option-duration-${preset.days}`}>
-                      {preset.label}
-                    </SelectItem>
-                  ))}
-                  <SelectItem value="custom" data-testid="option-duration-custom">
-                    Custom…
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex items-baseline justify-between gap-2">
+                <Label id="duration-preset" className="text-xs font-medium text-muted-foreground">Duration</Label>
+                <span className="text-sm font-semibold tabular-nums text-foreground">{plan.duration}d</span>
+              </div>
+              <div className="grid min-w-0 grid-cols-2 gap-2" role="group" aria-labelledby="duration-preset" data-testid="select-duration">
+                {TRAVEL_DURATION_PRESETS.map((preset) => (
+                  <Button
+                    key={preset.days}
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className={travelTileClass(!customDurationOpen && plan.duration === preset.days)}
+                    onClick={() => {
+                      setCustomDurationOpen(false);
+                      updateDuration(preset.days);
+                    }}
+                    data-testid={`option-duration-${preset.days}`}
+                  >
+                    {preset.label}
+                  </Button>
+                ))}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className={travelTileClass(customDurationOpen || !matchedDurationPreset)}
+                  onClick={() => setCustomDurationOpen(true)}
+                  data-testid="option-duration-custom"
+                >
+                  Custom
+                </Button>
+              </div>
 
               {(customDurationOpen || !matchedDurationPreset) && (
-                <div className="flex items-center gap-2 pt-1">
+                <div className="flex items-center justify-center gap-3 pt-1">
                   <Button
                     type="button"
                     variant="outline"
                     size="icon"
-                    className="shrink-0"
+                    className="h-12 w-12 shrink-0 rounded-xl"
                     onClick={() => updateDuration(Math.max(1, plan.duration - 1))}
                     aria-label="Decrease duration"
                     data-testid="button-duration-minus"
@@ -2485,30 +2544,30 @@ export default function Travel() {
                     type="number"
                     min={1}
                     max={365}
+                    inputMode="numeric"
                     value={plan.duration}
                     onChange={(e) => updateDuration(parseInt(e.target.value) || 1)}
-                    className="w-20 text-center"
+                    className="h-12 w-24 rounded-xl text-center text-xl font-semibold tabular-nums"
                     data-testid="input-duration"
                   />
                   <Button
                     type="button"
                     variant="outline"
                     size="icon"
-                    className="shrink-0"
+                    className="h-12 w-12 shrink-0 rounded-xl"
                     onClick={() => updateDuration(Math.min(365, plan.duration + 1))}
                     aria-label="Increase duration"
                     data-testid="button-duration-plus"
                   >
                     +
                   </Button>
-                  <span className="text-sm text-muted-foreground">days</span>
                 </div>
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-3">
               <div className="min-w-0 space-y-2">
-                <Label htmlFor="start-date">Start Date</Label>
+                <Label htmlFor="start-date" className="text-xs font-medium text-muted-foreground">Start</Label>
                 <Input
                   id="start-date"
                   type="date"
@@ -2524,11 +2583,12 @@ export default function Travel() {
                       endDate: endDate.toISOString().split("T")[0]
                     }));
                   }}
+                  className={travelDateInputClass}
                   data-testid="input-start-date"
                 />
               </div>
               <div className="min-w-0 space-y-2">
-                <Label htmlFor="end-date">End Date</Label>
+                <Label htmlFor="end-date" className="text-xs font-medium text-muted-foreground">End</Label>
                 <Input
                   id="end-date"
                   type="date"
@@ -2546,25 +2606,25 @@ export default function Travel() {
                       duration: diffDays
                     }));
                   }}
+                  className={travelDateInputClass}
                   data-testid="input-end-date"
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label>Travel type</Label>
-              <Select 
-                value={plan.travelType} 
-                onValueChange={(value: "domestic" | "international") => setPlan(prev => ({ ...prev, travelType: value }))}
-              >
-                <SelectTrigger data-testid="select-travel-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="domestic">Domestic</SelectItem>
-                  <SelectItem value="international">International</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label id="travel-type-label" className="text-xs font-medium text-muted-foreground">Travel type</Label>
+              <TravelSegmentGroup
+                labelledBy="travel-type-label"
+                value={plan.travelType}
+                onChange={(value) => setPlan((prev) => ({ ...prev, travelType: value }))}
+                options={[
+                  { value: "domestic", label: "Domestic" },
+                  { value: "international", label: "International" },
+                ]}
+                testId="select-travel-type"
+                columns={2}
+              />
             </div>
               </>
             ) : null}
@@ -2572,13 +2632,11 @@ export default function Travel() {
             {travelWizardStep === 1 ? (
               <>
             <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <Luggage className="h-4 w-4 text-muted-foreground" aria-hidden />
-                Trip style
-              </Label>
-              <Select
+              <Label id="trip-style-label" className="text-xs font-medium text-muted-foreground">Trip style</Label>
+              <TravelSegmentGroup
+                labelledBy="trip-style-label"
                 value={plan.tripStyle ?? "not_sure"}
-                onValueChange={(value: TravelTripStyle) => {
+                onChange={(value) => {
                   setPlan((prev) => {
                     const updated = { ...prev, tripStyle: value };
                     if (isTravelModeActive) {
@@ -2588,82 +2646,81 @@ export default function Travel() {
                     return updated;
                   });
                 }}
-              >
-                <SelectTrigger data-testid="select-trip-style">
-                  <SelectValue placeholder="Choose the closest match" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="not_sure">Not sure / mixed</SelectItem>
-                  <SelectItem value="relax">Relaxing — beach, resort, downtime</SelectItem>
-                  <SelectItem value="active">Active — hiking, skiing, lots of walking</SelectItem>
-                  <SelectItem value="city">City break — eating out, sightseeing</SelectItem>
-                  <SelectItem value="remote">Remote — limited shops or services</SelectItem>
-                  <SelectItem value="family">Visiting family or friends</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">Shapes tips while you travel.</p>
+                options={TRIP_STYLE_OPTIONS}
+                testId="select-trip-style"
+                columns={2}
+                variant="tiles"
+              />
             </div>
 
             <div className="space-y-2">
-              <Label>Timezone change</Label>
-              <Select 
-                value={plan.timezoneChange} 
-                onValueChange={(value: "none" | "minor" | "major") => {
-                  setPlan(prev => ({ 
-                    ...prev, 
+              <Label id="timezone-label" className="text-xs font-medium text-muted-foreground">Timezone</Label>
+              <TravelSegmentGroup
+                labelledBy="timezone-label"
+                value={plan.timezoneChange}
+                onChange={(value) => {
+                  setPlan((prev) => ({
+                    ...prev,
                     timezoneChange: value,
                     timezoneDirection: value === "none" ? "none" : prev.timezoneDirection === "none" ? "east" : prev.timezoneDirection,
-                    timezoneHours: value === "none" ? 0 : value === "minor" ? 2 : 6
+                    timezoneHours: value === "none" ? 0 : value === "minor" ? 2 : 6,
                   }));
                 }}
-              >
-                <SelectTrigger data-testid="select-timezone">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  <SelectItem value="minor">Minor (1-3 hours)</SelectItem>
-                  <SelectItem value="major">Major (4+ hours)</SelectItem>
-                </SelectContent>
-              </Select>
+                options={[
+                  { value: "none", label: "None" },
+                  { value: "minor", label: "Minor" },
+                  { value: "major", label: "Major" },
+                ]}
+                testId="select-timezone"
+                columns={3}
+              />
             </div>
             
             {plan.timezoneChange !== "none" && (
-              <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
+              <div className="space-y-3 rounded-xl border border-border/50 bg-background/50 p-3">
                 <div className="space-y-2">
-                  <Label>Hours Difference</Label>
-                  <Select 
-                    value={plan.timezoneHours.toString()} 
-                    onValueChange={(value) => setPlan(prev => ({ ...prev, timezoneHours: parseInt(value) }))}
-                  >
-                    <SelectTrigger data-testid="select-timezone-hours">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(h => (
-                        <SelectItem key={h} value={h.toString()}>{h} hour{h > 1 ? "s" : ""}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label className="text-xs font-medium text-muted-foreground">Hours</Label>
+                  <div className="flex items-center justify-center gap-3" data-testid="select-timezone-hours">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-12 w-12 rounded-xl"
+                      onClick={() => setPlan((prev) => ({ ...prev, timezoneHours: Math.max(1, prev.timezoneHours - 1) }))}
+                      aria-label="Decrease hours"
+                    >
+                      -
+                    </Button>
+                    <span className="min-w-[3.5rem] text-center font-display text-2xl font-bold tabular-nums">
+                      {plan.timezoneHours}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-12 w-12 rounded-xl"
+                      onClick={() => setPlan((prev) => ({ ...prev, timezoneHours: Math.min(12, prev.timezoneHours + 1) }))}
+                      aria-label="Increase hours"
+                    >
+                      +
+                    </Button>
+                    <span className="text-sm text-muted-foreground">h</span>
+                  </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Direction</Label>
-                  <Select 
-                    value={plan.timezoneDirection} 
-                    onValueChange={(value: "east" | "west") => setPlan(prev => ({ ...prev, timezoneDirection: value }))}
-                  >
-                    <SelectTrigger data-testid="select-timezone-direction">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="east">Travelling East (ahead)</SelectItem>
-                      <SelectItem value="west">Travelling West (behind)</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label id="timezone-direction-label" className="text-xs font-medium text-muted-foreground">Direction</Label>
+                  <TravelSegmentGroup
+                    labelledBy="timezone-direction-label"
+                    value={plan.timezoneDirection === "none" ? "east" : plan.timezoneDirection}
+                    onChange={(value) => setPlan((prev) => ({ ...prev, timezoneDirection: value }))}
+                    options={[
+                      { value: "east", label: "East" },
+                      { value: "west", label: "West" },
+                    ]}
+                    testId="select-timezone-direction"
+                    columns={2}
+                  />
                 </div>
-                <p className="col-span-2 text-xs text-muted-foreground">
-                  Destination is {plan.timezoneHours} hours {plan.timezoneDirection === "east" ? "ahead of" : "behind"} your home time
-                </p>
               </div>
             )}
               </>
@@ -2672,106 +2729,76 @@ export default function Travel() {
             {travelWizardStep === 2 ? (
               <>
             <div className="space-y-2">
-              <Label>Pharmacy access</Label>
-              <Select 
-                value={plan.accessRisk} 
-                onValueChange={(value: "easy" | "limited" | "unsure") => setPlan(prev => ({ ...prev, accessRisk: value }))}
-              >
-                <SelectTrigger data-testid="select-access-risk">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="easy">Easy access to pharmacies</SelectItem>
-                  <SelectItem value="limited">Limited access</SelectItem>
-                  <SelectItem value="unsure">Unsure</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Your home pharmacy (for collecting before you go):
-              </p>
+              <Label id="access-risk-label" className="text-xs font-medium text-muted-foreground">Pharmacy access</Label>
+              <TravelSegmentGroup
+                labelledBy="access-risk-label"
+                value={plan.accessRisk}
+                onChange={(value) => setPlan((prev) => ({ ...prev, accessRisk: value }))}
+                options={[
+                  { value: "easy", label: "Easy" },
+                  { value: "limited", label: "Limited" },
+                  { value: "unsure", label: "Unsure" },
+                ]}
+                testId="select-access-risk"
+                columns={3}
+              />
               <PharmacyCard variant="default" />
             </div>
 
             <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <Thermometer className="h-4 w-4" />
-                Weather at Destination
-              </Label>
-              <Select 
-                value={plan.weatherChange} 
-                onValueChange={(value: "warmer" | "colder" | "similar" | "unknown") => setPlan(prev => ({ ...prev, weatherChange: value }))}
-              >
-                <SelectTrigger data-testid="select-weather-change">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="unknown">I'm not sure</SelectItem>
-                  <SelectItem value="similar">Similar to home</SelectItem>
-                  <SelectItem value="warmer">Warmer than home</SelectItem>
-                  <SelectItem value="colder">Colder than home</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label id="weather-change-label" className="text-xs font-medium text-muted-foreground">Weather</Label>
+              <TravelSegmentGroup
+                labelledBy="weather-change-label"
+                value={plan.weatherChange}
+                onChange={(value) => setPlan((prev) => ({ ...prev, weatherChange: value }))}
+                options={[
+                  { value: "similar", label: "Similar" },
+                  { value: "warmer", label: "Warmer" },
+                  { value: "colder", label: "Colder" },
+                  { value: "unknown", label: "Unsure" },
+                ]}
+                testId="select-weather-change"
+                columns={2}
+                variant="tiles"
+              />
             </div>
 
             {(plan.weatherChange === "warmer" || plan.weatherChange === "colder") && (
-              <div className="space-y-2 p-4 bg-muted/50 rounded-lg">
-                <Label>How much {plan.weatherChange === "warmer" ? "warmer" : "colder"}?</Label>
-                <Select 
-                  value={plan.weatherSeverity} 
-                  onValueChange={(value: "slight" | "moderate" | "extreme") => setPlan(prev => ({ ...prev, weatherSeverity: value }))}
-                >
-                  <SelectTrigger data-testid="select-weather-severity">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="slight">Slightly (5-10°C difference)</SelectItem>
-                    <SelectItem value="moderate">Moderately (10-20°C difference)</SelectItem>
-                    <SelectItem value="extreme">Significantly (20°C+ difference)</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  {plan.weatherChange === "warmer" 
-                    ? "Heat can speed up insulin absorption and increase hypo risk" 
-                    : "Cold can slow insulin absorption and affect CGM/meter accuracy"}
-                </p>
+              <div className="space-y-2 rounded-xl border border-border/50 bg-background/50 p-3">
+                <Label id="weather-severity-label" className="text-xs font-medium text-muted-foreground">How much?</Label>
+                <TravelSegmentGroup
+                  labelledBy="weather-severity-label"
+                  value={plan.weatherSeverity}
+                  onChange={(value) => setPlan((prev) => ({ ...prev, weatherSeverity: value }))}
+                  options={[
+                    { value: "slight", label: "Slight" },
+                    { value: "moderate", label: "Moderate" },
+                    { value: "extreme", label: "Extreme" },
+                  ]}
+                  testId="select-weather-severity"
+                  columns={3}
+                />
               </div>
             )}
-
-            <Alert className="border-border/60 bg-muted/20">
-              <Info className="h-4 w-4" />
-              <AlertDescription className="text-xs">
-                Packing uses your Supply Tracker — keep supplies up to date for accurate quantities.
-              </AlertDescription>
-            </Alert>
               </>
             ) : null}
-
-            <div className="flex gap-2 pt-1">
-              <Button type="button" variant="outline" className="min-h-11 flex-1 rounded-xl" onClick={backTravelWizard}>
-                {travelWizardStep === 0 ? "Back" : "Previous"}
-              </Button>
-              <Button
-                type="button"
-                className="min-h-11 flex-1 rounded-xl"
-                onClick={advanceTravelWizard}
-                data-testid={travelWizardStep === TRAVEL_INPUT_STEPS - 1 ? "button-generate-plan" : "button-travel-wizard-next"}
-              >
-                {travelWizardStep === TRAVEL_INPUT_STEPS - 1 ? (
-                  <>
-                    Generate plan
-                    <ChevronRight className="h-4 w-4 ml-2" />
-                  </>
-                ) : (
-                  <>
-                    Next
-                    <ChevronRight className="h-4 w-4 ml-2" />
-                  </>
-                )}
-              </Button>
-            </div>
           </CardContent>
         </Card>
       </PageShell>
+      <div
+        className="fixed bottom-[var(--bottom-nav-height,0px)] left-0 right-0 z-40 border-t border-border/80 bg-background/95 px-4 py-2.5 backdrop-blur supports-[backdrop-filter]:bg-background/85 pb-[max(0.625rem,env(safe-area-inset-bottom))]"
+      >
+        <Button
+          type="button"
+          className="mx-auto flex h-12 w-full max-w-lg rounded-xl text-base font-semibold"
+          onClick={advanceTravelWizard}
+          data-testid={travelWizardStep === TRAVEL_INPUT_STEPS - 1 ? "button-generate-plan" : "button-travel-wizard-next"}
+        >
+          {travelWizardStep === TRAVEL_INPUT_STEPS - 1 ? "Generate plan" : "Next"}
+          <ChevronRight className="h-4 w-4 ml-2" />
+        </Button>
+      </div>
+      </>
     );
   }
 
@@ -2793,56 +2820,47 @@ export default function Travel() {
         actions={<ScenarioCoachLink topic="travel" from="travel-results" />}
       />
 
-      <div className="overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-b from-primary/10 via-card to-card shadow-sm ring-1 ring-primary/10">
-        <div className="px-5 pb-4 pt-5 text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-primary/90">Packing progress</p>
-          <p className="mt-1 font-display text-5xl font-bold tabular-nums tracking-tight text-foreground">
-            {checkedCount}/{packingList.length}
+      <div className="overflow-hidden rounded-[1.35rem] border border-sky-500/25 bg-gradient-to-br from-sky-500/[0.10] via-card to-card shadow-[0_12px_40px_-24px_rgba(14,165,233,0.45)]">
+        <div className="px-4 pb-4 pt-4 sm:px-5">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">Packed</p>
+          <p className="mt-1 font-display text-[2.5rem] font-bold leading-none tabular-nums tracking-tight text-foreground">
+            {checkedCount}
+            <span className="text-xl font-semibold text-muted-foreground">/{packingList.length}</span>
           </p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {plan.duration} day{plan.duration === 1 ? "" : "s"} ·{" "}
-            {formatTripDate(plan.startDate, profile, { day: "numeric", month: "short" }) || "Start"} –{" "}
-            {formatTripDate(plan.endDate, profile, { day: "numeric", month: "short", year: "numeric" }) || "End"}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground capitalize">
-            {plan.travelType} · {packingPct}% packed
-          </p>
+          <div className="mt-3.5 flex flex-wrap gap-2 border-t border-border/40 pt-3.5">
+            <span className="inline-flex items-center rounded-xl bg-background/80 px-3 py-1.5 text-sm font-semibold tabular-nums ring-1 ring-border/50">
+              {plan.duration}d
+            </span>
+            <span className="inline-flex items-center rounded-xl bg-background/50 px-3 py-1.5 text-sm font-medium ring-1 ring-border/40">
+              {formatTripDate(plan.startDate, profile, { day: "numeric", month: "short" }) || "Start"} –{" "}
+              {formatTripDate(plan.endDate, profile, { day: "numeric", month: "short" }) || "End"}
+            </span>
+            <span className="inline-flex items-center rounded-xl bg-background/50 px-3 py-1.5 text-sm font-medium capitalize ring-1 ring-border/40">
+              {plan.travelType} · {packingPct}%
+            </span>
+          </div>
         </div>
       </div>
 
       <div
         className={cn(
-          "rounded-2xl border px-3 py-2.5 flex flex-wrap items-center justify-between gap-2",
-          isTravelModeActive ? "border-primary/30 bg-primary/5" : "border-border/60 bg-card/40",
+          "flex items-center justify-between gap-3 rounded-[1.35rem] border px-4 py-3.5",
+          isTravelModeActive ? "border-sky-500/30 bg-sky-500/[0.08]" : "border-border/50 bg-card/70",
         )}
         data-testid="strip-travel-mode-status"
       >
         {isTravelModeActive ? (
           <>
-            <div className="flex items-center gap-2 min-w-0">
-              <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
-              <p className="text-sm font-medium truncate">Travel mode on</p>
-            </div>
-            <Button size="sm" variant="outline" onClick={handleDeactivateTravelMode} data-testid="button-deactivate-travel">
+            <p className="text-sm font-semibold">Travel mode on</p>
+            <Button size="sm" variant="outline" className="h-10 rounded-xl" onClick={handleDeactivateTravelMode} data-testid="button-deactivate-travel">
               End
             </Button>
           </>
         ) : (
           <>
-            <div className="flex items-start gap-2 min-w-0 flex-1">
-              <Plane className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-              <p className="text-xs text-muted-foreground leading-snug">
-                Turn on for reminders until{" "}
-                <span className="text-foreground font-medium">
-                  {formatTripDate(plan.endDate, profile, { day: "numeric", month: "short", year: "numeric" }) ||
-                    "your return date"}
-                </span>
-                .
-              </p>
-            </div>
-            <Button size="sm" onClick={handleActivateTravelMode} data-testid="button-activate-travel" className="shrink-0">
-              <Plane className="h-3.5 w-3.5 mr-1.5" />
-              Activate
+            <p className="text-sm font-semibold">Start this trip</p>
+            <Button size="sm" className="h-10 rounded-xl" onClick={handleActivateTravelMode} data-testid="button-activate-travel">
+              Start travel
             </Button>
           </>
         )}
@@ -2854,39 +2872,39 @@ export default function Travel() {
         className="w-full"
         data-testid="tabs-travel-results"
       >
-        <TabsList className={cn("grid w-full gap-1", showClimateTab ? "grid-cols-3" : "grid-cols-2")}>
-          <TabsTrigger value="packing" className="text-xs sm:text-sm" data-testid="tab-results-packing">
+        <TabsList className={cn("grid h-11 w-full gap-1 rounded-xl bg-muted/45 p-1", showClimateTab ? "grid-cols-3" : "grid-cols-2")}>
+          <TabsTrigger value="packing" className="rounded-lg text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm" data-testid="tab-results-packing">
             Packing
           </TabsTrigger>
-          <TabsTrigger value="emergency" className="text-xs sm:text-sm" data-testid="tab-results-emergency">
+          <TabsTrigger value="emergency" className="rounded-lg text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm" data-testid="tab-results-emergency">
             Emergency
           </TabsTrigger>
           {showClimateTab && (
-            <TabsTrigger value="climate" className="text-xs sm:text-sm" data-testid="tab-results-climate">
+            <TabsTrigger value="climate" className="rounded-lg text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm" data-testid="tab-results-climate">
               Climate
             </TabsTrigger>
           )}
         </TabsList>
 
         <TabsContent value="packing" className="mt-4 space-y-4">
-          <Card className="surface-card border-border/60 shadow-none" data-testid="card-smart-packing-list">
-            <CardHeader className="pb-2">
+          <Card className="overflow-hidden rounded-[1.35rem] border-border/50 shadow-none" data-testid="card-smart-packing-list">
+            <CardHeader className="px-4 pb-2 pt-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <CardTitle className="text-base font-semibold">Packing list</CardTitle>
-                <Badge variant="secondary" className="tabular-nums">
+                <span className="text-sm font-semibold tabular-nums">
                   {checkedCount}/{packingList.length}
-                </Badge>
+                </span>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4 pt-0">
+            <CardContent className="space-y-4 px-4 pb-4 pt-0">
               {(Object.keys(categoryLabels) as Array<keyof typeof categoryLabels>).map((category) => {
                 const items = groupedItems[category];
                 if (!items || items.length === 0) return null;
                 const { label, icon: Icon, color } = categoryLabels[category];
                 return (
                   <div key={category} className="space-y-1.5">
-                    <h3 className={cn("text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5", color)}>
-                      <Icon className="h-3.5 w-3.5" />
+                    <h3 className={cn("flex items-center gap-1.5 text-sm font-semibold", color)}>
+                      <Icon className="h-4 w-4" />
                       {label}
                     </h3>
                     <div className="space-y-1">
@@ -2906,10 +2924,7 @@ export default function Travel() {
                   </div>
                 );
               })}
-              <div className="pt-2 border-t border-border/50 space-y-2">
-                <p className="text-[11px] text-muted-foreground text-center leading-snug">
-                  Educational packing guide only — not medical advice. Follow your care team.
-                </p>
+              <div className="space-y-2 border-t border-border/50 pt-2">
                 <MedicalSourcesLink anchor="insulin" className="flex justify-center" compact />
               </div>
             </CardContent>
@@ -2932,20 +2947,26 @@ export default function Travel() {
             </Link>
           </div>
 
-          <Card className="surface-card border-border/60 shadow-none">
-            <CardHeader className="pb-2">
+          <Card className="overflow-hidden rounded-[1.35rem] border-border/50 shadow-none">
+            <CardHeader className="px-4 pb-2 pt-4">
               <CardTitle className="text-base font-semibold">If something goes wrong</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2 pt-0 text-xs text-foreground/90">
-              <p>
-                <span className="font-semibold">1. Hypo first.</span> Treat lows, then reassess.
-              </p>
-              <p>
-                <span className="font-semibold">2. Lost supplies.</span> Pharmacy, then urgent care with your letter.
-              </p>
-              <p>
-                <span className="font-semibold">3. Prevent crisis.</span> Carry-on only; know your team and local emergency number.
-              </p>
+            <CardContent className="space-y-2 px-4 pb-4 pt-0">
+              {[
+                { n: "1", title: "Hypo first", body: "Treat lows, then reassess." },
+                { n: "2", title: "Lost supplies", body: "Pharmacy, then urgent care with your letter." },
+                { n: "3", title: "Prevent crisis", body: "Carry-on only; know your team and local emergency number." },
+              ].map((row) => (
+                <div key={row.n} className="flex items-start gap-3 rounded-xl border border-border/50 bg-card/70 px-3.5 py-3">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-muted/60 text-sm font-bold tabular-nums">
+                    {row.n}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground">{row.title}</p>
+                    <p className="mt-0.5 text-sm leading-snug text-foreground/85">{row.body}</p>
+                  </div>
+                </div>
+              ))}
             </CardContent>
           </Card>
 
@@ -3015,8 +3036,8 @@ export default function Travel() {
           {!isPumpUser && plan.timezoneChange !== "none" && (() => {
             const tz = climateTimezoneGuidance(plan);
             return (
-              <Card className="surface-card border-primary/30 shadow-none" data-testid="card-climate-basal-timing">
-                <CardHeader className="pb-2">
+              <Card className="overflow-hidden rounded-[1.35rem] border-sky-500/25 shadow-none" data-testid="card-climate-basal-timing">
+                <CardHeader className="px-4 pb-2 pt-4">
                   <div className="flex items-start justify-between gap-2">
                     <CardTitle className="text-base font-semibold flex items-center gap-2">
                       <Clock className="h-4 w-4 shrink-0 text-primary" aria-hidden />
@@ -3040,14 +3061,11 @@ export default function Travel() {
                       }
                     />
                   </div>
-                  <CardDescription className="text-xs leading-snug">
-                    Shift by up to 2h a day, not all at once — enter your usual time below for a day-by-day plan.
-                  </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-3 pt-0 pb-4">
+                <CardContent className="space-y-3 px-4 pb-4 pt-0">
                   <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
                     <div className="space-y-1.5">
-                      <Label htmlFor="basal-time" className="text-xs">
+                      <Label htmlFor="basal-time" className="text-sm">
                         {usesTwoBasalDoses ? "First long-acting (home time)" : "Long-acting time (home)"}
                       </Label>
                       <Input
@@ -3059,13 +3077,13 @@ export default function Travel() {
                           const current = storage.getSettings();
                           storage.saveSettings({ ...current, basalInjectionTime: e.target.value });
                         }}
-                        className="h-10 w-32"
+                        className="h-11 w-32 rounded-xl"
                         data-testid="input-basal-time"
                       />
                     </div>
                     {usesTwoBasalDoses ? (
                       <div className="space-y-1.5">
-                        <Label htmlFor="basal-time-2" className="text-xs">
+                        <Label htmlFor="basal-time-2" className="text-sm">
                           Second long-acting (home time)
                         </Label>
                         <Input
@@ -3077,7 +3095,7 @@ export default function Travel() {
                             const current = storage.getSettings();
                             storage.saveSettings({ ...current, basalInjectionTime2: e.target.value });
                           }}
-                          className="h-10 w-32"
+                          className="h-11 w-32 rounded-xl"
                           data-testid="input-basal-time-2"
                         />
                       </div>
@@ -3089,11 +3107,11 @@ export default function Travel() {
                       {basalSchedules.map(({ doseLabel, rows }) =>
                         rows.length === 0 ? null : (
                           <div key={doseLabel} className="space-y-2">
-                            <p className="text-xs font-medium text-muted-foreground">{doseLabel}</p>
-                            <div className="overflow-x-auto rounded-lg border border-border/60">
+                            <p className="text-sm font-medium text-muted-foreground">{doseLabel}</p>
+                            <div className="overflow-x-auto rounded-xl border border-border/60">
                               <table className="w-full min-w-[260px] text-sm">
                                 <thead>
-                                  <tr className="bg-muted/40 text-left text-xs text-muted-foreground">
+                                  <tr className="bg-muted/40 text-left text-sm text-muted-foreground">
                                     <th className="px-3 py-2 font-medium">Day</th>
                                     <th className="px-3 py-2 font-medium">Home</th>
                                     <th className="px-3 py-2 font-medium">Local</th>
@@ -3106,8 +3124,8 @@ export default function Travel() {
                                       className={idx % 2 === 0 ? "bg-muted/15" : undefined}
                                     >
                                       <td className="px-3 py-2 font-medium">{row.label}</td>
-                                      <td className="px-3 py-2 font-mono text-xs tabular-nums">{row.homeTime}</td>
-                                      <td className="px-3 py-2 font-mono text-xs tabular-nums">{row.localTime}</td>
+                                      <td className="px-3 py-2 font-mono text-sm tabular-nums">{row.homeTime}</td>
+                                      <td className="px-3 py-2 font-mono text-sm tabular-nums">{row.localTime}</td>
                                     </tr>
                                   ))}
                                 </tbody>
@@ -3118,10 +3136,6 @@ export default function Travel() {
                       )}
                     </div>
                   )}
-
-                  <p className="text-[11px] leading-snug text-muted-foreground">
-                    Guide only — agree your plan with your diabetes team before you go.
-                  </p>
                 </CardContent>
               </Card>
             );
@@ -3133,8 +3147,8 @@ export default function Travel() {
             const visibleBullets = weather.bullets.slice(0, 2);
             const moreBullets = weather.bullets.slice(2);
             return (
-              <Card className="surface-card border-border/60 shadow-none">
-                <CardHeader className="pb-2">
+              <Card className="overflow-hidden rounded-[1.35rem] border-border/50 shadow-none">
+                <CardHeader className="px-4 pb-2 pt-4">
                   <div className="flex items-start justify-between gap-2">
                     <CardTitle className="text-base font-semibold flex items-center gap-2">
                       {plan.weatherChange === "warmer" ? (
@@ -3167,9 +3181,11 @@ export default function Travel() {
                       />
                     )}
                   </div>
-                  <CardDescription className="text-xs">{weather.subtitle}</CardDescription>
+                  {weather.subtitle ? (
+                    <p className="text-sm text-muted-foreground">{weather.subtitle}</p>
+                  ) : null}
                 </CardHeader>
-                <CardContent className="pt-0 pb-4">
+                <CardContent className="px-4 pb-4 pt-0">
                   <ul className="space-y-2 text-sm leading-snug text-foreground/90">
                     {visibleBullets.map((line) => (
                       <li key={line} className="flex gap-2.5">
@@ -3186,8 +3202,8 @@ export default function Travel() {
           {plan.timezoneChange !== "none" && (() => {
             const tz = climateTimezoneGuidance(plan);
             return (
-              <Card className="surface-card border-border/60 shadow-none">
-                <CardHeader className="pb-2">
+              <Card className="overflow-hidden rounded-[1.35rem] border-border/50 shadow-none">
+                <CardHeader className="px-4 pb-2 pt-4">
                   <div className="flex items-start justify-between gap-2">
                     <CardTitle className="text-base font-semibold flex items-center gap-2">
                       <Globe className="h-4 w-4 shrink-0 text-primary" aria-hidden />
@@ -3211,19 +3227,21 @@ export default function Travel() {
                       }
                     />
                   </div>
-                  <CardDescription className="text-xs leading-snug">{tz.subtitle}</CardDescription>
+                  {tz.subtitle ? (
+                    <p className="text-sm text-muted-foreground">{tz.subtitle}</p>
+                  ) : null}
                 </CardHeader>
-                <CardContent className="pt-0 pb-4">
+                <CardContent className="px-4 pb-4 pt-0">
                   <div className="grid gap-2 sm:grid-cols-3">
                     {tz.phases.map((phase) => (
                       <div
                         key={phase.label}
-                        className="rounded-lg border border-border/50 bg-muted/20 px-3 py-2.5"
+                        className="rounded-xl border border-border/50 bg-muted/20 px-3 py-2.5"
                       >
                         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                           {phase.label}
                         </p>
-                        <p className="mt-1 text-xs leading-relaxed text-foreground/85">{phase.text}</p>
+                        <p className="mt-1 text-sm leading-relaxed text-foreground/85">{phase.text}</p>
                       </div>
                     ))}
                   </div>
@@ -3232,7 +3250,7 @@ export default function Travel() {
             );
           })()}
 
-          <p className="text-center text-[11px] leading-snug text-muted-foreground">
+          <p className="text-center text-sm leading-snug text-muted-foreground">
             Educational guidance only — not medical advice.
           </p>
         </TabsContent>

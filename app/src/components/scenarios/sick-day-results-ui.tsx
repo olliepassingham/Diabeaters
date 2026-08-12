@@ -1,10 +1,9 @@
 import { AlertCircle, Activity, ChevronDown, Clock, Droplets, Syringe, Thermometer } from "lucide-react";
 import { Link } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Disclaimer } from "@/components/disclaimer";
@@ -66,9 +65,6 @@ export function SickDayDisclaimerFooter({ className }: { className?: string }) {
     <div className={cn("space-y-1 pt-1", className)} data-testid="sickday-disclaimer-footer">
       <Disclaimer className="text-center text-[11px] leading-relaxed opacity-80" />
       <MedicalSourcesLink anchor="sickday" compact className="text-center" />
-      <p className="text-center text-[11px] text-muted-foreground">
-        Contact your team when unwell — especially with high glucose or ketones.
-      </p>
     </div>
   );
 }
@@ -84,6 +80,15 @@ function formatKetone(level: KetoneLevel | "") {
   if (!level) return "—";
   if (level === "none") return "None";
   return level.charAt(0).toUpperCase() + level.slice(1);
+}
+
+function segmentClass(active: boolean) {
+  return cn(
+    "h-9 min-h-0 flex-1 rounded-lg px-1.5 text-xs font-medium shadow-none transition-colors sm:text-sm",
+    active
+      ? "bg-background text-foreground shadow-sm ring-1 ring-border/60 dark:bg-background/90"
+      : "text-muted-foreground hover:text-foreground",
+  );
 }
 
 export type SickDayCgmBgFieldProps = {
@@ -122,65 +127,103 @@ export function SickDayReadingsFields({
 
   return (
     <div className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor={severityId} className="text-sm font-medium">
-          Illness severity
+      <div className="space-y-1.5">
+        <Label id={severityId} className="text-xs font-medium text-muted-foreground">
+          How unwell
         </Label>
-        <Select value={severity} onValueChange={onSeverityChange}>
-          <SelectTrigger id={severityId} data-testid="select-severity">
-            <SelectValue placeholder="Select severity" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="minor">Minor — cold, feeling off</SelectItem>
-            <SelectItem value="moderate">Moderate — fever, flu</SelectItem>
-            <SelectItem value="severe">Severe — vomiting, can&apos;t eat</SelectItem>
-          </SelectContent>
-        </Select>
+        <div
+          className="grid grid-cols-3 gap-1 rounded-xl bg-muted/45 p-1 dark:bg-muted/30"
+          role="group"
+          aria-labelledby={severityId}
+          data-testid="select-severity"
+        >
+          {(
+            [
+              { value: "minor", label: "Minor" },
+              { value: "moderate", label: "Moderate" },
+              { value: "severe", label: "Severe" },
+            ] as const
+          ).map((opt) => (
+            <Button
+              key={opt.value}
+              type="button"
+              variant="ghost"
+              size="sm"
+              className={cn(segmentClass(severity === opt.value), "w-full")}
+              onClick={() => onSeverityChange(opt.value)}
+              data-testid={`button-severity-${opt.value}`}
+            >
+              {opt.label}
+            </Button>
+          ))}
+        </div>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor={bgId} className="text-sm font-medium">
-            Blood glucose ({bgUnits})
-          </Label>
+
+      <div className="space-y-1.5">
+        <Label htmlFor={bgId} className="text-xs font-medium text-muted-foreground">
+          Blood glucose
+        </Label>
+        <div className="flex items-stretch gap-2">
           <Input
             id={bgId}
             type="number"
-            placeholder={bgUnits === "mmol/L" ? "e.g. 10.0" : "e.g. 180"}
+            placeholder={bgUnits === "mmol/L" ? "10.0" : "180"}
             value={bgLevel}
             onChange={(e) => onBgLevelChange(e.target.value)}
+            className="h-12 flex-1 rounded-xl border-border/60 bg-background text-xl font-semibold tabular-nums tracking-tight shadow-none"
             data-testid="input-bg-level"
           />
-          {cgm ? (
-            <CgmPrefillButton
-              prefill={cgm.prefill}
-              loading={cgm.loading}
-              bgUnits={bgUnits}
-              currentValue={bgLevel}
-              onApply={onBgLevelChange}
-              onRefresh={cgm.onRefresh}
-              emptyHint={cgm.emptyHint}
-              allowSync
-              testId={`${idPrefix}-cgm-prefill`}
-            />
-          ) : null}
+          <span className="flex min-w-[4.5rem] items-center justify-center rounded-xl border border-border/60 bg-muted/40 px-3 text-sm font-semibold text-muted-foreground">
+            {bgUnits}
+          </span>
         </div>
-        <div className="space-y-2">
-          <Label htmlFor={ketoneId} className="flex items-center gap-1 text-sm font-medium">
-            Ketones
-            <InfoTooltip {...DIABETES_TERMS.ketones} />
-          </Label>
-          <Select value={ketoneLevel} onValueChange={(val) => onKetoneLevelChange(val as KetoneLevel)}>
-            <SelectTrigger id={ketoneId} data-testid="select-ketone-level">
-              <SelectValue placeholder="Select level" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">None</SelectItem>
-              <SelectItem value="trace">Trace</SelectItem>
-              <SelectItem value="small">Small</SelectItem>
-              <SelectItem value="moderate">Moderate</SelectItem>
-              <SelectItem value="large">Large</SelectItem>
-            </SelectContent>
-          </Select>
+        {cgm ? (
+          <CgmPrefillButton
+            prefill={cgm.prefill}
+            loading={cgm.loading}
+            bgUnits={bgUnits}
+            currentValue={bgLevel}
+            onApply={onBgLevelChange}
+            onRefresh={cgm.onRefresh}
+            emptyHint={cgm.emptyHint}
+            allowSync
+            testId={`${idPrefix}-cgm-prefill`}
+          />
+        ) : null}
+      </div>
+
+      <div className="space-y-1.5">
+        <Label id={ketoneId} className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+          Ketones
+          <InfoTooltip {...DIABETES_TERMS.ketones} />
+        </Label>
+        <div
+          className="grid grid-cols-5 gap-1 rounded-xl bg-muted/45 p-1 dark:bg-muted/30"
+          role="group"
+          aria-labelledby={ketoneId}
+          data-testid="select-ketone-level"
+        >
+          {(
+            [
+              { value: "none", label: "None" },
+              { value: "trace", label: "Trace" },
+              { value: "small", label: "Small" },
+              { value: "moderate", label: "Mod" },
+              { value: "large", label: "Large" },
+            ] as const
+          ).map((opt) => (
+            <Button
+              key={opt.value}
+              type="button"
+              variant="ghost"
+              size="sm"
+              className={cn(segmentClass(ketoneLevel === opt.value), "w-full px-0.5")}
+              onClick={() => onKetoneLevelChange(opt.value)}
+              data-testid={`button-ketone-${opt.value}`}
+            >
+              {opt.label}
+            </Button>
+          ))}
         </div>
       </div>
     </div>
@@ -195,34 +238,34 @@ export type SickDayTddFieldProps = {
 export function SickDayTddField({ tdd, hasTdd }: SickDayTddFieldProps) {
   if (!hasTdd) {
     return (
-      <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 p-3">
+      <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-3 py-2.5">
         <p className="text-sm text-muted-foreground">
           Set TDD in{" "}
           <Link href="/settings/ratios" className="font-medium text-primary hover:underline" data-testid="link-settings-insulin">
             Insulin & Ratios
-          </Link>{" "}
-          to use the adviser.
+          </Link>
         </p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-2">
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-border/50 bg-background/70 px-3 py-2.5">
       <Label htmlFor="tdd" className="flex items-center gap-1 text-sm font-medium">
-        Total Daily Dose (TDD)
+        TDD
         <InfoTooltip {...DIABETES_TERMS.tdd} />
       </Label>
-      <div className="flex items-center gap-2 max-w-xs">
-        <Input id="tdd" type="number" value={tdd} readOnly className="cursor-default bg-muted" data-testid="input-tdd" />
-        <span className="shrink-0 text-xs text-muted-foreground">u/day</span>
+      <div className="flex items-baseline gap-1.5">
+        <Input
+          id="tdd"
+          type="number"
+          value={tdd}
+          readOnly
+          className="h-9 w-20 cursor-default bg-muted/50 text-right font-semibold tabular-nums"
+          data-testid="input-tdd"
+        />
+        <span className="text-sm text-muted-foreground">u/day</span>
       </div>
-      <p className="text-xs text-muted-foreground">
-        From{" "}
-        <Link href="/settings/ratios" className="text-primary hover:underline" data-testid="link-insulin-settings">
-          Insulin & Ratios
-        </Link>
-      </p>
     </div>
   );
 }
@@ -258,31 +301,40 @@ export function SickDayUpdateReadingsCollapsible({
 }: SickDayUpdateReadingsCollapsibleProps) {
   const summary =
     bgLevel && ketoneLevel && severity
-      ? `${formatSeverity(severity)} · ${bgLevel} ${bgUnits} · ketones ${formatKetone(ketoneLevel)}`
-      : "Tap to update glucose, ketones, or severity";
+      ? `${formatSeverity(severity)} · ${bgLevel} ${bgUnits} · ${formatKetone(ketoneLevel)}`
+      : "Glucose, ketones, severity";
 
   return (
-    <Card className="surface-card border-border/60 shadow-none" data-testid="card-sickday-update-readings">
+    <Card
+      className="overflow-hidden rounded-[1.35rem] border-amber-500/20 bg-gradient-to-b from-amber-500/[0.07] via-card to-card shadow-none dark:border-amber-400/15 dark:from-amber-950/40"
+      data-testid="card-sickday-update-readings"
+    >
       <Collapsible open={open} onOpenChange={onOpenChange} className="group">
         <CollapsibleTrigger asChild>
           <button
             type="button"
-            className="flex w-full items-start justify-between gap-3 px-4 py-4 text-left transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+            className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-amber-500/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
             data-testid="sickday-update-readings-trigger"
             aria-expanded={open}
           >
-            <div className="min-w-0 space-y-1">
-              <p className="text-sm font-semibold text-foreground">Update readings</p>
-              <p className="text-xs text-muted-foreground">{summary}</p>
+            <div
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-500/10 text-amber-700 ring-1 ring-amber-500/20 dark:text-amber-200"
+              aria-hidden
+            >
+              <Thermometer className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-display text-base font-semibold tracking-tight text-foreground">Update readings</p>
+              <p className="mt-0.5 truncate text-sm text-muted-foreground">{summary}</p>
             </div>
             <ChevronDown
-              className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180"
+              className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180"
               aria-hidden
             />
           </button>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <CardContent className="space-y-4 border-t border-border/50 pt-4">
+          <CardContent className="space-y-4 border-t border-amber-500/10 px-4 pb-4 pt-4">
             <SickDayReadingsFields
               severity={severity}
               onSeverityChange={onSeverityChange}
@@ -297,11 +349,11 @@ export function SickDayUpdateReadingsCollapsible({
             <Button
               type="button"
               onClick={onCalculate}
-              className="h-11 w-full rounded-xl font-semibold"
+              className="h-12 w-full rounded-xl font-semibold"
               data-testid={idPrefix === "active" ? "button-update-readings-active" : "button-update-readings"}
             >
               <Activity className="mr-2 h-4 w-4" aria-hidden />
-              Update recommendations
+              Update plan
             </Button>
           </CardContent>
         </CollapsibleContent>
@@ -348,33 +400,53 @@ export function SickDayResultsPanel({
 
   const heroSurface =
     verdict?.tone === "critical"
-      ? "border-red-500/35 bg-gradient-to-b from-red-500/12 via-card to-card"
+      ? "border-red-500/30 bg-gradient-to-br from-red-500/[0.12] via-card to-card shadow-[0_12px_40px_-24px_rgba(239,68,68,0.45)]"
       : verdict?.tone === "caution"
-        ? "border-amber-500/35 bg-gradient-to-b from-amber-500/10 via-card to-card"
-        : "border-primary/30 bg-gradient-to-b from-primary/10 via-card to-card";
+        ? "border-amber-500/30 bg-gradient-to-br from-amber-500/[0.10] via-card to-card shadow-[0_12px_40px_-24px_rgba(245,158,11,0.45)]"
+        : "border-emerald-500/25 bg-gradient-to-br from-emerald-500/[0.10] via-card to-card shadow-[0_12px_40px_-24px_rgba(16,185,129,0.45)]";
 
-  const contextLine = `${formatSeverity(severity)} · BG ${bgLevel || "—"} ${bgUnits} · ketones ${formatKetone(ketoneLevel)}`;
   const ketoneLine =
     results.ketoneActionRequired === "emergency" || results.ketoneActionRequired === "urgent"
       ? results.ketoneWarningBrief || results.ketoneWarning
       : results.ketoneGuidanceBrief || results.ketoneGuidance;
+
+  const careRows = [
+    {
+      icon: Syringe,
+      label: isPumpUser ? "Basal" : "Long-acting",
+      value: results.basalAdjustmentBrief || results.basalAdjustment,
+      tone: "text-primary",
+    },
+    {
+      icon: Droplets,
+      label: "Fluids",
+      value: results.hydrationBrief || results.hydrationNote,
+      tone: "text-sky-600 dark:text-sky-400",
+    },
+    {
+      icon: Clock,
+      label: "Checks",
+      value: results.monitoringBrief || results.monitoringFrequency,
+      tone: "text-muted-foreground",
+    },
+  ];
 
   return (
     <div className="space-y-3" data-testid="card-sickday-recommendations">
       {(results.ketoneActionRequired === "emergency" || results.ketoneActionRequired === "urgent") && (
         <div
           className={cn(
-            "rounded-2xl border px-4 py-3",
+            "rounded-[1.35rem] border px-4 py-3.5",
             results.ketoneActionRequired === "emergency" ? "border-red-600 bg-red-600 text-white" : ketoneAccent("urgent"),
           )}
         >
-          <div className="flex items-start gap-2">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          <div className="flex items-start gap-2.5">
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
             <div className="min-w-0">
-              <p className="text-sm font-semibold">
-                {results.ketoneActionRequired === "emergency" ? "Emergency — get help now" : "Urgent — contact your team"}
+              <p className="text-base font-semibold leading-tight">
+                {results.ketoneActionRequired === "emergency" ? "Get help now" : "Contact your team"}
               </p>
-              <p className={cn("mt-1 text-xs leading-relaxed", results.ketoneActionRequired === "emergency" ? "text-red-100" : "text-foreground/85")}>
+              <p className={cn("mt-1 text-sm leading-relaxed", results.ketoneActionRequired === "emergency" ? "text-red-50" : "text-foreground/85")}>
                 {ketoneLine}
               </p>
             </div>
@@ -382,159 +454,154 @@ export function SickDayResultsPanel({
         </div>
       )}
 
-      <div className={cn("overflow-hidden rounded-2xl border shadow-sm ring-1 ring-border/20", heroSurface)}>
-        <div className="relative px-5 pb-4 pt-5 text-center">
-          {verdict ? (
-            <Badge
-              variant="secondary"
-              className={cn("absolute right-3 top-3 rounded-full font-medium", verdictBadgeClass)}
-            >
-              {verdict.label}
-            </Badge>
+      <div className={cn("overflow-hidden rounded-[1.35rem] border", heroSurface)}>
+        <div className="px-4 pb-4 pt-4 sm:px-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                {results.correctionDose > 0 ? "Suggested correction" : "Your plan"}
+              </p>
+              {results.correctionDose > 0 ? (
+                <p
+                  className="mt-1 font-display text-[2.5rem] font-bold leading-none tabular-nums tracking-tight text-foreground"
+                  data-testid="text-correction-dose"
+                >
+                  {results.correctionDose}
+                  <span className="ml-0.5 text-xl font-semibold text-muted-foreground">u</span>
+                </p>
+              ) : (
+                <p className="mt-1 font-display text-2xl font-bold tracking-tight text-foreground">
+                  {verdict?.title ?? "Review below"}
+                </p>
+              )}
+            </div>
+            {verdict ? (
+              <Badge variant="secondary" className={cn("shrink-0 rounded-full px-2.5 py-1 font-medium", verdictBadgeClass)}>
+                {verdict.label}
+              </Badge>
+            ) : null}
+          </div>
+          {verdict?.message ? (
+            <p className="mt-2.5 text-sm leading-relaxed text-muted-foreground">{verdict.message}</p>
           ) : null}
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-primary/90">
-            {results.correctionDose > 0 ? "Suggested correction" : "Your plan"}
-          </p>
-          {results.correctionDose > 0 ? (
-            <p className="mt-1 font-display text-5xl font-bold tabular-nums tracking-tight text-foreground" data-testid="text-correction-dose">
-              {results.correctionDose}
-              <span className="text-2xl font-semibold text-muted-foreground">u</span>
-            </p>
-          ) : (
-            <p className="mt-1 text-xl font-semibold text-foreground">{verdict?.title ?? "Review below"}</p>
-          )}
-          <p className="mt-2 text-sm text-muted-foreground">{contextLine}</p>
-          {verdict ? <p className="mt-2 text-xs text-foreground/85">{verdict.message}</p> : null}
-          {lastUpdatedLabel ? <p className="mt-1 text-[11px] text-muted-foreground">{lastUpdatedLabel}</p> : null}
+          <div className="mt-3.5 flex flex-wrap gap-2 border-t border-border/40 pt-3.5">
+            <span className="inline-flex items-center rounded-xl bg-background/80 px-3 py-1.5 text-sm font-semibold tabular-nums ring-1 ring-border/50">
+              {bgLevel || "—"} {bgUnits}
+            </span>
+            <span className="inline-flex items-center rounded-xl bg-background/50 px-3 py-1.5 text-sm font-medium ring-1 ring-border/40">
+              {formatSeverity(severity)}
+            </span>
+            <span className="inline-flex items-center rounded-xl bg-background/50 px-3 py-1.5 text-sm font-medium ring-1 ring-border/40">
+              Ketones {formatKetone(ketoneLevel)}
+            </span>
+          </div>
+          {lastUpdatedLabel ? (
+            <p className="mt-2 text-sm text-muted-foreground">{lastUpdatedLabel}</p>
+          ) : null}
         </div>
       </div>
 
       {results.ketoneActionRequired === "monitor" && ketoneLine ? (
-        <div className={cn("rounded-2xl border px-4 py-3", ketoneAccent("monitor"))}>
-          <p className="text-sm font-semibold text-foreground">Ketones — keep monitoring</p>
-          <p className="mt-1 text-xs text-foreground/80">{ketoneLine}</p>
+        <div className={cn("rounded-[1.35rem] border px-4 py-3", ketoneAccent("monitor"))}>
+          <p className="text-sm font-semibold text-foreground">Keep checking ketones</p>
+          <p className="mt-1 text-sm leading-relaxed text-foreground/85">{ketoneLine}</p>
         </div>
       ) : null}
 
       {results.stackingWarning ? (
-        <div className="rounded-2xl border border-orange-500/25 bg-orange-500/8 px-4 py-3 dark:bg-orange-950/30">
+        <div className="rounded-[1.35rem] border border-orange-500/25 bg-orange-500/8 px-4 py-3 dark:bg-orange-950/30">
           <p className="text-sm font-semibold text-foreground">Space corrections</p>
-          <p className="mt-1 text-xs text-foreground/80">{results.stackingWarningBrief || results.stackingWarning}</p>
+          <p className="mt-1 text-sm leading-relaxed text-foreground/85">{results.stackingWarningBrief || results.stackingWarning}</p>
         </div>
       ) : null}
 
-      {results.correctionDose > 0 ? (
-        <Collapsible className="group rounded-2xl border border-border/60 bg-card/40">
-          <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium">
-            How this was calculated
-            <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
-          </CollapsibleTrigger>
-          <CollapsibleContent className="space-y-2 border-t border-border/50 px-4 pb-4 pt-2 text-xs text-muted-foreground">
-            <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-lg bg-muted/30 p-2 text-center">
-                <p className="text-[10px] uppercase tracking-wide opacity-70">Base</p>
-                <p className="text-sm font-semibold tabular-nums">{results.baseCorrectionDose}u</p>
-              </div>
-              <div className="rounded-lg bg-muted/30 p-2 text-center">
-                <p className="text-[10px] uppercase tracking-wide opacity-70">Safety</p>
-                <p className="text-sm font-semibold tabular-nums">×{results.severityModifier}</p>
-              </div>
-              <div className="rounded-lg bg-muted/30 p-2 text-center">
-                <p className="text-[10px] uppercase tracking-wide opacity-70">BG zone</p>
-                <p className="text-sm font-semibold tabular-nums">×{results.bgZoneModifier}</p>
+      <div className="grid grid-cols-1 gap-2">
+        {careRows.map((row) => {
+          const Icon = row.icon;
+          return (
+            <div
+              key={row.label}
+              className="flex items-start gap-3 rounded-[1.15rem] border border-border/50 bg-card/70 px-3.5 py-3"
+            >
+              <Icon className={cn("mt-0.5 h-4 w-4 shrink-0", row.tone)} aria-hidden />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground">{row.label}</p>
+                <p className="mt-0.5 text-sm leading-snug text-foreground/85">{row.value}</p>
               </div>
             </div>
-            <p className="italic leading-relaxed">{results.correctionExplanation}</p>
+          );
+        })}
+      </div>
+
+      <div className="rounded-[1.35rem] border border-border/50 bg-card/70 px-3.5 py-3.5">
+        <div className="mb-2.5 flex items-baseline justify-between gap-2">
+          <p className="text-sm font-semibold text-foreground">Meal ratios</p>
+          <p className="text-sm font-semibold tabular-nums text-muted-foreground">×{results.ratioMultiplier}</p>
+        </div>
+        <div className="grid grid-cols-2 gap-1.5">
+          {(
+            [
+              { label: "Breakfast", ratio: results.breakfastRatio, original: results.originalBreakfastRatio, testId: "breakfast" },
+              { label: "Lunch", ratio: results.lunchRatio, original: results.originalLunchRatio, testId: "lunch" },
+              { label: "Dinner", ratio: results.dinnerRatio, original: results.originalDinnerRatio, testId: "dinner" },
+              { label: "Snacks", ratio: results.snackRatio, original: results.originalSnackRatio, testId: "snack" },
+            ] as const
+          ).map((row) => (
+            <div
+              key={row.label}
+              className="flex min-h-9 items-center gap-1.5 rounded-lg border border-border/70 bg-background/70 px-2 py-1.5"
+            >
+              <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-muted-foreground">{row.label}</span>
+              <span className="shrink-0 text-sm font-bold tabular-nums" data-testid={`text-${row.testId}-ratio`}>
+                {row.ratio}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {results.correctionDose > 0 ? (
+        <Collapsible className="group overflow-hidden rounded-[1.35rem] border border-border/50 bg-card/50">
+          <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium">
+            How this was calculated
+            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-2.5 border-t border-border/50 px-4 pb-4 pt-3">
+            <div className="grid grid-cols-3 gap-1.5">
+              <div className="rounded-xl bg-muted/40 px-2 py-2 text-center">
+                <p className="text-[11px] font-medium text-muted-foreground">Base</p>
+                <p className="mt-0.5 text-sm font-semibold tabular-nums">{results.baseCorrectionDose}u</p>
+              </div>
+              <div className="rounded-xl bg-muted/40 px-2 py-2 text-center">
+                <p className="text-[11px] font-medium text-muted-foreground">Safety</p>
+                <p className="mt-0.5 text-sm font-semibold tabular-nums">×{results.severityModifier}</p>
+              </div>
+              <div className="rounded-xl bg-muted/40 px-2 py-2 text-center">
+                <p className="text-[11px] font-medium text-muted-foreground">BG zone</p>
+                <p className="mt-0.5 text-sm font-semibold tabular-nums">×{results.bgZoneModifier}</p>
+              </div>
+            </div>
+            <p className="text-sm leading-relaxed text-foreground/85">{results.correctionExplanation}</p>
             <MedicalNumericOutputDisclaimer compact />
           </CollapsibleContent>
         </Collapsible>
       ) : null}
 
-      <Collapsible className="group rounded-2xl border border-border/60 bg-card/40">
-        <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium">
-          <span>
-            Meal ratios <span className="text-muted-foreground font-normal">· ×{results.ratioMultiplier}</span>
-          </span>
-          <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
-        </CollapsibleTrigger>
-        <CollapsibleContent className="border-t border-border/50 px-4 pb-4 pt-3">
-          <div className="grid grid-cols-2 gap-2">
-            {(
-              [
-                { label: "Breakfast", ratio: results.breakfastRatio, original: results.originalBreakfastRatio, testId: "breakfast" },
-                { label: "Lunch", ratio: results.lunchRatio, original: results.originalLunchRatio, testId: "lunch" },
-                { label: "Dinner", ratio: results.dinnerRatio, original: results.originalDinnerRatio, testId: "dinner" },
-                { label: "Snacks", ratio: results.snackRatio, original: results.originalSnackRatio, testId: "snack" },
-              ] as const
-            ).map((row) => (
-              <div key={row.label} className="rounded-lg border border-border/50 bg-background/50 p-2.5">
-                <p className="text-xs text-muted-foreground">{row.label}</p>
-                <div className="mt-0.5 flex items-baseline gap-2">
-                  <p className="font-semibold tabular-nums" data-testid={`text-${row.testId}-ratio`}>
-                    {row.ratio}
-                  </p>
-                  <span className="text-xs text-muted-foreground line-through tabular-nums">{row.original}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
-
-      <div className="rounded-2xl border border-border/60 bg-card/40 px-4 py-3 space-y-2.5">
-        <p className="text-sm font-semibold text-foreground">Basal, fluids & checks</p>
-        <div className="flex gap-2.5 text-xs">
-          <Syringe className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
-          <p className="text-foreground/85">
-            <span className="font-medium text-muted-foreground">{isPumpUser ? "Basal" : "Long-acting"}: </span>
-            {results.basalAdjustmentBrief || results.basalAdjustment}
-          </p>
-        </div>
-        <div className="flex gap-2.5 text-xs">
-          <Droplets className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sky-600" aria-hidden />
-          <p className="text-foreground/85">
-            <span className="font-medium text-muted-foreground">Fluids: </span>
-            {results.hydrationBrief || results.hydrationNote}
-          </p>
-        </div>
-        <div className="flex gap-2.5 text-xs">
-          <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
-          <p className="text-foreground/85">
-            <span className="font-medium text-muted-foreground">Checks: </span>
-            {results.monitoringBrief || results.monitoringFrequency}
-          </p>
-        </div>
-      </div>
-
       {isPumpUser ? (
-        <Collapsible className="group rounded-2xl border border-border/60 bg-card/40">
+        <Collapsible className="group overflow-hidden rounded-[1.35rem] border border-border/50 bg-card/50">
           <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium">
             Pump tips
-            <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
+            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
           </CollapsibleTrigger>
-          <CollapsibleContent className="space-y-1.5 border-t border-border/50 px-4 pb-4 pt-2 text-xs text-foreground/85">
+          <CollapsibleContent className="space-y-2 border-t border-border/50 px-4 pb-4 pt-3 text-sm leading-relaxed text-foreground/85">
             <p>Change set/site if glucose stays high after two corrections.</p>
-            <p>Use your pump calculator; mind IOB.</p>
+            <p>Use your pump calculator and check IOB.</p>
             {(ketoneLevel === "moderate" || ketoneLevel === "large") && (
               <p className="font-medium">Moderate/large ketones: pens may be safer — ask your team.</p>
             )}
           </CollapsibleContent>
         </Collapsible>
       ) : null}
-
-      <Collapsible className="group rounded-2xl border border-dashed border-border/60 bg-muted/10">
-        <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium">
-          Quick reminders
-          <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
-        </CollapsibleTrigger>
-        <CollapsibleContent className="border-t border-border/50 px-4 pb-4 pt-2">
-          <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground">
-            <li>Do not skip basal insulin</li>
-            <li>Recheck ketones if BG stays above {bgUnits === "mmol/L" ? "13.9 mmol/L" : "250 mg/dL"}</li>
-            <li>Moderate/large ketones or worsening symptoms: get medical help</li>
-          </ul>
-        </CollapsibleContent>
-      </Collapsible>
     </div>
   );
 }
