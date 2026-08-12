@@ -255,14 +255,14 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
   if (error) {
     return (
       <WidgetCard className="overflow-visible" data-testid="widget-quick-exercise">
-        <CardHeader className="p-4 pb-2 md:p-6 md:pb-3">
+        <CardHeader className="space-y-0 p-3 pb-1.5 sm:p-4 sm:pb-2">
           <div className="flex items-center gap-2">
-            <Dumbbell className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-            <CardTitle className="text-h3 text-foreground">Quick exercise</CardTitle>
+            <Dumbbell className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <CardTitle className="text-base font-semibold leading-tight text-foreground">Quick exercise</CardTitle>
           </div>
         </CardHeader>
-        <CardContent className="p-4 pt-0 md:px-6 md:pb-6">
-          <p className="text-body text-muted-foreground">{error}</p>
+        <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0">
+          <p className="text-sm text-muted-foreground">{error}</p>
         </CardContent>
       </WidgetCard>
     );
@@ -271,8 +271,8 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
   if (exercises === null) {
     return (
       <WidgetCard className="overflow-visible" data-testid="widget-quick-exercise">
-        <CardContent className="p-4 md:p-6">
-          <p className="text-body text-muted-foreground">Loading…</p>
+        <CardContent className="p-3 sm:p-4">
+          <p className="text-sm text-muted-foreground">Loading…</p>
         </CardContent>
       </WidgetCard>
     );
@@ -298,32 +298,29 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
 
   return (
     <WidgetCard className="overflow-visible" data-testid="widget-quick-exercise">
-      <CardHeader className="p-4 pb-2 md:p-6 md:pb-3">
+      <CardHeader className="space-y-0 p-3 pb-1.5 sm:p-4 sm:pb-2">
         <Link href="/scenarios/exercise">
           <div className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer">
-            <Dumbbell className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-            <CardTitle className="text-h3 text-foreground">Quick exercise</CardTitle>
+            <Dumbbell className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <CardTitle className="text-base font-semibold leading-tight text-foreground">Quick exercise</CardTitle>
           </div>
         </Link>
-        <p className="text-small text-muted-foreground uppercase tracking-wide mt-1">
-          {exercises.length > 0 || activeSession ? "Start a saved workout" : null}
-        </p>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3 p-4 pt-0 md:px-6 md:pb-6">
+      <CardContent className="flex flex-col gap-2 p-3 pt-0 sm:gap-2.5 sm:p-4 sm:pt-0">
         {travelActiveTripHint ? (
-          <p className="text-xs text-muted-foreground -mt-1" data-testid="text-exercise-travel-active-hint">
+          <p className="text-[11px] text-muted-foreground" data-testid="text-exercise-travel-active-hint">
             On an active trip — logging sessions helps you spot patterns.
           </p>
         ) : null}
         {activeSession && (
-          <div className="space-y-2.5 rounded-xl border border-emerald-500/25 bg-gradient-to-br from-emerald-500/[0.07] via-transparent to-teal-500/[0.04] px-3 py-3 dark:from-emerald-950/40 dark:to-transparent">
-            <div className="flex items-start gap-2.5" data-testid="text-active-session-notice">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
-                <Play className="h-4 w-4 shrink-0" aria-hidden />
+          <div className="space-y-2 rounded-xl border border-emerald-500/25 bg-gradient-to-br from-emerald-500/[0.07] via-transparent to-teal-500/[0.04] px-2.5 py-2.5 dark:from-emerald-950/40 dark:to-transparent">
+            <div className="flex items-center gap-2.5" data-testid="text-active-session-notice">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+                <Play className="h-3.5 w-3.5 shrink-0" aria-hidden />
               </span>
-              <div className="min-w-0 pt-0.5">
-                <p className="text-sm font-semibold text-foreground leading-tight">{activeSession.exerciseName}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground leading-tight truncate">{activeSession.exerciseName}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
                   {activeSession.phase === "pre"
                     ? "Preparing — start when ready"
                     : activeSession.phase === "active"
@@ -362,79 +359,71 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
         )}
 
         {exercises.length > 0 ? (
-          <>
-            <div className="flex flex-col gap-2">
-              {exercises.map((exercise) => {
-                const Icon = EXERCISE_ICONS[exercise.exerciseType] || Dumbbell;
-                const isActive = activeSession?.routineId === exercise.id;
-                return (
-                  <div
-                    key={exercise.id}
+          <div className="flex flex-col gap-1.5">
+            {exercises.map((exercise) => {
+              const Icon = EXERCISE_ICONS[exercise.exerciseType] || Dumbbell;
+              const isActive = activeSession?.routineId === exercise.id;
+              return (
+                <div
+                  key={exercise.id}
+                  className={cn(
+                    "flex w-full items-center gap-0.5 rounded-xl border border-border/70 bg-card/80 p-0.5 transition-colors",
+                    "hover:border-emerald-500/35 hover:bg-emerald-500/[0.06] dark:hover:border-emerald-500/25 dark:hover:bg-emerald-950/25",
+                    isActive && "border-emerald-500/60 dark:border-emerald-500/50 opacity-50",
+                  )}
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleQuickStart(exercise)}
                     className={cn(
-                      "flex w-full items-center gap-1.5 rounded-xl border border-border bg-card p-1 shadow-sm transition-colors",
-                      "hover:border-emerald-500/35 hover:bg-emerald-500/[0.06] dark:hover:border-emerald-500/25 dark:hover:bg-emerald-950/25",
-                      isActive && "border-emerald-500/60 dark:border-emerald-500/50 opacity-50",
+                      "pressable flex min-h-10 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 py-1.5 text-left",
+                      isActive && "pointer-events-none",
                     )}
+                    disabled={isActive}
+                    data-testid={`button-quick-exercise-${exercise.id}`}
                   >
-                    <button
-                      type="button"
-                      onClick={() => handleQuickStart(exercise)}
-                      className={cn(
-                        "pressable flex min-h-11 min-w-0 flex-1 items-center justify-between gap-3 rounded-lg px-2.5 py-2 text-left",
-                        isActive && "pointer-events-none",
-                      )}
-                      disabled={isActive}
-                      data-testid={`button-quick-exercise-${exercise.id}`}
-                    >
-                      <span className="flex min-w-0 flex-1 items-center gap-3">
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 dark:bg-emerald-500/15">
-                          <Icon className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 dark:bg-emerald-500/15">
+                      <Icon className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                    </span>
+                    <span className="min-w-0 flex-1 text-left">
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <span className="block truncate text-sm font-semibold leading-tight text-foreground">
+                          {exercise.name}
                         </span>
-                        <span className="min-w-0 text-left">
-                          <span className="flex min-w-0 items-center gap-1.5">
-                            <span className="block truncate text-sm font-semibold text-foreground">{exercise.name}</span>
-                            {isStarterExerciseRoutine(exercise) ? (
-                              <Badge
-                                variant="secondary"
-                                className="shrink-0 px-1.5 py-0 text-[0.6rem] font-medium"
-                                data-testid="badge-starter-exercise"
-                              >
-                                Example
-                              </Badge>
-                            ) : null}
-                            {isActive ? (
-                              <Badge
-                                variant="secondary"
-                                className="shrink-0 px-1.5 py-0 text-[0.6rem] font-medium text-emerald-700 dark:text-emerald-300"
-                              >
-                                Active
-                              </Badge>
-                            ) : null}
-                          </span>
-                          <span className="block text-xs text-muted-foreground">
-                            {exercise.durationMinutes} min · {exercise.intensity}
-                          </span>
-                        </span>
+                        {isStarterExerciseRoutine(exercise) ? (
+                          <Badge
+                            variant="secondary"
+                            className="h-4 shrink-0 px-1 py-0 text-[0.6rem] font-medium"
+                            data-testid="badge-starter-exercise"
+                          >
+                            Example
+                          </Badge>
+                        ) : null}
+                        {isActive ? (
+                          <Badge
+                            variant="secondary"
+                            className="h-4 shrink-0 px-1 py-0 text-[0.6rem] font-medium text-emerald-700 dark:text-emerald-300"
+                          >
+                            Active
+                          </Badge>
+                        ) : null}
                       </span>
-                      <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                    </button>
-                    <ExerciseRoutineAdjustTrigger
-                      disabled={isActive || !!activeSession}
-                      onClick={() => setAdjustRoutine(exercise)}
-                      testId={`button-adjust-exercise-${exercise.id}`}
-                      className="mr-0.5"
-                    />
-                  </div>
-                );
-              })}
-            </div>
-
-            {!compact ? (
-              <p className="text-xs text-muted-foreground px-0.5">
-                Tap to start · pencil to adjust duration or intensity first.
-              </p>
-            ) : null}
-          </>
+                      <span className="mt-0.5 block truncate text-[11px] leading-none text-muted-foreground">
+                        {exercise.durationMinutes} min · {exercise.intensity}
+                      </span>
+                    </span>
+                    <ArrowRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" aria-hidden />
+                  </button>
+                  <ExerciseRoutineAdjustTrigger
+                    disabled={isActive || !!activeSession}
+                    onClick={() => setAdjustRoutine(exercise)}
+                    testId={`button-adjust-exercise-${exercise.id}`}
+                    className="mr-0.5 h-8 w-8"
+                  />
+                </div>
+              );
+            })}
+          </div>
         ) : (
           <HomeCardEmpty
             compact
@@ -446,7 +435,7 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
               <Button
                 variant="secondary"
                 size="sm"
-                className="w-full min-h-9 gap-1.5 text-xs font-medium shadow-sm border border-border/80"
+                className="w-full h-9 gap-1.5 text-xs font-medium shadow-sm border border-border/80"
                 data-testid="button-exercise-action"
               >
                 <Plus className="h-3.5 w-3.5" aria-hidden />
@@ -457,19 +446,17 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
         )}
 
         {(exercises.length > 0 || activeSession) && (
-        <Link href={plannerCtaHref}>
-          <Button
-            variant="secondary"
-            size="sm"
-            className="w-full min-h-10 gap-1.5 font-medium shadow-sm border border-border/80"
-            data-testid="button-exercise-action"
-          >
-            <>
+          <Link href={plannerCtaHref}>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="w-full h-9 gap-1.5 text-xs font-medium shadow-sm border border-border/80"
+              data-testid="button-exercise-action"
+            >
               {plannerCtaLabel}
               <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-            </>
-          </Button>
-        </Link>
+            </Button>
+          </Link>
         )}
       </CardContent>
 

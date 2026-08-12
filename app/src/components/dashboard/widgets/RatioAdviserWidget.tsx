@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import {
   Syringe,
   ArrowRight,
-  AlertCircle,
   Pill,
   ThermometerSun,
   ThermometerSnowflake,
@@ -24,9 +23,9 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { WidgetCard } from "./WidgetCard";
 import type { DashboardWidgetLayoutProps } from "./types";
-import { isCompactLayout } from "./types";
 import { cn } from "@/lib/utils";
 import { HomeCardEmpty } from "@/components/home/home-ui";
+
 function getScenarioFactor(scenarioState: ScenarioState): { factor: number; label: string; icon: typeof Pill } | null {
   if (scenarioState.sickDayActive) {
     const severity = scenarioState.sickDaySeverity || "moderate";
@@ -85,8 +84,7 @@ export function adviserMealPlannerHref(mealLabel: string): string {
   return "/adviser?tab=meal";
 }
 
-export function RatioAdviserWidget(props: DashboardWidgetLayoutProps) {
-  const compact = isCompactLayout(props);
+export function RatioAdviserWidget(_props: DashboardWidgetLayoutProps) {
   const { toast } = useToast();
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [scenarioState, setScenarioState] = useState<ScenarioState | null>(null);
@@ -129,13 +127,13 @@ export function RatioAdviserWidget(props: DashboardWidgetLayoutProps) {
   if (error) {
     return (
       <WidgetCard className="overflow-visible" data-testid="widget-ratio-adviser">
-        <CardHeader className="p-3 pb-1.5 md:p-4 md:pb-2">
+        <CardHeader className="space-y-0 p-3 pb-1.5 sm:p-4 sm:pb-2">
           <div className="flex items-center gap-2">
             <Syringe className="h-4 w-4 text-sky-600 dark:text-sky-400 shrink-0" />
-            <CardTitle className="text-base font-semibold text-foreground">Your ratios</CardTitle>
+            <CardTitle className="text-base font-semibold leading-tight text-foreground">Your ratios</CardTitle>
           </div>
         </CardHeader>
-        <CardContent className="p-3 pt-0 md:px-4 md:pb-4">
+        <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0">
           <p className="text-sm text-muted-foreground">{error}</p>
         </CardContent>
       </WidgetCard>
@@ -145,7 +143,7 @@ export function RatioAdviserWidget(props: DashboardWidgetLayoutProps) {
   if (settings === null || scenarioState === null) {
     return (
       <WidgetCard className="overflow-visible" data-testid="widget-ratio-adviser">
-        <CardContent className="p-3 md:p-4">
+        <CardContent className="p-3 sm:p-4">
           <p className="text-sm text-muted-foreground">Loading…</p>
         </CardContent>
       </WidgetCard>
@@ -167,7 +165,7 @@ export function RatioAdviserWidget(props: DashboardWidgetLayoutProps) {
 
   return (
     <WidgetCard className="overflow-visible" data-testid="widget-ratio-adviser">
-      <CardHeader className="space-y-0 p-3 pb-1.5 md:p-4 md:pb-2">
+      <CardHeader className="space-y-0 p-3 pb-1.5 sm:p-4 sm:pb-2">
         <Link href="/settings/ratios">
           <div className="flex flex-wrap items-center gap-1.5 hover:opacity-80 transition-opacity cursor-pointer">
             <Syringe className="h-4 w-4 text-sky-600 dark:text-sky-400 shrink-0" />
@@ -187,11 +185,8 @@ export function RatioAdviserWidget(props: DashboardWidgetLayoutProps) {
             )}
           </div>
         </Link>
-        <p className="text-[0.65rem] leading-snug text-muted-foreground mt-0.5">
-          {hasRatios ? "Tap a meal row for quick meal planner · title opens ratio setup" : null}
-        </p>
       </CardHeader>
-      <CardContent className="flex flex-col gap-2 p-3 pt-0 md:px-4 md:pb-3">
+      <CardContent className="flex flex-col gap-2 p-3 pt-0 sm:p-4 sm:pt-0">
         {hasRatios ? (
           <div className="grid grid-cols-2 gap-1.5">
             {ratios.map((r, idx) => {
@@ -200,62 +195,39 @@ export function RatioAdviserWidget(props: DashboardWidgetLayoutProps) {
               const mt = r.label.toLowerCase();
               const wideLast = lastRatioSpansFullRow && idx === ratios.length - 1;
 
-              const ratioBlock =
-                scenario && adjusted ? (
-                  <div className="space-y-0.5 text-right">
-                    <div className="text-[0.6rem] leading-none text-muted-foreground line-through tabular-nums opacity-80">
-                      {base}
-                    </div>
-                    <div className="text-base font-bold tabular-nums leading-none text-amber-700 dark:text-amber-400">
-                      {adjusted}
-                    </div>
-                    <div className="truncate text-[0.55rem] leading-tight text-muted-foreground">{scenario.label}</div>
-                  </div>
-                ) : (
-                  <span className="block text-base font-bold tabular-nums leading-none tracking-tight text-foreground">
-                    {base}
-                  </span>
-                );
-
               return (
                 <Link
                   key={r.label}
                   href={adviserMealPlannerHref(r.label)}
                   className={cn("block min-w-0", wideLast && "col-span-2")}
-                  title="Quick meal planner — this meal time selected"
+                  title={`${r.label} meal planner`}
                   data-testid={`link-dashboard-meal-planner-${mt}`}
                 >
                   <div
                     className={cn(
-                      "pressable card-interactive rounded-lg border border-border bg-card text-left shadow-sm transition-colors",
+                      "pressable flex min-h-9 items-center gap-1.5 rounded-lg border border-border/70 bg-card/80 px-2 py-1.5 text-left transition-colors",
                       "hover:border-sky-500/35 hover:bg-sky-500/[0.06] dark:hover:border-sky-500/25 dark:hover:bg-sky-950/25",
-                      wideLast
-                        ? "flex min-h-10 flex-row items-center gap-2 px-2 py-1.5"
-                        : "flex h-full min-h-[3.75rem] flex-col p-2"
                     )}
                   >
-                    {wideLast ? (
-                      <>
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-sky-500/10 dark:bg-sky-500/15">
-                          <RowIcon className="h-3 w-3 text-sky-600 dark:text-sky-400" aria-hidden />
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-sky-500/10 dark:bg-sky-500/15">
+                      <RowIcon className="h-3 w-3 text-sky-600 dark:text-sky-400" aria-hidden />
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-[11px] font-medium leading-none text-muted-foreground">
+                      {r.label}
+                    </span>
+                    {scenario && adjusted ? (
+                      <span className="shrink-0 text-right leading-none">
+                        <span className="mr-1 text-[0.6rem] tabular-nums text-muted-foreground line-through opacity-70">
+                          {base}
                         </span>
-                        <span className="min-w-0 flex-1 truncate text-[0.65rem] font-medium text-muted-foreground">
-                          {r.label}
+                        <span className="text-sm font-bold tabular-nums text-amber-700 dark:text-amber-400">
+                          {adjusted}
                         </span>
-                        <div className="shrink-0 text-right">{ratioBlock}</div>
-                        <ArrowRight className="h-3 w-3 shrink-0 text-muted-foreground/55" aria-hidden />
-                      </>
+                      </span>
                     ) : (
-                      <>
-                        <div className="flex items-start justify-between gap-1">
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-sky-500/10 dark:bg-sky-500/15">
-                            <RowIcon className="h-3 w-3 text-sky-600 dark:text-sky-400" aria-hidden />
-                          </span>
-                          <ArrowRight className="h-3 w-3 shrink-0 text-muted-foreground/55" aria-hidden />
-                        </div>
-                        <span className="mt-0.5 truncate text-[0.65rem] font-medium text-muted-foreground">{r.label}</span>
-                        <div className="mt-auto min-h-[1.25rem] pt-0.5">{ratioBlock}</div>
-                      </>
+                      <span className="shrink-0 text-sm font-bold tabular-nums leading-none tracking-tight text-foreground">
+                        {base}
+                      </span>
                     )}
                   </div>
                 </Link>
@@ -277,16 +249,18 @@ export function RatioAdviserWidget(props: DashboardWidgetLayoutProps) {
                 return (
                   <div
                     key={key}
-                    className="flex min-h-[3.25rem] flex-col rounded-lg border border-dashed border-border/80 bg-muted/20 p-2"
+                    className="flex min-h-9 items-center gap-1.5 rounded-lg border border-dashed border-border/80 bg-muted/20 px-2 py-1.5"
                     data-testid={`starter-ratio-preview-${key}`}
                   >
-                    <div className="flex items-center gap-1.5">
-                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-sky-500/10 dark:bg-sky-500/15">
-                        <RowIcon className="h-2.5 w-2.5 text-sky-600 dark:text-sky-400" aria-hidden />
-                      </span>
-                      <span className="truncate text-[0.65rem] font-medium text-muted-foreground">{label}</span>
-                    </div>
-                    <span className="mt-auto pt-1 text-sm font-semibold tabular-nums text-foreground/90">{display}</span>
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-sky-500/10 dark:bg-sky-500/15">
+                      <RowIcon className="h-3 w-3 text-sky-600 dark:text-sky-400" aria-hidden />
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-[11px] font-medium leading-none text-muted-foreground">
+                      {label}
+                    </span>
+                    <span className="shrink-0 text-sm font-semibold tabular-nums leading-none text-foreground/90">
+                      {display}
+                    </span>
                   </div>
                 );
               })}
@@ -306,35 +280,30 @@ export function RatioAdviserWidget(props: DashboardWidgetLayoutProps) {
             >
               Use starter ratios
             </Button>
-            <p className="text-[0.65rem] leading-snug text-muted-foreground px-0.5">
-              Typical clinic starting point (1u:10g for each meal). Not medical advice.
-            </p>
-            <div className="flex flex-col gap-1.5 sm:flex-row sm:items-stretch">
-              <Link href="/settings/ratios" className="sm:flex-1">
+            <div className="grid grid-cols-2 gap-1.5">
+              <Link href="/settings/ratios">
                 <Button
                   variant="secondary"
                   size="sm"
                   className="h-9 w-full gap-1 text-xs font-medium shadow-sm border border-border/80"
                   data-testid="button-view-ratios"
                 >
-                  Set up ratios
+                  Set up
                   <ArrowRight className="h-3 w-3" aria-hidden />
                 </Button>
               </Link>
-              <Link href="/adviser?tab=meal" className="sm:flex-1">
-                <Button variant="outline" size="sm" className="h-9 w-full gap-1 text-xs font-medium" data-testid="button-dashboard-quick-meal-planner">
-                  Quick meal planner
+              <Link href="/adviser?tab=meal">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 w-full gap-1 text-xs font-medium"
+                  data-testid="button-dashboard-quick-meal-planner"
+                >
+                  Meal planner
                   <ArrowRight className="h-3 w-3" aria-hidden />
                 </Button>
               </Link>
             </div>
-          </div>
-        )}
-
-        {hasRatios && !compact && (
-          <div className="flex items-start gap-1.5 rounded-md bg-muted/40 px-2 py-1 text-[0.65rem] leading-snug text-muted-foreground">
-            <AlertCircle className="mt-px h-3 w-3 shrink-0 opacity-80" aria-hidden />
-            <span>Not medical advice — follow your care team.</span>
           </div>
         )}
       </CardContent>

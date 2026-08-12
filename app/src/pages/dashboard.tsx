@@ -1106,8 +1106,8 @@ export default function Dashboard() {
         allowResize={!isMobile}
       />
 
-      <section className="animate-stagger space-y-3 sm:space-y-4 pt-1.5 sm:pt-2" data-testid="dashboard-widgets">
-        <div className="grid grid-cols-1 items-start gap-4 sm:gap-6 md:grid-cols-2">
+      <section className="animate-stagger space-y-2.5 sm:space-y-4 pt-1 sm:pt-2" data-testid="dashboard-widgets">
+        <div className="grid grid-cols-1 items-start gap-3 sm:gap-5 md:grid-cols-2">
           {widgetsToRender.map((w) => {
             const Comp = w.Component;
             if (!Comp) return null;
