@@ -41,7 +41,7 @@ export function ProfileHeroCard({
       <CardContent
         className={cn(
           "relative",
-          compact ? "p-3 sm:p-3.5" : relaxed ? "p-5 sm:p-6" : "p-4 sm:p-5",
+          compact ? "p-2.5" : relaxed ? "p-5 sm:p-6" : "p-4 sm:p-5",
         )}
       >
         {children}
@@ -83,7 +83,11 @@ type ProfileAvatarTileProps = {
   alt?: string;
   href?: string;
   testId?: string;
-  size?: "md" | "lg";
+  size?: "md" | "lg" | "xl";
+  /** Circular avatars sit cleanly inside story rings. */
+  shape?: "rounded" | "circle";
+  /** Photo frame ring. Turn off when wrapped in `StoryAvatarRing`. */
+  framed?: boolean;
   onImageError?: () => void;
   /** Opens file picker / upload flow; mutually exclusive with `href`. */
   onClick?: () => void;
@@ -95,6 +99,7 @@ type ProfileAvatarTileProps = {
 const avatarSizeClass = {
   md: "h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem]",
   lg: "h-[4.25rem] w-[4.25rem] sm:h-24 sm:w-24",
+  xl: "h-[5.5rem] w-[5.5rem] sm:h-[6.5rem] sm:w-[6.5rem]",
 };
 
 export function ProfileAvatarTile({
@@ -104,6 +109,8 @@ export function ProfileAvatarTile({
   href,
   testId,
   size = "lg",
+  shape = "rounded",
+  framed = true,
   onImageError,
   onClick,
   disabled = false,
@@ -113,11 +120,15 @@ export function ProfileAvatarTile({
   const showImage = Boolean(imageUrl);
   const interactive = Boolean(onClick) && !href;
   const imgAlt = interactive ? "" : alt;
+  const circle = shape === "circle";
+  const shapeClass = circle ? "rounded-full" : "rounded-2xl";
 
   const inner = (
     <div
       className={cn(
-        "relative flex shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-muted/80 ring-2 ring-background shadow-sm dark:bg-muted/50",
+        "relative flex shrink-0 items-center justify-center overflow-hidden bg-muted/80 dark:bg-muted/50",
+        shapeClass,
+        framed && (circle ? "ring-1 ring-border/50 shadow-sm" : "ring-2 ring-background shadow-sm"),
         avatarSizeClass[size],
         (href || interactive) && "avatar-hover-scale transition-transform",
         interactive && !disabled && "group-hover:ring-primary/30",
@@ -127,7 +138,13 @@ export function ProfileAvatarTile({
       {showImage ? (
         <img src={imageUrl!} alt={imgAlt} className="h-full w-full object-cover" onError={onImageError} />
       ) : (
-        <span className="text-xl font-semibold text-muted-foreground sm:text-2xl" aria-hidden>
+        <span
+          className={cn(
+            "font-semibold text-muted-foreground",
+            size === "xl" ? "text-2xl sm:text-3xl" : "text-xl sm:text-2xl",
+          )}
+          aria-hidden
+        >
           {initials}
         </span>
       )}
@@ -149,7 +166,7 @@ export function ProfileAvatarTile({
 
   if (href) {
     return (
-      <Link href={href} className="shrink-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background" aria-label={alt}>
+      <Link href={href} className={cn("shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background", shapeClass)} aria-label={alt}>
         {inner}
       </Link>
     );
@@ -165,7 +182,8 @@ export function ProfileAvatarTile({
         aria-label={busy ? "Uploading profile photo" : actionLabel}
         data-testid={testId ?? "avatar-change"}
         className={cn(
-          "group shrink-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background",
+          "group shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background",
+          shapeClass,
           (disabled || busy) && "cursor-not-allowed opacity-80",
         )}
       >
@@ -288,8 +306,17 @@ export function ProfileFollowStats({
   onFollowingClick?: () => void;
   followersTestId?: string;
   followingTestId?: string;
-  variant?: "compact" | "pill";
+  variant?: "compact" | "pill" | "stack";
 }) {
+  if (variant === "stack") {
+    return (
+      <div className="grid flex-1 grid-cols-2" role="group" aria-label="Follower stats">
+        <ProfileFollowStatButton count={followers} label="followers" onClick={onFollowersClick} testId={followersTestId} stack />
+        <ProfileFollowStatButton count={following} label="following" onClick={onFollowingClick} testId={followingTestId} stack />
+      </div>
+    );
+  }
+
   if (variant === "pill") {
     return (
       <div
@@ -318,22 +345,33 @@ function ProfileFollowStatButton({
   onClick,
   testId,
   pill,
+  stack,
 }: {
   count: number;
   label: string;
   onClick?: () => void;
   testId?: string;
   pill?: boolean;
+  stack?: boolean;
 }) {
-  const content = (
+  const content = stack ? (
+    <>
+      <span className="block text-lg font-semibold tabular-nums leading-none tracking-tight text-foreground">
+        {count}
+      </span>
+      <span className="mt-0.5 block text-[11px] text-muted-foreground">{label}</span>
+    </>
+  ) : (
     <>
       <span className="font-semibold tabular-nums text-foreground">{count}</span>{" "}
-      <span className={pill ? "text-muted-foreground" : "text-muted-foreground"}>{label}</span>
+      <span className="text-muted-foreground">{label}</span>
     </>
   );
-  const className = pill
-    ? "px-3.5 py-2 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-    : "text-left transition-colors hover:underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm";
+  const className = stack
+    ? "flex flex-col items-center justify-center rounded-xl py-1 text-center transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    : pill
+      ? "px-3.5 py-2 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+      : "text-left transition-colors hover:underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm";
 
   if (onClick) {
     return (

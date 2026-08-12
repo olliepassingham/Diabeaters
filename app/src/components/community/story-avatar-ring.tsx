@@ -14,6 +14,8 @@ type Props = {
   subtle?: boolean;
   /** Minimal ring padding for dense feed story strip. */
   compact?: boolean;
+  /** Thicker, high-contrast ring for public profile avatars. */
+  prominent?: boolean;
 };
 
 export function StoryAvatarRing({
@@ -25,23 +27,28 @@ export function StoryAvatarRing({
   interactive = true,
   subtle = false,
   compact = false,
+  prominent = false,
 }: Props) {
   if (state === "none") return <>{children}</>;
 
   const ringClass =
     state === "unseen"
-      ? subtle || compact
-        ? "bg-gradient-to-tr from-primary/50 via-primary/35 to-primary/25"
-        : "bg-gradient-to-tr from-primary via-rose-400 to-amber-400"
-      : subtle || compact
-        ? "bg-muted-foreground/30"
-        : "bg-muted-foreground/45";
+      ? prominent
+        ? "bg-[conic-gradient(from_210deg,rgb(var(--color-primary)),#f43f5e,#f59e0b,rgb(var(--color-primary)))]"
+        : subtle || compact
+          ? "bg-gradient-to-tr from-primary/50 via-primary/35 to-primary/25"
+          : "bg-gradient-to-tr from-primary via-rose-400 to-amber-400"
+      : prominent
+        ? "bg-muted-foreground/55"
+        : subtle || compact
+          ? "bg-muted-foreground/30"
+          : "bg-muted-foreground/45";
 
-  const ringPad = compact ? "p-[1px]" : subtle ? "p-[1.5px]" : "p-[2.5px]";
-  const innerPad = compact ? "p-0" : subtle ? "p-px" : "p-[2px]";
+  const ringPad = prominent ? "p-[3.5px]" : compact ? "p-[1px]" : subtle ? "p-[1.5px]" : "p-[2.5px]";
+  const innerPad = prominent ? "p-[3px]" : compact ? "p-0" : subtle ? "p-px" : "p-[2px]";
 
   const inner = (
-    <div className={cn("rounded-full", ringPad, ringClass, className)}>
+    <div className={cn("rounded-full", ringPad, ringClass, prominent && "shadow-sm", className)}>
       <div className={cn("rounded-full bg-background", innerPad)}>{children}</div>
     </div>
   );

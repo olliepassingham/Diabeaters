@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ChevronRight, Search, Users, X } from "lucide-react";
+import { Search, Users, X } from "lucide-react";
 import { Link } from "wouter";
 
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
@@ -34,6 +34,9 @@ type FollowListDialogProps = {
   people: FollowListPerson[];
   loading?: boolean;
   error?: string | null;
+  /** Switch Followers / Following without closing the sheet. */
+  onKindChange?: (kind: FollowListKind) => void;
+  counts?: { followers: number; following: number };
 };
 
 function preventDialogAutoFocus(e: Event) {
@@ -46,14 +49,14 @@ function kindCopy(kind: FollowListKind) {
       title: "Following",
       description: "People this profile follows on the Feed.",
       empty: "Not following anyone yet.",
-      emptyFilter: "No one in Following matches that search.",
+      emptyFilter: "No one matches that search.",
     };
   }
   return {
     title: "Followers",
     description: "People who follow this profile on the Feed.",
     empty: "No followers yet.",
-    emptyFilter: "No followers match that search.",
+    emptyFilter: "No one matches that search.",
   };
 }
 
@@ -65,11 +68,62 @@ function matchesQuery(person: FollowListPerson, query: string): boolean {
   return name.includes(q) || handle.includes(q);
 }
 
+function FollowListKindTabs({
+  kind,
+  counts,
+  onKindChange,
+}: {
+  kind: FollowListKind;
+  counts?: { followers: number; following: number };
+  onKindChange: (kind: FollowListKind) => void;
+}) {
+  const options: { value: FollowListKind; label: string; count?: number }[] = [
+    { value: "followers", label: "Followers", count: counts?.followers },
+    { value: "following", label: "Following", count: counts?.following },
+  ];
+
+  return (
+    <div
+      className="grid grid-cols-2 rounded-full border border-border/50 bg-muted/35 p-0.5"
+      role="tablist"
+      aria-label="Follow lists"
+    >
+      {options.map((opt) => {
+        const active = kind === opt.value;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => {
+              if (!active) onKindChange(opt.value);
+            }}
+            className={cn(
+              "inline-flex h-9 items-center justify-center gap-1.5 rounded-full px-2 text-sm font-medium transition-colors",
+              active
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {opt.label}
+            {typeof opt.count === "number" ? (
+              <span className={cn("tabular-nums", active ? "text-foreground/70" : "text-muted-foreground/80")}>
+                {opt.count.toLocaleString()}
+              </span>
+            ) : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function FollowListPersonSkeleton() {
   return (
-    <li className="flex items-center gap-3 px-1 py-2.5">
+    <li className="flex items-center gap-3 rounded-2xl border border-border/40 bg-card/50 px-3 py-2.5">
       <Skeleton className="h-11 w-11 shrink-0 rounded-full" />
-      <div className="min-w-0 flex-1 space-y-2">
+      <div className="min-w-0 flex-1 space-y-1.5">
         <Skeleton className="h-3.5 w-36 max-w-[70%]" />
         <Skeleton className="h-3 w-24 max-w-[45%]" />
       </div>
@@ -83,48 +137,48 @@ function FollowListBody({
   loading,
   error,
   onNavigate,
+  onKindChange,
+  counts,
 }: {
   kind: FollowListKind;
   people: FollowListPerson[];
   loading: boolean;
   error: string | null;
   onNavigate: () => void;
+  onKindChange?: (kind: FollowListKind) => void;
+  counts?: { followers: number; following: number };
 }) {
   const [query, setQuery] = useState("");
   const copy = kindCopy(kind);
   const filtered = useMemo(() => people.filter((p) => matchesQuery(p, query)), [people, query]);
-  const showSearch = !loading && !error && people.length >= 6;
-  const countLabel =
-    people.length === 1 ? "1 person" : `${people.length.toLocaleString()} people`;
+  const showSearch = !loading && !error && people.length > 0;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="shrink-0 space-y-3 px-4 pb-2 sm:px-6">
-        {!loading && !error && people.length > 0 ? (
-          <p className="text-xs font-medium tabular-nums text-muted-foreground">{countLabel}</p>
-        ) : null}
+      <div className="shrink-0 space-y-2.5 px-4 pb-2 sm:px-5">
+        {onKindChange ? <FollowListKindTabs kind={kind} counts={counts} onKindChange={onKindChange} /> : null}
         {showSearch ? (
           <div className="relative">
             <Search
-              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+              className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
               aria-hidden
             />
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by name or @handle"
+              placeholder="Search name or @handle"
               aria-label={`Search ${copy.title.toLowerCase()}`}
               autoComplete="off"
               autoCorrect="off"
               autoCapitalize="none"
               spellCheck={false}
-              className="h-10 rounded-2xl border-border/50 bg-muted/25 pl-10 pr-10 text-[15px] shadow-sm"
+              className="h-11 rounded-full border-border/45 bg-muted/40 pl-10 pr-10 text-[15px] shadow-none"
             />
             {query.trim() ? (
               <button
                 type="button"
                 onClick={() => setQuery("")}
-                className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 aria-label="Clear search"
               >
                 <X className="h-3.5 w-3.5" aria-hidden />
@@ -134,38 +188,42 @@ function FollowListBody({
         ) : null}
       </div>
 
-      {/* Explicit max-height so overflow scrolls even when the sheet sizes to content. */}
       <div
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-1 sm:px-6 sm:pb-6 [-webkit-overflow-scrolling:touch] max-h-[min(68dvh,32rem)]"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-1 sm:px-5 sm:pb-5 [-webkit-overflow-scrolling:touch] max-h-[min(68dvh,32rem)]"
         data-testid="follow-list-scroll"
       >
         {loading ? (
-          <ul className="m-0 list-none space-y-0.5 p-0" aria-busy="true" aria-label="Loading list">
+          <ul className="m-0 list-none space-y-2 p-0" aria-busy="true" aria-label="Loading list">
             {Array.from({ length: 6 }, (_, i) => (
               <FollowListPersonSkeleton key={i} />
             ))}
           </ul>
         ) : error ? (
-          <p className="px-1 py-8 text-center text-sm text-destructive">{error}</p>
+          <p className="px-1 py-10 text-center text-sm text-destructive">{error}</p>
         ) : people.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 px-4 py-12 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted/70 text-muted-foreground">
-              <Users className="h-5 w-5" aria-hidden />
+          <div className="flex flex-col items-center gap-2.5 px-4 py-10 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted/60 text-muted-foreground">
+              <Users className="h-6 w-6" aria-hidden />
             </div>
-            <p className="text-sm text-muted-foreground">{copy.empty}</p>
+            <p className="text-sm font-medium text-foreground">{copy.empty}</p>
+            <p className="max-w-[16rem] text-xs leading-relaxed text-muted-foreground">
+              {kind === "following"
+                ? "When they follow people on the Feed, they’ll show up here."
+                : "When people follow this profile, they’ll show up here."}
+            </p>
           </div>
         ) : filtered.length === 0 ? (
           <p className="px-1 py-10 text-center text-sm text-muted-foreground">{copy.emptyFilter}</p>
         ) : (
-          <ul className="m-0 list-none divide-y divide-border/50 p-0">
+          <ul className="m-0 list-none space-y-2 p-0">
             {filtered.map((row) => (
               <li key={row.id}>
                 <Link
                   href={`/community/profile/${encodeURIComponent(row.id)}`}
                   onClick={onNavigate}
                   className={cn(
-                    "group flex items-center gap-3 rounded-xl px-1 py-3 transition-colors",
-                    "hover:bg-muted/50 active:bg-muted/70",
+                    "flex items-center gap-3 rounded-2xl border border-border/45 bg-card/60 px-3 py-2.5 shadow-sm",
+                    "transition-colors hover:bg-card/90 active:bg-muted/70",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background",
                   )}
                 >
@@ -177,19 +235,15 @@ function FollowListBody({
                     fallbackSrc={row.fallbackSrc}
                   />
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-[15px] font-medium leading-snug text-foreground">
+                    <div className="truncate text-sm font-semibold leading-tight text-foreground">
                       {row.full_name}
                     </div>
                     {row.public_handle ? (
-                      <div className="truncate text-sm text-muted-foreground">@{row.public_handle}</div>
+                      <div className="truncate text-xs text-muted-foreground">@{row.public_handle}</div>
                     ) : (
-                      <div className="truncate text-sm text-muted-foreground/70">View profile</div>
+                      <div className="truncate text-xs text-muted-foreground/70">View profile</div>
                     )}
                   </div>
-                  <ChevronRight
-                    className="h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5 group-hover:text-muted-foreground"
-                    aria-hidden
-                  />
                 </Link>
               </li>
             ))}
@@ -211,6 +265,8 @@ export function FollowListDialog({
   people,
   loading = false,
   error = null,
+  onKindChange,
+  counts,
 }: FollowListDialogProps) {
   const isMobile = useIsMobile();
   const copy = kindCopy(kind);
@@ -224,6 +280,8 @@ export function FollowListDialog({
       loading={loading}
       error={error}
       onNavigate={() => onOpenChange(false)}
+      onKindChange={onKindChange}
+      counts={counts}
     />
   );
 
@@ -233,7 +291,6 @@ export function FollowListDialog({
         open={open}
         onOpenChange={onOpenChange}
         title={copy.title}
-        description={copy.description}
         className="max-h-[min(92dvh,720px)]"
         bodyClassName="flex min-h-0 flex-1 flex-col overflow-hidden"
         onOpenAutoFocus={preventDialogAutoFocus}
@@ -246,12 +303,12 @@ export function FollowListDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange} mobileSheet={false}>
       <DialogContent
-        className="flex max-h-[min(85dvh,36rem)] flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:max-w-md"
+        className="flex max-h-[min(85dvh,36rem)] flex-col gap-0 overflow-hidden rounded-[1.35rem] p-0 sm:max-w-md"
         onOpenAutoFocus={preventDialogAutoFocus}
       >
-        <DialogHeader className="shrink-0 space-y-1 px-6 pb-2 pt-6 text-left">
+        <DialogHeader className="shrink-0 space-y-0 px-5 pb-3 pt-5 text-left">
           <DialogTitle>{copy.title}</DialogTitle>
-          <DialogDescription>{copy.description}</DialogDescription>
+          <DialogDescription className="sr-only">{copy.description}</DialogDescription>
         </DialogHeader>
         {body}
       </DialogContent>

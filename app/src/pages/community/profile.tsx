@@ -25,11 +25,9 @@ import {
   ProfileFollowStats,
   ProfileHandle,
   ProfileHeroCard,
-  ProfileMetaRow,
   ProfileMutedCard,
   ProfileSectionHeading,
   ProfileSupportedPersonBadge,
-  ProfileInlineActionRow,
 } from "@/components/profile/profile-ui";
 import { Button } from "@/components/ui/button";
 import {
@@ -414,10 +412,11 @@ export default function CommunityProfilePage() {
       ) : (
         <ProfileHeroCard testId="public-profile-hero" compact flat>
           <div className="space-y-2">
-            <div className="flex items-start gap-3">
+            <div className="flex items-start gap-2.5">
               <div className="shrink-0">
                 {storyRing !== "none" && authorStories.length > 0 && canViewStory ? (
                   <StoryAvatarRing
+                    prominent
                     state={storyRing}
                     onClick={() => setStoryViewerOpen(true)}
                     label={
@@ -433,6 +432,8 @@ export default function CommunityProfilePage() {
                       initials={profileInitials(displayName)}
                       alt={displayName}
                       size="md"
+                      shape="circle"
+                      framed={false}
                     />
                   </StoryAvatarRing>
                 ) : (
@@ -441,12 +442,23 @@ export default function CommunityProfilePage() {
                     initials={profileInitials(displayName)}
                     alt={displayName}
                     size="md"
+                    shape="circle"
                   />
                 )}
               </div>
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 space-y-1">
                 <div className="flex items-start justify-between gap-1">
-                  <ProfileDisplayName size="sm" name={displayName} />
+                  <div className="flex min-w-0 items-baseline gap-1.5">
+                    <div className="min-w-0">
+                      <ProfileDisplayName size="sm" name={displayName} />
+                    </div>
+                    {profile.public_handle ? <ProfileHandle handle={profile.public_handle} /> : null}
+                    {isSelf && !profile.is_public ? (
+                      <span className="inline-flex rounded-full border border-amber-500/35 bg-amber-500/[0.08] px-1.5 py-0 text-[10px] font-medium text-amber-950 dark:text-amber-100">
+                        Hidden
+                      </span>
+                    ) : null}
+                  </div>
                   {!isSelf && user ? (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -454,7 +466,7 @@ export default function CommunityProfilePage() {
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 shrink-0 rounded-full text-muted-foreground"
+                          className="h-7 w-7 shrink-0 rounded-full text-muted-foreground"
                           aria-label="Profile options"
                         >
                           <MoreHorizontal className="h-4 w-4" aria-hidden />
@@ -471,92 +483,88 @@ export default function CommunityProfilePage() {
                     </DropdownMenu>
                   ) : null}
                 </div>
-                <ProfileMetaRow>
-                  {profile.public_handle ? <ProfileHandle handle={profile.public_handle} /> : null}
-                  <ProfileStreakBadges streaks={profile.streaks ?? profile.achievements ?? []} size="sm" />
-                  {isSelf && !profile.is_public ? (
-                    <span className="inline-flex rounded-full border border-amber-500/35 bg-amber-500/[0.08] px-2 py-0.5 text-[11px] font-medium text-amber-950 dark:text-amber-100">
-                      Hidden from others
-                    </span>
-                  ) : null}
-                </ProfileMetaRow>
                 <ProfileFollowStats
                   followers={counts.followers}
                   following={counts.following}
                   onFollowersClick={() => void openList("followers")}
                   onFollowingClick={() => void openList("following")}
                 />
+                <ProfileStreakBadges
+                  streaks={profile.streaks ?? profile.achievements ?? []}
+                  size="sm"
+                  className="gap-1"
+                />
               </div>
             </div>
 
             {profileBio || livingWithLine ? (
               <ProfileBioPreview
-                relaxed
+                compact
                 bio={profileBio}
                 livingWithLine={livingWithLine}
                 emptyLabel={isBeatieProfile ? BEATIE_FEED_BOT_DEFAULT_BIO : "No bio yet."}
               />
             ) : null}
 
-            {profile.supported_person ? (
-              <ProfileSupportedPersonBadge person={profile.supported_person} subtle className="w-fit" />
-            ) : null}
-
-            {isSelf && user ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8 w-fit gap-1.5 rounded-full text-xs"
-                onClick={() => setStoryCreateOpen(true)}
-              >
-                <Plus className="h-3.5 w-3.5" aria-hidden />
-                Add story
-              </Button>
-            ) : null}
-
-            {isSelf && latestStory && userId ? (
-              <StoryViewersSummary storyId={latestStory.id} authorId={userId} variant="inline" />
-            ) : null}
-
-            {!isSelf && user ? (
-              <ProfileInlineActionRow>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={followingThem ? "secondary" : "default"}
-                  disabled={followBusy || blockStatus.iBlockedThem || blockStatus.theyBlockedMe}
-                  onClick={() => void toggleFollow()}
-                  className="gap-1.5 text-xs"
-                >
-                  {followingThem ? (
-                    <UserCheck className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  ) : (
-                    <UserPlus className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  )}
-                  {followingThem ? "Following" : "Follow"}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={blockStatus.iBlockedThem || blockStatus.theyBlockedMe}
-                  onClick={() => void openMessages()}
-                  className="gap-1.5 text-xs"
-                >
-                  <MessageCircle className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  Message
-                </Button>
-              </ProfileInlineActionRow>
-            ) : null}
-
-            {!isSelf && !user ? (
-              <p className="text-xs text-muted-foreground sm:text-sm">
-                <Link href={loginNextHref} className="font-medium text-primary underline-offset-4 hover:underline">
-                  Sign in
-                </Link>{" "}
-                to follow or message.
-              </p>
+            {profile.supported_person || user || !isSelf ? (
+              <div className="flex flex-wrap items-center gap-1.5">
+                {profile.supported_person ? (
+                  <ProfileSupportedPersonBadge person={profile.supported_person} subtle className="w-fit" />
+                ) : null}
+                {isSelf && user ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 w-fit gap-1 rounded-full px-2.5 text-xs"
+                    onClick={() => setStoryCreateOpen(true)}
+                  >
+                    <Plus className="h-3.5 w-3.5" aria-hidden />
+                    Add story
+                  </Button>
+                ) : null}
+                {isSelf && latestStory && userId ? (
+                  <StoryViewersSummary storyId={latestStory.id} authorId={userId} variant="inline" />
+                ) : null}
+                {!isSelf && user ? (
+                  <>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={followingThem ? "secondary" : "default"}
+                      disabled={followBusy || blockStatus.iBlockedThem || blockStatus.theyBlockedMe}
+                      onClick={() => void toggleFollow()}
+                      className="h-7 gap-1 rounded-full px-3 text-xs"
+                    >
+                      {followingThem ? (
+                        <UserCheck className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                      ) : (
+                        <UserPlus className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                      )}
+                      {followingThem ? "Following" : "Follow"}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={blockStatus.iBlockedThem || blockStatus.theyBlockedMe}
+                      onClick={() => void openMessages()}
+                      className="h-7 gap-1 rounded-full px-3 text-xs"
+                    >
+                      <MessageCircle className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                      Message
+                    </Button>
+                  </>
+                ) : null}
+                {!isSelf && !user ? (
+                  <p className="text-xs text-muted-foreground">
+                    <Link href={loginNextHref} className="font-medium text-primary underline-offset-4 hover:underline">
+                      Sign in
+                    </Link>{" "}
+                    to follow or message.
+                  </p>
+                ) : null}
+              </div>
             ) : null}
           </div>
         </ProfileHeroCard>
@@ -622,6 +630,8 @@ export default function CommunityProfilePage() {
           }
         }}
         kind={listKind}
+        onKindChange={(next) => void openList(next)}
+        counts={counts}
         people={listRows}
         loading={listLoading}
       />

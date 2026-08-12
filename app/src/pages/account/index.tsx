@@ -820,6 +820,8 @@ export default function Account() {
           }
         }}
         kind={followListKind ?? "followers"}
+        onKindChange={(next) => void openFollowList(next)}
+        counts={publicCounts ?? undefined}
         people={followListRows}
         loading={followListLoading}
         error={followListError}
