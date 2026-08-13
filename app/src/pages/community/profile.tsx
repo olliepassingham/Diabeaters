@@ -44,12 +44,10 @@ import { ProfilePostMediaGrid } from "@/components/community/profile-post-media-
 import { StoryAvatarRing } from "@/components/community/story-avatar-ring";
 import { StoryCreateSheet } from "@/components/community/story-create-sheet";
 import { StoryViewerDialog } from "@/components/community/story-viewer-dialog";
-import { StoryViewersSummary } from "@/components/community/story-viewers-sheet";
 import { ProfileStreakBadges } from "@/components/achievements/achievements-panel";
 import { fetchPublicProfileStreaks, USER_ACHIEVEMENTS_CHANGED_EVENT } from "@/lib/user-achievements";
 import { useResolvedProfileImageUrl } from "@/hooks/use-resolved-profile-image-url";
 import { useCommunityStories } from "@/hooks/use-community-stories";
-import { latestStoryForAuthor } from "@/lib/community/stories-supabase";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { getPrimaryAppRole } from "@/lib/carer-session";
@@ -142,7 +140,6 @@ export default function CommunityProfilePage() {
     profileStoryAuthorIds,
   );
   const authorStories = userId ? storiesByAuthor.get(userId) ?? [] : [];
-  const latestStory = latestStoryForAuthor(authorStories);
   const storyRing = profileRingState(userId ?? "");
 
   const isSelf = Boolean(user?.id && userId && user.id === userId);
@@ -522,9 +519,6 @@ export default function CommunityProfilePage() {
                     <Plus className="h-3.5 w-3.5" aria-hidden />
                     Add story
                   </Button>
-                ) : null}
-                {isSelf && latestStory && userId ? (
-                  <StoryViewersSummary storyId={latestStory.id} authorId={userId} variant="inline" />
                 ) : null}
                 {!isSelf && user ? (
                   <>

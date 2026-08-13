@@ -1,31 +1,31 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { Eye, ChevronRight, Flag, Loader2, MessageCircle, Send, X } from "lucide-react";
+import { Eye, Flag, Loader2, MessageCircle, Send, X } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { StoryOverlayLayer } from "@/components/community/story-overlay-layer";
-import { StoryViewersSheet, useStoryViewerCount } from "@/components/community/story-viewers-sheet";
+import { StoryViewersSheet } from "@/components/community/story-viewers-sheet";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { sendStoryReplyToDmThread, submitContentReport } from "@/lib/community";
 import {
   fetchActiveStoryForAuthor,
-  fetchStoryReactionProfiles,
   fetchStoryReactionSummary,
   getStoryMediaSignedUrl,
   markStoryViewed,
   setStoryReaction,
-  storyReactionEmoji,
   STORY_REACTION_OPTIONS,
-  totalStoryReactions,
   type CommunityStoryRow,
   type StoryReactionKind,
-  type StoryReactionProfile,
   type StoryReactionSummary,
 } from "@/lib/community/stories-supabase";
 import { cn } from "@/lib/utils";
+
+const DISMISS_DRAG_PX = 72;
+const NAV_DRAG_PX = 56;
+const TAP_SLOP_PX = 12;
 
 export type StoryViewerEntry = {
   authorId: string;
@@ -124,7 +124,6 @@ export function StoryViewerDialog({
   const [replyOpen, setReplyOpen] = useState(false);
   const [replyDraft, setReplyDraft] = useState("");
   const [replyBusy, setReplyBusy] = useState(false);
-  const [reactionProfiles, setReactionProfiles] = useState<StoryReactionProfile[]>([]);
 
   const current = queue[index];
   const isLast = index >= queue.length - 1;
@@ -132,12 +131,13 @@ export function StoryViewerDialog({
   const profileHref = current ? `/community/profile/${encodeURIComponent(current.authorId)}` : "#";
   const isOwnStory = Boolean(viewerId && current?.authorId === viewerId);
   const canInteract = Boolean(viewerId && current && !isOwnStory);
-  const { count: viewCount, refresh: refreshViewCount } = useStoryViewerCount(
-    isOwnStory ? resolvedStory?.id : undefined,
-    isOwnStory ? viewerId : undefined,
-  );
 
   const closeViewer = useCallback(() => onOpenChange(false), [onOpenChange]);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const dragRef = useRef({ x: 0, y: 0 });
+  const suppressClick = useRef(false);
+  const [drag, setDrag] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -148,6 +148,10 @@ export function StoryViewerDialog({
       setReplyOpen(false);
       setReplyDraft("");
       setViewersOpen(false);
+      touchStart.current = null;
+      dragRef.current = { x: 0, y: 0 };
+      setDrag({ x: 0, y: 0 });
+      setDragging(false);
       return;
     }
     setIndex(Math.min(Math.max(initialIndex, 0), Math.max(queue.length - 1, 0)));
@@ -216,44 +220,81 @@ export function StoryViewerDialog({
     };
   }, [open, resolvedStory?.id]);
 
-  const refreshReactionProfiles = useCallback(async () => {
-    if (!resolvedStory || !isOwnStory) {
-      setReactionProfiles([]);
-      return;
-    }
-    const res = await fetchStoryReactionProfiles(resolvedStory.id);
-    if (!res.error) {
-      setReactionProfiles(res.data);
-      setReactions((prev) => {
-        const base: StoryReactionSummary = { heart: 0, support: 0, celebrate: 0, my_reaction: prev?.my_reaction ?? null };
-        for (const row of res.data) {
-          if (row.reaction_kind === "heart") base.heart += 1;
-          else if (row.reaction_kind === "support") base.support += 1;
-          else if (row.reaction_kind === "celebrate") base.celebrate += 1;
-        }
-        return base;
-      });
-    }
-  }, [resolvedStory, isOwnStory]);
-
-  useEffect(() => {
-    if (!open || !resolvedStory || !isOwnStory) {
-      setReactionProfiles([]);
-      return;
-    }
-    void refreshReactionProfiles();
-    const id = window.setInterval(() => void refreshReactionProfiles(), 12_000);
-    return () => window.clearInterval(id);
-  }, [open, resolvedStory?.id, isOwnStory, refreshReactionProfiles]);
-
   const advance = useCallback(() => {
-    if (replyOpen) return;
+    if (replyOpen || viewersOpen) return;
     if (index < queue.length - 1) {
       setIndex((i) => i + 1);
       return;
     }
     onOpenChange(false);
-  }, [index, queue.length, onOpenChange, replyOpen]);
+  }, [index, queue.length, onOpenChange, replyOpen, viewersOpen]);
+
+  const goPrev = useCallback(() => {
+    if (replyOpen || viewersOpen) return;
+    if (index > 0) setIndex((i) => i - 1);
+  }, [index, replyOpen, viewersOpen]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (replyOpen || viewersOpen) return;
+      if (e.key === "ArrowRight") advance();
+      if (e.key === "ArrowLeft") goPrev();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open, advance, goPrev, replyOpen, viewersOpen]);
+
+  const resetDrag = useCallback(() => {
+    touchStart.current = null;
+    dragRef.current = { x: 0, y: 0 };
+    setDragging(false);
+    setDrag({ x: 0, y: 0 });
+  }, []);
+
+  const onTouchStart = (e: TouchEvent) => {
+    if (replyOpen || viewersOpen) return;
+    const t = e.changedTouches[0];
+    if (!t) return;
+    touchStart.current = { x: t.clientX, y: t.clientY };
+    setDragging(true);
+  };
+
+  const onTouchMove = (e: TouchEvent) => {
+    if (!touchStart.current || replyOpen || viewersOpen) return;
+    const t = e.changedTouches[0];
+    if (!t) return;
+    const dx = t.clientX - touchStart.current.x;
+    const dy = t.clientY - touchStart.current.y;
+    if (Math.abs(dy) > Math.abs(dx) && dy > 0) {
+      dragRef.current = { x: 0, y: dy };
+      setDrag({ x: 0, y: dy });
+      return;
+    }
+    if (Math.abs(dx) > Math.abs(dy)) {
+      dragRef.current = { x: dx, y: 0 };
+      setDrag({ x: dx, y: 0 });
+      return;
+    }
+    dragRef.current = { x: 0, y: 0 };
+    setDrag({ x: 0, y: 0 });
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart.current) return;
+    const { x, y } = dragRef.current;
+    if (Math.abs(x) > TAP_SLOP_PX || Math.abs(y) > TAP_SLOP_PX) {
+      suppressClick.current = true;
+    }
+    if (y >= DISMISS_DRAG_PX) {
+      closeViewer();
+    } else if (x <= -NAV_DRAG_PX) {
+      advance();
+    } else if (x >= NAV_DRAG_PX) {
+      goPrev();
+    }
+    resetDrag();
+  };
 
   async function handleReport() {
     if (!resolvedStory || reportBusy) return;
@@ -294,10 +335,8 @@ export function StoryViewerDialog({
     });
   }
 
-  async function openViewers() {
+  function openViewers() {
     if (!resolvedStory || !isOwnStory || !viewerId) return;
-    void refreshViewCount();
-    void refreshReactionProfiles();
     setViewersOpen(true);
   }
 
@@ -324,44 +363,64 @@ export function StoryViewerDialog({
     return null;
   }
 
-  const reactionTotal = totalStoryReactions(reactions);
+  const dismissProgress = Math.min(1, drag.y / 220);
 
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange} mobileSheet={false}>
         <DialogContent
-          className="flex max-h-[100dvh] max-w-[100vw] flex-col gap-0 overflow-hidden border-0 bg-black p-0 sm:max-w-lg sm:rounded-xl"
+          className="inset-0 flex h-[100dvh] max-h-[100dvh] w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-0 bg-black p-0 left-0 top-0 sm:inset-auto sm:left-[50%] sm:top-[50%] sm:h-[min(100dvh,760px)] sm:w-full sm:max-w-md sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-[1.75rem] [&>button]:hidden"
           aria-describedby={undefined}
         >
-          <div className="relative flex min-h-[min(100dvh,720px)] flex-1 flex-col bg-black">
+          <DialogTitle className="sr-only">{displayName}'s story</DialogTitle>
+          <div
+            className={cn(
+              "relative flex min-h-0 flex-1 flex-col overflow-hidden bg-black",
+              dragging ? "transition-none" : "transition-transform duration-200 ease-out",
+            )}
+            style={{
+              transform: `translate3d(0, ${drag.y}px, 0) scale(${1 - dismissProgress * 0.06})`,
+              opacity: 1 - dismissProgress * 0.35,
+            }}
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+            onTouchCancel={onTouchEnd}
+          >
             <div
-              className="pointer-events-none absolute inset-x-0 top-0 z-10 h-32 bg-gradient-to-b from-black/80 via-black/40 to-transparent"
+              className="pointer-events-none absolute inset-x-0 top-0 z-10 h-36 bg-gradient-to-b from-black/75 via-black/35 to-transparent"
               aria-hidden
             />
             <div
-              className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-40 bg-gradient-to-t from-black/85 via-black/45 to-transparent"
+              className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-44 bg-gradient-to-t from-black/80 via-black/35 to-transparent"
               aria-hidden
             />
 
-            {queue.length > 1 ? (
-              <div
-                className="absolute left-0 right-0 top-0 z-30 flex gap-1 px-3 pt-[max(0.6rem,env(safe-area-inset-top))]"
-                aria-hidden
-              >
-                {queue.map((entry, i) => (
-                  <div key={entry.authorId} className="h-0.5 min-w-0 flex-1 overflow-hidden rounded-full bg-white/25">
-                    <div
-                      className={cn(
-                        "h-full rounded-full bg-white transition-[width] duration-200",
-                        i < index ? "w-full" : i === index ? "w-full" : "w-0",
-                      )}
-                    />
-                  </div>
-                ))}
-              </div>
-            ) : null}
+            <div
+              className="pointer-events-none absolute left-1/2 top-[max(0.4rem,env(safe-area-inset-top))] z-30 h-1 w-10 -translate-x-1/2 rounded-full bg-white/35 sm:hidden"
+              aria-hidden
+            />
 
-            <div className="absolute left-0 right-0 top-0 z-20 flex items-center justify-between gap-2 px-3 pb-2 pt-[max(2.25rem,env(safe-area-inset-top))]">
+            <div
+              className="absolute left-0 right-0 top-0 z-30 flex gap-1 px-3 pt-[max(0.9rem,calc(env(safe-area-inset-top)+0.35rem))] sm:pt-3"
+              aria-hidden
+            >
+              {(queue.length > 0 ? queue : [{ authorId: "story" }]).map((entry, i) => (
+                <div
+                  key={`${entry.authorId}-${i}`}
+                  className="h-[2px] min-w-0 flex-1 overflow-hidden rounded-full bg-white/25"
+                >
+                  <div
+                    className={cn(
+                      "h-full rounded-full bg-white transition-[width] duration-200",
+                      i < index || queue.length <= 1 ? "w-full" : i === index ? "w-full" : "w-0",
+                    )}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="absolute left-0 right-0 top-0 z-20 flex items-center justify-between gap-2 px-3 pb-2 pt-[max(1.85rem,calc(env(safe-area-inset-top)+1.15rem))]">
               {current ? (
                 <Link
                   href={profileHref}
@@ -369,53 +428,57 @@ export function StoryViewerDialog({
                     e.stopPropagation();
                     closeViewer();
                   }}
-                  className="flex min-w-0 max-w-[calc(100%-5.5rem)] items-center gap-2.5 rounded-full py-1 pr-3 pl-1 outline-none ring-offset-background transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/35"
+                  className="flex min-w-0 max-w-[calc(100%-5.5rem)] items-center gap-2.5 rounded-full py-1 pr-3 pl-1 outline-none transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/35"
                   data-testid="story-viewer-author-link"
                 >
                   <CommunityAuthorAvatar
                     displayName={displayName}
                     avatarPath={current.authorAvatarUrl}
                     size="sm"
-                    className="!h-9 !w-9 shrink-0 ring-2 ring-white/20 shadow-md"
+                    className="!h-9 !w-9 shrink-0 shadow-md ring-2 ring-white/25"
                   />
                   <span className="min-w-0 text-left">
-                    <span className="block truncate text-sm font-semibold leading-tight text-white">{displayName}</span>
+                    <span className="block truncate text-[13px] font-semibold leading-tight tracking-tight text-white">
+                      {displayName}
+                    </span>
                     {resolvedStory?.created_at ? (
                       <time
-                        className="block truncate text-[11px] leading-tight text-white/65"
+                        className="block truncate text-[11px] leading-tight text-white/60"
                         dateTime={resolvedStory.created_at}
                         title={resolvedStory.created_at}
                       >
                         {formatDistanceToNow(new Date(resolvedStory.created_at), { addSuffix: true })}
                       </time>
                     ) : (
-                      <span className="block text-[11px] leading-tight text-white/55">View profile</span>
+                      <span className="block text-[11px] leading-tight text-white/50">View profile</span>
                     )}
                   </span>
                 </Link>
               ) : (
                 <div className="min-w-0 flex-1" />
               )}
-              <div className="flex shrink-0 items-center gap-0.5">
+              <div className="flex shrink-0 items-center gap-1">
+                {!isOwnStory ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 rounded-full border border-white/10 bg-white/10 text-white/90 backdrop-blur-md hover:bg-white/20 hover:text-white"
+                    disabled={reportBusy || !resolvedStory}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void handleReport();
+                    }}
+                    aria-label="Report story"
+                  >
+                    <Flag className="h-4 w-4" />
+                  </Button>
+                ) : null}
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="h-9 w-9 rounded-full text-white/90 hover:bg-white/15 hover:text-white"
-                  disabled={reportBusy || !resolvedStory}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void handleReport();
-                  }}
-                  aria-label="Report story"
-                >
-                  <Flag className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9 rounded-full text-white/90 hover:bg-white/15 hover:text-white"
+                  className="h-9 w-9 rounded-full border border-white/10 bg-white/10 text-white/90 backdrop-blur-md hover:bg-white/20 hover:text-white"
                   onClick={(e) => {
                     e.stopPropagation();
                     closeViewer();
@@ -429,8 +492,14 @@ export function StoryViewerDialog({
 
             <button
               type="button"
-              className="relative flex flex-1 cursor-default items-center justify-center border-0 bg-transparent p-0 pb-28 outline-none"
-              onClick={advance}
+              className="relative flex min-h-0 flex-1 cursor-default items-center justify-center border-0 bg-transparent p-0 outline-none"
+              onClick={() => {
+                if (suppressClick.current) {
+                  suppressClick.current = false;
+                  return;
+                }
+                advance();
+              }}
               aria-label={isLast ? "Close story" : "Next story"}
             >
               {loading ? (
@@ -440,13 +509,13 @@ export function StoryViewerDialog({
               ) : !mediaUrl ? (
                 <Loader2 className="h-8 w-8 animate-spin text-white/70" aria-hidden />
               ) : (
-                <div className="relative flex h-full w-full items-center justify-center">
+                <div className="relative h-full w-full">
                   {resolvedStory.media_kind === "image" ? (
-                    <img src={mediaUrl} alt="" className="max-h-full w-full object-contain pointer-events-none" />
+                    <img src={mediaUrl} alt="" className="h-full w-full object-cover pointer-events-none" />
                   ) : (
                     <video
                       src={mediaUrl}
-                      className="max-h-full w-full object-contain pointer-events-none"
+                      className="h-full w-full object-cover pointer-events-none"
                       controls={false}
                       playsInline
                       autoPlay
@@ -459,67 +528,43 @@ export function StoryViewerDialog({
               )}
             </button>
 
-            <div className="absolute bottom-0 left-0 right-0 z-20 space-y-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div
+              className="absolute bottom-0 left-0 right-0 z-20 px-4 pb-[max(1.1rem,env(safe-area-inset-bottom))]"
+              onClick={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+            >
               {resolvedStory?.caption ? (
-                <p className="text-center text-sm leading-snug text-white/90">{resolvedStory.caption}</p>
+                <p className="mb-3 text-center text-sm font-medium leading-snug text-white drop-shadow-[0_1px_8px_rgba(0,0,0,0.65)]">
+                  {resolvedStory.caption}
+                </p>
               ) : null}
 
               {isOwnStory ? (
-                <div className="flex flex-col items-center gap-2">
+                <div className="flex justify-center">
                   <button
                     type="button"
-                    className="inline-flex max-w-full items-center gap-2.5 rounded-full border border-white/15 bg-black/40 px-4 py-2.5 text-left shadow-lg backdrop-blur-md transition-colors hover:bg-black/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
+                    className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/10 px-3.5 py-2 text-white shadow-[0_8px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition-colors hover:bg-white/16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
                     onClick={(e) => {
                       e.stopPropagation();
-                      void openViewers();
+                      openViewers();
                     }}
                   >
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10">
-                      <Eye className="h-4 w-4 text-white/90" aria-hidden />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-medium leading-tight text-white">
-                        {viewCount === 0 && reactionTotal === 0
-                          ? "No activity yet"
-                          : [
-                              viewCount > 0 ? `${viewCount} viewer${viewCount === 1 ? "" : "s"}` : null,
-                              reactionTotal > 0
-                                ? `${reactionTotal} reaction${reactionTotal === 1 ? "" : "s"}`
-                                : null,
-                            ]
-                              .filter(Boolean)
-                              .join(" · ")}
-                      </span>
-                      <span className="block text-xs leading-tight text-white/55">Tap for views and reactions</span>
-                    </span>
-                    <ChevronRight className="h-4 w-4 shrink-0 text-white/45" aria-hidden />
+                    <Eye className="h-4 w-4 text-white/90" aria-hidden />
+                    <span className="text-[13px] font-medium tracking-tight">Activity</span>
                   </button>
-                  {reactionProfiles.length > 0 ? (
-                    <div className="flex max-w-full flex-wrap justify-center gap-1.5 px-2">
-                      {reactionProfiles.slice(0, 6).map((r) => (
-                        <span
-                          key={r.user_id}
-                          className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/35 px-2 py-1 text-xs text-white/90 backdrop-blur-sm"
-                        >
-                          <span aria-hidden>{storyReactionEmoji(r.reaction_kind)}</span>
-                          <span className="max-w-[5rem] truncate">{r.name.split(" ")[0]}</span>
-                        </span>
-                      ))}
-                      {reactionProfiles.length > 6 ? (
-                        <span className="text-xs text-white/50">+{reactionProfiles.length - 6} more</span>
-                      ) : null}
-                    </div>
-                  ) : null}
                 </div>
               ) : canInteract ? (
                 <div className="space-y-2">
                   {replyOpen ? (
-                    <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                    <div
+                      className="flex items-center gap-2 rounded-full border border-white/12 bg-black/45 p-1 pl-4 backdrop-blur-xl"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <Input
                         value={replyDraft}
                         onChange={(e) => setReplyDraft(e.target.value)}
-                        placeholder="Write a reply…"
-                        className="border-white/20 bg-black/40 text-white placeholder:text-white/50"
+                        placeholder="Send a reply…"
+                        className="h-10 border-0 bg-transparent px-0 text-white shadow-none placeholder:text-white/45 focus-visible:ring-0"
                         maxLength={500}
                         autoFocus
                         onKeyDown={(e) => {
@@ -532,7 +577,7 @@ export function StoryViewerDialog({
                       <Button
                         type="button"
                         size="icon"
-                        className="shrink-0"
+                        className="h-10 w-10 shrink-0 rounded-full"
                         disabled={replyBusy}
                         onClick={() => void handleSendReply()}
                         aria-label="Send reply"
@@ -541,7 +586,10 @@ export function StoryViewerDialog({
                       </Button>
                     </div>
                   ) : (
-                    <div className="flex items-center justify-center gap-2" onClick={(e) => e.stopPropagation()}>
+                    <div
+                      className="mx-auto flex w-fit items-center gap-0.5 rounded-full border border-white/12 bg-black/40 p-1 backdrop-blur-xl"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       {STORY_REACTION_OPTIONS.map((opt) => (
                         <Button
                           key={opt.kind}
@@ -564,7 +612,7 @@ export function StoryViewerDialog({
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="h-11 gap-1.5 rounded-full px-3 text-white hover:bg-white/15"
+                        className="h-11 gap-1.5 rounded-full px-3.5 text-[13px] font-medium text-white hover:bg-white/15"
                         onClick={() => setReplyOpen(true)}
                       >
                         <MessageCircle className="h-4 w-4" />
@@ -573,14 +621,6 @@ export function StoryViewerDialog({
                     </div>
                   )}
                 </div>
-              ) : null}
-
-              {queue.length > 1 ? (
-                <p className="pointer-events-none text-center text-[11px] text-white/50">
-                  Tap for {isLast ? "close" : "next"}
-                </p>
-              ) : !canInteract && !isOwnStory ? (
-                <p className="pointer-events-none text-center text-[11px] text-white/50">Tap to close</p>
               ) : null}
             </div>
           </div>

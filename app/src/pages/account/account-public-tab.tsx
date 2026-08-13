@@ -7,7 +7,6 @@ import { ProfilePostMediaGrid } from "@/components/community/profile-post-media-
 import { StoryAvatarRing } from "@/components/community/story-avatar-ring";
 import { StoryCreateSheet } from "@/components/community/story-create-sheet";
 import { StoryViewerDialog } from "@/components/community/story-viewer-dialog";
-import { StoryViewersSummary } from "@/components/community/story-viewers-sheet";
 import { AccountPublicAchievementsSummary } from "@/components/achievements/achievements-panel";
 import {
   ProfilePostsViewTabs,
@@ -30,7 +29,6 @@ import {
   ProfileSectionHeading,
 } from "@/components/profile/profile-ui";
 import { fetchCommunityPostsByAuthorPage } from "@/lib/community";
-import { latestStoryForAuthor } from "@/lib/community/stories-supabase";
 import { useCommunityStories } from "@/hooks/use-community-stories";
 import { canEngageWithCommunityFeed, useProfile } from "@/lib/profile";
 import { sharePublicProfile } from "@/lib/share-public-profile";
@@ -80,7 +78,6 @@ export function AccountPublicProfileTab({
   const storyAuthorIds = useMemo(() => [userId], [userId]);
   const { storiesByAuthor, refresh: refreshStories, ringState } = useCommunityStories(userId, storyAuthorIds);
   const authorStories = storiesByAuthor.get(userId) ?? [];
-  const latestStory = latestStoryForAuthor(authorStories);
   const storyRing = ringState(userId);
   const hasActiveStory = storyRing !== "none" && authorStories.length > 0;
 
@@ -150,13 +147,19 @@ export function AccountPublicProfileTab({
             }
           >
             <ProfileHeroNameRow>
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 space-y-0.5">
                 <ProfileDisplayName
                   compact
                   name={displayName}
                   href={publicProfileHref}
                   testId="link-my-public-profile-name"
                 />
+                <ProfileMetaRow>
+                  <ProfileHandle handle={publicHandle || null} />
+                  {!isPublic ? (
+                    <span className="text-[11px] font-medium text-muted-foreground">Not visible on Feed</span>
+                  ) : null}
+                </ProfileMetaRow>
               </div>
               <Button
                 type="button"
@@ -169,13 +172,6 @@ export function AccountPublicProfileTab({
                 Edit
               </Button>
             </ProfileHeroNameRow>
-
-            <ProfileMetaRow>
-              <ProfileHandle handle={publicHandle || null} />
-              {!isPublic ? (
-                <span className="text-[11px] font-medium text-muted-foreground">Not visible on Feed</span>
-              ) : null}
-            </ProfileMetaRow>
 
             <ProfileFollowStats
               followers={followers}
@@ -191,44 +187,37 @@ export function AccountPublicProfileTab({
             <ProfileBioPreview compact bio={bioPreview} livingWithLine={livingWithLine} />
           </ProfileHeroRow>
 
-          <div className="flex flex-wrap items-center gap-1.5">
+          <ProfileActionGrid>
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="h-8 w-fit gap-1 rounded-full px-2.5 text-xs"
+              className={isPublic ? undefined : "col-span-2"}
               onClick={() => setStoryCreateOpen(true)}
               data-testid="button-account-add-story"
             >
-              <Plus className="h-3.5 w-3.5" aria-hidden />
+              <Plus className="h-4 w-4 mr-2 shrink-0" aria-hidden />
               Add story
             </Button>
-            {latestStory ? (
-              <StoryViewersSummary storyId={latestStory.id} authorId={userId} variant="inline" />
-            ) : null}
-          </div>
-
-          {isPublic ? (
-            <ProfileActionGrid>
+            {isPublic ? (
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                className="col-span-2"
                 data-testid="share-public-profile"
                 onClick={() => void handleShareProfile()}
               >
                 <Share2 className="h-4 w-4 mr-2 shrink-0" aria-hidden />
                 Share profile
               </Button>
-            </ProfileActionGrid>
-          ) : null}
+            ) : null}
+          </ProfileActionGrid>
         </div>
       </ProfileHeroCard>
 
       <div className="space-y-3">
         <div className="flex flex-wrap items-end justify-between gap-2">
-          <ProfileSectionHeading title="Your posts" subtitle="What others see when they visit your profile" />
+          <ProfileSectionHeading title="Your posts" />
           {isPublic ? (
             <ProfilePostsViewTabs
               value={postsView}
