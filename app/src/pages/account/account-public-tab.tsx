@@ -1,9 +1,13 @@
-import { useState } from "react";
-import { Pencil, Share2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Pencil, Plus, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FeedPostList } from "@/components/community/feed-post-list";
 import { ProfilePostMediaGrid } from "@/components/community/profile-post-media-grid";
+import { StoryAvatarRing } from "@/components/community/story-avatar-ring";
+import { StoryCreateSheet } from "@/components/community/story-create-sheet";
+import { StoryViewerDialog } from "@/components/community/story-viewer-dialog";
+import { StoryViewersSummary } from "@/components/community/story-viewers-sheet";
 import { AccountPublicAchievementsSummary } from "@/components/achievements/achievements-panel";
 import {
   ProfilePostsViewTabs,
@@ -26,6 +30,8 @@ import {
   ProfileSectionHeading,
 } from "@/components/profile/profile-ui";
 import { fetchCommunityPostsByAuthorPage } from "@/lib/community";
+import { latestStoryForAuthor } from "@/lib/community/stories-supabase";
+import { useCommunityStories } from "@/hooks/use-community-stories";
 import { canEngageWithCommunityFeed, useProfile } from "@/lib/profile";
 import { sharePublicProfile } from "@/lib/share-public-profile";
 import { useToast } from "@/hooks/use-toast";
@@ -69,6 +75,27 @@ export function AccountPublicProfileTab({
   const canEngageWithFeed = !viewerProfileLoading && canEngageWithCommunityFeed(viewerProfile);
   const publicProfileHref = `/community/profile/${encodeURIComponent(userId)}`;
   const [postsView, setPostsView] = useState<ProfilePostsView>(() => readStoredProfilePostsView());
+  const [storyViewerOpen, setStoryViewerOpen] = useState(false);
+  const [storyCreateOpen, setStoryCreateOpen] = useState(false);
+  const storyAuthorIds = useMemo(() => [userId], [userId]);
+  const { storiesByAuthor, refresh: refreshStories, ringState } = useCommunityStories(userId, storyAuthorIds);
+  const authorStories = storiesByAuthor.get(userId) ?? [];
+  const latestStory = latestStoryForAuthor(authorStories);
+  const storyRing = ringState(userId);
+  const hasActiveStory = storyRing !== "none" && authorStories.length > 0;
+
+  const avatarTile = (
+    <ProfileAvatarTile
+      size="md"
+      imageUrl={avatarDisplayUrl}
+      initials={avatarInitials}
+      alt={displayName}
+      href={hasActiveStory ? undefined : publicProfileHref}
+      shape={hasActiveStory ? "circle" : "rounded"}
+      framed={!hasActiveStory}
+      testId="link-my-public-profile-avatar"
+    />
+  );
 
   async function handleShareProfile() {
     const result = await sharePublicProfile({
@@ -106,14 +133,20 @@ export function AccountPublicProfileTab({
         <div className="flex flex-col gap-3">
           <ProfileHeroRow
             avatar={
-              <ProfileAvatarTile
-                size="md"
-                imageUrl={avatarDisplayUrl}
-                initials={avatarInitials}
-                alt={displayName}
-                href={publicProfileHref}
-                testId="link-my-public-profile-avatar"
-              />
+              hasActiveStory ? (
+                <StoryAvatarRing
+                  prominent
+                  state={storyRing}
+                  onClick={() => setStoryViewerOpen(true)}
+                  label={
+                    authorStories.every((s) => s.viewed_by_me) ? "Rewatch your stories" : "Your stories"
+                  }
+                >
+                  {avatarTile}
+                </StoryAvatarRing>
+              ) : (
+                avatarTile
+              )
             }
           >
             <ProfileHeroNameRow>
@@ -153,8 +186,27 @@ export function AccountPublicProfileTab({
               followingTestId="link-my-public-profile-following"
             />
 
+            {!supporterMode ? <AccountPublicAchievementsSummary onsetDate={diabetesOnsetDate} /> : null}
+
             <ProfileBioPreview compact bio={bioPreview} livingWithLine={livingWithLine} />
           </ProfileHeroRow>
+
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 w-fit gap-1 rounded-full px-2.5 text-xs"
+              onClick={() => setStoryCreateOpen(true)}
+              data-testid="button-account-add-story"
+            >
+              <Plus className="h-3.5 w-3.5" aria-hidden />
+              Add story
+            </Button>
+            {latestStory ? (
+              <StoryViewersSummary storyId={latestStory.id} authorId={userId} variant="inline" />
+            ) : null}
+          </div>
 
           {isPublic ? (
             <ProfileActionGrid>
@@ -173,8 +225,6 @@ export function AccountPublicProfileTab({
           ) : null}
         </div>
       </ProfileHeroCard>
-
-      {!supporterMode ? <AccountPublicAchievementsSummary onsetDate={diabetesOnsetDate} /> : null}
 
       <div className="space-y-3">
         <div className="flex flex-wrap items-end justify-between gap-2">
@@ -214,6 +264,29 @@ export function AccountPublicProfileTab({
           />
         )}
       </div>
+
+      <StoryViewerDialog
+        open={storyViewerOpen}
+        onOpenChange={setStoryViewerOpen}
+        viewerId={userId}
+        entries={
+          hasActiveStory
+            ? authorStories.map((story) => ({
+                authorId: userId,
+                story,
+                authorDisplayName: displayName,
+                authorAvatarUrl: avatarDisplayUrl,
+              }))
+            : []
+        }
+        initialIndex={0}
+        onViewed={() => refreshStories()}
+      />
+      <StoryCreateSheet
+        open={storyCreateOpen}
+        onOpenChange={setStoryCreateOpen}
+        onPosted={() => refreshStories()}
+      />
     </div>
   );
 }

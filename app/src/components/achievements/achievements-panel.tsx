@@ -56,7 +56,7 @@ function usePinnedStreakKindsState(): ProfileStreakKind[] {
   return pinned;
 }
 
-/** Account → Public profile: pinned live streak badges with a link to the full Tools page. */
+/** Account → Public profile: compact pinned streak chips (no extra card). */
 export function AccountPublicAchievementsSummary({
   className,
   onsetDate,
@@ -72,29 +72,19 @@ export function AccountPublicAchievementsSummary({
     return () => window.removeEventListener(USER_ACHIEVEMENTS_CHANGED_EVENT, refresh);
   }, [onsetDate]);
 
+  if (streaks.length === 0) return null;
+
   return (
-    <ProfileMutedCard testId="account-public-achievements" className={className}>
-      <div className="space-y-3">
-        <ProfileSectionHeading
-          title="Your streaks"
-          subtitle={
-            streaks.length > 0
-              ? "Pinned streaks appear on your public profile when your Feed visibility is on."
-              : "Earn milestones in Tools, then pin streaks you want on your public profile."
-          }
-        />
-
-        {streaks.length > 0 ? (
-          <ProfileStreakBadges streaks={streaks} />
-        ) : (
-          <p className="text-sm text-muted-foreground">No streaks pinned yet.</p>
-        )}
-
-        <Button asChild variant="outline" size="sm" className="w-full sm:w-auto" data-testid="account-achievements-tools-link">
-          <Link href="/tools/achievements">Manage in Tools</Link>
-        </Button>
-      </div>
-    </ProfileMutedCard>
+    <div className={cn("flex flex-wrap items-center gap-2", className)} data-testid="account-public-achievements">
+      <ProfileStreakBadges streaks={streaks} size="sm" className="gap-1" />
+      <Link
+        href="/tools/achievements"
+        className="text-[11px] font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+        data-testid="account-achievements-tools-link"
+      >
+        Manage
+      </Link>
+    </div>
   );
 }
 
