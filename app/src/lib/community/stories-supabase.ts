@@ -36,6 +36,8 @@ export type CommunityStoryRow = {
   created_at: string;
   expires_at: string;
   viewed_by_me: boolean;
+  /** Feed post this story was shared from, if any. */
+  source_post_id: string | null;
 };
 
 export type StoryReactionSummary = {
@@ -115,6 +117,7 @@ function mapStory(r: Record<string, unknown>, viewedByMe = false): CommunityStor
     created_at: String(r.created_at ?? ""),
     expires_at: String(r.expires_at ?? ""),
     viewed_by_me: viewedByMe,
+    source_post_id: r.source_post_id ? String(r.source_post_id) : null,
   };
 }
 
@@ -465,7 +468,7 @@ export async function fetchStoryViewerProfiles(
 
 export async function insertCommunityStory(
   file: File,
-  options?: { caption?: string; overlays?: StoryOverlay[] },
+  options?: { caption?: string; overlays?: StoryOverlay[]; sourcePostId?: string | null },
 ): Promise<{
   data: CommunityStoryRow | null;
   error: Error | null;
@@ -480,6 +483,7 @@ export async function insertCommunityStory(
   const overlays = options?.overlays ?? [];
   const overlayErr = validateStoryOverlays(overlays);
   if (overlayErr) return { data: null, error: overlayErr };
+  const sourcePostId = options?.sourcePostId?.trim() || null;
 
   const { data: sessionData } = await supabase.auth.getSession();
   const uid = sessionData.session?.user?.id;
@@ -508,6 +512,7 @@ export async function insertCommunityStory(
       expires_at: expiresAt,
       caption,
       overlays: overlays.length > 0 ? overlays : null,
+      ...(sourcePostId ? { source_post_id: sourcePostId } : {}),
     })
     .select("*")
     .single();
@@ -518,6 +523,35 @@ export async function insertCommunityStory(
   }
 
   return { data: mapStory(data as Record<string, unknown>, false), error: null };
+}
+
+export async function deleteCommunityStory(storyId: string): Promise<{ error: Error | null }> {
+  const supabase = getSupabase();
+  if (!supabase) return { error: new Error("Supabase not configured") };
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData.session?.user?.id;
+  if (!uid) return { error: new Error("Not signed in") };
+
+  const { data, error: fetchErr } = await supabase
+    .from("community_stories")
+    .select("id, author_id, media_path")
+    .eq("id", storyId)
+    .maybeSingle();
+  if (fetchErr) return { error: new Error(fetchErr.message) };
+  if (!data) return { error: new Error("Story not found") };
+
+  const row = data as Record<string, unknown>;
+  if (String(row.author_id ?? "") !== uid) {
+    return { error: new Error("You can only delete your own story.") };
+  }
+
+  const { error } = await supabase.from("community_stories").delete().eq("id", storyId).eq("author_id", uid);
+  if (error) return { error: new Error(error.message) };
+
+  const mediaPath = String(row.media_path ?? "").trim();
+  if (mediaPath) await deleteStoryMediaPaths(supabase, [mediaPath]);
+  return { error: null };
 }
 
 export type StoryRingState = "none" | "unseen" | "seen";

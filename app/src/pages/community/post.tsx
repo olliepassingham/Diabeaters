@@ -525,13 +525,14 @@ export default function CommunityPostPage() {
             prev ? { ...prev, like_count: Math.max(prev.like_count, visibleCount) } : prev,
           );
         }}
-        onAddToStory={(p) => void shareToStory.sharePostToStory(p)}
+        onAddToStory={(p, meta) => void shareToStory.sharePostToStory(p, meta)}
         addToStoryBusy={shareToStory.busyPostId === post.id}
       />
 
       <StoryCreateSheet
         open={shareToStory.open}
         prefillFile={shareToStory.prefillFile}
+        sourcePostId={shareToStory.sourcePostId}
         onOpenChange={shareToStory.onOpenChange}
       />
 

@@ -933,7 +933,7 @@ export function FeedPostList(props: {
                     p.id === post.id ? { ...p, like_count: Math.max(p.like_count, visibleCount) } : p,
                   );
                 }}
-                onAddToStory={(p) => void shareToStory.sharePostToStory(p)}
+                onAddToStory={(p, meta) => void shareToStory.sharePostToStory(p, meta)}
                 addToStoryBusy={shareToStory.busyPostId === post.id}
               />
             );
@@ -1045,6 +1045,7 @@ export function FeedPostList(props: {
       <StoryCreateSheet
         open={shareToStory.open}
         prefillFile={shareToStory.prefillFile}
+        sourcePostId={shareToStory.sourcePostId}
         onOpenChange={shareToStory.onOpenChange}
         onPosted={props.onStoryPosted}
       />

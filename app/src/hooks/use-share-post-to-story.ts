@@ -1,21 +1,23 @@
 import { useCallback, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { fileFromPostMediaPath } from "@/lib/community/post-media-signed-urls";
+import { renderPostAsStoryFile, type StoryPostShareMeta } from "@/lib/community/story-post-share";
 import type { CommunityPostRow } from "@/lib/community";
+
+export type { StoryPostShareMeta };
 
 export function useSharePostToStory() {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [prefillFile, setPrefillFile] = useState<File | null>(null);
+  const [sourcePostId, setSourcePostId] = useState<string | null>(null);
   const [busyPostId, setBusyPostId] = useState<string | null>(null);
 
   const sharePostToStory = useCallback(
-    async (post: CommunityPostRow) => {
-      const path = post.image_urls[0];
-      if (!path || busyPostId) return;
+    async (post: CommunityPostRow, meta: StoryPostShareMeta) => {
+      if (busyPostId) return;
       setBusyPostId(post.id);
       try {
-        const file = await fileFromPostMediaPath(path);
+        const file = await renderPostAsStoryFile(post, meta);
         if (!file) {
           toast({
             title: "Could not add to story",
@@ -25,6 +27,7 @@ export function useSharePostToStory() {
           return;
         }
         setPrefillFile(file);
+        setSourcePostId(post.id);
         setOpen(true);
       } catch {
         toast({
@@ -41,8 +44,11 @@ export function useSharePostToStory() {
 
   const onOpenChange = useCallback((next: boolean) => {
     setOpen(next);
-    if (!next) setPrefillFile(null);
+    if (!next) {
+      setPrefillFile(null);
+      setSourcePostId(null);
+    }
   }, []);
 
-  return { sharePostToStory, busyPostId, open, prefillFile, onOpenChange };
+  return { sharePostToStory, busyPostId, open, prefillFile, sourcePostId, onOpenChange };
 }

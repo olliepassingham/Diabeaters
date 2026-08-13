@@ -54,6 +54,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { FieldLabelWithInfo } from "@/components/ui/field-label-with-info";
 import { useToast } from "@/hooks/use-toast";
+import type { StoryPostShareMeta } from "@/lib/community/story-post-share";
 import { buildPublicAppUrl } from "@/lib/auth-app-url";
 import { getProfileIdByPublicHandle, getProfilesByIds, normalizePublicHandleInput } from "@/lib/profile";
 import { cn } from "@/lib/utils";
@@ -197,8 +198,8 @@ type FeedPostCardProps = {
   askBeatieBusy?: boolean;
   /** Prioritize loading images/video in the first visible feed posts. */
   mediaPriority?: boolean;
-  /** Share this post's photo to a 24h story (own photo posts). */
-  onAddToStory?: (post: CommunityPostRow) => void;
+  /** Share this post to a 24h story. */
+  onAddToStory?: (post: CommunityPostRow, meta: StoryPostShareMeta) => void;
   addToStoryBusy?: boolean;
 };
 
@@ -535,9 +536,7 @@ export function FeedPostCard({
   const hasFeedImages = !eventExtra && !post.video_url && post.image_urls.length > 0;
   const hasFeedVideo = !eventExtra && Boolean(post.video_url);
   const isMediaFirst = hasFeedVideo || hasFeedImages;
-  const canAddToStory = Boolean(
-    onAddToStory && isAuthor && post.post_kind === "standard" && hasFeedImages,
-  );
+  const canAddToStory = Boolean(onAddToStory && viewerId);
 
   const facepilePeople = useMemo(() => {
     const list: PostLikerDisplay[] = [];
@@ -622,7 +621,13 @@ export function FeedPostCard({
               <DropdownMenuItem
                 disabled={addToStoryBusy}
                 data-testid="button-add-post-to-story"
-                onClick={() => onAddToStory?.(post)}
+                onClick={() =>
+                  onAddToStory?.(post, {
+                    authorName: authorDisplayName,
+                    authorHandle: authorPublicHandle,
+                    isOwn: isAuthor,
+                  })
+                }
               >
                 {addToStoryBusy ? "Preparing…" : "Add to your story"}
               </DropdownMenuItem>

@@ -1,16 +1,27 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { Eye, Flag, Loader2, MessageCircle, Send, X } from "lucide-react";
+import { ExternalLink, Eye, Flag, Loader2, MessageCircle, Send, Trash2, X } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { StoryOverlayLayer } from "@/components/community/story-overlay-layer";
 import { StoryViewersSheet } from "@/components/community/story-viewers-sheet";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { sendStoryReplyToDmThread, submitContentReport } from "@/lib/community";
 import {
+  deleteCommunityStory,
   fetchActiveStoryForAuthor,
   fetchStoryReactionSummary,
   getStoryMediaSignedUrl,
@@ -124,6 +135,8 @@ export function StoryViewerDialog({
   const [replyOpen, setReplyOpen] = useState(false);
   const [replyDraft, setReplyDraft] = useState("");
   const [replyBusy, setReplyBusy] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   const current = queue[index];
   const isLast = index >= queue.length - 1;
@@ -133,6 +146,26 @@ export function StoryViewerDialog({
   const canInteract = Boolean(viewerId && current && !isOwnStory);
 
   const closeViewer = useCallback(() => onOpenChange(false), [onOpenChange]);
+  const sourcePostId = resolvedStory?.source_post_id ?? null;
+  const openSourcePost = useCallback(() => {
+    if (!sourcePostId) return;
+    closeViewer();
+    setLocation(`/community/post/${sourcePostId}`);
+  }, [sourcePostId, closeViewer, setLocation]);
+  const viewPostButton = sourcePostId ? (
+    <button
+      type="button"
+      className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/10 px-3.5 py-2 text-white shadow-[0_8px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition-colors hover:bg-white/16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
+      onClick={(e) => {
+        e.stopPropagation();
+        openSourcePost();
+      }}
+      data-testid="button-story-view-post"
+    >
+      <ExternalLink className="h-4 w-4 text-white/90" aria-hidden />
+      <span className="text-[13px] font-medium tracking-tight">View post</span>
+    </button>
+  ) : null;
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const dragRef = useRef({ x: 0, y: 0 });
   const suppressClick = useRef(false);
@@ -148,6 +181,7 @@ export function StoryViewerDialog({
       setReplyOpen(false);
       setReplyDraft("");
       setViewersOpen(false);
+      setDeleteOpen(false);
       touchStart.current = null;
       dragRef.current = { x: 0, y: 0 };
       setDrag({ x: 0, y: 0 });
@@ -221,29 +255,29 @@ export function StoryViewerDialog({
   }, [open, resolvedStory?.id]);
 
   const advance = useCallback(() => {
-    if (replyOpen || viewersOpen) return;
+    if (replyOpen || viewersOpen || deleteOpen) return;
     if (index < queue.length - 1) {
       setIndex((i) => i + 1);
       return;
     }
     onOpenChange(false);
-  }, [index, queue.length, onOpenChange, replyOpen, viewersOpen]);
+  }, [index, queue.length, onOpenChange, replyOpen, viewersOpen, deleteOpen]);
 
   const goPrev = useCallback(() => {
-    if (replyOpen || viewersOpen) return;
+    if (replyOpen || viewersOpen || deleteOpen) return;
     if (index > 0) setIndex((i) => i - 1);
-  }, [index, replyOpen, viewersOpen]);
+  }, [index, replyOpen, viewersOpen, deleteOpen]);
 
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (replyOpen || viewersOpen) return;
+      if (replyOpen || viewersOpen || deleteOpen) return;
       if (e.key === "ArrowRight") advance();
       if (e.key === "ArrowLeft") goPrev();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, advance, goPrev, replyOpen, viewersOpen]);
+  }, [open, advance, goPrev, replyOpen, viewersOpen, deleteOpen]);
 
   const resetDrag = useCallback(() => {
     touchStart.current = null;
@@ -253,7 +287,7 @@ export function StoryViewerDialog({
   }, []);
 
   const onTouchStart = (e: TouchEvent) => {
-    if (replyOpen || viewersOpen) return;
+    if (replyOpen || viewersOpen || deleteOpen) return;
     const t = e.changedTouches[0];
     if (!t) return;
     touchStart.current = { x: t.clientX, y: t.clientY };
@@ -261,7 +295,7 @@ export function StoryViewerDialog({
   };
 
   const onTouchMove = (e: TouchEvent) => {
-    if (!touchStart.current || replyOpen || viewersOpen) return;
+    if (!touchStart.current || replyOpen || viewersOpen || deleteOpen) return;
     const t = e.changedTouches[0];
     if (!t) return;
     const dx = t.clientX - touchStart.current.x;
@@ -307,6 +341,21 @@ export function StoryViewerDialog({
     }
     toast({ title: "Report submitted", description: "Thanks — we'll review this story." });
     onOpenChange(false);
+  }
+
+  async function handleDeleteStory() {
+    if (!resolvedStory || !isOwnStory || deleteBusy) return;
+    setDeleteBusy(true);
+    const res = await deleteCommunityStory(resolvedStory.id);
+    setDeleteBusy(false);
+    if (res.error) {
+      toast({ title: "Could not delete story", description: res.error.message, variant: "destructive" });
+      return;
+    }
+    setDeleteOpen(false);
+    toast({ title: "Story deleted", description: "It’s no longer on your profile." });
+    onViewed?.();
+    closeViewer();
   }
 
   async function handleReaction(kind: StoryReactionKind) {
@@ -458,7 +507,23 @@ export function StoryViewerDialog({
                 <div className="min-w-0 flex-1" />
               )}
               <div className="flex shrink-0 items-center gap-1">
-                {!isOwnStory ? (
+                {isOwnStory ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 rounded-full border border-white/10 bg-white/10 text-white/90 backdrop-blur-md hover:bg-white/20 hover:text-white"
+                    disabled={!resolvedStory || deleteBusy}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteOpen(true);
+                    }}
+                    aria-label="Delete story"
+                    data-testid="button-delete-story"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                ) : (
                   <Button
                     type="button"
                     variant="ghost"
@@ -473,7 +538,7 @@ export function StoryViewerDialog({
                   >
                     <Flag className="h-4 w-4" />
                   </Button>
-                ) : null}
+                )}
                 <Button
                   type="button"
                   variant="ghost"
@@ -540,7 +605,8 @@ export function StoryViewerDialog({
               ) : null}
 
               {isOwnStory ? (
-                <div className="flex justify-center">
+                <div className="flex justify-center gap-2">
+                  {viewPostButton}
                   <button
                     type="button"
                     className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/10 px-3.5 py-2 text-white shadow-[0_8px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition-colors hover:bg-white/16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
@@ -553,9 +619,11 @@ export function StoryViewerDialog({
                     <span className="text-[13px] font-medium tracking-tight">Activity</span>
                   </button>
                 </div>
-              ) : canInteract ? (
+              ) : (
                 <div className="space-y-2">
-                  {replyOpen ? (
+                  {viewPostButton ? <div className="flex justify-center">{viewPostButton}</div> : null}
+                  {canInteract ? (
+                    replyOpen ? (
                     <div
                       className="flex items-center gap-2 rounded-full border border-white/12 bg-black/45 p-1 pl-4 backdrop-blur-xl"
                       onClick={(e) => e.stopPropagation()}
@@ -619,9 +687,10 @@ export function StoryViewerDialog({
                         Reply
                       </Button>
                     </div>
-                  )}
+                    )
+                  ) : null}
                 </div>
-              ) : null}
+              )}
             </div>
           </div>
         </DialogContent>
@@ -635,6 +704,30 @@ export function StoryViewerDialog({
           authorId={viewerId}
         />
       ) : null}
+
+      <AlertDialog open={deleteOpen} onOpenChange={(open) => !deleteBusy && setDeleteOpen(open)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this story?</AlertDialogTitle>
+            <AlertDialogDescription>
+              It will be removed from your profile for everyone. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteBusy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteBusy}
+              onClick={(e) => {
+                e.preventDefault();
+                void handleDeleteStory();
+              }}
+            >
+              {deleteBusy ? "Deleting…" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

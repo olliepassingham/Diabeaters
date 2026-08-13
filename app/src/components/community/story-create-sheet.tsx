@@ -9,6 +9,7 @@ import {
   insertCommunityStory,
   MAX_STORY_BYTES,
   MAX_STORY_CAPTION_LENGTH,
+  MAX_STORY_OVERLAY_TEXT_LENGTH,
   type StoryOverlay,
 } from "@/lib/community/stories-supabase";
 import { cn } from "@/lib/utils";
@@ -19,6 +20,10 @@ type Props = {
   onPosted?: () => void;
   /** Opens the composer with this file already selected (e.g. share a post photo). */
   prefillFile?: File | null;
+  /** Optional credit overlay (e.g. @handle when sharing someone else's post). */
+  prefillOverlayText?: string | null;
+  /** Feed post this story should link back to (cleared if the user changes media). */
+  sourcePostId?: string | null;
 };
 
 function MediaPickCard({
@@ -49,7 +54,14 @@ function MediaPickCard({
   );
 }
 
-export function StoryCreateSheet({ open, onOpenChange, onPosted, prefillFile }: Props) {
+export function StoryCreateSheet({
+  open,
+  onOpenChange,
+  onPosted,
+  prefillFile,
+  prefillOverlayText,
+  sourcePostId,
+}: Props) {
   const { toast } = useToast();
   const photoInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
@@ -58,6 +70,7 @@ export function StoryCreateSheet({ open, onOpenChange, onPosted, prefillFile }: 
   const [caption, setCaption] = useState("");
   const [overlays, setOverlays] = useState<StoryOverlay[]>([]);
   const [busy, setBusy] = useState(false);
+  const [linkedPostId, setLinkedPostId] = useState<string | null>(null);
   const appliedPrefill = useRef<File | null>(null);
 
   function reset() {
@@ -66,6 +79,7 @@ export function StoryCreateSheet({ open, onOpenChange, onPosted, prefillFile }: 
     setPreview(null);
     setCaption("");
     setOverlays([]);
+    setLinkedPostId(null);
     if (photoInputRef.current) photoInputRef.current.value = "";
     if (videoInputRef.current) videoInputRef.current.value = "";
   }
@@ -79,12 +93,18 @@ export function StoryCreateSheet({ open, onOpenChange, onPosted, prefillFile }: 
     appliedPrefill.current = prefillFile;
     setFile(prefillFile);
     setCaption("");
-    setOverlays([]);
+    setLinkedPostId(sourcePostId?.trim() || null);
+    const credit = prefillOverlayText?.trim().slice(0, MAX_STORY_OVERLAY_TEXT_LENGTH);
+    setOverlays(
+      credit
+        ? [{ id: crypto.randomUUID(), text: credit, x: 0.5, y: 0.86, style: "pill" }]
+        : [],
+    );
     setPreview((prev) => {
       if (prev) URL.revokeObjectURL(prev);
       return URL.createObjectURL(prefillFile);
     });
-  }, [open, prefillFile]);
+  }, [open, prefillFile, prefillOverlayText, sourcePostId]);
 
   function onPick(files: FileList | null) {
     const f = files?.[0];
@@ -93,6 +113,7 @@ export function StoryCreateSheet({ open, onOpenChange, onPosted, prefillFile }: 
     setFile(f);
     setPreview(URL.createObjectURL(f));
     setOverlays([]);
+    setLinkedPostId(null);
     if (photoInputRef.current) photoInputRef.current.value = "";
     if (videoInputRef.current) videoInputRef.current.value = "";
   }
@@ -103,6 +124,7 @@ export function StoryCreateSheet({ open, onOpenChange, onPosted, prefillFile }: 
     const res = await insertCommunityStory(file, {
       caption: caption.trim() || undefined,
       overlays,
+      sourcePostId: linkedPostId,
     });
     setBusy(false);
     if (res.error) {
@@ -166,6 +188,11 @@ export function StoryCreateSheet({ open, onOpenChange, onPosted, prefillFile }: 
               <RefreshCw className="h-3.5 w-3.5" aria-hidden />
               Change media
             </button>
+            {linkedPostId ? (
+              <p className="text-center text-[11px] text-muted-foreground">
+                Viewers can open the original post from this story.
+              </p>
+            ) : null}
             <Textarea
               id="story-caption"
               value={caption}
