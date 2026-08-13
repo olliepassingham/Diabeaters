@@ -78,13 +78,13 @@ describe("carer-bedtime-situation", () => {
         },
         { includeBg: true },
       ),
-    ).toBe("Worth a closer watch tonight · 4.8 mmol/L");
-  });
+      ).toBe("They noted this was worth watching overnight · 4.8 mmol/L");
+    });
 
   it("situation detail routes by readiness", () => {
     expect(bedtimeSituationDetail({ bedtime_ready: true }, true)).toBe("Overnight looks steady");
     expect(
       bedtimeSituationDetail({ bedtime_ready: false, readiness_level: "alert" }, false),
-    ).toBe("Higher overnight risk flagged at check-in");
+    ).toBe("Higher overnight risk noted at check-in");
   });
 });

@@ -174,37 +174,36 @@ export function SupporterHero({
       )}
       data-testid="carer-view-header"
     >
-      <CardContent className="flex flex-col gap-3.5 p-4 sm:gap-4 sm:p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3.5">
-            <div
-              className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-primary/10 ring-2 ring-background shadow-sm sm:h-16 sm:w-16"
-              aria-hidden={!avatarUrl}
+      <CardContent className="flex flex-col gap-3 p-3.5 sm:gap-4 sm:p-5">
+        <div className="flex items-start gap-3">
+          <div
+            className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-primary/10 ring-2 ring-background shadow-sm sm:h-14 sm:w-14"
+            aria-hidden={!avatarUrl}
+          >
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <Sparkles className="h-5 w-5 text-primary sm:h-6 sm:w-6" aria-hidden />
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              {multiPerson ? `Supporter mode · ${linkedPeople.length} people` : "Supporter mode"}
+            </p>
+            <p
+              className="font-display text-lg font-semibold leading-snug tracking-tight text-foreground text-balance sm:text-xl"
+              data-testid="text-carer-view-name"
             >
-              {avatarUrl ? (
-                <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <Sparkles className="h-6 w-6 text-primary" aria-hidden />
-              )}
-            </div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                {multiPerson ? `Supporter mode · ${linkedPeople.length} people` : "Supporter mode"}
-              </p>
-              <p
-                className="font-display text-xl font-semibold leading-tight tracking-tight text-foreground sm:text-2xl"
-                data-testid="text-carer-view-name"
-              >
-                Supporting {displayName}
-              </p>
-            </div>
+              Supporting {displayName}
+            </p>
           </div>
           {showEmergencyLink ? (
             <a
               href="#carer-emergency"
               className={cn(
-                "inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full border border-destructive/25 bg-destructive/[0.06] px-3 text-xs font-semibold text-foreground",
+                "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-destructive/25 bg-destructive/[0.06] text-destructive",
                 "hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "sm:h-9 sm:w-auto sm:gap-1.5 sm:rounded-full sm:px-2.5 sm:text-xs sm:font-semibold sm:text-foreground",
               )}
               aria-label="Jump to emergency details"
               onClick={(e) => {
@@ -212,8 +211,8 @@ export function SupporterHero({
                 scrollToCarerViewSection("carer-emergency");
               }}
             >
-              <Phone className="h-4 w-4 text-destructive" aria-hidden />
-              Emergency
+              <Phone className="h-4 w-4" aria-hidden />
+              <span className="hidden sm:inline">Emergency</span>
             </a>
           ) : null}
         </div>

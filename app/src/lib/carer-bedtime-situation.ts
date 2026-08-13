@@ -31,7 +31,7 @@ export function formatBedtimeSharedBg(summary: Record<string, unknown> | null | 
   return `${display} ${units}`;
 }
 
-/** Short detail when the linked person’s bedtime check needs attention. */
+/** Short detail when the linked person completed a bedtime check that was not fully steady. */
 export function bedtimeAttentionDetail(
   rawState: Record<string, unknown> | null | undefined,
   options?: BedtimeSituationDetailOptions,
@@ -44,15 +44,17 @@ export function bedtimeAttentionDetail(
   const level = typeof rawState.readiness_level === "string" ? rawState.readiness_level.trim() : "";
   if (level === "alert") {
     return bgLabel
-      ? `Higher overnight risk flagged at check-in · ${bgLabel}`
-      : "Higher overnight risk flagged at check-in";
+      ? `Higher overnight risk noted at check-in · ${bgLabel}`
+      : "Higher overnight risk noted at check-in";
   }
   if (level === "monitor") {
-    return bgLabel ? `Worth a closer watch tonight · ${bgLabel}` : "Worth a closer watch tonight";
+    return bgLabel
+      ? `They noted this was worth watching overnight · ${bgLabel}`
+      : "They noted this was worth watching overnight";
   }
 
   if (!summary) {
-    return bgLabel ? `Needs a closer look · ${bgLabel}` : "Something at check-in needs a closer look";
+    return bgLabel ? `They completed a bedtime check · ${bgLabel}` : "They completed a bedtime check";
   }
 
   const bits: string[] = [];
@@ -62,7 +64,7 @@ export function bedtimeAttentionDetail(
   if (summary.trend === "falling") bits.push("falling BG");
   if (summary.exercised_today === true) bits.push("exercise today");
   if (bits.length > 0) return bits.slice(0, bgLabel ? 3 : 2).join(" · ");
-  return "Something at check-in needs a closer look";
+  return "They completed a bedtime check";
 }
 
 /** Calm reassurance when their bedtime check came back Ready. */

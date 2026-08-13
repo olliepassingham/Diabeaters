@@ -240,7 +240,9 @@ type CarerSituationLine = {
   id: string;
   kind: "sick_day" | "travel" | "bedtime" | "other";
   title: string;
+  meta?: string;
   detail?: string;
+  statusLabel?: string;
   tone: CarerSituationTone;
 };
 
@@ -426,7 +428,9 @@ function scenarioSituationLines(
       lines.push({
         id: `${rowId}-bedtime`,
         kind: "bedtime",
-        title: `Bedtime — ${ready ? "Ready" : "Needs attention"} · Checked ${when}`,
+        title: "Bedtime check",
+        meta: `Checked ${when}`,
+        statusLabel: ready ? "Steady" : "Action taken",
         detail: bedtimeSituationDetail(rawState, ready, bedtimeOpts),
         tone: ready ? "calm" : "attention",
       });
@@ -453,15 +457,28 @@ function scenarioSituationLines(
 
 function situationRowClass(tone: CarerSituationTone): string {
   if (tone === "active") {
-    return "border-orange-500/30 bg-orange-500/[0.07] dark:bg-orange-950/35";
+    return "border-orange-500/25 bg-orange-500/[0.06] dark:bg-orange-950/30";
   }
   if (tone === "attention") {
-    return "border-amber-500/35 bg-amber-500/[0.08] dark:bg-amber-950/35";
+    return "border-primary/18 bg-primary/[0.05] dark:bg-primary/[0.08]";
   }
   if (tone === "ended") {
-    return "border-border/40 bg-muted/20 text-muted-foreground";
+    return "border-border/40 bg-muted/15 text-muted-foreground";
   }
-  return "border-border/50 bg-background/50";
+  return "border-border/45 bg-card/70";
+}
+
+function situationStatusClass(tone: CarerSituationTone): string {
+  if (tone === "active") {
+    return "border-orange-500/20 bg-orange-500/10 text-orange-950 dark:text-orange-100";
+  }
+  if (tone === "attention") {
+    return "border-primary/20 bg-primary/10 text-primary";
+  }
+  if (tone === "ended") {
+    return "border-border/50 bg-muted/40 text-muted-foreground";
+  }
+  return "border-emerald-500/20 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200";
 }
 
 /**
@@ -1976,7 +1993,7 @@ export default function CarerViewPage() {
                   <InlineInfoHint
                     ariaLabel="About situations"
                     content={
-                      <p>Shared travel, sick-day, and bedtime flags when their project allows it.</p>
+                      <p>Travel, sick day, and bedtime checks they have shared — read-only, for context.</p>
                     }
                     className="-mr-2 shrink-0"
                   />
@@ -2000,40 +2017,56 @@ export default function CarerViewPage() {
                           : line.kind === "bedtime"
                             ? Moon
                             : Info;
-                    const iconClass =
+                    const iconWellClass =
                       line.kind === "sick_day"
-                        ? "text-orange-600 dark:text-orange-400"
+                        ? "bg-orange-500/10 text-orange-600 dark:text-orange-400"
                         : line.kind === "travel"
-                          ? "text-purple-600 dark:text-purple-400"
-                          : line.kind === "bedtime" && line.tone === "attention"
-                            ? "text-amber-700 dark:text-amber-300"
+                          ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                          : line.kind === "bedtime" && line.tone === "calm"
+                            ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
                             : line.kind === "bedtime"
-                              ? "text-indigo-600 dark:text-indigo-400"
-                              : "text-muted-foreground";
+                              ? "bg-primary/10 text-primary"
+                              : "bg-muted/60 text-muted-foreground";
                     return (
                       <div
                         key={line.id}
                         className={cn(
-                          "flex items-start gap-2 rounded-lg border px-2.5 py-2 text-sm",
+                          "flex items-start gap-3 rounded-2xl border px-3.5 py-3",
                           situationRowClass(line.tone),
                         )}
                         data-testid={`carer-situation-${line.kind}-${line.tone}`}
                       >
-                        <Icon className={cn("mt-0.5 h-4 w-4 shrink-0", iconClass)} aria-hidden />
-                        <div className="min-w-0 flex-1 space-y-0.5">
-                          <p className="font-medium leading-snug text-foreground">{line.title}</p>
+                        <div
+                          className={cn(
+                            "mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
+                            iconWellClass,
+                          )}
+                          aria-hidden
+                        >
+                          <Icon className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="font-semibold leading-snug text-foreground">{line.title}</p>
+                            {line.statusLabel ? (
+                              <Badge
+                                variant="secondary"
+                                className={cn(
+                                  "shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold",
+                                  situationStatusClass(line.tone),
+                                )}
+                              >
+                                {line.statusLabel}
+                              </Badge>
+                            ) : null}
+                          </div>
+                          {line.meta ? (
+                            <p className="text-xs leading-snug text-muted-foreground">{line.meta}</p>
+                          ) : null}
                           {line.detail ? (
-                            <p className="text-xs leading-snug text-muted-foreground">{line.detail}</p>
+                            <p className="text-xs leading-relaxed text-muted-foreground">{line.detail}</p>
                           ) : null}
                         </div>
-                        {line.tone === "attention" ? (
-                          <Badge
-                            variant="secondary"
-                            className="shrink-0 rounded-full border-0 bg-amber-500/20 text-[11px] font-semibold text-amber-950 dark:text-amber-100"
-                          >
-                            Attention
-                          </Badge>
-                        ) : null}
                       </div>
                     );
                   })
