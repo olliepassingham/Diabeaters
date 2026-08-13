@@ -1659,6 +1659,7 @@ export default function CarerViewPage() {
       linkedPatients.map((p) => ({
         patientId: p.patientId,
         label: p.patient_full_name?.trim() || "Linked person",
+        avatarUrl: p.patient_avatar_url,
         active: p.patientId === activePatientId,
       })),
     [linkedPatients, activePatientId],

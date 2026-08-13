@@ -38,10 +38,10 @@ type Props = {
   className?: string;
 };
 
-/** Match feed post author avatars (`feed-post-card` uses `!h-9 !w-9`). */
-const AVATAR_CLASS = "!h-9 !w-9";
-const ITEM_WIDTH = "w-11";
-const NAME_CLASS = "w-full truncate text-center text-[9px] leading-none text-muted-foreground/70";
+/** Match feed post author avatars. */
+const AVATAR_CLASS = "!h-11 !w-11";
+const ITEM_WIDTH = "w-14";
+const NAME_CLASS = "w-full truncate text-center text-[10px] font-medium leading-tight text-muted-foreground";
 
 function SelfStoryCell({
   self,
@@ -80,7 +80,7 @@ function SelfStoryCell({
               e.stopPropagation();
               onAddStory();
             }}
-            className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-primary text-primary-foreground ring-2 ring-background outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground ring-2 ring-background outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             aria-label="Add another story"
           >
             <Plus className="h-2 w-2" strokeWidth={3} />
@@ -101,7 +101,7 @@ function SelfStoryCell({
               className={AVATAR_CLASS}
             />
           </span>
-          <span className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-primary text-primary-foreground ring-2 ring-background">
+          <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground ring-2 ring-background">
             <Plus className="h-2 w-2" strokeWidth={3} />
           </span>
         </button>
@@ -140,7 +140,7 @@ function FeedStoriesStrip({ children }: { children: ReactNode }) {
     <div className="relative -mx-1">
       <div
         ref={scrollRef}
-        className="flex gap-1.5 overflow-x-auto px-0.5 py-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex gap-2.5 overflow-x-auto px-0.5 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         data-testid="feed-stories-strip"
         aria-label="Stories"
       >
@@ -248,7 +248,7 @@ export function FeedStoriesComposerHeader({
 
                 {loading
                   ? Array.from({ length: 3 }).map((_, i) => (
-                      <div key={i} className="h-9 w-9 shrink-0 animate-pulse rounded-full bg-muted/25" />
+                      <div key={i} className="h-11 w-11 shrink-0 animate-pulse rounded-full bg-muted/25" />
                     ))
                   : storyEntries.map(({ person, stories, story }) => (
                       <div key={person.id} className={cn("flex shrink-0 flex-col items-center gap-0.5", ITEM_WIDTH)}>

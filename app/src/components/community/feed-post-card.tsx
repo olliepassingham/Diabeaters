@@ -2,7 +2,6 @@ import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "
 import { Link, useLocation } from "wouter";
 import {
   Bookmark,
-  ChevronRight,
   Flag,
   Heart,
   Loader2,
@@ -48,6 +47,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { CommunityPeopleSheet } from "@/components/community/community-people-sheet";
 import { MentionTextarea } from "@/components/community/mention-textarea";
 import { renderBodyWithMentions } from "@/components/community/render-body-with-mentions";
 import { Textarea } from "@/components/ui/textarea";
@@ -73,12 +73,71 @@ import {
   sendFeedPostToDmThread,
   type CommunityPostCommentRow,
   type CommunityPostRow,
+  type PostLikerDisplay,
 } from "@/lib/community";
+import { useProfile } from "@/lib/profile";
 
 const RECENT_DM_PEERS_LIMIT = 20;
+const LIKE_PREVIEW_LIMIT = 4;
 
 function shortPeerId(id: string) {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
+}
+
+function firstName(name: string): string {
+  return name.trim().split(/\s+/)[0] || name;
+}
+
+function likesSummaryLine({
+  count,
+  likedByMe,
+  preview,
+  viewerId,
+}: {
+  count: number;
+  likedByMe: boolean;
+  preview: PostLikerDisplay[];
+  viewerId?: string;
+}): string {
+  const others = preview.filter((p) => p.user_id !== viewerId);
+  const n0 = others[0] ? firstName(others[0].name) : null;
+  const n1 = others[1] ? firstName(others[1].name) : null;
+  const rest = likedByMe ? count - 1 : count;
+
+  if (likedByMe) {
+    if (count <= 1) return "Liked by you";
+    if (n0 && rest === 1) return `Liked by you and ${n0}`;
+    if (n0 && rest === 2 && n1) return `Liked by you, ${n0} and ${n1}`;
+    if (n0) return `Liked by you, ${n0} and ${rest - 1} ${rest - 1 === 1 ? "other" : "others"}`;
+    return `Liked by you and ${rest} ${rest === 1 ? "other" : "others"}`;
+  }
+  if (count === 1 && n0) return `Liked by ${n0}`;
+  if (count === 2 && n0 && n1) return `Liked by ${n0} and ${n1}`;
+  if (n0 && count > 1) return `Liked by ${n0} and ${count - 1} ${count - 1 === 1 ? "other" : "others"}`;
+  return `${count} ${count === 1 ? "like" : "likes"}`;
+}
+
+function LikeFacepile({ people }: { people: PostLikerDisplay[] }) {
+  const shown = people.slice(0, 3);
+  if (shown.length === 0) return null;
+  return (
+    <div className="flex shrink-0 items-center" aria-hidden>
+      {shown.map((p, i) => (
+        <div
+          key={p.user_id}
+          className="relative rounded-full ring-2 ring-card"
+          style={{ marginLeft: i === 0 ? 0 : -7, zIndex: shown.length - i }}
+        >
+          <CommunityAuthorAvatar
+            size="sm"
+            displayName={p.name}
+            avatarPath={p.avatar_url}
+            className="!h-[1.375rem] !w-[1.375rem]"
+          />
+        </div>
+      ))}
+    </div>
+  );
 }
 
 /** date-fns throws RangeError on invalid dates; DB/RPC should always send ISO strings but guard anyway. */
@@ -177,6 +236,7 @@ export function FeedPostCard({
 }: FeedPostCardProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { profile: viewerProfile } = useProfile();
   const mayEngage = Boolean(viewerId && canEngageWithFeed);
   const canReportPost = viewerId && viewerId !== post.author_id;
   const onLikersLoadedRef = useRef(onLikersLoaded);
@@ -210,6 +270,7 @@ export function FeedPostCard({
   >([]);
   const [likersError, setLikersError] = useState<string | null>(null);
   const [likersTruncated, setLikersTruncated] = useState(false);
+  const [previewLikers, setPreviewLikers] = useState<PostLikerDisplay[]>([]);
 
   const [interestedOpen, setInterestedOpen] = useState(false);
   const [interestedLoading, setInterestedLoading] = useState(false);
@@ -251,12 +312,29 @@ export function FeedPostCard({
       }
       setLikersRows(res.data);
       setLikersTruncated(res.truncated);
+      setPreviewLikers(res.data.slice(0, LIKE_PREVIEW_LIMIT));
       onLikersLoadedRef.current?.({ visibleCount: res.data.length });
     })();
     return () => {
       cancelled = true;
     };
   }, [likersOpen, post.id]);
+
+  useEffect(() => {
+    if (post.like_count <= 0) {
+      setPreviewLikers([]);
+      return;
+    }
+    if (likersOpen) return;
+    let cancelled = false;
+    void fetchPostLikersWithProfiles(post.id, { limit: LIKE_PREVIEW_LIMIT }).then((res) => {
+      if (cancelled || res.error) return;
+      setPreviewLikers(res.data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [likersOpen, post.id, post.like_count]);
 
   useEffect(() => {
     if (!interestedOpen) return;
@@ -453,9 +531,36 @@ export function FeedPostCard({
   const hasFeedVideo = !eventExtra && Boolean(post.video_url);
   const isMediaFirst = hasFeedVideo || hasFeedImages;
 
+  const facepilePeople = useMemo(() => {
+    const list: PostLikerDisplay[] = [];
+    if (post.liked_by_me && viewerId) {
+      list.push({
+        user_id: viewerId,
+        name: viewerProfile?.full_name?.trim() || "You",
+        avatar_url: viewerProfile?.avatar_url ?? null,
+      });
+    }
+    for (const p of previewLikers) {
+      if (p.user_id === viewerId) continue;
+      list.push(p);
+      if (list.length >= 3) break;
+    }
+    return list;
+  }, [post.liked_by_me, previewLikers, viewerId, viewerProfile?.avatar_url, viewerProfile?.full_name]);
+
+  const likesLine =
+    post.like_count > 0
+      ? likesSummaryLine({
+          count: post.like_count,
+          likedByMe: post.liked_by_me,
+          preview: previewLikers,
+          viewerId,
+        })
+      : null;
+
   const engagementRow = (
     <div
-      className="flex items-center justify-between gap-1 px-2 pt-0.5 sm:px-3"
+      className="flex items-center justify-between gap-1 px-2 pt-1 sm:px-3.5"
       data-testid="post-engagement-row"
     >
       <div className="flex min-w-0 items-center">
@@ -540,14 +645,14 @@ export function FeedPostCard({
 
   return (
     <>
-    <article className="animate-soft-in border-b border-border/40 bg-transparent py-3 last:border-b-0 sm:mx-1 sm:mb-3 sm:rounded-[1.35rem] sm:border sm:border-border/50 sm:bg-card/70 sm:py-3.5 sm:shadow-sm sm:last:border dark:sm:bg-card/50">
-      <div className="flex items-center gap-3 px-3 py-1 sm:px-4">
+    <article className="animate-soft-in overflow-hidden rounded-[1.35rem] border border-border/50 bg-card/90 py-3 shadow-none dark:bg-card/70">
+      <div className="flex items-center gap-3 px-3.5 pb-1 pt-0.5 sm:px-4">
         <CommunityAuthorAvatar
           displayName={authorDisplayName}
           avatarPath={authorAvatarPath}
           profileHref={`/community/profile/${post.author_id}`}
           size="md"
-          className="!h-10 !w-10"
+          className="!h-11 !w-11"
           fallbackSrc={showBeatieAvatar ? BEATIE_FEED_AVATAR_FALLBACK_SRC : undefined}
         />
         <div className="min-w-0 flex-1">
@@ -565,17 +670,24 @@ export function FeedPostCard({
                 >
                   {authorDisplayName}
                 </Link>
+                {authorPublicHandle ? (
+                  <span className="truncate text-[13px] text-muted-foreground">@{authorPublicHandle}</span>
+                ) : null}
                 {isBeatiePost ? (
                   <Badge
                     variant="outline"
-                    className="border-primary/35 bg-transparent px-1 py-0 text-[9px] font-medium leading-none text-primary"
+                    className="border-primary/35 bg-transparent px-1.5 py-0 text-[9px] font-medium leading-none text-primary"
                   >
                     AI guide
                   </Badge>
                 ) : null}
               </div>
               <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12px] text-muted-foreground">
-                <span data-testid="feed-post-topic" title={topicLabel} className="truncate">
+                <span
+                  data-testid="feed-post-topic"
+                  title={topicLabel}
+                  className="inline-flex max-w-[10rem] truncate rounded-full bg-muted/60 px-1.5 py-0.5 text-[11px] font-medium text-foreground/80"
+                >
                   {topicLabel}
                 </span>
                 <span aria-hidden>·</span>
@@ -640,7 +752,7 @@ export function FeedPostCard({
       ) : null}
 
       {!isMediaFirst ? (
-        <div className="space-y-2 px-3 pb-1">
+        <div className="space-y-2 px-3.5 pb-1 sm:px-4">
           {bodyText ? (
             <p className="text-[15px] leading-[1.45] whitespace-pre-wrap text-foreground">
               {renderBodyWithMentions(bodyText, post.mention_map)}
@@ -679,18 +791,21 @@ export function FeedPostCard({
       {post.like_count > 0 ? (
         <button
           type="button"
-          className="block px-3 pt-1.5 text-left text-sm font-semibold text-foreground hover:underline underline-offset-2"
+          className="flex w-full items-center gap-2 px-3.5 pt-0.5 text-left transition-opacity hover:opacity-80 active:opacity-70 sm:px-4"
           disabled={!viewerId}
           aria-label={`${post.like_count} ${post.like_count === 1 ? "like" : "likes"} — see who liked`}
           onClick={() => setLikersOpen(true)}
           data-testid="button-post-likers"
         >
-          {post.like_count} {post.like_count === 1 ? "like" : "likes"}
+          <LikeFacepile people={facepilePeople} />
+          <span className="min-w-0 truncate text-sm font-semibold text-foreground">
+            {likesLine}
+          </span>
         </button>
       ) : null}
 
       {isMediaFirst && bodyText ? (
-        <p className="px-3 pt-1.5 text-sm leading-snug text-foreground">
+        <p className="px-3.5 pt-1.5 text-sm leading-snug text-foreground sm:px-4">
           <Link
             href={`/community/profile/${post.author_id}`}
             className="mr-1.5 font-semibold hover:underline underline-offset-2"
@@ -702,7 +817,7 @@ export function FeedPostCard({
       ) : null}
 
       {isMediaFirst && (eventExtra || pollExtra || previewLink) ? (
-        <div className="space-y-2 px-3 pt-2">
+        <div className="space-y-2 px-3.5 pt-2 sm:px-4">
           {eventExtra ? (
             <FeedEventCard
               event={eventExtra}
@@ -731,7 +846,7 @@ export function FeedPostCard({
       {!expanded && post.comment_count > 0 ? (
         <button
           type="button"
-          className="block px-3 pt-1 text-left text-xs text-muted-foreground hover:text-foreground"
+          className="block px-3.5 pt-1 text-left text-[13px] font-medium text-muted-foreground hover:text-foreground sm:px-4"
           onClick={onToggleComments}
         >
           View all {post.comment_count} comment{post.comment_count === 1 ? "" : "s"}
@@ -739,7 +854,7 @@ export function FeedPostCard({
       ) : null}
 
       {expanded ? (
-        <div className="mt-2 space-y-2.5 border-t border-border/25 px-3 pt-3 sm:px-4">
+        <div className="mt-2.5 space-y-3 border-t border-border/30 px-3.5 pb-0.5 pt-3 sm:px-4">
           {loadingComments ? (
             <div className="space-y-1.5" aria-busy="true">
               <Skeleton className="h-11 w-full rounded-lg" />
@@ -770,7 +885,7 @@ export function FeedPostCard({
                 </Button>
               ) : null}
               {comments.length > 0 ? (
-                <ul className="space-y-1" role="list">
+                <ul className="space-y-0.5" role="list">
                   {comments.map((c) => (
                     <FeedCommentItem
                       key={c.id}
@@ -792,7 +907,7 @@ export function FeedPostCard({
                   ))}
                 </ul>
               ) : (
-                <p className="py-0.5 text-[11px] text-muted-foreground">No comments yet — say hello.</p>
+                <p className="py-1 text-sm text-muted-foreground">No comments yet — say hello.</p>
               )}
             </div>
           )}
@@ -829,142 +944,56 @@ export function FeedPostCard({
     </article>
 
       <Dialog open={likersOpen} onOpenChange={setLikersOpen}>
-        <DialogContent className="sm:max-w-md flex flex-col max-h-[min(70vh,28rem)]">
-          <DialogHeader>
-            <DialogTitle>Likes</DialogTitle>
-            <DialogDescription>
-              {likersLoading
-                ? "Fetching who liked this post…"
-                : likersError
-                  ? "Could not load the list of likes."
-                  : likersRows.length === 0
-                    ? "No one has liked this post yet."
-                    : likersTruncated
-                      ? `Showing the first ${POST_LIKERS_QUERY_LIMIT} people who liked this post (there may be more).`
-                      : `People who liked this post (${likersRows.length}).`}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="min-h-0 flex-1 overflow-y-auto pr-1 -mr-1">
-            {likersLoading ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden />
-              </div>
-            ) : likersError ? (
-              <p className="text-sm text-destructive">{likersError}</p>
-            ) : likersRows.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No likes to show.</p>
-            ) : (
-              <ul className="space-y-2">
-                {likersRows.map((row) => (
-                  <li key={row.user_id}>
-                    <Link
-                      href={`/community/profile/${row.user_id}`}
-                      className="flex items-center gap-2 rounded-md px-1 py-1.5 hover:bg-muted/60 min-h-11"
-                      onClick={() => setLikersOpen(false)}
-                    >
-                      <CommunityAuthorAvatar
-                        size="sm"
-                        displayName={row.name}
-                        avatarPath={row.avatar_url}
-                      />
-                      <span className="text-sm font-medium text-foreground truncate">{row.name}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          {likersTruncated ? (
-            <p className="text-tiny text-muted-foreground pt-1 border-t border-border/60">
-              Pull down on the feed (or use the refresh icon) to sync the like count on the post card.
-            </p>
-          ) : null}
-        </DialogContent>
+        <CommunityPeopleSheet
+          title="Likes"
+          icon={Heart}
+          rows={likersRows}
+          loading={likersLoading}
+          error={likersError}
+          emptyTitle="No one has liked this post yet."
+          loadingLabel="Fetching who liked this post…"
+          errorLabel="Could not load the list of likes."
+          countLabel={(n) =>
+            likersTruncated
+              ? `Showing the first ${POST_LIKERS_QUERY_LIMIT} people (there may be more).`
+              : n === 1
+                ? "1 person liked this post"
+                : `${n} people liked this post`
+          }
+          truncatedNote={
+            likersTruncated
+              ? "Pull down on the feed (or use the refresh icon) to sync the like count on the post card."
+              : null
+          }
+          onNavigate={() => setLikersOpen(false)}
+        />
       </Dialog>
 
       <Dialog open={interestedOpen} onOpenChange={setInterestedOpen}>
-        <DialogContent className="flex max-h-[min(72vh,32rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-md">
-          <DialogHeader className="space-y-0 border-b border-border/50 px-4 py-3.5 text-left sm:px-5 sm:py-4">
-            <div className="flex items-start gap-3 pr-8">
-              <div
-                className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10"
-                aria-hidden
-              >
-                <Heart className="h-4 w-4 text-primary" />
-              </div>
-              <div className="min-w-0 flex-1 space-y-0.5">
-                <div className="flex items-center gap-2">
-                  <DialogTitle className="text-base font-semibold leading-tight">Interested</DialogTitle>
-                  {!interestedLoading && !interestedError && interestedRows.length > 0 ? (
-                    <Badge variant="secondary" className="h-5 shrink-0 px-1.5 text-[10px] tabular-nums">
-                      {interestedRows.length}
-                    </Badge>
-                  ) : null}
-                </div>
-                {eventExtra?.title?.trim() ? (
-                  <p className="truncate text-xs text-muted-foreground">{eventExtra.title.trim()}</p>
-                ) : null}
-                <DialogDescription className="text-xs leading-relaxed text-muted-foreground">
-                  {interestedLoading
-                    ? "Loading…"
-                    : interestedError
-                      ? "Could not load this list."
-                      : interestedRows.length === 0
-                        ? "No one has marked interest yet."
-                        : interestedTruncated
-                          ? `First ${POST_LIKERS_QUERY_LIMIT} shown — there may be more.`
-                          : `${interestedRows.length === 1 ? "1 person" : `${interestedRows.length} people`} interested in this event`}
-                </DialogDescription>
-              </div>
-            </div>
-          </DialogHeader>
-          <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2 sm:px-3">
-            {interestedLoading ? (
-              <div className="space-y-2 px-1 py-1">
-                {[0, 1, 2].map((i) => (
-                  <div key={i} className="flex items-center gap-3 rounded-xl px-2.5 py-2">
-                    <Skeleton className="h-9 w-9 shrink-0 rounded-full" />
-                    <Skeleton className="h-4 flex-1 max-w-[8rem]" />
-                  </div>
-                ))}
-              </div>
-            ) : interestedError ? (
-              <p className="px-2 py-6 text-center text-sm text-destructive">{interestedError}</p>
-            ) : interestedRows.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
-                <Heart className="h-8 w-8 text-muted-foreground/35" aria-hidden />
-                <p className="text-sm text-muted-foreground">Be the first to mark interested.</p>
-              </div>
-            ) : (
-              <ul className="space-y-0.5">
-                {interestedRows.map((row) => (
-                  <li key={row.user_id}>
-                    <Link
-                      href={`/community/profile/${row.user_id}`}
-                      className="flex min-h-11 items-center gap-3 rounded-xl px-2.5 py-2 transition-colors hover:bg-muted/50 active:bg-muted/70"
-                      onClick={() => setInterestedOpen(false)}
-                    >
-                      <CommunityAuthorAvatar
-                        size="sm"
-                        displayName={row.name}
-                        avatarPath={row.avatar_url}
-                      />
-                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
-                        {row.name}
-                      </span>
-                      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50" aria-hidden />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          {interestedTruncated ? (
-            <p className="border-t border-border/50 px-4 py-2.5 text-[11px] leading-relaxed text-muted-foreground sm:px-5">
-              Pull down on the feed to refresh the interest count on the event card.
-            </p>
-          ) : null}
-        </DialogContent>
+        <CommunityPeopleSheet
+          title="Interested"
+          subtitle={eventExtra?.title?.trim() || null}
+          icon={Heart}
+          rows={interestedRows}
+          loading={interestedLoading}
+          error={interestedError}
+          emptyTitle="Be the first to mark interested."
+          loadingLabel="Loading…"
+          errorLabel="Could not load this list."
+          countLabel={(n) =>
+            interestedTruncated
+              ? `First ${POST_LIKERS_QUERY_LIMIT} shown — there may be more.`
+              : n === 1
+                ? "1 person interested in this event"
+                : `${n} people interested in this event`
+          }
+          truncatedNote={
+            interestedTruncated
+              ? "Pull down on the feed to refresh the interest count on the event card."
+              : null
+          }
+          onNavigate={() => setInterestedOpen(false)}
+        />
       </Dialog>
 
       <Dialog
@@ -994,12 +1023,12 @@ export function FeedPostCard({
             ) : shareRecentPeers.length === 0 ? (
               <p className="text-sm text-muted-foreground">No recent chats yet.</p>
             ) : (
-              <ul className="max-h-56 space-y-1 overflow-y-auto rounded-md border border-border/60 p-1">
+              <ul className="max-h-56 space-y-0.5 overflow-y-auto rounded-2xl border border-border/50 bg-muted/15 p-1">
                 {shareRecentPeers.map((peer) => (
                   <li key={peer.user_id}>
                     <button
                       type="button"
-                      className={`flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm min-h-11 disabled:opacity-50 ${
+                      className={`flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left text-sm min-h-12 disabled:opacity-50 ${
                         shareSelectedPeer?.user_id === peer.user_id
                           ? "bg-primary/10 ring-1 ring-primary/25"
                           : "hover:bg-muted/60"

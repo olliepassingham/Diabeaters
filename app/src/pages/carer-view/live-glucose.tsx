@@ -2,7 +2,7 @@ import { Link } from "wouter";
 import { Droplet, Loader2, Minus, RefreshCw, TrendingDown, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { SupporterHypoCheckInButton } from "@/components/supporter-hypo-check-in-section";
 import { useLinkedPatient } from "@/hooks/use-linked-patient";
@@ -66,81 +66,85 @@ export default function CarerLiveGlucosePage() {
           </CardContent>
         </Card>
       ) : (
-        <Card
-          className={cn(
-            "overflow-hidden rounded-2xl shadow-none",
-            reading ? glucoseRangeCardClasses(rangeStatus) : "border-border/60",
-          )}
-        >
-          <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-2">
-            <div className="min-w-0 space-y-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <CardTitle className="text-base font-medium text-muted-foreground">Now</CardTitle>
+        <>
+          <section
+            className={cn(
+              "relative overflow-hidden rounded-[1.35rem] border px-4 py-3 shadow-none",
+              reading ? glucoseRangeCardClasses(rangeStatus) : "border-border/60 bg-card",
+            )}
+          >
+            <div className="flex items-center gap-3">
+              <div className="min-w-0 flex-1">
+                {loading && !reading ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                    Loading…
+                  </div>
+                ) : reading ? (
+                  <div className="flex items-center gap-3">
+                    <p
+                      className={cn(
+                        "font-display text-4xl font-bold tabular-nums tracking-tight leading-none",
+                        glucoseRangeValueClasses(rangeStatus),
+                      )}
+                      data-testid="carer-live-glucose-value"
+                    >
+                      {prefill?.value}
+                      <span className="ml-1.5 text-sm font-semibold text-muted-foreground">{reading.units}</span>
+                    </p>
+                    {TrendIcon && reading.trend ? (
+                      <span
+                        className={cn(
+                          "inline-flex min-h-11 items-center gap-1.5 rounded-2xl bg-background/70 px-2.5 text-base font-semibold capitalize",
+                          glucoseRangeValueClasses(rangeStatus),
+                        )}
+                      >
+                        <TrendIcon className="h-5 w-5" strokeWidth={2.5} aria-hidden />
+                        {reading.trend}
+                      </span>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No recent reading. Ask them to open Diabeaters with CGM connected.
+                  </p>
+                )}
                 {reading ? (
-                  <Badge
-                    variant="secondary"
-                    className="rounded-full border-0 bg-background/60 text-xs font-medium"
-                  >
-                    {glucoseRangeStatusLabel(rangeStatus)}
-                  </Badge>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+                    <Badge
+                      variant="secondary"
+                      className="rounded-full border-0 bg-background/60 px-2 py-0 text-[11px] font-medium"
+                    >
+                      {glucoseRangeStatusLabel(rangeStatus)}
+                    </Badge>
+                    <span>
+                      {reading.sourceLabel} · {formatAgeMinutes(reading.ageMinutes)} ago
+                      {reading.stalenessNote ? ` · ${reading.stalenessNote}` : ""}
+                    </span>
+                  </div>
                 ) : null}
               </div>
-
-              {loading && !reading ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                  Loading…
-                </div>
-              ) : reading ? (
-                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                  <p
-                    className={cn(
-                      "text-3xl font-semibold tabular-nums tracking-tight",
-                      glucoseRangeValueClasses(rangeStatus),
-                    )}
-                    data-testid="carer-live-glucose-value"
-                  >
-                    {prefill?.value}{" "}
-                    <span className="text-lg font-medium text-muted-foreground">{reading.units}</span>
-                  </p>
-                  {TrendIcon && reading.trend ? (
-                    <span className="inline-flex items-center gap-1 text-sm capitalize text-muted-foreground">
-                      <TrendIcon className="h-4 w-4" aria-hidden />
-                      {reading.trend}
-                    </span>
-                  ) : null}
-                  <span className="text-xs text-muted-foreground">
-                    {reading.sourceLabel} · {formatAgeMinutes(reading.ageMinutes)} ago
-                  </span>
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  No recent reading. Ask them to open Diabeaters with CGM connected.
-                </p>
-              )}
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-11 w-11 shrink-0 rounded-xl"
+                onClick={refresh}
+                disabled={loading}
+                aria-label="Refresh glucose reading"
+                data-testid="button-carer-glucose-refresh"
+              >
+                <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} aria-hidden />
+              </Button>
             </div>
+          </section>
 
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="h-9 w-9 shrink-0"
-              onClick={refresh}
-              disabled={loading}
-              aria-label="Refresh glucose reading"
-              data-testid="button-carer-glucose-refresh"
-            >
-              <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} aria-hidden />
-            </Button>
-          </CardHeader>
-
-          <CardContent className="space-y-4">
+          <section className="space-y-3 overflow-hidden rounded-[1.35rem] border border-border/50 bg-card/80 p-4 shadow-none">
             {reading ? (
               <p className="text-xs text-muted-foreground tabular-nums">
                 {row?.target_low != null && row?.target_high != null
                   ? `Target ${formatTargetBgInput(row.target_low, row.units)}–${formatTargetBgInput(row.target_high, row.units)} ${row.units}`
                   : "Target range not included with this reading"}
-                {reading.stalenessNote ? ` · ${reading.stalenessNote}` : ""}
               </p>
             ) : null}
 
@@ -194,8 +198,8 @@ export default function CarerLiveGlucosePage() {
                 </Link>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </section>
+        </>
       )}
     </PageShell>
   );

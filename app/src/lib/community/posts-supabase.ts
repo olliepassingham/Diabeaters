@@ -1506,7 +1506,10 @@ function shortLikerId(id: string) {
 }
 
 /** User IDs who liked the post, oldest first (RLS applies). */
-export async function fetchLikerUserIdsForPost(postId: string): Promise<{
+export async function fetchLikerUserIdsForPost(
+  postId: string,
+  limit = POST_LIKERS_QUERY_LIMIT,
+): Promise<{
   data: string[];
   error: Error | null;
   truncated: boolean;
@@ -1519,22 +1522,25 @@ export async function fetchLikerUserIdsForPost(postId: string): Promise<{
     .select("user_id")
     .eq("post_id", postId)
     .order("created_at", { ascending: true })
-    .limit(POST_LIKERS_QUERY_LIMIT);
+    .limit(limit);
 
   if (error) return { data: [], error: new Error(error.message), truncated: false };
   const rows = data ?? [];
-  const truncated = rows.length >= POST_LIKERS_QUERY_LIMIT;
+  const truncated = rows.length >= limit;
   const ids = rows.map((r: { user_id: string }) => String(r.user_id));
   return { data: ids, error: null, truncated };
 }
 
 /** Likers with display names from profiles (same order as fetchLikerUserIdsForPost). */
-export async function fetchPostLikersWithProfiles(postId: string): Promise<{
+export async function fetchPostLikersWithProfiles(
+  postId: string,
+  opts?: { limit?: number },
+): Promise<{
   data: PostLikerDisplay[];
   error: Error | null;
   truncated: boolean;
 }> {
-  const { data: ids, error, truncated } = await fetchLikerUserIdsForPost(postId);
+  const { data: ids, error, truncated } = await fetchLikerUserIdsForPost(postId, opts?.limit);
   if (error) return { data: [], error, truncated: false };
   if (ids.length === 0) return { data: [], error: null, truncated };
 

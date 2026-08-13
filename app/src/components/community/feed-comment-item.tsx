@@ -53,7 +53,7 @@ export function FeedCommentItem({
 
   return (
     <li
-      className={cn("flex gap-2.5 py-1.5", isBeatie && "rounded-xl bg-primary/[0.05] px-2")}
+      className={cn("flex gap-2.5 rounded-2xl px-1 py-2", isBeatie && "bg-primary/[0.05] px-2.5")}
       data-testid={`feed-comment-${commentId}`}
     >
       <CommunityAuthorAvatar
@@ -62,7 +62,7 @@ export function FeedCommentItem({
         avatarPath={meta.avatar_url}
         profileHref={isBeatie && beatieFeedBotUserId ? `/community/profile/${beatieFeedBotUserId}` : `/community/profile/${authorId}`}
         fallbackSrc={isBeatie ? BEATIE_FEED_AVATAR_FALLBACK_SRC : undefined}
-        className="!h-8 !w-8 shrink-0"
+        className="!h-9 !w-9 shrink-0"
       />
       <div className="min-w-0 flex-1 space-y-0.5">
         <div className="flex items-start justify-between gap-1">

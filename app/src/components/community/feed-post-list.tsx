@@ -874,7 +874,7 @@ export function FeedPostList(props: {
           description={props.emptyStateDescription ?? "When someone posts, it will show up here."}
         />
       ) : (
-        <div className="flex flex-col">
+        <div className="flex flex-col gap-3">
           {displayPosts.map((post, index) => {
             const m = metaFor(post.author_id);
             const authorDisplayName = displayAuthorName(m, post.author_id, beatieFeedBotUserId);

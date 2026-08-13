@@ -713,16 +713,16 @@ export default function CommunityHomePage() {
           }}
           className="w-full"
         >
-          <TabsList className="grid h-11 w-full grid-cols-2 rounded-full bg-muted/45 p-1 dark:bg-muted/30">
+          <TabsList className="grid h-12 w-full grid-cols-2 rounded-full bg-muted/45 p-1 dark:bg-muted/30">
             <TabsTrigger
               value="following"
-              className="rounded-full text-sm font-medium data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+              className="rounded-full text-sm font-semibold data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
             >
               Following
             </TabsTrigger>
             <TabsTrigger
               value="everyone"
-              className="rounded-full text-sm font-medium data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+              className="rounded-full text-sm font-semibold data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
             >
               Everyone
             </TabsTrigger>
@@ -778,7 +778,7 @@ export default function CommunityHomePage() {
                 value={feedSearch}
                 onChange={(e) => setFeedSearch(e.target.value)}
                 placeholder="Search posts…"
-                className="h-9 pl-9 pr-20"
+                className="h-11 pl-9 pr-20 rounded-2xl"
                 aria-label="Search posts"
                 title="Search posts (header search finds people by @handle)"
               />
@@ -798,7 +798,7 @@ export default function CommunityHomePage() {
             <div className="flex items-center gap-1.5 sm:hidden">
               <div className="min-w-0 flex-1">
                 {savedOnly ? (
-                  <div className="flex h-9 w-full items-center rounded-xl border border-border/50 bg-muted/30 px-3 text-sm text-muted-foreground">
+                  <div className="flex h-11 w-full items-center rounded-2xl border border-border/50 bg-muted/30 px-3 text-sm text-muted-foreground">
                     Saved posts
                   </div>
                 ) : (
@@ -810,7 +810,7 @@ export default function CommunityHomePage() {
                       else if (isCommunityTopicId(v)) setTopicFilter(v);
                     }}
                   >
-                    <SelectTrigger className="h-9 w-full rounded-xl border-border/50 bg-background/80" aria-label="Feed topic">
+                    <SelectTrigger className="h-11 w-full rounded-2xl border-border/50 bg-background/80" aria-label="Feed topic">
                       <SelectValue placeholder="Topic" />
                     </SelectTrigger>
                     <SelectContent>
@@ -828,7 +828,7 @@ export default function CommunityHomePage() {
                 type="button"
                 variant={savedOnly ? "secondary" : "outline"}
                 size="icon"
-                className="h-9 w-9 shrink-0 rounded-xl"
+                className="h-11 w-11 shrink-0 rounded-2xl"
                 aria-pressed={savedOnly}
                 aria-label={savedOnly ? "Saved posts filter on" : "Show saved posts"}
                 onClick={() => {
@@ -847,7 +847,7 @@ export default function CommunityHomePage() {
                 type="button"
                 variant={savedOnly ? "secondary" : "outline"}
                 size="icon"
-                className="h-9 w-9 shrink-0 rounded-xl"
+                className="h-11 w-11 shrink-0 rounded-2xl"
                 aria-pressed={savedOnly}
                 aria-label={savedOnly ? "Saved posts filter on" : "Show saved posts"}
                 onClick={() => {
@@ -869,7 +869,7 @@ export default function CommunityHomePage() {
             <div className="flex items-center gap-1.5 sm:hidden">
               <div className="min-w-0 flex-1">
                 {savedOnly ? (
-                  <div className="flex h-9 w-full items-center rounded-xl border border-border/50 bg-muted/30 px-3 text-sm text-muted-foreground">
+                  <div className="flex h-11 w-full items-center rounded-2xl border border-border/50 bg-muted/30 px-3 text-sm text-muted-foreground">
                     Saved posts
                   </div>
                 ) : (
@@ -881,7 +881,7 @@ export default function CommunityHomePage() {
                       else if (isCommunityTopicId(v)) setTopicFilter(v);
                     }}
                   >
-                    <SelectTrigger className="h-9 w-full rounded-xl border-border/50 bg-background/80" aria-label="Feed topic">
+                    <SelectTrigger className="h-11 w-full rounded-2xl border-border/50 bg-background/80" aria-label="Feed topic">
                       <SelectValue placeholder="Topic" />
                     </SelectTrigger>
                     <SelectContent>
@@ -899,7 +899,7 @@ export default function CommunityHomePage() {
                 type="button"
                 variant={savedOnly ? "secondary" : "outline"}
                 size="icon"
-                className="h-9 w-9 shrink-0 rounded-xl"
+                className="h-11 w-11 shrink-0 rounded-2xl"
                 aria-pressed={savedOnly}
                 aria-label={savedOnly ? "Saved posts filter on" : "Show saved posts"}
                 onClick={() => {
@@ -916,7 +916,7 @@ export default function CommunityHomePage() {
                 type="button"
                 variant="outline"
                 size="icon"
-                className="h-9 w-9 shrink-0 rounded-xl"
+                className="h-11 w-11 shrink-0 rounded-2xl"
                 aria-label="Search posts"
                 title="Search posts"
                 onClick={() => setFeedSearchExpanded(true)}
@@ -929,7 +929,7 @@ export default function CommunityHomePage() {
                 type="button"
                 variant={savedOnly ? "secondary" : "outline"}
                 size="icon"
-                className="h-9 w-9 shrink-0 rounded-xl"
+                className="h-11 w-11 shrink-0 rounded-2xl"
                 aria-pressed={savedOnly}
                 aria-label={savedOnly ? "Saved posts filter on" : "Show saved posts"}
                 onClick={() => {
@@ -946,7 +946,7 @@ export default function CommunityHomePage() {
                 type="button"
                 variant="outline"
                 size="icon"
-                className="h-9 w-9 shrink-0 rounded-xl"
+                className="h-11 w-11 shrink-0 rounded-2xl"
                 aria-label="Search posts"
                 title="Search posts"
                 onClick={() => setFeedSearchExpanded(true)}
@@ -968,7 +968,7 @@ export default function CommunityHomePage() {
                 value={feedSearch}
                 onChange={(e) => setFeedSearch(e.target.value)}
                 placeholder="Search posts…"
-                className="h-9 pl-9 pr-3"
+                className="h-11 pl-9 pr-3 rounded-2xl"
                 aria-label="Search posts"
                 title="Search posts (header search finds people by @handle)"
               />
@@ -1012,7 +1012,7 @@ export default function CommunityHomePage() {
         />
       ) : null}
 
-      <div className="-mx-4 min-w-0 md:-mx-6">
+      <div className="min-w-0">
       <FeedPostList
         viewerId={user?.id}
         canEngageWithFeed={canEngageWithFeed}
