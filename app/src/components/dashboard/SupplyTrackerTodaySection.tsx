@@ -32,9 +32,16 @@ import { computeStreakStats } from "@/lib/activity-streaks";
 import { prefetchToolsDestinationHref } from "@/lib/tools-route-prefetch";
 import { tripStyleLabel } from "@/lib/travel-active-guidance";
 import {
-  bedtimeReadinessLabel,
   findMorningHomeBedtimeLog,
 } from "@/lib/bedtime-overnight-window";
+import {
+  computeOvernightSummaryFromLocalHistory,
+  overnightSummariesDiffer,
+  overnightTirTone,
+} from "@/lib/bedtime-overnight-analysis";
+import { getCgmLocalHistory } from "@/lib/cgm/cgm-history-store";
+import { resolveUserTargetBgRange } from "@/lib/target-bg-range";
+import type { BgUnits } from "@/lib/cgm/types";
 import { cn } from "@/lib/utils";
 
 /**
@@ -257,6 +264,33 @@ function TodayAtAGlanceContent(props: { supplyShortcutHidden?: boolean; healthSt
     // eslint-disable-next-line react-hooks/exhaustive-deps -- activityTick refreshes on focus/visibility
     [bedtimeLogs, isEvening, activityTick],
   );
+
+  const overnightTirPercent = useMemo(() => {
+    if (!morningBedtimeLog) return null;
+    if (typeof morningBedtimeLog.overnightCgmSummary?.inRangePercent === "number") {
+      return morningBedtimeLog.overnightCgmSummary.inRangePercent;
+    }
+    const points = getCgmLocalHistory();
+    if (points.length === 0) return null;
+    const units: BgUnits = morningBedtimeLog.bgUnits === "mg/dL" ? "mg/dL" : "mmol/L";
+    const { low, high } = resolveUserTargetBgRange(storage.getSettings(), units);
+    const summary = computeOvernightSummaryFromLocalHistory(morningBedtimeLog, points, low, high, units);
+    return summary?.inRangePercent ?? null;
+  }, [morningBedtimeLog]);
+  const overnightTirBand = overnightTirPercent == null ? null : overnightTirTone(overnightTirPercent);
+
+  useEffect(() => {
+    if (!morningBedtimeLog) return;
+    const points = getCgmLocalHistory();
+    if (points.length === 0) return;
+    const units: BgUnits = morningBedtimeLog.bgUnits === "mg/dL" ? "mg/dL" : "mmol/L";
+    const { low, high } = resolveUserTargetBgRange(storage.getSettings(), units);
+    const summary = computeOvernightSummaryFromLocalHistory(morningBedtimeLog, points, low, high, units);
+    if (overnightSummariesDiffer(morningBedtimeLog.overnightCgmSummary, summary) && summary) {
+      storage.updateBedtimeLog(morningBedtimeLog.id, { overnightCgmSummary: summary });
+      setBedtimeLogs(storage.getBedtimeLogs());
+    }
+  }, [morningBedtimeLog]);
 
   const parseISODateOnly = (dateStr: string | undefined): Date | null => {
     if (!dateStr) return null;
@@ -516,19 +550,27 @@ function TodayAtAGlanceContent(props: { supplyShortcutHidden?: boolean; healthSt
             <div
               className={cn(
                 "flex cursor-pointer items-center gap-2 rounded-xl border px-2.5 py-2 text-sm leading-snug transition-colors",
-                morningBedtimeLog.readinessLevel === "alert"
-                  ? "border-red-500/20 bg-red-500/[0.05] text-red-950 hover:bg-red-500/[0.08] dark:border-red-500/25 dark:bg-red-950/25 dark:text-red-100"
-                  : morningBedtimeLog.readinessLevel === "monitor"
-                    ? "border-amber-500/20 bg-amber-500/[0.05] text-amber-950 hover:bg-amber-500/[0.08] dark:border-amber-500/25 dark:bg-amber-950/25 dark:text-amber-100"
-                    : "border-emerald-500/20 bg-emerald-500/[0.05] text-emerald-950 hover:bg-emerald-500/[0.08] dark:border-emerald-500/25 dark:bg-emerald-950/25 dark:text-emerald-100",
+                overnightTirBand == null
+                  ? "border-border/45 bg-muted/15 text-foreground hover:bg-muted/30 dark:border-border/35 dark:bg-muted/10 dark:hover:bg-muted/20"
+                  : overnightTirBand === "low"
+                    ? "border-red-500/20 bg-red-500/[0.05] text-red-950 hover:bg-red-500/[0.08] dark:border-red-500/25 dark:bg-red-950/25 dark:text-red-100"
+                    : overnightTirBand === "ok"
+                      ? "border-amber-500/20 bg-amber-500/[0.05] text-amber-950 hover:bg-amber-500/[0.08] dark:border-amber-500/25 dark:bg-amber-950/25 dark:text-amber-100"
+                      : "border-emerald-500/20 bg-emerald-500/[0.05] text-emerald-950 hover:bg-emerald-500/[0.08] dark:border-emerald-500/25 dark:bg-emerald-950/25 dark:text-emerald-100",
               )}
               data-testid="card-morning-bedtime-score"
+              aria-label={
+                overnightTirPercent == null
+                  ? "Last night — open bedtime review"
+                  : `Last night · ${overnightTirPercent}% in range overnight`
+              }
             >
               <Moon className="h-4 w-4 shrink-0" aria-hidden />
-              <div className="min-w-0 flex-1">
-                <p className="font-medium">Last night · {bedtimeReadinessLabel(morningBedtimeLog.readinessLevel)}</p>
-                <p className="text-[11px] leading-tight opacity-80">Tap to review how overnight went</p>
-              </div>
+              <p className="min-w-0 flex-1 font-medium">
+                {overnightTirPercent == null
+                  ? "Last night"
+                  : `Last night · ${overnightTirPercent}%`}
+              </p>
               <ArrowRight className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
             </div>
           </Link>

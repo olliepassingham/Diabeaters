@@ -378,6 +378,13 @@ export function analyzeBedtimeOvernight(
 /** Minimum overnight samples before we show time-in-range on history rows. */
 export const BEDTIME_TIR_MIN_READINGS = 4;
 
+/** Home glance colour for overnight time in range: >70% green, 40–70% amber, <40% red. */
+export function overnightTirTone(inRangePercent: number): "good" | "ok" | "low" {
+  if (inRangePercent > 70) return "good";
+  if (inRangePercent >= 40) return "ok";
+  return "low";
+}
+
 export function bedtimeOvernightSummaryFromStats(
   stats: Pick<BedtimeOvernightStats, "inRangePercent" | "readingCount" | "hadLow" | "hadHigh">,
   computedAt = new Date().toISOString(),

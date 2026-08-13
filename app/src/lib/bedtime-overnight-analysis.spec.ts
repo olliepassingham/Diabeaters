@@ -6,6 +6,7 @@ import {
   BEDTIME_TIR_MIN_READINGS,
   entriesToOvernightReadings,
   filterEntriesToSleepWindow,
+  overnightTirTone,
 } from "./bedtime-overnight-analysis";
 import { computeBedtimeSleepWindow, findReviewableBedtimeLog, resolveOvernightReviewTarget, findMorningHomeBedtimeLog, isBedtimeMorningHomeWindow, bedtimeReadinessLabel, toBedtimeStreakDayKey } from "./bedtime-overnight-window";
 import type { BedtimeLog } from "@/lib/storage";
@@ -206,5 +207,13 @@ describe("bedtime overnight analysis", () => {
     expect(insight.stats.hadHigh).toBe(false);
     expect(insight.headline).toMatch(/rising/i);
     expect(insight.considerations.some((c) => /dawn|morning|target/i.test(c))).toBe(true);
+  });
+
+  it("maps overnight TIR to green / amber / red bands", () => {
+    expect(overnightTirTone(82)).toBe("good");
+    expect(overnightTirTone(71)).toBe("good");
+    expect(overnightTirTone(70)).toBe("ok");
+    expect(overnightTirTone(40)).toBe("ok");
+    expect(overnightTirTone(39)).toBe("low");
   });
 });
