@@ -109,7 +109,7 @@ export function StoryOverlayEditor({ overlays, onChange, children, className }: 
     <div className="space-y-3">
       <div
         ref={containerRef}
-        className={cn("relative overflow-hidden rounded-xl border border-border/50 bg-black", className)}
+        className={cn("relative overflow-hidden rounded-[1.35rem] border border-border/50 bg-black", className)}
         data-vaul-no-drag
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -128,22 +128,28 @@ export function StoryOverlayEditor({ overlays, onChange, children, className }: 
         />
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center justify-center gap-1.5">
         {overlays.length === 0 ? (
-          <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={addOverlay}>
-            <Type className="h-4 w-4" />
+          <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 rounded-full px-3 text-xs" onClick={addOverlay}>
+            <Type className="h-3.5 w-3.5" />
             Add text
           </Button>
         ) : (
           <>
-            <Button type="button" variant="outline" size="sm" onClick={toggleStyle}>
-              Style: {selected?.style === "pill" ? "Pill" : "Shadow"}
+            <Button type="button" variant="outline" size="sm" className="h-8 rounded-full px-3 text-xs" onClick={toggleStyle}>
+              {selected?.style === "pill" ? "Pill" : "Shadow"}
             </Button>
-            <Button type="button" variant="outline" size="sm" onClick={() => selected && startEdit(selected)}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 rounded-full px-3 text-xs"
+              onClick={() => selected && startEdit(selected)}
+            >
               Edit text
             </Button>
-            <Button type="button" variant="ghost" size="sm" onClick={() => onChange([])}>
-              Remove text
+            <Button type="button" variant="ghost" size="sm" className="h-8 rounded-full px-3 text-xs" onClick={() => onChange([])}>
+              Remove
             </Button>
           </>
         )}
@@ -156,6 +162,7 @@ export function StoryOverlayEditor({ overlays, onChange, children, className }: 
             onChange={(e) => setDraftText(e.target.value)}
             maxLength={MAX_STORY_OVERLAY_TEXT_LENGTH}
             placeholder="Text on your story"
+            className="h-10 rounded-full px-4"
             autoFocus
             onKeyDown={(e) => {
               if (e.key === "Enter") {
@@ -164,7 +171,7 @@ export function StoryOverlayEditor({ overlays, onChange, children, className }: 
               }
             }}
           />
-          <Button type="button" size="sm" onClick={commitEdit}>
+          <Button type="button" size="sm" className="h-10 rounded-full px-4" onClick={commitEdit}>
             Done
           </Button>
         </div>

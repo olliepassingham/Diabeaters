@@ -250,6 +250,7 @@ export function AccountPublicProfileTab({
             emptyStateTitle="No posts yet"
             emptyStateDescription="Share something on the Feed — it will show up here."
             fetchPage={(limit, cursor) => fetchCommunityPostsByAuthorPage(userId, limit, cursor, null)}
+            onStoryPosted={() => refreshStories()}
           />
         )}
       </div>

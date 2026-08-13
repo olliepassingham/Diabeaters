@@ -1053,6 +1053,7 @@ export default function CommunityHomePage() {
               : "Share a tip, a win, or a question. The community grows with every post."
         }
         fetchPage={fetchFeedPage}
+        onStoryPosted={() => refreshStories()}
       />
       </div>
       <CommunityPushPromptDialog

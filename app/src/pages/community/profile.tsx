@@ -608,6 +608,7 @@ export default function CommunityProfilePage() {
                 emptyStateTitle="No posts yet"
                 emptyStateDescription={isSelf ? "You haven’t posted yet." : "This member hasn’t posted yet."}
                 fetchPage={(limit, cursor) => fetchCommunityPostsByAuthorPage(userId, limit, cursor, null)}
+                onStoryPosted={() => refreshStories()}
               />
             )}
           </div>

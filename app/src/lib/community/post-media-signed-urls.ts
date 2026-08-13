@@ -112,6 +112,30 @@ export async function getPostMediaSignedUrl(path: string): Promise<string | null
   return url;
 }
 
+function mimeFromPathAndBlob(path: string, blob: Blob): string {
+  if (blob.type && blob.type !== "application/octet-stream") return blob.type;
+  const lower = path.toLowerCase();
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".gif")) return "image/gif";
+  if (lower.endsWith(".mp4")) return "video/mp4";
+  if (lower.endsWith(".mov")) return "video/quicktime";
+  if (lower.endsWith(".webm")) return "video/webm";
+  return "image/jpeg";
+}
+
+/** Download a post image/video as a File so it can be re-uploaded as a story. */
+export async function fileFromPostMediaPath(path: string): Promise<File | null> {
+  const url = await getPostMediaSignedUrl(path);
+  if (!url) return null;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  const blob = await res.blob();
+  if (blob.size <= 0) return null;
+  const name = path.split("/").pop()?.trim() || "story.jpg";
+  return new File([blob], name, { type: mimeFromPathAndBlob(path, blob) });
+}
+
 /** Warm the signed-URL cache (and optionally preload image bytes) for feed media. */
 export function prefetchPostMediaSignedUrls(
   paths: string[],

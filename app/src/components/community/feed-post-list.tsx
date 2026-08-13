@@ -4,6 +4,7 @@ import { Loader2, RefreshCw, SearchX, Users } from "lucide-react";
 import { EmptyState, FeedLoadingSkeleton } from "@/components/empty-state";
 import { FeedPostCard } from "@/components/community/feed-post-card";
 import { PostEditImagesField } from "@/components/community/post-edit-images-field";
+import { StoryCreateSheet } from "@/components/community/story-create-sheet";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -34,6 +35,7 @@ import {
 } from "@/components/ui/select";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { usePostEditImages } from "@/hooks/use-post-edit-images";
+import { useSharePostToStory } from "@/hooks/use-share-post-to-story";
 import { useToast } from "@/hooks/use-toast";
 import { isSupabaseConfigured, getSupabase } from "@/lib/supabase";
 import {
@@ -136,10 +138,13 @@ export function FeedPostList(props: {
   onExploreTopicInEveryone?: (topicId: CommunityTopicId) => void;
   /** Switch to Everyone tab (onboarding). */
   onSwitchToEveryone?: () => void;
+  /** Refresh the stories strip after sharing a post to a story. */
+  onStoryPosted?: () => void;
 }) {
   const { toast } = useToast();
   const pageSize = props.pageSize ?? 20;
   const { fetchPage } = props;
+  const shareToStory = useSharePostToStory();
   const topicsForSelect = props.topicsForSelect ?? COMMUNITY_TOPICS;
   const topicFilter = props.topicFilter ?? null;
   const followingAuthorIdsForSearch =
@@ -928,6 +933,8 @@ export function FeedPostList(props: {
                     p.id === post.id ? { ...p, like_count: Math.max(p.like_count, visibleCount) } : p,
                   );
                 }}
+                onAddToStory={(p) => void shareToStory.sharePostToStory(p)}
+                addToStoryBusy={shareToStory.busyPostId === post.id}
               />
             );
           })}
@@ -1035,6 +1042,12 @@ export function FeedPostList(props: {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <StoryCreateSheet
+        open={shareToStory.open}
+        prefillFile={shareToStory.prefillFile}
+        onOpenChange={shareToStory.onOpenChange}
+        onPosted={props.onStoryPosted}
+      />
     </div>
   );
 }

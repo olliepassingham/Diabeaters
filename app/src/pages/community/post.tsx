@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { Link, useLocation, useRoute } from "wouter";
 import { FeedPostCard } from "@/components/community/feed-post-card";
 import { PostEditImagesField } from "@/components/community/post-edit-images-field";
+import { StoryCreateSheet } from "@/components/community/story-create-sheet";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,6 +35,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useCommunityTopicOrder } from "@/hooks/use-community-topic-order";
 import { usePostEditImages } from "@/hooks/use-post-edit-images";
+import { useSharePostToStory } from "@/hooks/use-share-post-to-story";
 import { useAuth } from "@/lib/auth-context";
 import { canEngageWithCommunityFeed, COMMUNITY_FEED_ENGAGE_REQUIRED_MESSAGE, useProfile } from "@/lib/profile";
 import {
@@ -72,6 +74,7 @@ export default function CommunityPostPage() {
   const orderedTopics = useCommunityTopicOrder();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const shareToStory = useSharePostToStory();
 
   const [post, setPost] = useState<CommunityPostRow | null>(null);
   const [loading, setLoading] = useState(true);
@@ -522,6 +525,14 @@ export default function CommunityPostPage() {
             prev ? { ...prev, like_count: Math.max(prev.like_count, visibleCount) } : prev,
           );
         }}
+        onAddToStory={(p) => void shareToStory.sharePostToStory(p)}
+        addToStoryBusy={shareToStory.busyPostId === post.id}
+      />
+
+      <StoryCreateSheet
+        open={shareToStory.open}
+        prefillFile={shareToStory.prefillFile}
+        onOpenChange={shareToStory.onOpenChange}
       />
 
       <Dialog open={reportOpen} onOpenChange={setReportOpen}>
