@@ -135,23 +135,61 @@ export default function CgmLivePage() {
 
       <section
         className={cn(
-          "relative overflow-hidden rounded-[1.35rem] border p-5 shadow-none",
+          "relative overflow-hidden rounded-[1.35rem] border px-4 py-3 shadow-none",
           latestStatus ? glucoseRangeCardClasses(latestStatus) : "border-border/60 bg-card",
         )}
       >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 space-y-1">
-            {latestStatus ? (
-              <Badge
-                variant="secondary"
-                className="rounded-full border-0 bg-background/60 text-xs font-medium"
-                data-testid="cgm-live-range-status"
-              >
-                {glucoseRangeStatusLabel(latestStatus)}
-              </Badge>
+        <div className="flex items-center gap-3">
+          <div className="min-w-0 flex-1">
+            {loading && !latest ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                Loading…
+              </div>
+            ) : latest ? (
+              <div className="flex items-center gap-3">
+                <p
+                  className={cn(
+                    "font-display text-4xl font-bold tabular-nums tracking-tight leading-none",
+                    latestStatus ? glucoseRangeValueClasses(latestStatus) : undefined,
+                  )}
+                  data-testid="cgm-live-current-value"
+                >
+                  {formatTargetBgInput(latest.value, units)}
+                  <span className="ml-1.5 text-sm font-semibold text-muted-foreground">{units}</span>
+                </p>
+                {TrendIcon && latest.trend ? (
+                  <span
+                    className={cn(
+                      "inline-flex min-h-11 items-center gap-1.5 rounded-2xl bg-background/70 px-2.5 text-base font-semibold capitalize",
+                      latestStatus ? glucoseRangeValueClasses(latestStatus) : "text-foreground",
+                    )}
+                    data-testid="cgm-live-trend"
+                  >
+                    <TrendIcon className="h-5 w-5" strokeWidth={2.5} aria-hidden />
+                    {latest.trend}
+                  </span>
+                ) : null}
+              </div>
             ) : (
-              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Now</p>
+              <p className="text-sm text-muted-foreground">No recent reading</p>
             )}
+            {latest ? (
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+                {latestStatus ? (
+                  <Badge
+                    variant="secondary"
+                    className="rounded-full border-0 bg-background/60 px-2 py-0 text-[11px] font-medium"
+                    data-testid="cgm-live-range-status"
+                  >
+                    {glucoseRangeStatusLabel(latestStatus)}
+                  </Badge>
+                ) : null}
+                <span>
+                  {sourceLabel ?? "CGM"} · {formatAgeMinutes(Math.max(0, Math.floor((Date.now() - latest.timeMs) / 60_000)))} ago
+                </span>
+              </div>
+            ) : null}
           </div>
           <Button
             type="button"
@@ -166,39 +204,6 @@ export default function CgmLivePage() {
             <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} aria-hidden />
           </Button>
         </div>
-
-        {loading && !latest ? (
-          <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-            Loading…
-          </div>
-        ) : latest ? (
-          <div className="mt-3 space-y-2">
-            <p
-              className={cn(
-                "font-display text-6xl font-bold tabular-nums tracking-tight leading-none",
-                latestStatus ? glucoseRangeValueClasses(latestStatus) : undefined,
-              )}
-              data-testid="cgm-live-current-value"
-            >
-              {formatTargetBgInput(latest.value, units)}{" "}
-              <span className="text-xl font-semibold text-muted-foreground">{units}</span>
-            </p>
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
-              {TrendIcon && latest.trend ? (
-                <span className="inline-flex items-center gap-1 capitalize">
-                  <TrendIcon className="h-4 w-4" aria-hidden />
-                  {latest.trend}
-                </span>
-              ) : null}
-              <span>
-                {sourceLabel ?? "CGM"} · {formatAgeMinutes(Math.max(0, Math.floor((Date.now() - latest.timeMs) / 60_000)))} ago
-              </span>
-            </div>
-          </div>
-        ) : (
-          <p className="mt-4 text-sm text-muted-foreground">No recent reading</p>
-        )}
       </section>
 
       <section className="space-y-4 overflow-hidden rounded-[1.35rem] border border-border/50 bg-card/80 p-4 shadow-none">

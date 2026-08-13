@@ -91,6 +91,43 @@ function formatChartTimeLabel(timeMs: number, compact: boolean): string {
   return `${day} ${time}`;
 }
 
+/** Clock-style x-axis labels, matching the Patterns overlay chart (`12am`, `6pm`). */
+export function formatCgmHistoryAxisLabel(timeMs: number): string {
+  const h = new Date(timeMs).getHours();
+  if (h === 0) return "12am";
+  if (h === 12) return "12pm";
+  return h < 12 ? `${h}am` : `${h - 12}pm`;
+}
+
+/**
+ * Even local-hour ticks across a history window.
+ * 3h → hourly, 12h → every 2 hours, 24h → every 4 hours.
+ */
+export function buildCgmHistoryAxisTicks(startMs: number, endMs: number): number[] {
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) {
+    return Number.isFinite(startMs) ? [startMs] : [];
+  }
+  const spanHours = (endMs - startMs) / 3_600_000;
+  const stepHours = spanHours <= 4 ? 1 : spanHours <= 16 ? 2 : 4;
+
+  const cursor = new Date(startMs);
+  cursor.setMinutes(0, 0, 0);
+  const rem = cursor.getHours() % stepHours;
+  if (rem !== 0) {
+    cursor.setHours(cursor.getHours() + (stepHours - rem));
+  }
+  if (cursor.getTime() < startMs) {
+    cursor.setHours(cursor.getHours() + stepHours);
+  }
+
+  const ticks: number[] = [];
+  while (cursor.getTime() <= endMs) {
+    ticks.push(cursor.getTime());
+    cursor.setHours(cursor.getHours() + stepHours);
+  }
+  return ticks;
+}
+
 export function chartYDomain(points: CgmChartPoint[], units: BgUnits, extraValues: number[] = []): [number, number] {
   if (points.length === 0 && extraValues.length === 0) {
     return units === "mmol/L" ? [3, 12] : [54, 216];

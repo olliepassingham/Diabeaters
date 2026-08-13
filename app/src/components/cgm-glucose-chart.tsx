@@ -1,5 +1,10 @@
 import { useId, useMemo } from "react";
-import { chartYDomain, type CgmChartPoint } from "@/lib/cgm/cgm-chart";
+import {
+  buildCgmHistoryAxisTicks,
+  chartYDomain,
+  formatCgmHistoryAxisLabel,
+  type CgmChartPoint,
+} from "@/lib/cgm/cgm-chart";
 import { CGM_CHART_OVERLAY_COLORS, type CgmChartOverlay } from "@/lib/cgm/cgm-chart-overlays";
 import type { NearFutureProjectionResult } from "@/lib/cgm/near-future-projection";
 import type { BgUnits } from "@/lib/cgm/types";
@@ -29,11 +34,6 @@ const PAD = { top: 12, right: 10, bottom: 28, left: 36 };
 /** Share of the plot width reserved for the projected (+15/+30 min) segment. */
 const FUTURE_ZONE_RATIO = 0.26;
 const FALLBACK_STROKE = "hsl(var(--chart-2))";
-
-function scaleX(index: number, count: number, width: number, offset = PAD.left): number {
-  if (count <= 1) return offset + width / 2;
-  return offset + (index / (count - 1)) * width;
-}
 
 function scaleY(value: number, min: number, max: number, innerHeight: number): number {
   if (max <= min) return PAD.top + innerHeight / 2;
@@ -73,13 +73,21 @@ export function CgmGlucoseChart({
     return chartYDomain(points, units, extras);
   }, [points, units, projection]);
 
+  const chartStartMs = points[0]?.timeMs ?? 0;
+  const chartEndMs = points[points.length - 1]?.timeMs ?? chartStartMs;
+
   const historyCoords = useMemo(() => {
-    return points.map((p, i) => ({
-      x: scaleX(i, points.length, historyWidth),
+    return points.map((p) => ({
+      x: scaleXByTime(p.timeMs, chartStartMs, chartEndMs, historyWidth),
       y: scaleY(p.value, yMin, yMax, innerHeight),
       value: p.value,
     }));
-  }, [points, yMin, yMax, historyWidth, innerHeight]);
+  }, [points, chartStartMs, chartEndMs, yMin, yMax, historyWidth, innerHeight]);
+
+  const axisTicks = useMemo(
+    () => buildCgmHistoryAxisTicks(chartStartMs, chartEndMs),
+    [chartStartMs, chartEndMs],
+  );
 
   const linePath = useMemo(() => {
     if (historyCoords.length === 0) return "";
@@ -92,21 +100,6 @@ export function CgmGlucoseChart({
     const steps = 4;
     return Array.from({ length: steps + 1 }, (_, i) => yMin + ((yMax - yMin) * i) / steps);
   }, [yMin, yMax]);
-
-  const xLabelIndices = useMemo(() => {
-    if (points.length <= 1) return [0];
-    if (points.length <= 4) {
-      // When projecting, skip the last history tick — it sits on the "now" divider
-      // and collides with +15m / +30m on narrow screens.
-      return hasProjection
-        ? points.map((_, i) => i).filter((i) => i < points.length - 1)
-        : points.map((_, i) => i);
-    }
-    if (hasProjection) {
-      return [0, Math.floor(points.length / 2)];
-    }
-    return [0, Math.floor(points.length / 2), points.length - 1];
-  }, [points, hasProjection]);
 
   const refLines = [targetLow, targetHigh].filter((v): v is number => typeof v === "number" && Number.isFinite(v));
   const hasTargetBand =
@@ -123,8 +116,6 @@ export function CgmGlucoseChart({
   }, [hasTargetBand, historyCoords, targetLow, targetHigh]);
 
   const latestStatus = pointStatuses[pointStatuses.length - 1] ?? "in_range";
-  const chartStartMs = points[0]?.timeMs ?? 0;
-  const chartEndMs = points[points.length - 1]?.timeMs ?? chartStartMs;
   const areaStroke = hasTargetBand ? glucoseRangeChartStroke(latestStatus) : FALLBACK_STROKE;
 
   const future = useMemo(() => {
@@ -280,9 +271,9 @@ export function CgmGlucoseChart({
           />
         ))}
 
-        {points.length > 1 ? (
+        {points.length > 1 && historyCoords.length > 1 ? (
           <path
-            d={`${linePath} L${scaleX(points.length - 1, points.length, historyWidth).toFixed(1)},${(PAD.top + innerHeight).toFixed(1)} L${PAD.left},${(PAD.top + innerHeight).toFixed(1)} Z`}
+            d={`${linePath} L${historyCoords[historyCoords.length - 1]!.x.toFixed(1)},${(PAD.top + innerHeight).toFixed(1)} L${historyCoords[0]!.x.toFixed(1)},${(PAD.top + innerHeight).toFixed(1)} Z`}
             fill={`url(#${gradientId})`}
             stroke="none"
           />
@@ -395,11 +386,13 @@ export function CgmGlucoseChart({
           const status = pointStatuses[i] ?? "in_range";
           const isLatest = i === points.length - 1;
           const r = isLatest ? 5 : points.length > 40 ? 0 : 2.5;
+          const coord = historyCoords[i];
+          if (!coord) return null;
           return (
             <circle
               key={`${p.recordedAt}-${i}`}
-              cx={scaleX(i, points.length, historyWidth)}
-              cy={scaleY(p.value, yMin, yMax, innerHeight)}
+              cx={coord.x}
+              cy={coord.y}
               r={r}
               fill={hasTargetBand ? glucoseRangeChartStroke(status) : FALLBACK_STROKE}
               stroke={isLatest ? "hsl(var(--background))" : "none"}
@@ -408,24 +401,32 @@ export function CgmGlucoseChart({
           );
         })}
 
-        {xLabelIndices.map((i) => {
-          const p = points[i];
-          if (!p) return null;
-          const x = scaleX(i, points.length, historyWidth);
-          // Keep the first label from clipping off the left; mid labels stay centred.
-          const anchor = i === 0 ? "start" : "middle";
+        {axisTicks.map((ms) => {
+          const x = scaleXByTime(ms, chartStartMs, chartEndMs, historyWidth);
+          const historyRight = PAD.left + historyWidth;
+          if (future && historyRight - x < 10) return null;
+          const anchor = x < PAD.left + 14 ? "start" : x > historyRight - 14 ? "end" : "middle";
           return (
-            <text
-              key={`${p.recordedAt}-x`}
-              x={x}
-              y={HEIGHT - 8}
-              textAnchor={anchor}
-              fontSize="8.5"
-              fill="currentColor"
-              fillOpacity={0.85}
-            >
-              {p.timeLabel}
-            </text>
+            <g key={ms}>
+              <line
+                x1={x}
+                y1={PAD.top}
+                x2={x}
+                y2={PAD.top + innerHeight}
+                stroke="currentColor"
+                strokeOpacity={0.08}
+              />
+              <text
+                x={x}
+                y={HEIGHT - 8}
+                textAnchor={anchor}
+                fontSize="9"
+                fill="currentColor"
+                fillOpacity={0.85}
+              >
+                {formatCgmHistoryAxisLabel(ms)}
+              </text>
+            </g>
           );
         })}
 
@@ -435,7 +436,7 @@ export function CgmGlucoseChart({
               x={future.x15}
               y={HEIGHT - 8}
               textAnchor="middle"
-              fontSize="8"
+              fontSize="9"
               fill="currentColor"
               fillOpacity={0.55}
             >
@@ -445,7 +446,7 @@ export function CgmGlucoseChart({
               x={Math.min(future.x30, WIDTH - PAD.right)}
               y={HEIGHT - 8}
               textAnchor="end"
-              fontSize="8"
+              fontSize="9"
               fill="currentColor"
               fillOpacity={0.55}
             >
