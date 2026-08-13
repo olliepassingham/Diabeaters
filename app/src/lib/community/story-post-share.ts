@@ -1,26 +1,26 @@
+import { format } from "date-fns";
 import { fileFromPostMediaPath } from "@/lib/community/post-media-signed-urls";
-import { formatEventWhen } from "@/lib/community/event-display";
+import { parseEventDate } from "@/lib/community/event-display";
 import { parseEventExtra, parsePollExtra } from "@/lib/community/post-kinds";
 import type { CommunityPostRow } from "@/lib/community";
 
 const W = 1080;
 const H = 1920;
 /** Keep content clear of the story viewer header (avatar / name / close). */
-const TOP_SAFE = 300;
+const TOP_SAFE = 280;
 /** Keep content clear of the Activity / reply chrome. */
-const BOTTOM_SAFE = 250;
-const SIDE = 64;
-const CARD_PAD = 48;
-const CARD_RADIUS = 44;
-const IMAGE_RADIUS = 28;
+const BOTTOM_SAFE = 260;
+const SIDE = 72;
 
-const BG_INNER = "#152036";
-const BG_OUTER = "#070b14";
-const CARD = "#1b2740";
-const TEXT = "#f8fafc";
-const MUTED = "#94a3b8";
-const ACCENT = "#2dd4bf";
-const LINE = "rgba(255,255,255,0.12)";
+const FONT = 'Outfit, "Inter Variable", Inter, system-ui, sans-serif';
+const FONT_SERIF = 'Georgia, "Iowan Old Style", "Times New Roman", serif';
+
+const INK = "#12141a";
+const INK_MUTED = "#5c6473";
+const CREAM = "#f6f1e8";
+const TEAL = "#14b8a6";
+const TEAL_DEEP = "#0f766e";
+const WHITE = "#f8fafc";
 
 export type StoryPostShareMeta = {
   authorName: string;
@@ -222,13 +222,6 @@ async function loadMedia(path: string | null | undefined): Promise<CanvasImageSo
   }
 }
 
-function kindLabel(post: CommunityPostRow): string {
-  if (post.post_kind === "poll") return "Poll";
-  if (post.post_kind === "event") return "Event";
-  if (post.video_url) return "Video";
-  return "Post";
-}
-
 function canvasToFile(canvas: HTMLCanvasElement): Promise<File | null> {
   return new Promise((resolve) => {
     canvas.toBlob(
@@ -245,36 +238,362 @@ function canvasToFile(canvas: HTMLCanvasElement): Promise<File | null> {
   });
 }
 
-function headerHeight(handle: string | null): number {
-  return 44 + 12 + 40 + (handle ? 32 : 0) + 28;
+function handleOf(meta: StoryPostShareMeta): string | null {
+  const h = meta.authorHandle?.trim().replace(/^@/, "") || null;
+  return h || null;
 }
 
-function drawCardHeader(
+function nameOf(meta: StoryPostShareMeta): string {
+  return meta.authorName.trim() || "Member";
+}
+
+function initialOf(name: string): string {
+  const ch = name.trim().charAt(0);
+  return ch ? ch.toUpperCase() : "M";
+}
+
+function quoteMetrics(text: string): { size: number; lh: number; maxLines: number } {
+  const len = text.trim().length;
+  if (len <= 70) return { size: 54, lh: 68, maxLines: 7 };
+  if (len <= 140) return { size: 44, lh: 58, maxLines: 8 };
+  if (len <= 240) return { size: 38, lh: 50, maxLines: 10 };
+  return { size: 34, lh: 46, maxLines: 12 };
+}
+
+function eventParts(iso: string): { weekday: string; day: string; month: string; time: string } {
+  const d = parseEventDate(iso);
+  if (!d) return { weekday: "EVENT", day: "·", month: "", time: iso };
+  return {
+    weekday: format(d, "EEE").toUpperCase(),
+    day: format(d, "d"),
+    month: format(d, "MMM").toUpperCase(),
+    time: format(d, "h:mm a"),
+  };
+}
+
+function drawAtmosphere(ctx: CanvasRenderingContext2D, media: CanvasImageSource | null) {
+  ctx.fillStyle = "#07080d";
+  ctx.fillRect(0, 0, W, H);
+
+  if (media) {
+    ctx.save();
+    ctx.filter = "blur(48px)";
+    drawCover(ctx, media, -120, -120, W + 240, H + 240, 0);
+    ctx.restore();
+    ctx.fillStyle = "rgba(6, 8, 14, 0.58)";
+    ctx.fillRect(0, 0, W, H);
+  } else {
+    const a = ctx.createRadialGradient(W * 0.22, H * 0.28, 40, W * 0.22, H * 0.28, 780);
+    a.addColorStop(0, "rgba(20, 184, 166, 0.28)");
+    a.addColorStop(1, "rgba(20, 184, 166, 0)");
+    ctx.fillStyle = a;
+    ctx.fillRect(0, 0, W, H);
+    const b = ctx.createRadialGradient(W * 0.86, H * 0.72, 20, W * 0.86, H * 0.72, 820);
+    b.addColorStop(0, "rgba(59, 130, 246, 0.22)");
+    b.addColorStop(1, "rgba(59, 130, 246, 0)");
+    ctx.fillStyle = b;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  const vignette = ctx.createLinearGradient(0, 0, 0, H);
+  vignette.addColorStop(0, "rgba(0,0,0,0.38)");
+  vignette.addColorStop(0.22, "rgba(0,0,0,0)");
+  vignette.addColorStop(0.78, "rgba(0,0,0,0)");
+  vignette.addColorStop(1, "rgba(0,0,0,0.55)");
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, W, H);
+}
+
+function drawLiftedCard(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
-  kind: string,
+  w: number,
+  h: number,
+  r: number,
+  fill: string,
+) {
+  ctx.save();
+  ctx.shadowColor = "rgba(0, 0, 0, 0.48)";
+  ctx.shadowBlur = 48;
+  ctx.shadowOffsetY = 22;
+  fillRoundRect(ctx, x, y, w, h, r, fill);
+  ctx.restore();
+  ctx.save();
+  roundRect(ctx, x, y, w, h, r);
+  ctx.strokeStyle = "rgba(255,255,255,0.22)";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawInitialAvatar(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  name: string,
+  onLight: boolean,
+) {
+  fillRoundRect(ctx, x, y, size, size, size / 2, onLight ? TEAL_DEEP : "rgba(20, 184, 166, 0.22)");
+  ctx.fillStyle = onLight ? WHITE : TEAL;
+  ctx.font = `700 ${Math.round(size * 0.42)}px ${FONT}`;
+  ctx.textAlign = "center";
+  ctx.fillText(initialOf(name), x + size / 2, y + size * 0.68);
+  ctx.textAlign = "left";
+}
+
+function drawAuthorRow(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
   name: string,
   handle: string | null,
-): number {
-  ctx.font = "700 20px system-ui, sans-serif";
-  const label = kind.toUpperCase();
-  const pillW = Math.ceil(ctx.measureText(label).width) + 28;
-  fillRoundRect(ctx, x, y, pillW, 40, 20, "rgba(45, 212, 191, 0.16)");
-  ctx.fillStyle = ACCENT;
-  ctx.fillText(label, x + 14, y + 27);
+  onLight: boolean,
+) {
+  const av = 52;
+  drawInitialAvatar(ctx, x, y, av, name, onLight);
+  ctx.fillStyle = onLight ? INK : WHITE;
+  ctx.font = `600 28px ${FONT}`;
+  ctx.fillText(name, x + av + 16, y + 24);
+  ctx.fillStyle = onLight ? INK_MUTED : "rgba(248,250,252,0.62)";
+  ctx.font = `500 22px ${FONT}`;
+  ctx.fillText(handle ? `@${handle}` : "From the feed", x + av + 16, y + 48);
+}
 
-  ctx.fillStyle = TEXT;
-  ctx.font = "700 34px system-ui, sans-serif";
-  ctx.fillText(name, x, y + 40 + 12 + 30);
-  let next = y + 40 + 12 + 40;
-  if (handle) {
-    ctx.fillStyle = MUTED;
-    ctx.font = "500 26px system-ui, sans-serif";
-    ctx.fillText(`@${handle}`, x, next + 28);
-    next += 32;
+function drawPin(ctx: CanvasRenderingContext2D, x: number, y: number, color: string) {
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(x + 11, y);
+  ctx.bezierCurveTo(x + 4, y, x, y + 7, x, y + 13);
+  ctx.bezierCurveTo(x, y + 20, x + 11, y + 30, x + 11, y + 30);
+  ctx.bezierCurveTo(x + 11, y + 30, x + 22, y + 20, x + 22, y + 13);
+  ctx.bezierCurveTo(x + 22, y + 7, x + 18, y, x + 11, y);
+  ctx.closePath();
+  ctx.arc(x + 11, y + 12, 4, 0, Math.PI * 2, true);
+  ctx.fill("evenodd");
+  ctx.restore();
+}
+
+function drawQuoteCard(
+  ctx: CanvasRenderingContext2D,
+  body: string,
+  name: string,
+  handle: string | null,
+) {
+  const pad = 56;
+  const innerW = W - SIDE * 2;
+  const textW = innerW - pad * 2;
+  const metrics = quoteMetrics(body);
+  ctx.font = `500 ${metrics.size}px ${FONT_SERIF}`;
+  const textH = wrappedHeight(ctx, body, textW, metrics.lh, metrics.maxLines);
+  const authorH = 64;
+  const cardH = Math.min(H - TOP_SAFE - BOTTOM_SAFE, pad + 92 + textH + 40 + authorH + pad);
+  const cardY = TOP_SAFE + Math.max(0, (H - TOP_SAFE - BOTTOM_SAFE - cardH) / 2);
+
+  drawLiftedCard(ctx, SIDE, cardY, innerW, cardH, 40, CREAM);
+  ctx.save();
+  roundRect(ctx, SIDE, cardY, innerW, cardH, 40);
+  ctx.clip();
+  ctx.fillStyle = TEAL;
+  ctx.fillRect(SIDE, cardY, innerW, 8);
+  ctx.restore();
+
+  ctx.fillStyle = "rgba(15, 118, 110, 0.14)";
+  ctx.font = `700 168px ${FONT_SERIF}`;
+  ctx.fillText("“", SIDE + 28, cardY + 148);
+
+  ctx.fillStyle = INK;
+  ctx.font = `500 ${metrics.size}px ${FONT_SERIF}`;
+  drawWrapped(ctx, body, SIDE + pad, cardY + pad + 108, textW, metrics.lh, metrics.maxLines);
+
+  const authorY = cardY + cardH - pad - authorH + 6;
+  ctx.strokeStyle = "rgba(18, 20, 26, 0.08)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(SIDE + pad, authorY - 22);
+  ctx.lineTo(SIDE + innerW - pad, authorY - 22);
+  ctx.stroke();
+  drawAuthorRow(ctx, SIDE + pad, authorY, name, handle, true);
+}
+
+function drawEventCard(
+  ctx: CanvasRenderingContext2D,
+  event: { title: string; starts_at: string; location?: string; details?: string },
+  media: CanvasImageSource | null,
+  name: string,
+  handle: string | null,
+) {
+  const innerW = W - SIDE * 2;
+  const maxCardH = H - TOP_SAFE - BOTTOM_SAFE;
+  const imageH = media ? 720 : 280;
+  const pad = 44;
+  const textW = innerW - pad * 2;
+  const parts = eventParts(event.starts_at);
+  const loc = event.location?.trim() || "";
+
+  ctx.font = `700 46px ${FONT}`;
+  const titleH = media ? 0 : wrappedHeight(ctx, event.title, textW, 54, 3);
+  const metaH = 156;
+  const cardH = Math.min(maxCardH, imageH + (media ? 0 : titleH + 24) + metaH + pad);
+  const cardY = TOP_SAFE + Math.max(0, (maxCardH - cardH) / 2);
+
+  drawLiftedCard(ctx, SIDE, cardY, innerW, cardH, 40, "#101826");
+
+  ctx.save();
+  roundRect(ctx, SIDE, cardY, innerW, cardH, 40);
+  ctx.clip();
+  if (media) {
+    drawCover(ctx, media, SIDE, cardY, innerW, imageH, 0);
+    const fade = ctx.createLinearGradient(0, cardY + imageH - 220, 0, cardY + imageH);
+    fade.addColorStop(0, "rgba(16, 24, 38, 0)");
+    fade.addColorStop(1, "#101826");
+    ctx.fillStyle = fade;
+    ctx.fillRect(SIDE, cardY + imageH - 220, innerW, 220);
+    ctx.fillStyle = WHITE;
+    ctx.font = `700 52px ${FONT}`;
+    drawWrapped(ctx, event.title, SIDE + pad, cardY + imageH - 118, textW, 58, 2);
+  } else {
+    const hdr = ctx.createLinearGradient(SIDE, cardY, SIDE + innerW, cardY + imageH);
+    hdr.addColorStop(0, "#134e4a");
+    hdr.addColorStop(1, "#1e3a5f");
+    ctx.fillStyle = hdr;
+    ctx.fillRect(SIDE, cardY, innerW, imageH);
+    ctx.fillStyle = "rgba(255,255,255,0.08)";
+    ctx.font = `700 220px ${FONT}`;
+    ctx.fillText(parts.day, SIDE + 36, cardY + 210);
   }
-  return next + 28;
+  ctx.restore();
+
+  let y = cardY + imageH + 28;
+  if (!media) {
+    ctx.fillStyle = WHITE;
+    ctx.font = `700 46px ${FONT}`;
+    y += 40;
+    y += drawWrapped(ctx, event.title, SIDE + pad, y, textW, 54, 3) + 20;
+  }
+
+  const chipW = 118;
+  fillRoundRect(ctx, SIDE + pad, y, chipW, 118, 22, CREAM);
+  ctx.fillStyle = TEAL_DEEP;
+  ctx.font = `700 18px ${FONT}`;
+  ctx.textAlign = "center";
+  ctx.fillText(parts.weekday, SIDE + pad + chipW / 2, y + 32);
+  ctx.fillStyle = INK;
+  ctx.font = `700 44px ${FONT}`;
+  ctx.fillText(parts.day, SIDE + pad + chipW / 2, y + 76);
+  ctx.fillStyle = INK_MUTED;
+  ctx.font = `600 16px ${FONT}`;
+  ctx.fillText(parts.month, SIDE + pad + chipW / 2, y + 100);
+  ctx.textAlign = "left";
+
+  const metaX = SIDE + pad + chipW + 28;
+  ctx.fillStyle = WHITE;
+  ctx.font = `600 30px ${FONT}`;
+  ctx.fillText(parts.time, metaX, y + 38);
+  if (loc) {
+    drawPin(ctx, metaX, y + 52, TEAL);
+    ctx.fillStyle = "rgba(248,250,252,0.78)";
+    ctx.font = `500 26px ${FONT}`;
+    const locLabel = loc.length > 28 ? `${loc.slice(0, 27)}…` : loc;
+    ctx.fillText(locLabel, metaX + 30, y + 76);
+  }
+  ctx.fillStyle = "rgba(248,250,252,0.5)";
+  ctx.font = `500 22px ${FONT}`;
+  ctx.fillText(handle ? `${name}  ·  @${handle}` : name, metaX, y + 110);
+}
+
+function drawMediaCard(
+  ctx: CanvasRenderingContext2D,
+  media: CanvasImageSource,
+  caption: string,
+  name: string,
+  handle: string | null,
+) {
+  const innerW = W - SIDE * 2;
+  const maxCardH = H - TOP_SAFE - BOTTOM_SAFE;
+  const imageH = Math.min(1180, maxCardH);
+  const cardY = TOP_SAFE + Math.max(0, (maxCardH - imageH) / 2);
+
+  drawLiftedCard(ctx, SIDE, cardY, innerW, imageH, 40, "#101826");
+  ctx.save();
+  roundRect(ctx, SIDE, cardY, innerW, imageH, 40);
+  ctx.clip();
+  drawCover(ctx, media, SIDE, cardY, innerW, imageH, 0);
+
+  ctx.font = `600 28px ${FONT}`;
+  const nameW = ctx.measureText(name).width;
+  ctx.font = `500 22px ${FONT}`;
+  const subW = ctx.measureText(handle ? `@${handle}` : "From the feed").width;
+  const chipW = Math.min(innerW - 56, 52 + 16 + Math.max(nameW, subW) + 36);
+  fillRoundRect(ctx, SIDE + 28, cardY + 28, chipW, 64, 32, "rgba(8, 10, 16, 0.58)");
+  drawAuthorRow(ctx, SIDE + 40, cardY + 34, name, handle, false);
+
+  if (caption) {
+    const fade = ctx.createLinearGradient(0, cardY + imageH - 220, 0, cardY + imageH);
+    fade.addColorStop(0, "rgba(8, 10, 16, 0)");
+    fade.addColorStop(1, "rgba(8, 10, 16, 0.78)");
+    ctx.fillStyle = fade;
+    ctx.fillRect(SIDE, cardY + imageH - 220, innerW, 220);
+    ctx.fillStyle = WHITE;
+    ctx.font = `500 32px ${FONT}`;
+    drawWrapped(ctx, caption, SIDE + 40, cardY + imageH - 88, innerW - 80, 42, 3);
+  }
+  ctx.restore();
+}
+
+function drawPollCard(
+  ctx: CanvasRenderingContext2D,
+  question: string,
+  options: string[],
+  name: string,
+  handle: string | null,
+) {
+  const pad = 48;
+  const innerW = W - SIDE * 2;
+  const textW = innerW - pad * 2;
+  const opts = options.slice(0, 6);
+  ctx.font = `700 40px ${FONT}`;
+  const qH = wrappedHeight(ctx, question, textW, 52, 4);
+  const cardH = Math.min(
+    H - TOP_SAFE - BOTTOM_SAFE,
+    pad + 36 + qH + 28 + opts.length * 96 + 28 + 64 + pad,
+  );
+  const cardY = TOP_SAFE + Math.max(0, (H - TOP_SAFE - BOTTOM_SAFE - cardH) / 2);
+
+  drawLiftedCard(ctx, SIDE, cardY, innerW, cardH, 40, "#101826");
+  ctx.save();
+  roundRect(ctx, SIDE, cardY, innerW, cardH, 40);
+  ctx.clip();
+  ctx.fillStyle = TEAL;
+  ctx.fillRect(SIDE, cardY, innerW, 8);
+  ctx.restore();
+  ctx.fillStyle = WHITE;
+  ctx.font = `700 40px ${FONT}`;
+  let y = cardY + pad + 12;
+  y += drawWrapped(ctx, question, SIDE + pad, y + 40, textW, 52, 4) + 24;
+
+  ctx.font = `600 28px ${FONT}`;
+  for (const option of opts) {
+    if (y + 80 > cardY + cardH - pad - 80) break;
+    fillRoundRect(ctx, SIDE + pad, y, textW, 80, 22, "rgba(255,255,255,0.06)");
+    roundRect(ctx, SIDE + pad, y, textW, 80, 22);
+    ctx.strokeStyle = "rgba(255,255,255,0.12)";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(SIDE + pad + 32, y + 40, 11, 0, Math.PI * 2);
+    ctx.strokeStyle = TEAL;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    ctx.fillStyle = WHITE;
+    const label = option.length > 42 ? `${option.slice(0, 41)}…` : option;
+    ctx.fillText(label, SIDE + pad + 58, y + 50);
+    y += 96;
+  }
+
+  drawAuthorRow(ctx, SIDE + pad, cardY + cardH - pad - 52, name, handle, false);
 }
 
 /** Renders a 9:16 story card for any feed post (photo + caption, text, poll, or event). */
@@ -299,122 +618,19 @@ export async function renderPostAsStoryFile(
     if (event && body === event.title.trim()) return "";
     return body;
   })();
-  const handle = meta.authorHandle?.trim().replace(/^@/, "") || null;
-  const name = meta.authorName.trim() || "Member";
-  const kind = kindLabel(post);
-  const innerW = W - SIDE * 2;
-  const textW = innerW - CARD_PAD * 2;
-  const maxCardH = H - TOP_SAFE - BOTTOM_SAFE;
-  const chromeH = headerHeight(handle);
+  const handle = handleOf(meta);
+  const name = nameOf(meta);
 
-  const bg = ctx.createRadialGradient(W / 2, H * 0.48, 40, W / 2, H * 0.48, 1100);
-  bg.addColorStop(0, BG_INNER);
-  bg.addColorStop(1, BG_OUTER);
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, W, H);
-
-  let bodyH = 0;
-  let imageH = 0;
-  const optionCount = poll ? Math.min(poll.options.length, 6) : 0;
+  drawAtmosphere(ctx, media);
 
   if (poll) {
-    ctx.font = "700 44px system-ui, sans-serif";
-    const qH = wrappedHeight(ctx, poll.question, textW, 56, 5);
-    bodyH = qH + 28 + optionCount * 92;
+    drawPollCard(ctx, poll.question, poll.options, name, handle);
   } else if (event) {
-    imageH = media ? 520 : 0;
-    ctx.font = "700 44px system-ui, sans-serif";
-    const titleH = wrappedHeight(ctx, event.title, textW, 54, 3);
-    ctx.font = "600 28px system-ui, sans-serif";
-    const whenH = wrappedHeight(ctx, formatEventWhen(event.starts_at), textW, 38, 2);
-    ctx.font = "500 26px system-ui, sans-serif";
-    const locH = event.location?.trim() ? wrappedHeight(ctx, event.location.trim(), textW, 36, 2) : 0;
-    const detH = event.details?.trim() ? wrappedHeight(ctx, event.details.trim(), textW, 34, 3) : 0;
-    bodyH = (imageH ? imageH + 28 : 0) + titleH + 14 + whenH + (locH ? locH + 10 : 0) + (detH ? detH + 8 : 0);
+    drawEventCard(ctx, event, media, name, handle);
   } else if (media) {
-    const captionH = caption
-      ? (() => {
-          ctx.font = "500 34px system-ui, sans-serif";
-          return 28 + wrappedHeight(ctx, caption, textW, 44, 6);
-        })()
-      : 0;
-    imageH = Math.min(980, maxCardH - CARD_PAD * 2 - chromeH - captionH);
-    imageH = Math.max(520, imageH);
-    bodyH = imageH + captionH;
+    drawMediaCard(ctx, media, caption, name, handle);
   } else {
-    ctx.font = "600 42px system-ui, sans-serif";
-    bodyH = wrappedHeight(ctx, caption || "Shared from the feed", textW, 54, 10);
-  }
-
-  const cardH = Math.min(maxCardH, Math.max(420, CARD_PAD * 2 + chromeH + bodyH));
-  const cardY = TOP_SAFE + Math.max(0, (maxCardH - cardH) / 2);
-  const cardX = SIDE;
-
-  fillRoundRect(ctx, cardX, cardY, innerW, cardH, CARD_RADIUS, CARD);
-  ctx.save();
-  roundRect(ctx, cardX, cardY, innerW, cardH, CARD_RADIUS);
-  ctx.strokeStyle = LINE;
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  ctx.restore();
-
-  const contentX = cardX + CARD_PAD;
-  let y = drawCardHeader(ctx, contentX, cardY + CARD_PAD, kind, name, handle);
-  const contentBottom = cardY + cardH - CARD_PAD;
-
-  if (poll) {
-    ctx.fillStyle = TEXT;
-    ctx.font = "700 44px system-ui, sans-serif";
-    y += drawWrapped(ctx, poll.question, contentX, y, textW, 56, 5) + 20;
-    ctx.font = "600 30px system-ui, sans-serif";
-    for (const option of poll.options.slice(0, 6)) {
-      if (y + 80 > contentBottom) break;
-      fillRoundRect(ctx, contentX, y, textW, 76, 38, "rgba(255,255,255,0.05)");
-      roundRect(ctx, contentX, y, textW, 76, 38);
-      ctx.strokeStyle = LINE;
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      ctx.fillStyle = TEXT;
-      const label = option.length > 40 ? `${option.slice(0, 39)}…` : option;
-      ctx.fillText(label, contentX + 28, y + 48);
-      y += 92;
-    }
-  } else if (event) {
-    if (media && imageH > 0) {
-      drawCover(ctx, media, contentX, y, textW, imageH, IMAGE_RADIUS);
-      y += imageH + 32;
-    }
-    ctx.fillStyle = TEXT;
-    ctx.font = "700 44px system-ui, sans-serif";
-    y += drawWrapped(ctx, event.title, contentX, y, textW, 54, 3) + 12;
-    ctx.fillStyle = ACCENT;
-    ctx.font = "600 28px system-ui, sans-serif";
-    y += drawWrapped(ctx, formatEventWhen(event.starts_at), contentX, y, textW, 38, 2) + 8;
-    if (event.location?.trim()) {
-      ctx.fillStyle = MUTED;
-      ctx.font = "500 26px system-ui, sans-serif";
-      y += drawWrapped(ctx, event.location.trim(), contentX, y, textW, 36, 2) + 8;
-    }
-    if (event.details?.trim()) {
-      ctx.fillStyle = MUTED;
-      ctx.font = "500 26px system-ui, sans-serif";
-      drawWrapped(ctx, event.details.trim(), contentX, y, textW, 34, 3);
-    }
-  } else if (media) {
-    drawCover(ctx, media, contentX, y, textW, imageH, IMAGE_RADIUS);
-    if (caption) {
-      ctx.fillStyle = TEXT;
-      ctx.font = "500 34px system-ui, sans-serif";
-      drawWrapped(ctx, caption, contentX, y + imageH + 48, textW, 44, 6);
-    }
-  } else {
-    const body = caption || "Shared from the feed";
-    ctx.font = "600 42px system-ui, sans-serif";
-    const textH = wrappedHeight(ctx, body, textW, 54, 10);
-    const avail = contentBottom - y;
-    const firstBaseline = y + Math.max(24, (avail - textH) / 2) + 40;
-    ctx.fillStyle = TEXT;
-    drawWrapped(ctx, body, contentX, firstBaseline, textW, 54, 10);
+    drawQuoteCard(ctx, caption || "Shared from the feed", name, handle);
   }
 
   return canvasToFile(canvas);

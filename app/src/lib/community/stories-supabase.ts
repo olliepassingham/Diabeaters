@@ -502,20 +502,27 @@ export async function insertCommunityStory(
   });
   if (upErr) return { data: null, error: new Error(upErr.message) };
 
-  const { data, error } = await supabase
+  const baseRow = {
+    id: storyId,
+    author_id: uid,
+    media_path: dest,
+    media_kind: mediaKind,
+    expires_at: expiresAt,
+    caption,
+    overlays: overlays.length > 0 ? overlays : null,
+  };
+  let { data, error } = await supabase
     .from("community_stories")
-    .insert({
-      id: storyId,
-      author_id: uid,
-      media_path: dest,
-      media_kind: mediaKind,
-      expires_at: expiresAt,
-      caption,
-      overlays: overlays.length > 0 ? overlays : null,
-      ...(sourcePostId ? { source_post_id: sourcePostId } : {}),
-    })
+    .insert(sourcePostId ? { ...baseRow, source_post_id: sourcePostId } : baseRow)
     .select("*")
     .single();
+
+  // Column is added by migration; retry so sharing still works if it is not applied yet.
+  if (error && sourcePostId && /source_post_id/i.test(error.message)) {
+    const retry = await supabase.from("community_stories").insert(baseRow).select("*").single();
+    data = retry.data;
+    error = retry.error;
+  }
 
   if (error) {
     await supabase.storage.from(COMMUNITY_POST_IMAGES_BUCKET).remove([dest]);
