@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { dismissBedtimeOutcomePrompt } from "@/lib/bedtime-outcome-prompt";
@@ -23,6 +22,10 @@ import {
   overnightSummariesDiffer,
   type BedtimeOvernightInsight,
 } from "@/lib/bedtime-overnight-analysis";
+import {
+  buildOvernightCheckinTakeaway,
+  describeLastNightCheck,
+} from "@/lib/bedtime-outcome-insights";
 import { formatTargetBgInput } from "@/lib/hypo-context";
 import type { BgUnits } from "@/lib/cgm/types";
 import { storage, type BedtimeLog, type BedtimeOutcome } from "@/lib/storage";
@@ -31,6 +34,8 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   log: BedtimeLog | null;
+  /** Other bedtime logs, used to personalise the takeaway. */
+  logs?: BedtimeLog[];
   onSaved?: () => void;
 };
 
@@ -43,13 +48,13 @@ const FEEL_OPTIONS: { value: BedtimeOutcome["overnightFeel"]; label: string; Ico
 
 const FOLLOWED_OPTIONS: { value: BedtimeOutcome["followedAction"]; label: string }[] = [
   { value: "yes", label: "Yes" },
-  { value: "partially", label: "Partially" },
+  { value: "partially", label: "Partly" },
   { value: "no", label: "No" },
 ];
 
 function actionSuggestedLabel(log: BedtimeLog): string | null {
-  if (log.actionSuggested === "correction") return "the suggested correction";
-  if (log.actionSuggested === "snack") return "the suggested snack";
+  if (log.actionSuggested === "correction") return "the correction";
+  if (log.actionSuggested === "snack") return "the snack";
   return null;
 }
 
@@ -60,10 +65,11 @@ function feelFromCgmInsight(insight: BedtimeOvernightInsight): BedtimeOutcome["o
   return "steady";
 }
 
-export function BedtimeOutcomeCheckinDialog({ open, onOpenChange, log, onSaved }: Props) {
+export function BedtimeOutcomeCheckinDialog({ open, onOpenChange, log, logs = [], onSaved }: Props) {
   const { toast } = useToast();
   const [feel, setFeel] = useState<BedtimeOutcome["overnightFeel"] | null>(null);
   const [morningBg, setMorningBg] = useState("");
+  const [showMorningBg, setShowMorningBg] = useState(false);
   const [followedAction, setFollowedAction] = useState<BedtimeOutcome["followedAction"] | null>(null);
   const [busy, setBusy] = useState(false);
   const [prefilledFromCgm, setPrefilledFromCgm] = useState(false);
@@ -75,6 +81,7 @@ export function BedtimeOutcomeCheckinDialog({ open, onOpenChange, log, onSaved }
     if (open) {
       setFeel(null);
       setMorningBg("");
+      setShowMorningBg(false);
       setFollowedAction(null);
       setPrefilledFromCgm(false);
     }
@@ -92,7 +99,9 @@ export function BedtimeOutcomeCheckinDialog({ open, onOpenChange, log, onSaved }
 
   if (!log) return null;
 
+  const recap = describeLastNightCheck(log);
   const askFollowed = actionSuggestedLabel(log) != null;
+  const showCgmChecking = cgmLoading && feel == null;
 
   const handleSkip = () => {
     dismissBedtimeOutcomePrompt(log.id);
@@ -126,9 +135,18 @@ export function BedtimeOutcomeCheckinDialog({ open, onOpenChange, log, onSaved }
         }
       }
       storage.updateBedtimeLog(log.id, patch);
+      const result = buildOvernightCheckinTakeaway(
+        log,
+        {
+          overnightFeel: feel,
+          followedAction: outcome.followedAction,
+          morningBg: outcome.morningBg,
+        },
+        logs,
+      );
       toast({
-        title: "Thanks for the update",
-        description: "This helps tailor future bedtime guidance to your own nights.",
+        title: result.headline,
+        description: result.recommendations[0] ?? result.body,
       });
       onOpenChange(false);
       onSaved?.();
@@ -137,103 +155,77 @@ export function BedtimeOutcomeCheckinDialog({ open, onOpenChange, log, onSaved }
     }
   };
 
-  const checkBgLabel = `${log.currentBg} ${log.bgUnits}`;
-  const showCgmChecking = cgmLoading && feel == null;
+  const recapBits = [
+    recap.bgLine.replace(/^Bedtime check was /, ""),
+    recap.actionLine?.replace(/^We suggested /, ""),
+    ...recap.contextChips,
+  ].filter(Boolean);
 
   return (
     <AlertDialog open={open} onOpenChange={handleOpenChange}>
       <AlertDialogContent className="max-w-md" data-testid="dialog-bedtime-outcome-checkin">
         <AlertDialogHeader>
-          <AlertDialogTitle className="flex items-center gap-2">
-            <Moon className="h-5 w-5 text-primary shrink-0" aria-hidden />
+          <AlertDialogTitle className="flex items-center gap-2 text-left">
+            <Moon className="h-5 w-5 shrink-0 text-primary" aria-hidden />
             How did last night go?
           </AlertDialogTitle>
           <AlertDialogDescription asChild>
-            <div className="text-left space-y-4 text-sm text-muted-foreground">
+            <div className="space-y-3 text-left text-sm text-muted-foreground">
+              <p className="text-[13px] leading-snug text-foreground/80">
+                {recapBits.join(" · ")}
+              </p>
+
               {prefilledFromCgm ? (
-                <p className="flex items-start gap-1.5 text-foreground/90" data-testid="text-bedtime-outcome-cgm-prefilled">
-                  <Radio className="h-3.5 w-3.5 shrink-0 translate-y-0.5 text-primary" aria-hidden />
+                <p className="flex items-start gap-1.5 text-[13px] text-foreground/90" data-testid="text-bedtime-outcome-cgm-prefilled">
+                  <Radio className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
                   <span>
-                    Filled in from your connected CGM for last night — check it looks right, then save.
+                    {cgmInsight?.headline
+                      ? `${cgmInsight.headline}. Change it if that’s wrong, then save.`
+                      : "Filled in from your CGM — change it if that’s wrong, then save."}
                   </span>
+                </p>
+              ) : showCgmChecking ? (
+                <p className="flex items-center gap-1.5 text-xs">
+                  <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+                  Checking your CGM…
                 </p>
               ) : (
-                <p>
-                  Your bedtime check was {checkBgLabel}. Tell us what actually happened overnight so future checks
-                  can reflect your own patterns.
-                  {showCgmChecking ? (
-                    <span className="mt-1.5 flex items-center gap-1.5 text-xs">
-                      <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
-                      Checking your connected CGM — this may fill itself in…
-                    </span>
-                  ) : null}
-                </p>
+                <p className="text-[13px]">One tap is enough — we’ll use it on similar nights.</p>
               )}
 
-              <div className="space-y-1.5">
-                <span className="text-xs font-medium text-muted-foreground">Overnight, glucose was mostly…</span>
-                <div
-                  className="grid grid-cols-2 gap-1.5"
-                  role="group"
-                  aria-label="Overnight glucose result"
-                >
-                  {FEEL_OPTIONS.map(({ value, label, Icon }) => (
-                    <Button
-                      key={value}
-                      type="button"
-                      variant={feel === value ? "default" : "outline"}
-                      size="sm"
-                      className={cn(
-                        "h-10 min-h-0 justify-start gap-1.5 rounded-lg px-2.5 text-xs shadow-none sm:text-sm",
-                        feel === value ? "" : "text-muted-foreground",
-                      )}
-                      onClick={() => {
-                        setPrefilledFromCgm(false);
-                        setFeel(value);
-                      }}
-                      disabled={busy}
-                      data-testid={`button-bedtime-outcome-feel-${value}`}
-                    >
-                      <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                      {label}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="bedtime-outcome-morning-bg" className="text-xs font-medium text-muted-foreground">
-                  Actual BG this morning (optional)
-                </Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="bedtime-outcome-morning-bg"
-                    type="number"
-                    step="0.1"
-                    inputMode="decimal"
-                    placeholder={log.bgUnits === "mmol/L" ? "e.g. 6.5" : "e.g. 115"}
-                    value={morningBg}
-                    onChange={(e) => {
+              <div
+                className="grid grid-cols-2 gap-1.5"
+                role="group"
+                aria-label="Overnight glucose result"
+              >
+                {FEEL_OPTIONS.map(({ value, label, Icon }) => (
+                  <Button
+                    key={value}
+                    type="button"
+                    variant={feel === value ? "default" : "outline"}
+                    size="sm"
+                    className={cn(
+                      "h-10 min-h-0 justify-start gap-1.5 rounded-xl px-2.5 text-[13px] shadow-none",
+                      feel === value ? "" : "text-foreground",
+                    )}
+                    onClick={() => {
                       setPrefilledFromCgm(false);
-                      setMorningBg(e.target.value);
+                      setFeel(value);
                     }}
                     disabled={busy}
-                    className="h-10 flex-1 text-base"
-                    data-testid="input-bedtime-outcome-morning-bg"
-                  />
-                  <span className="flex h-10 items-center rounded-md border border-border/60 bg-muted/30 px-2.5 text-sm font-medium text-muted-foreground">
-                    {log.bgUnits}
-                  </span>
-                </div>
+                    data-testid={`button-bedtime-outcome-feel-${value}`}
+                  >
+                    <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    {label}
+                  </Button>
+                ))}
               </div>
 
               {askFollowed ? (
-                <div className="space-y-1.5">
-                  <span className="text-xs font-medium text-muted-foreground">
-                    Did you follow {actionSuggestedLabel(log)}?
-                  </span>
+                <div className="flex items-center gap-2">
+                  <span className="shrink-0 text-[12px] text-muted-foreground">Followed {actionSuggestedLabel(log)}?</span>
                   <div
-                    className="flex gap-1 rounded-lg border border-border/60 bg-muted/30 p-0.5"
+                    className="flex min-w-0 flex-1 gap-1 rounded-xl border border-border/60 bg-muted/25 p-0.5"
                     role="group"
                     aria-label="Followed suggested action"
                   >
@@ -244,7 +236,7 @@ export function BedtimeOutcomeCheckinDialog({ open, onOpenChange, log, onSaved }
                         variant={followedAction === opt.value ? "default" : "ghost"}
                         size="sm"
                         className={cn(
-                          "h-9 min-h-0 flex-1 rounded-md px-1 text-xs shadow-none sm:text-sm",
+                          "h-8 min-h-0 flex-1 rounded-lg px-1 text-xs shadow-none",
                           followedAction === opt.value ? "" : "text-muted-foreground",
                         )}
                         onClick={() => setFollowedAction(opt.value)}
@@ -258,9 +250,37 @@ export function BedtimeOutcomeCheckinDialog({ open, onOpenChange, log, onSaved }
                 </div>
               ) : null}
 
-              <p className="text-xs italic">
-                Educational only — this never changes how your correction dose is calculated.
-              </p>
+              {showMorningBg ? (
+                <div className="flex gap-2">
+                  <Input
+                    id="bedtime-outcome-morning-bg"
+                    type="number"
+                    step="0.1"
+                    inputMode="decimal"
+                    placeholder={log.bgUnits === "mmol/L" ? "Morning BG" : "Morning BG"}
+                    value={morningBg}
+                    onChange={(e) => {
+                      setPrefilledFromCgm(false);
+                      setMorningBg(e.target.value);
+                    }}
+                    disabled={busy}
+                    className="h-10 flex-1 text-base"
+                    data-testid="input-bedtime-outcome-morning-bg"
+                  />
+                  <span className="flex h-10 items-center rounded-xl border border-border/60 bg-muted/30 px-2.5 text-sm font-medium text-muted-foreground">
+                    {log.bgUnits}
+                  </span>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="text-[12px] font-medium text-primary underline-offset-2 hover:underline"
+                  onClick={() => setShowMorningBg(true)}
+                  data-testid="button-bedtime-outcome-add-morning-bg"
+                >
+                  Add morning BG
+                </button>
+              )}
             </div>
           </AlertDialogDescription>
         </AlertDialogHeader>

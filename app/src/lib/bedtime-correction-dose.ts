@@ -8,27 +8,33 @@ export type BedtimeHighSeverity = "moderate" | "high" | "very_high";
 /**
  * How far above target the current reading is, independent of the trend arrow. A flat or
  * falling reading that's only just above target and one that's dangerously high both used to
- * get the same base caution share — this is what lets a very high reading (e.g. 16+ mmol/L
+ * get the same base caution share — this is what lets a very high reading (e.g. 15+ mmol/L
  * against a target of 10) push toward a fuller correction even when it isn't currently rising,
  * since staying that high overnight carries its own real risk, not just the risk of a later low.
  */
 export function classifyBedtimeHighSeverity(bgMmol: number, targetHighMmol: number): BedtimeHighSeverity {
   const excess = bgMmol - targetHighMmol;
-  if (excess > 6) return "very_high";
+  if (excess > 5) return "very_high";
   if (excess > 2) return "high";
   return "moderate";
 }
 
 /**
- * Floor on the *combined* multiplier (trend share × remaining-after-IOB share) once severity is
- * elevated — otherwise a fresh dose (steep IOB cut) stacked with standard bedtime caution can
- * crush a severe high down to almost nothing, which is what produced a 1u suggestion at 16.4
- * mmol/L. Skipped when there's a genuine reason to expect glucose to keep dropping on its own
+ * Floor on the *combined* multiplier (trend share × remaining-after-IOB share × extras) once
+ * severity is elevated — otherwise a fresh dose (steep IOB cut) stacked with bedtime caution and
+ * alcohol/exercise can crush a severe high down to almost nothing. A 15 mmol/L bedtime reading
+ * that is expected to rise further is a high-overnight-glucose problem first; delayed-alcohol
+ * lows still belong as a warning, but should not keep the share down at ~30%.
+ * Skipped when there's a genuine reason to expect glucose to keep dropping on its own
  * (currently falling, or the user says they usually fall overnight) — that caution should stand.
  */
-function correctionSeverityFloor(severity: BedtimeHighSeverity): number {
-  if (severity === "very_high") return 0.45;
-  if (severity === "high") return 0.3;
+function correctionSeverityFloor(
+  severity: BedtimeHighSeverity,
+  overnightUsualTrend: OvernightUsualTrend,
+): number {
+  const rise = overnightUsualTrend === "rise";
+  if (severity === "very_high") return rise ? 0.55 : 0.45;
+  if (severity === "high") return rise ? 0.45 : 0.3;
   return 0;
 }
 
@@ -230,7 +236,7 @@ function iobWarningForHours(insulinHours: number): string {
     return "You have significant active insulin from less than 1 hour ago. This may bring you down on its own.";
   }
   if (insulinHours < 2) {
-    return "You still have active insulin from your recent dose. It may bring you down further.";
+    return "Recent insulin is still active. It may bring you down further — that's the main reason this is smaller than a full correction.";
   }
   if (insulinHours < 4) {
     return "Some insulin is still active from earlier. A smaller correction accounts for this.";
@@ -341,7 +347,7 @@ export function calculateBedtimeCorrectionDose(params: {
   const rawMultiplier = bedtimeReduction * (1 - iobReduction) * extraCautionMultiplier;
   const effectiveMultiplier = expectingDrop
     ? rawMultiplier
-    : Math.max(rawMultiplier, correctionSeverityFloor(severity));
+    : Math.max(rawMultiplier, correctionSeverityFloor(severity, overnightUsualTrend));
 
   const rawEffective = fullDose * effectiveMultiplier;
   const suggestedDose = Math.round(rawEffective);
@@ -369,7 +375,7 @@ export function calculateBedtimeCorrectionDose(params: {
   let alcoholWarning = "";
   if (hadAlcohol) {
     alcoholWarning =
-      "Alcohol can cause delayed lows, so we've made this suggestion more cautious. Correcting at bedtime after drinking carries extra risk.";
+      "Alcohol can cause delayed lows later tonight, so this stays a cautious share — not a full correction.";
   }
 
   let hypoWarning = "";

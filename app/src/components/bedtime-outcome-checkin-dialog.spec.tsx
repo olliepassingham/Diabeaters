@@ -99,15 +99,15 @@ describe("BedtimeOutcomeCheckinDialog", () => {
   it("shows a checking indicator while CGM history is still loading", () => {
     mockCgmInsight = { insight: null, loading: true };
     render(<BedtimeOutcomeCheckinDialog open onOpenChange={() => {}} log={baseLog()} />);
-    expect(screen.getByText(/Checking your connected CGM/i)).toBeTruthy();
+    expect(screen.getByText(/Checking your CGM/i)).toBeTruthy();
   });
 
-  it("pre-fills feel and morning BG from a steady CGM insight, enabling Save immediately", () => {
+  it("pre-fills feel from a steady CGM insight, enabling Save immediately", () => {
     mockCgmInsight = { insight: baseInsight(), loading: false };
     render(<BedtimeOutcomeCheckinDialog open onOpenChange={() => {}} log={baseLog()} />);
 
     expect(screen.getByTestId("text-bedtime-outcome-cgm-prefilled")).toBeTruthy();
-    expect((screen.getByTestId("input-bedtime-outcome-morning-bg") as HTMLInputElement).value).toBe("6.2");
+    expect(screen.queryByTestId("input-bedtime-outcome-morning-bg")).toBeNull();
     expect((screen.getByTestId("button-bedtime-outcome-save") as HTMLButtonElement).disabled).toBe(false);
   });
 
@@ -124,13 +124,14 @@ describe("BedtimeOutcomeCheckinDialog", () => {
     );
   });
 
-  it("clears the CGM-prefilled note once the user edits the morning BG manually", () => {
+  it("stores the CGM morning reading even when the extra field stays hidden", () => {
     mockCgmInsight = { insight: baseInsight(), loading: false };
     render(<BedtimeOutcomeCheckinDialog open onOpenChange={() => {}} log={baseLog()} />);
-    expect(screen.getByTestId("text-bedtime-outcome-cgm-prefilled")).toBeTruthy();
-
-    fireEvent.change(screen.getByTestId("input-bedtime-outcome-morning-bg"), { target: { value: "9.9" } });
-    expect(screen.queryByTestId("text-bedtime-outcome-cgm-prefilled")).toBeNull();
+    fireEvent.click(screen.getByTestId("button-bedtime-outcome-save"));
+    expect(mockUpdateBedtimeLog).toHaveBeenCalledWith(
+      "log-1",
+      expect.objectContaining({ outcome: expect.objectContaining({ morningBg: 6.2 }) }),
+    );
   });
 
   it("clears the CGM-prefilled note once the user taps a different feel option", () => {
@@ -165,8 +166,27 @@ describe("BedtimeOutcomeCheckinDialog", () => {
         log={baseLog({ actionSuggested: "correction" })}
       />,
     );
-    expect(screen.getByText(/Did you follow the suggested correction/i)).toBeTruthy();
+    expect(screen.getByText(/Followed the correction/i)).toBeTruthy();
     expect(screen.getByTestId("button-bedtime-outcome-followed-yes")).toBeTruthy();
+    expect(screen.getByText(/7\.2 mmol\/L/i)).toBeTruthy();
+  });
+
+  it("closes as soon as the night is saved, with the tip in a toast", () => {
+    const onOpenChange = vi.fn();
+    render(
+      <BedtimeOutcomeCheckinDialog
+        open
+        onOpenChange={onOpenChange}
+        log={baseLog({ actionSuggested: "correction" })}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("button-bedtime-outcome-feel-went_high"));
+    fireEvent.click(screen.getByTestId("button-bedtime-outcome-followed-no"));
+    fireEvent.click(screen.getByTestId("button-bedtime-outcome-save"));
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({ title: expect.stringMatching(/skipping/i) }),
+    );
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
   it("skip dismisses without saving", () => {

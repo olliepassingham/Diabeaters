@@ -95,6 +95,38 @@ function buildWarnings(
   return warnings;
 }
 
+function compactWhyLine(correction: BedtimeCorrectionData): string {
+  const iob = Boolean(correction.iobWarning);
+  const alcohol = Boolean(correction.alcoholWarning);
+  const exercise = Boolean(correction.exerciseWarning);
+  if (iob && alcohol) return "Held back mainly for recent insulin, with extra caution for alcohol.";
+  if (iob && exercise) return "Held back mainly for recent insulin, with extra caution after exercise.";
+  if (iob) return "Held back for insulin still on board.";
+  if (alcohol && exercise) return "Held back for exercise and delayed lows after alcohol.";
+  if (alcohol) return "Held back for delayed lows after alcohol.";
+  if (exercise) return "Held back because exercise can raise overnight sensitivity.";
+  if (correction.overnightTrendNote) return correction.overnightTrendNote;
+  return "";
+}
+
+function reasonChips(correction: BedtimeCorrectionData): { id: string; label: string }[] {
+  const chips: { id: string; label: string }[] = [];
+  if (correction.iobWarning) chips.push({ id: "iob", label: "Active insulin" });
+  if (correction.alcoholWarning) chips.push({ id: "alcohol", label: "Alcohol" });
+  if (correction.exerciseWarning) chips.push({ id: "exercise", label: "Exercise" });
+  if (correction.hypoWarning) chips.push({ id: "hypo", label: "Recent hypo" });
+  if (/rise overnight/i.test(correction.overnightTrendNote)) chips.push({ id: "rise", label: "Usually rises" });
+  else if (/fall overnight/i.test(correction.overnightTrendNote)) chips.push({ id: "fall", label: "Usually falls" });
+  return chips;
+}
+
+function compactWarningText(warning: WarningItem): string {
+  if (warning.id === "iob") return "Recent insulin is still active — that's why this is less than a full correction.";
+  if (warning.id === "alcohol") return "Alcohol can cause delayed lows later tonight.";
+  if (warning.id === "exercise") return "Exercise can raise insulin sensitivity overnight.";
+  return warning.text;
+}
+
 const iconClasses = {
   amber: "text-amber-600 dark:text-amber-400",
   red: "text-red-600 dark:text-red-400",
@@ -182,6 +214,8 @@ export function BedtimeCorrectionPanel({
 }) {
   const warnings = buildWarnings(correction, hoursUntilSleep);
   const topWarning = warnings[0];
+  const chips = reasonChips(correction);
+  const why = compactWhyLine(correction);
 
   if (variant === "details") {
     return (
@@ -206,7 +240,7 @@ export function BedtimeCorrectionPanel({
       >
         <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
           <Badge variant="secondary" className="rounded-full px-2.5 text-xs font-medium">
-            ~{correction.pctOfFullDose}% of full dose
+            {correction.suggestedDose}u of {correction.fullDose}u
           </Badge>
           <span className="text-sm tabular-nums text-muted-foreground">
             <span data-testid="text-correction-current-bg">{correction.currentBg}</span>
@@ -214,14 +248,21 @@ export function BedtimeCorrectionPanel({
             <span data-testid="text-correction-target-bg">{correction.targetBg}</span> {correction.bgUnits}
           </span>
         </div>
-        <p className="mx-auto mt-2 max-w-sm text-xs leading-relaxed text-muted-foreground">{correction.trendNote}</p>
-        {correction.overnightTrendNote ? (
-          <p
-            className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-muted-foreground"
-            data-testid="text-correction-overnight-note-compact"
-          >
-            {correction.overnightTrendNote}
-          </p>
+        {chips.length > 0 ? (
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
+            {chips.map((chip) => (
+              <span
+                key={chip.id}
+                data-testid={`chip-correction-${chip.id}`}
+                className="rounded-full bg-background/70 px-2.5 py-1 text-[11px] font-medium text-foreground ring-1 ring-border/50"
+              >
+                {chip.label}
+              </span>
+            ))}
+          </div>
+        ) : null}
+        {why ? (
+          <p className="mx-auto mt-2.5 max-w-sm text-sm leading-snug text-foreground/85">{why}</p>
         ) : null}
       </ScenarioResultHero>
 
@@ -231,14 +272,8 @@ export function BedtimeCorrectionPanel({
             const Icon = topWarning.icon;
             return <Icon className={cn("mt-0.5 h-4 w-4 shrink-0", iconClasses[topWarning.tone])} aria-hidden />;
           })()}
-          <span data-testid={topWarning.testId}>{topWarning.text}</span>
+          <span data-testid={topWarning.testId}>{compactWarningText(topWarning)}</span>
         </div>
-      ) : null}
-
-      {warnings.length > 1 ? (
-        <p className="text-center text-xs text-muted-foreground">
-          +{warnings.length - 1} more note{warnings.length - 1 === 1 ? "" : "s"} in full breakdown
-        </p>
       ) : null}
     </div>
   );

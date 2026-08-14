@@ -1526,6 +1526,7 @@ export default function Bedtime() {
         open={outcomeCheckinOpen}
         onOpenChange={setOutcomeCheckinOpen}
         log={outcomeCheckinLog}
+        logs={bedtimeLogs}
         onSaved={refreshBedtimeLogs}
       />
     </PageShell>

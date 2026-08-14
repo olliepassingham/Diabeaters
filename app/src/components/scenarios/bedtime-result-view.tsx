@@ -216,7 +216,7 @@ export function BedtimeResultView({
         </div>
       ) : null}
 
-      {topGuidance.length > 0 ? (
+      {result.action.kind !== "correction" && topGuidance.length > 0 ? (
         <div className="rounded-[1.35rem] border border-border/50 bg-card/70 px-4 py-3.5 backdrop-blur-sm">
           <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">Next steps</p>
           <ul className="mt-2.5 space-y-2.5" aria-label="Bedtime guidance">

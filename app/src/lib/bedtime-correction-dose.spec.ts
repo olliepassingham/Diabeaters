@@ -12,6 +12,7 @@ describe("classifyBedtimeHighSeverity", () => {
   it("is moderate close to target, high a bit further, very_high once far above", () => {
     expect(classifyBedtimeHighSeverity(11, 10)).toBe("moderate");
     expect(classifyBedtimeHighSeverity(13, 10)).toBe("high");
+    expect(classifyBedtimeHighSeverity(15.4, 10)).toBe("very_high");
     expect(classifyBedtimeHighSeverity(17, 10)).toBe("very_high");
   });
 });
@@ -367,6 +368,44 @@ describe("calculateBedtimeCorrectionDose", () => {
       } else {
         expect(usuallyFalls.status).toBe("dose_too_small");
       }
+    });
+  });
+
+  describe("high bedtime reading with alcohol, IOB, and a usual overnight rise", () => {
+    // Reported: 15.4 mmol/L, stable, alcohol, insulin in the last couple of hours, usual overnight
+    // rise. Stacked caution used to land around 33% / 2u — too small if levels typically climb.
+    const reported = {
+      bgMmol: 15.4,
+      targetLowMmol: 4,
+      targetHighMmol: 10,
+      correctionFactor: 1.65,
+      bgUnits: "mmol/L" as const,
+      insulinHours: 1.5,
+      bgTrend: "steady" as const,
+      overnightUsualTrend: "rise" as const,
+      exercisedToday: false,
+      hadAlcohol: true,
+      recentHypos: false,
+      sickDayActive: false,
+    };
+
+    it("keeps a meaningful share of the full correction instead of ~33%", () => {
+      const result = calculateBedtimeCorrectionDose(reported);
+      expect(result.status).toBe("dose");
+      if (result.status !== "dose") return;
+      expect(result.pctOfFullDose).toBeGreaterThanOrEqual(45);
+      expect(result.suggestedDose).toBeGreaterThanOrEqual(3);
+      expect(result.alcoholWarning).toMatch(/alcohol/i);
+      expect(result.iobWarning).toMatch(/insulin/i);
+    });
+
+    it("is still more cautious than the same night without alcohol", () => {
+      const withAlcohol = calculateBedtimeCorrectionDose(reported);
+      const without = calculateBedtimeCorrectionDose({ ...reported, hadAlcohol: false });
+      expect(withAlcohol.status).toBe("dose");
+      expect(without.status).toBe("dose");
+      if (withAlcohol.status !== "dose" || without.status !== "dose") return;
+      expect(withAlcohol.suggestedDose).toBeLessThanOrEqual(without.suggestedDose);
     });
   });
 });

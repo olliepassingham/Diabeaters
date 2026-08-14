@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { buildOutcomePatternTip, summarizeOutcomeAccuracy, type BedtimeOutcomeContext } from "@/lib/bedtime-outcome-insights";
+import {
+  buildOutcomePatternTip,
+  buildOvernightCheckinTakeaway,
+  describeLastNightCheck,
+  summarizeOutcomeAccuracy,
+  type BedtimeOutcomeContext,
+} from "@/lib/bedtime-outcome-insights";
 import type { BedtimeLog, BedtimeOutcome } from "@/lib/storage";
 
 function recentDate(daysAgo: number): string {
@@ -60,7 +66,7 @@ describe("buildOutcomePatternTip", () => {
     ];
     const tip = buildOutcomePatternTip(logs, exerciseCorrectionContext);
     expect(tip).not.toBeNull();
-    expect(tip).toMatch(/going low 3 of 4/);
+    expect(tip).toMatch(/gone low 3 of 4/);
   });
 
   it("returns null when outcomes are mixed with no clear majority", () => {
@@ -117,5 +123,63 @@ describe("summarizeOutcomeAccuracy", () => {
       makeLog({ readinessLevel: "steady", outcome: makeOutcome({ overnightFeel: "steady" }) }),
     ];
     expect(summarizeOutcomeAccuracy(logs)).toBeNull();
+  });
+});
+
+describe("describeLastNightCheck", () => {
+  it("names the suggested correction and context chips", () => {
+    const recap = describeLastNightCheck(
+      makeLog({ currentBg: 15.4, actionSuggested: "correction", exercisedToday: true }),
+    );
+    expect(recap.bgLine).toMatch(/15\.4 mmol\/L/);
+    expect(recap.actionLine).toMatch(/correction/i);
+    expect(recap.contextChips).toContain("Exercise");
+  });
+});
+
+describe("buildOvernightCheckinTakeaway", () => {
+  it("recommends hypo treatment when a followed correction still went low", () => {
+    const takeaway = buildOvernightCheckinTakeaway(
+      makeLog({ actionSuggested: "correction" }),
+      { overnightFeel: "went_low", followedAction: "yes" },
+    );
+    expect(takeaway.headline).toMatch(/still went low/i);
+    expect(takeaway.recommendations.join(" ")).toMatch(/hypo treatment/i);
+    expect(takeaway.nextCheckNote).toMatch(/never changes how a correction dose is calculated/i);
+  });
+
+  it("flags skipping a correction then waking high", () => {
+    const takeaway = buildOvernightCheckinTakeaway(
+      makeLog({ actionSuggested: "correction" }),
+      { overnightFeel: "went_high", followedAction: "no" },
+    );
+    expect(takeaway.headline).toMatch(/skipping/i);
+    expect(takeaway.body).toMatch(/woke high/i);
+  });
+
+  it("treats a followed correction that stayed steady as a positive pattern", () => {
+    const takeaway = buildOvernightCheckinTakeaway(
+      makeLog({ actionSuggested: "correction" }),
+      { overnightFeel: "steady", followedAction: "yes" },
+    );
+    expect(takeaway.headline).toMatch(/worked/i);
+    expect(takeaway.body).toMatch(/positive pattern/i);
+  });
+
+  it("counts prior similar nights in the recommendations", () => {
+    const prior = makeLog({
+      id: "older",
+      date: recentDate(4),
+      exercisedToday: true,
+      actionSuggested: "correction",
+      outcome: makeOutcome({ overnightFeel: "went_low" }),
+    });
+    const current = makeLog({ id: "tonight", exercisedToday: true, actionSuggested: "correction" });
+    const takeaway = buildOvernightCheckinTakeaway(
+      current,
+      { overnightFeel: "went_low", followedAction: "yes" },
+      [prior],
+    );
+    expect(takeaway.recommendations[0]).toMatch(/2 similar nights/i);
   });
 });
