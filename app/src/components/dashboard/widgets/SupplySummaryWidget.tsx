@@ -10,6 +10,7 @@ import { WidgetCard } from "./WidgetCard";
 import type { DashboardWidgetLayoutProps } from "./types";
 import { cn } from "@/lib/utils";
 import { HomeCardEmpty } from "@/components/home/home-ui";
+import { SupplyRunwayFill } from "@/components/visualizations/supply-runway-fill";
 
 const typeIcons: Record<string, typeof Package> = {
   needle: Syringe,
@@ -116,7 +117,7 @@ export function SupplySummaryWidget(_props: DashboardWidgetLayoutProps) {
       className={cn("overflow-visible", hasAlerts && "ring-1 ring-amber-500/35 dark:ring-amber-400/25")}
       data-testid="widget-supply-summary"
     >
-      <CardHeader className="p-4 pb-1.5 md:p-6 md:pb-2">
+      <CardHeader className="p-4 pb-2 md:p-6 md:pb-2">
         <div className="flex items-center justify-between gap-2">
           <Link href="/supplies">
             <div className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer min-w-0">
@@ -130,9 +131,6 @@ export function SupplySummaryWidget(_props: DashboardWidgetLayoutProps) {
             </Badge>
           )}
         </div>
-        <p className="text-small text-muted-foreground uppercase tracking-wide mt-0.5">
-          {supplies.length > 0 ? "Stock & estimated run-out · tap an item to open it" : null}
-        </p>
       </CardHeader>
       <CardContent className="flex flex-col gap-2.5 p-4 pt-0 md:px-6 md:pb-5">
         {supplies.length === 0 ? (
@@ -168,8 +166,6 @@ export function SupplySummaryWidget(_props: DashboardWidgetLayoutProps) {
               const actualDays = storage.getDaysRemaining(s);
               const daysForBar = Math.min(actualDays, 90);
               const barWidth = maxDaysForBar > 0 ? Math.max((daysForBar / maxDaysForBar) * 100, 2) : 2;
-              const barColor =
-                status === "critical" ? "bg-red-500" : status === "low" ? "bg-amber-500" : "bg-emerald-500";
               const runOutDate = storage.getRunOutDate(s);
 
               return (
@@ -177,13 +173,13 @@ export function SupplySummaryWidget(_props: DashboardWidgetLayoutProps) {
                   key={s.id}
                   href={`/supplies?supply=${encodeURIComponent(s.id)}`}
                   className={cn(
-                    "block space-y-1 rounded-lg border border-border/70 bg-card/60 px-2 py-1.5 text-left no-underline transition-colors outline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                    "block space-y-1.5 rounded-xl border border-border/50 bg-background/50 px-2.5 py-2 text-left no-underline transition-colors outline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                     status === "critical" &&
-                      "border-red-500/40 bg-red-500/[0.06] dark:border-red-500/30 dark:bg-red-950/25",
+                      "border-red-500/35 bg-red-500/[0.05] dark:border-red-500/25 dark:bg-red-950/20",
                     status === "low" &&
-                      "border-amber-500/35 bg-amber-500/[0.05] dark:border-amber-400/25 dark:bg-amber-950/20",
+                      "border-amber-500/30 bg-amber-500/[0.04] dark:border-amber-400/20 dark:bg-amber-950/15",
                     status === "ok" &&
-                      "hover:border-cyan-500/30 hover:bg-cyan-500/[0.04] dark:hover:border-cyan-500/20 dark:hover:bg-cyan-950/15"
+                      "hover:border-cyan-500/25 hover:bg-cyan-500/[0.04] dark:hover:border-cyan-500/20 dark:hover:bg-cyan-950/15"
                   )}
                   data-testid={`supply-summary-row-${s.id}`}
                 >
@@ -232,9 +228,7 @@ export function SupplySummaryWidget(_props: DashboardWidgetLayoutProps) {
                       </div>
                     </div>
                   </div>
-                  <div className="h-1 overflow-hidden rounded-full bg-muted">
-                    <div className={cn("h-full rounded-full transition-all", barColor)} style={{ width: `${barWidth}%` }} />
-                  </div>
+                  <SupplyRunwayFill fillPercent={barWidth} status={status} className="h-1.5" />
                 </Link>
               );
             })}

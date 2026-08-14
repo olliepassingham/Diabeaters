@@ -29,6 +29,8 @@ import { ToastAction } from "@/components/ui/toast";
 import { SupplyRunwayAtAGlance } from "@/components/visualizations/supply-runway-at-glance";
 import { addLocalSupplyEvent, enqueueSupplyEventForCloud, inferDailyUsageFromLocalEvents, listLocalSupplyEvents } from "@/lib/supply-events";
 import { SettingsGroupLabel, SettingsPanel, SettingsPanelBody } from "@/components/settings/settings-ui";
+import { SupplyRunwayFill } from "@/components/visualizations/supply-runway-fill";
+import { cn } from "@/lib/utils";
 
 const typeIcons: Record<string, any> = {
   needle: Syringe,
@@ -732,34 +734,32 @@ function SupplyCard({
       )}
     </>
   );
-  const runwayPanel =
+  const runwayTone =
     daysRemaining === 999
       ? {
-          wrap: "rounded-xl border border-border/70 bg-background/60",
           labelClass: "text-muted-foreground",
           valueClass: "text-foreground",
           subClass: "text-muted-foreground",
         }
       : status === "critical"
         ? {
-            wrap: "rounded-xl border border-red-500/45 bg-red-500/[0.12] dark:bg-red-950/45 dark:border-red-500/35",
-            labelClass: "text-red-800 dark:text-red-200/90",
-            valueClass: "text-red-950 dark:text-red-50",
-            subClass: "text-red-900/75 dark:text-red-200/70",
+            labelClass: "text-red-700 dark:text-red-300",
+            valueClass: "text-red-700 dark:text-red-300",
+            subClass: "text-red-800/70 dark:text-red-200/70",
           }
         : status === "low"
           ? {
-              wrap: "rounded-xl border border-amber-500/45 bg-amber-500/[0.12] dark:bg-amber-950/40 dark:border-amber-500/35",
-              labelClass: "text-amber-900 dark:text-amber-200/90",
-              valueClass: "text-amber-950 dark:text-amber-50",
-              subClass: "text-amber-900/80 dark:text-amber-200/75",
+              labelClass: "text-amber-700 dark:text-amber-400",
+              valueClass: "text-amber-800 dark:text-amber-300",
+              subClass: "text-amber-800/75 dark:text-amber-200/70",
             }
           : {
-              wrap: "rounded-xl border border-emerald-500/40 bg-emerald-500/[0.11] dark:bg-emerald-950/35 dark:border-emerald-500/30",
-              labelClass: "text-emerald-900 dark:text-emerald-200/90",
-              valueClass: "text-emerald-950 dark:text-emerald-50",
-              subClass: "text-emerald-900/75 dark:text-emerald-200/75",
+              labelClass: "text-muted-foreground",
+              valueClass: "text-foreground",
+              subClass: "text-muted-foreground",
             };
+  const fillPercent =
+    daysRemaining === 999 ? 0 : Math.min(100, Math.max(2, (Math.max(0, daysRemaining) / 30) * 100));
 
   const stockLabel = (() => {
     if (isInsulinType(supply.type)) {
@@ -783,43 +783,45 @@ function SupplyCard({
 
   return (
     <Card
-      className={[
-        "overflow-hidden rounded-[1.35rem] border-border/70",
-        status === "critical"
-          ? "border-red-500/35 bg-red-500/[0.03]"
-          : status === "low"
-            ? "border-amber-500/35 bg-amber-500/[0.03]"
-            : "bg-card",
-      ].join(" ")}
+      className={cn(
+        "relative overflow-hidden rounded-[1.25rem] border-border/50 bg-card shadow-none",
+        status === "critical" && "border-red-500/30",
+        status === "low" && "border-amber-500/30",
+      )}
     >
-      <CardContent className="p-3">
+      <div
+        className={cn(
+          "absolute inset-y-0 left-0 w-[3px]",
+          status === "critical" && "bg-red-500",
+          status === "low" && "bg-amber-500",
+          status === "ok" && "bg-emerald-500/80",
+        )}
+        aria-hidden
+      />
+      <CardContent className="p-3.5 pl-4">
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 flex-1 items-center gap-2.5">
             <div
-              className={[
-                "flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border",
-                status === "critical"
-                  ? "border-red-500/30 bg-red-500/10 dark:bg-red-950/30"
-                  : status === "low"
-                    ? "border-amber-500/25 bg-amber-500/10 dark:bg-amber-950/30"
-                    : "border-border/60 bg-primary/10",
-              ].join(" ")}
+              className={cn(
+                "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
+                status === "critical" && "bg-red-500/12 dark:bg-red-950/40",
+                status === "low" && "bg-amber-500/12 dark:bg-amber-950/35",
+                status === "ok" && "bg-muted/70",
+              )}
             >
               <Icon
-                className={[
+                className={cn(
                   "h-4 w-4",
-                  status === "critical"
-                    ? "text-red-600 dark:text-red-400"
-                    : status === "low"
-                      ? "text-amber-700 dark:text-amber-400"
-                      : "text-primary",
-                ].join(" ")}
+                  status === "critical" && "text-red-600 dark:text-red-400",
+                  status === "low" && "text-amber-700 dark:text-amber-400",
+                  status === "ok" && "text-muted-foreground",
+                )}
                 aria-hidden
               />
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex min-w-0 items-center gap-2">
-                <p className="truncate text-sm font-semibold text-foreground">{supply.name}</p>
+                <p className="truncate text-[15px] font-semibold tracking-tight text-foreground">{supply.name}</p>
                 <button
                   type="button"
                   className="shrink-0"
@@ -835,11 +837,11 @@ function SupplyCard({
                 >
                   <Badge
                     variant="outline"
-                    className={[
-                      "h-5 px-1.5 text-[10px] transition",
+                    className={cn(
+                      "h-5 rounded-full px-1.5 text-[10px] font-medium transition",
                       nextActionBadgeClass,
-                      nextActionNudge > 0 ? "ring-2 ring-primary/30" : "",
-                    ].join(" ")}
+                      nextActionNudge > 0 && "ring-2 ring-primary/30",
+                    )}
                     data-testid={`badge-next-action-${supply.id}`}
                   >
                     {nextAction.label}
@@ -856,7 +858,7 @@ function SupplyCard({
             <Button
               variant="ghost"
               size="icon"
-              className="h-9 w-9"
+              className="h-8 w-8 text-muted-foreground"
               onClick={() => onEdit(supply)}
               aria-label={`Edit ${supply.name}`}
               data-testid={`button-edit-${supply.id}`}
@@ -868,7 +870,7 @@ function SupplyCard({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-9 w-9"
+                  className="h-8 w-8 text-muted-foreground"
                   aria-label={`Delete ${supply.name}`}
                   data-testid={`button-delete-${supply.id}`}
                 >
@@ -893,48 +895,54 @@ function SupplyCard({
           </div>
         </div>
 
-        <div className={`mt-2.5 grid grid-cols-2 gap-2 rounded-lg border p-2 ${runwayPanel.wrap}`}>
-          <div className="min-w-0 border-r border-border/50 pr-2">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Stock</p>
+        <div className="mt-3 flex items-end justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Stock</p>
             <div data-testid={`text-remaining-${supply.id}`}>
-              <p className="text-base font-semibold tabular-nums leading-tight">{stockLabel.primary}</p>
+              <p className="text-lg font-semibold tabular-nums leading-tight tracking-tight">{stockLabel.primary}</p>
               {stockLabel.secondary ? (
-                <p className="text-[10px] text-muted-foreground">{stockLabel.secondary}</p>
+                <p className="text-[11px] text-muted-foreground">{stockLabel.secondary}</p>
               ) : null}
             </div>
           </div>
-          <div className="min-w-0 pl-0.5">
-            <p className={`text-[10px] font-medium uppercase tracking-wide ${runwayPanel.labelClass}`}>Runway</p>
+          <div className="min-w-0 text-right">
+            <p className={cn("text-[10px] font-medium uppercase tracking-[0.14em]", runwayTone.labelClass)}>
+              Runway
+            </p>
             {daysRemaining === 999 ? (
               <>
-                <p className={`text-sm font-semibold leading-tight ${runwayPanel.valueClass}`}>No estimate</p>
-                <Button asChild size="sm" variant="link" className="h-auto p-0 text-[10px]">
+                <p className={cn("text-sm font-semibold leading-tight", runwayTone.valueClass)}>No estimate</p>
+                <Button asChild size="sm" variant="link" className="h-auto p-0 text-[11px]">
                   <Link href="/settings/usage#settings-usage">Set usage</Link>
                 </Button>
               </>
             ) : (
               <>
-                <p className={`text-base font-semibold tabular-nums leading-tight ${runwayPanel.valueClass}`}>
-                  {daysRemaining}d
+                <p className={cn("text-lg font-semibold tabular-nums leading-tight tracking-tight", runwayTone.valueClass)}>
+                  {daysRemaining}
+                  <span className="ml-0.5 text-sm font-medium text-muted-foreground">d</span>
                 </p>
                 {runOutDate ? (
-                  <p className={`text-[10px] ${runwayPanel.subClass}`}>until {format(runOutDate, "d MMM")}</p>
+                  <p className={cn("text-[11px]", runwayTone.subClass)}>until {format(runOutDate, "d MMM")}</p>
                 ) : null}
               </>
             )}
           </div>
         </div>
+        {daysRemaining !== 999 ? (
+          <SupplyRunwayFill fillPercent={fillPercent} status={status} className="mt-2.5 h-1.5" />
+        ) : null}
 
-        <div className="mt-1.5 hidden sm:block">{forecastLine}</div>
+        <div className="mt-2 hidden sm:block">{forecastLine}</div>
 
         <details className="mt-1 hidden sm:block">
           <summary className="cursor-pointer select-none text-[11px] text-muted-foreground">Details</summary>
           <div className="mt-1.5 space-y-1.5 text-xs">{detailsContent}</div>
         </details>
 
-        <details className="group mt-1.5 sm:hidden">
+        <details className="group mt-2 sm:hidden">
           <summary className="list-none cursor-pointer select-none">
-            <div className="flex items-center justify-between rounded-lg border border-border/60 px-2.5 py-1.5 text-[11px] text-muted-foreground">
+            <div className="flex items-center justify-between rounded-xl bg-muted/40 px-2.5 py-1.5 text-[11px] text-muted-foreground">
               <span>More</span>
               <ChevronDown className="h-3.5 w-3.5 group-open:hidden" />
               <ChevronUp className="hidden h-3.5 w-3.5 group-open:block" />
@@ -977,30 +985,30 @@ function SupplyCard({
 
         <div
           ref={actionRowRef}
-          className={[
-            "mt-2.5 flex items-center gap-1.5 border-t border-border/60 pt-2.5 transition",
-            nextActionNudge > 0 ? "rounded-lg ring-2 ring-primary/20" : "",
-          ].join(" ")}
+          className={cn(
+            "mt-3 flex items-center gap-2 rounded-xl bg-muted/35 p-1 transition",
+            nextActionNudge > 0 && "ring-2 ring-primary/20",
+          )}
         >
           <Button
-            variant="default"
+            variant="secondary"
             size="sm"
-            className="h-11 shrink-0 rounded-xl px-3.5"
+            className="h-10 shrink-0 rounded-[0.7rem] px-3.5 shadow-none"
             onClick={() => onLogPickup(supply)}
             data-testid={`button-refill-${supply.id}`}
           >
-            <RotateCcw className="mr-1 h-3 w-3" />
+            <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
             Refill
           </Button>
           {(() => {
             const inc = getSupplyIncrement(supply.type);
             const currentNow = Math.floor(adjustedQuantity);
             return (
-              <div className="flex min-w-0 flex-1 items-center justify-end gap-1">
+              <div className="flex min-w-0 flex-1 items-center justify-end">
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
-                  className="h-11 w-11 rounded-xl px-0 text-base"
+                  className="h-10 w-10 rounded-[0.7rem] px-0 text-base"
                   aria-label="Decrease quantity"
                   onClick={() => {
                     const nextQuantity = Math.max(0, currentNow - inc.amount);
@@ -1017,15 +1025,15 @@ function SupplyCard({
                   −
                 </Button>
                 <span
-                  className="min-w-[2.75rem] text-center text-base font-semibold tabular-nums"
+                  className="min-w-[2.5rem] text-center text-[15px] font-semibold tabular-nums"
                   data-testid={`text-quantity-${supply.id}`}
                 >
                   {Math.floor(adjustedQuantity)}
                 </span>
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
-                  className="h-11 w-11 rounded-xl px-0 text-base"
+                  className="h-10 w-10 rounded-[0.7rem] px-0 text-base"
                   aria-label="Increase quantity"
                   onClick={() => {
                     const nextQuantity = currentNow + inc.amount;
@@ -1047,8 +1055,8 @@ function SupplyCard({
         </div>
 
         {history.length > 0 && (
-          <details className="mt-2 opacity-90 hidden sm:block">
-            <summary className="text-xs text-muted-foreground cursor-pointer select-none">
+          <details className="mt-2 hidden opacity-90 sm:block">
+            <summary className="cursor-pointer select-none text-xs text-muted-foreground">
               History
             </summary>
             <div className="mt-2 space-y-1">
@@ -2057,12 +2065,11 @@ export default function Supplies() {
         <SupplyRunwayAtAGlance supplies={supplies} onSupplyClick={handleTimelineClick} />
       ) : null}
 
-      <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:justify-between">
-        <div className="w-full">
-          <div className="-mx-1 flex gap-2 overflow-x-auto rounded-2xl bg-muted/20 px-1 py-1 [scrollbar-width:thin]">
+      <div className="-mx-1 overflow-x-auto [scrollbar-width:thin]">
+        <div className="flex w-max min-w-full gap-1 rounded-2xl border border-border/50 bg-muted/25 p-1">
             <Button
               onClick={handleAddNew}
-              className="h-11 shrink-0 min-w-0 rounded-xl px-3.5"
+              className="h-10 shrink-0 rounded-xl px-3.5 shadow-none"
               data-testid="button-add-new-supply"
             >
               <Plus className="h-4 w-4 md:mr-1" />
@@ -2071,10 +2078,10 @@ export default function Supplies() {
 
             {usualPrescription && usualPrescription.items.length > 0 ? (
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={handleAddUsualPrescription}
-                className="h-11 shrink-0 min-w-0 rounded-xl px-3.5"
+                className="h-10 shrink-0 rounded-xl px-3"
                 data-testid="button-add-usual-prescription"
               >
                 <ClipboardList className="h-4 w-4 md:mr-1" />
@@ -2083,9 +2090,9 @@ export default function Supplies() {
             ) : null}
 
             <Button
-              variant="outline"
+              variant="ghost"
               onClick={() => setUsualDialogOpen(true)}
-              className="h-11 shrink-0 min-w-0 rounded-xl px-3.5"
+              className="h-10 shrink-0 rounded-xl px-3"
               data-testid="button-edit-usual-prescription"
             >
               <Pencil className="h-4 w-4 md:mr-1" />
@@ -2093,11 +2100,11 @@ export default function Supplies() {
             </Button>
 
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
               onClick={handleUndo}
               disabled={!previousSupplies}
-              className="h-11 shrink-0 rounded-xl px-3.5"
+              className="h-10 shrink-0 rounded-xl px-3"
               data-testid="button-undo"
               aria-label="Undo"
               title="Undo"
@@ -2108,9 +2115,9 @@ export default function Supplies() {
 
             <Link href="/settings/usage#settings-usage">
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                className="h-11 shrink-0 rounded-xl px-3.5"
+                className="h-10 shrink-0 rounded-xl px-3"
                 data-testid="button-usage-settings"
                 aria-label="Habits"
                 title="Habits"
@@ -2121,48 +2128,43 @@ export default function Supplies() {
             </Link>
 
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
-              className="h-11 shrink-0 rounded-xl px-3.5"
+              className="h-10 shrink-0 rounded-xl px-3"
               onClick={() => setReorderDialogOpen(true)}
               data-testid="button-toggle-planning"
             >
               <Calendar className="h-4 w-4 md:mr-1" />
               <span className="ml-1">Reorder</span>
             </Button>
-          </div>
         </div>
       </div>
 
       {(criticalSupplies.length > 0 || lowSupplies.length > 0) && (
-        <Card className="border-amber-500/30 bg-amber-50/40 dark:bg-amber-950/20">
-          <CardContent className="py-3 flex items-center justify-between gap-3">
-            <div className="text-sm">
-              <span className="font-medium">Warnings</span>{" "}
-              <span className="text-muted-foreground">
-                {criticalSupplies.length > 0 ? `${criticalSupplies.length} critical` : null}
-                {criticalSupplies.length > 0 && lowSupplies.length > 0 ? " • " : null}
-                {lowSupplies.length > 0 ? `${lowSupplies.length} low` : null}
-              </span>
-            </div>
-            <div className="flex gap-2 shrink-0">
-              {criticalSupplies.length > 0 && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-8"
-                  onClick={() => handleTimelineClick(criticalSupplies[0].id)}
-                >
-                  Jump
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-amber-500/25 bg-amber-500/[0.08] px-3.5 py-2.5 dark:bg-amber-950/25">
+          <div className="flex min-w-0 items-center gap-2 text-sm">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-400" aria-hidden />
+            <span className="font-medium text-foreground">
+              {criticalSupplies.length > 0 ? `${criticalSupplies.length} critical` : null}
+              {criticalSupplies.length > 0 && lowSupplies.length > 0 ? " · " : null}
+              {lowSupplies.length > 0 ? `${lowSupplies.length} low` : null}
+            </span>
+          </div>
+          {criticalSupplies.length > 0 && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 shrink-0 rounded-xl"
+              onClick={() => handleTimelineClick(criticalSupplies[0].id)}
+            >
+              Jump
+            </Button>
+          )}
+        </div>
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="-mx-1 flex h-auto w-[calc(100%+0.5rem)] gap-1 overflow-x-auto rounded-full bg-muted/45 p-1 [scrollbar-width:thin]">
+        <TabsList className="-mx-1 flex h-auto w-[calc(100%+0.5rem)] gap-0.5 overflow-x-auto rounded-full bg-muted/40 p-1 [scrollbar-width:thin]">
           <TabsTrigger value="all" className="shrink-0 rounded-full" data-testid="tab-all">
             All ({supplies.length})
           </TabsTrigger>
@@ -2188,22 +2190,24 @@ export default function Supplies() {
         </TabsList>
 
         {supplyTabValues.map((tabValue) => (
-          <TabsContent key={tabValue} value={tabValue} className="mt-6 animate-fade-in-up">
+          <TabsContent key={tabValue} value={tabValue} className="mt-4 animate-fade-in-up">
             {filterByType(tabValue).length === 0 ? (
-              <Card className="rounded-[1.35rem] border-border/60">
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <Package className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground text-center">
+              <Card className="rounded-[1.25rem] border-border/50 shadow-none">
+                <CardContent className="flex flex-col items-center justify-center py-14">
+                  <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-muted/60">
+                    <Package className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                  <p className="text-sm text-muted-foreground text-center">
                     No supplies in this category yet.
                   </p>
-                  <Button variant="outline" className="mt-4 h-12 rounded-xl" onClick={handleAddNew} data-testid="button-add-supply-empty">
+                  <Button variant="outline" className="mt-4 h-11 rounded-xl" onClick={handleAddNew} data-testid="button-add-supply-empty">
                     <Plus className="h-4 w-4 mr-2" />
-                    Add Supply
+                    Add supply
                   </Button>
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-3 lg:grid-cols-3">
+              <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 md:gap-3 lg:grid-cols-3">
                 {filterByType(tabValue).map((supply) => (
                   <div
                     key={supply.id}

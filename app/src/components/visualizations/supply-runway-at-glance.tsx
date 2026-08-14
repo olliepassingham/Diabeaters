@@ -1,9 +1,8 @@
 import { useMemo } from "react";
-import { Package } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { storage, type Supply } from "@/lib/storage";
-import { GradientMarkerBar } from "@/components/visualizations/gradient-marker-bar";
+import { SupplyRunwayFill } from "@/components/visualizations/supply-runway-fill";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -13,7 +12,7 @@ type Props = {
 };
 
 /**
- * Single “tightest runway” strip using the same marker-bar language as meal absorption — illustrative forecast only.
+ * Compact “tightest runway” strip — illustrative forecast only.
  */
 export function SupplyRunwayAtAGlance({ supplies, onSupplyClick, className }: Props) {
   const row = useMemo(() => {
@@ -29,50 +28,62 @@ export function SupplyRunwayAtAGlance({ supplies, onSupplyClick, className }: Pr
 
   if (!row) return null;
 
-  const { supply, actualDays } = row;
+  const { supply, actualDays, status } = row;
   const unknown = actualDays >= 999;
-  const markerPosition = unknown ? 0.5 : Math.min(0.97, Math.max(0.03, actualDays / 36));
-
+  const fillPercent = unknown ? 0 : Math.min(100, Math.max(2, (actualDays / 30) * 100));
   const daysLabel = unknown ? "Set usage to estimate" : `${actualDays} day${actualDays === 1 ? "" : "s"} left`;
 
   return (
     <Card
-      className={cn("overflow-hidden rounded-xl border-border/70", className)}
+      className={cn(
+        "overflow-hidden rounded-[1.25rem] border-border/50 shadow-none",
+        status === "critical" && "border-red-500/30 bg-red-500/[0.04] dark:bg-red-950/20",
+        status === "low" && "border-amber-500/30 bg-amber-500/[0.04] dark:bg-amber-950/15",
+        className,
+      )}
       data-testid="card-supply-runway-at-glance"
     >
-      <CardContent className="p-3">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <Package className="h-3.5 w-3.5" aria-hidden />
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">{supply.name}</p>
-              <p className="text-[11px] text-muted-foreground">
-                {unknown ? "Shortest runway — set usage to estimate" : `Shortest runway · ${daysLabel}`}
+      <CardContent className="p-3.5">
+        <div className="flex items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+              Shortest runway
+            </p>
+            <p className="mt-0.5 truncate text-sm font-semibold text-foreground">{supply.name}</p>
+            {!unknown ? (
+              <SupplyRunwayFill fillPercent={fillPercent} status={status} className="mt-2.5 h-1.5" />
+            ) : (
+              <p className="mt-1 text-[11px] text-muted-foreground">{daysLabel}</p>
+            )}
+          </div>
+          <div className="shrink-0 text-right">
+            {unknown ? (
+              <p className="text-sm font-medium text-muted-foreground">—</p>
+            ) : (
+              <p
+                className={cn(
+                  "text-[1.65rem] font-semibold tabular-nums leading-none tracking-tight",
+                  status === "critical" && "text-red-600 dark:text-red-400",
+                  status === "low" && "text-amber-700 dark:text-amber-400",
+                  status === "ok" && "text-foreground",
+                )}
+              >
+                {actualDays}
+                <span className="ml-0.5 text-sm font-medium text-muted-foreground">d</span>
               </p>
-            </div>
+            )}
           </div>
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            className="h-8 shrink-0 px-2 text-xs"
+            className="h-9 shrink-0 rounded-xl px-2.5 text-xs"
             onClick={() => onSupplyClick?.(supply.id)}
             data-testid="button-supply-runway-jump"
           >
             Open
           </Button>
         </div>
-        {!unknown ? (
-          <div className="mt-2">
-            <GradientMarkerBar
-              markerPosition={markerPosition}
-              showEndLabels={false}
-              trackGradientClassName="from-amber-900/90 via-emerald-700 to-emerald-400 dark:from-amber-950 dark:via-emerald-800 dark:to-emerald-300"
-            />
-          </div>
-        ) : null}
       </CardContent>
     </Card>
   );
