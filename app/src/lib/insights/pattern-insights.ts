@@ -17,6 +17,12 @@ export interface PatternInsight {
   tone: PatternInsightTone;
   title: string;
   body: string;
+  /** Short stat for the card, e.g. "7×" or "19 vs 0". */
+  metric?: string;
+  /** Caption under the metric, e.g. "last 4 weeks". */
+  metricHint?: string;
+  /** One educational next step — not dosing advice. */
+  takeaway?: string;
   actionLabel?: string;
   actionHref?: string;
 }
@@ -93,6 +99,11 @@ function detectHypoTimeCluster(hypoDates: Date[], now: Date): PatternInsight | n
     tone: "neutral",
     title: "A pattern in your low times",
     body: `${count} of your ${recent.length} hypos in the last 30 days were between ${start} and ${end}.`,
+    metric: `${start}–${end}`,
+    metricHint: "most common window",
+    takeaway: "If that slot often follows a meal, workout, or delayed snack, note it for clinic — don't change insulin from this screen.",
+    actionLabel: "See when lows happen",
+    actionHref: "/tools/patterns#when-lows",
   };
 }
 
@@ -121,6 +132,11 @@ function detectHypoWeekdayCluster(hypoDates: Date[], now: Date): PatternInsight 
     tone: "neutral",
     title: "A pattern in your low days",
     body: `${bestCount} of your ${recent.length} hypos in the last 6 weeks happened on a ${weekday}.`,
+    metric: weekday.slice(0, 3),
+    metricHint: `${bestCount} of ${recent.length} lows`,
+    takeaway: "If that day has a different routine — work, sport, later meals — it’s worth flagging with your care team.",
+    actionLabel: "See which days",
+    actionHref: "/tools/patterns#which-days",
   };
 }
 
@@ -144,7 +160,10 @@ function detectPostExerciseLows(hypoDates: Date[], exerciseDates: Date[], now: D
     kind: "post_exercise_lows",
     tone: "attention",
     title: "Lows after exercise",
-    body: `You've had a low within 24 hours of exercising ${count} times in the last 4 weeks. A bedtime check on training days can help.`,
+    body: `You've had a low within 24 hours of exercising ${count} times in the last 4 weeks.`,
+    metric: `${count}×`,
+    metricHint: "last 4 weeks",
+    takeaway: "A bedtime check on training days can help catch delayed lows.",
     actionLabel: "Open bedtime guide",
     actionHref: "/scenarios/bedtime",
   };
@@ -173,6 +192,9 @@ function detectHypoFreeStretch(hypoDates: Date[], now: Date): PatternInsight | n
     tone: "positive",
     title: "Longest stretch yet",
     body: `No lows logged in ${fullDays} days — your longest stretch in your recent history.`,
+    metric: `${fullDays}d`,
+    metricHint: "hypo-free",
+    takeaway: "Keep logging as usual so this view stays honest — quiet weeks are still useful data.",
   };
 }
 
@@ -195,6 +217,9 @@ function detectHypoFrequencyTrend(hypoDates: Date[], now: Date): PatternInsight 
       tone: "positive",
       title: "Fewer lows",
       body: `${current} lows in the last 30 days, down from ${previous} the month before.`,
+      metric: `${current} vs ${previous}`,
+      metricHint: "this month vs last",
+      takeaway: "Whatever you changed recently may be worth keeping — mention it at your next clinic if it holds.",
     };
   }
   if (current * 10 >= previous * 15) {
@@ -203,7 +228,10 @@ function detectHypoFrequencyTrend(hypoDates: Date[], now: Date): PatternInsight 
       kind: "hypo_frequency_trend",
       tone: "attention",
       title: "More lows lately",
-      body: `${current} lows in the last 30 days, up from ${previous} the month before. If this doesn't match what you expect, it can be worth mentioning to your care team.`,
+      body: `${current} lows in the last 30 days, up from ${previous} the month before.`,
+      metric: `${current} vs ${previous}`,
+      metricHint: "this month vs last",
+      takeaway: "If this doesn't match what you expect, it can be worth mentioning to your care team.",
       actionLabel: "Hypo help",
       actionHref: "/tools/hypo-help",
     };

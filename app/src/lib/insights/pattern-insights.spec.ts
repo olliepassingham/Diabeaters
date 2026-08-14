@@ -77,7 +77,9 @@ describe("hypo_time_cluster", () => {
     expect(insight!.tone).toBe("neutral");
     expect(insight!.title).toBe("A pattern in your low times");
     expect(insight!.body).toBe("4 of your 6 hypos in the last 30 days were between 3pm and 6pm.");
-    expect(insight!.actionLabel).toBeUndefined();
+    expect(insight!.metric).toBe("3pm–6pm");
+    expect(insight!.actionLabel).toBe("See when lows happen");
+    expect(insight!.actionHref).toBe("/tools/patterns#when-lows");
     expect(insight!.id).toBe("hypo-time-cluster:2026-07");
   });
 
@@ -159,8 +161,10 @@ describe("post_exercise_lows", () => {
     expect(insight!.tone).toBe("attention");
     expect(insight!.title).toBe("Lows after exercise");
     expect(insight!.body).toBe(
-      "You've had a low within 24 hours of exercising 2 times in the last 4 weeks. A bedtime check on training days can help.",
+      "You've had a low within 24 hours of exercising 2 times in the last 4 weeks.",
     );
+    expect(insight!.takeaway).toMatch(/bedtime check/i);
+    expect(insight!.metric).toBe("2×");
     expect(insight!.actionLabel).toBe("Open bedtime guide");
     expect(insight!.actionHref).toBe("/scenarios/bedtime");
     expect(insight!.id).toBe("post-exercise-lows:2026-07");
@@ -250,6 +254,7 @@ describe("hypo_frequency_trend", () => {
     expect(insight!.tone).toBe("positive");
     expect(insight!.title).toBe("Fewer lows");
     expect(insight!.body).toBe("3 lows in the last 30 days, down from 5 the month before.");
+    expect(insight!.metric).toBe("3 vs 5");
     expect(insight!.actionLabel).toBeUndefined();
     expect(insight!.id).toBe("hypo-frequency-trend:2026-07");
   });
@@ -289,9 +294,9 @@ describe("hypo_frequency_trend", () => {
     expect(insight).toBeDefined();
     expect(insight!.tone).toBe("attention");
     expect(insight!.title).toBe("More lows lately");
-    expect(insight!.body).toBe(
-      "6 lows in the last 30 days, up from 4 the month before. If this doesn't match what you expect, it can be worth mentioning to your care team.",
-    );
+    expect(insight!.body).toBe("6 lows in the last 30 days, up from 4 the month before.");
+    expect(insight!.takeaway).toMatch(/care team/i);
+    expect(insight!.metric).toBe("6 vs 4");
     expect(insight!.actionLabel).toBe("Hypo help");
     expect(insight!.actionHref).toBe("/tools/hypo-help");
   });

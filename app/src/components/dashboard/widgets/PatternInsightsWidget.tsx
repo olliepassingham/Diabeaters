@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { LineChart, Sparkles } from "lucide-react";
+import { ChevronRight, LineChart, Sparkles } from "lucide-react";
 import { Link } from "wouter";
 import { WidgetCard } from "./WidgetCard";
 import type { DashboardWidgetLayoutProps } from "./types";
@@ -11,6 +11,7 @@ import { computeHourlyHypoComparison } from "@/lib/insights/pattern-charts";
 import { listDismissedPatternInsightIds } from "@/lib/insights/insights-dismiss";
 import { OverlappingBarChart } from "@/components/patterns/overlapping-bar-chart";
 import { GlucoseDayOverlayChart } from "@/components/patterns/glucose-day-overlay-chart";
+import { PatternInsightCard } from "@/components/patterns/pattern-insight-card";
 import { isCgmPrefillActive } from "@/lib/cgm/preferences";
 import { fetchLiveCgmHistory } from "@/lib/cgm/live-cgm-history";
 import { countCgmLocalHistoryDays, getCgmLocalHistory } from "@/lib/cgm/cgm-history-store";
@@ -100,11 +101,12 @@ export function PatternInsightsWidget(props: DashboardWidgetLayoutProps) {
   const hourlyBuckets = useMemo(() => computeHourlyHypoComparison(hypoDates, new Date()), [hypoDates]);
   const hasHypoChart = !hasGlucoseChart && hypos.length >= MIN_HYPOS_FOR_CHART;
 
-  const topInsight = useMemo(() => {
-    if (hasGlucoseChart) return null;
+  const visibleInsights = useMemo(() => {
     const dismissed = new Set(listDismissedPatternInsightIds());
-    return computePatternInsights({ hypos, exerciseOutcomes }, 3).find((i) => !dismissed.has(i.id)) ?? null;
-  }, [hasGlucoseChart, hypos, exerciseOutcomes]);
+    const limit = compact ? 1 : 2;
+    return computePatternInsights({ hypos, exerciseOutcomes }, 4).filter((i) => !dismissed.has(i.id)).slice(0, limit);
+  }, [compact, hypos, exerciseOutcomes]);
+  const topInsight = visibleInsights[0] ?? null;
 
   if (!hasGlucoseChart && !hasHypoChart && !topInsight && !cgmConnected) return null;
 
@@ -116,17 +118,22 @@ export function PatternInsightsWidget(props: DashboardWidgetLayoutProps) {
     <WidgetCard data-testid="widget-pattern-insights">
       <CardHeader className="p-4 pb-2 md:p-6 md:pb-3">
         <div className="flex items-center justify-between gap-2 min-w-0">
-          <div className="flex items-center gap-2 min-w-0">
+          <Link
+            href="/tools/patterns"
+            className="flex min-w-0 items-center gap-2 hover:opacity-80 transition-opacity"
+            data-testid="link-view-all-patterns"
+          >
             {hasGlucoseChart ? (
               <LineChart className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden />
             ) : (
               <Sparkles className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden />
             )}
             <CardTitle className="text-h3 text-foreground">Your patterns</CardTitle>
-          </div>
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+          </Link>
           {hasGlucoseChart ? (
             <span
-              className="max-w-[55%] shrink-0 truncate text-xs text-muted-foreground"
+              className="max-w-[45%] shrink-0 truncate text-xs text-muted-foreground"
               title={filterSummary}
               data-testid="text-widget-glucose-filter-summary"
             >
@@ -161,11 +168,20 @@ export function PatternInsightsWidget(props: DashboardWidgetLayoutProps) {
           />
         ) : null}
 
-        {topInsight ? (
-          <p className="text-sm leading-snug text-foreground/90" data-testid="pattern-insight-summary">
-            <span className="font-medium">{topInsight.title}.</span>{" "}
-            <span className="text-muted-foreground">{topInsight.body}</span>
-          </p>
+        {visibleInsights.length > 0 ? (
+          <div className="space-y-2">
+            <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+              What we've noticed
+            </p>
+            {visibleInsights.map((insight) => (
+              <PatternInsightCard key={insight.id} insight={insight} compact />
+            ))}
+            {topInsight ? (
+              <p className="sr-only" data-testid="pattern-insight-summary">
+                {topInsight.title}. {topInsight.body}
+              </p>
+            ) : null}
+          </div>
         ) : null}
 
         {showBuildingTeaser ? (
@@ -173,14 +189,6 @@ export function PatternInsightsWidget(props: DashboardWidgetLayoutProps) {
             Still building your daily glucose pattern — check back in a few days.
           </p>
         ) : null}
-
-        <Link
-          href="/tools/patterns"
-          className="inline-flex items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
-          data-testid="link-view-all-patterns"
-        >
-          View all patterns
-        </Link>
       </CardContent>
     </WidgetCard>
   );

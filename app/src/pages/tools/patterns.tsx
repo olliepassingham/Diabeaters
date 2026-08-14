@@ -1,17 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
-import {
-  AlertTriangle,
-  CheckCircle2,
-  ChevronRight,
-  Info,
-  LineChart,
-  Radio,
-  Sparkles,
-  X,
-} from "lucide-react";
+import { LineChart, Radio, Sparkles } from "lucide-react";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EmptyState } from "@/components/empty-state";
@@ -19,7 +9,8 @@ import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { OverlappingBarChart } from "@/components/patterns/overlapping-bar-chart";
 import { WeeklyTrendChart } from "@/components/patterns/weekly-trend-chart";
 import { GlucoseDayOverlayChart } from "@/components/patterns/glucose-day-overlay-chart";
-import { computePatternInsights, type PatternInsightTone } from "@/lib/insights/pattern-insights";
+import { PatternInsightCard } from "@/components/patterns/pattern-insight-card";
+import { computePatternInsights } from "@/lib/insights/pattern-insights";
 import {
   computeHourlyHypoComparison,
   computeWeekdayHypoComparison,
@@ -45,29 +36,6 @@ import {
 } from "@/lib/cgm/glucose-day-filters";
 import { resolveUserTargetBgRange } from "@/lib/target-bg-range";
 import { normalizeBgUnits } from "@/lib/alcohol-night-tool";
-import { cn } from "@/lib/utils";
-
-/** Tone-specific styling for a "What we've noticed" row — icon, badge tint, and card wash. */
-const TONE_STYLES: Record<
-  PatternInsightTone,
-  { Icon: typeof AlertTriangle; badge: string; card: string }
-> = {
-  attention: {
-    Icon: AlertTriangle,
-    badge: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
-    card: "border-amber-500/20 bg-amber-500/[0.05] dark:bg-amber-500/[0.07]",
-  },
-  positive: {
-    Icon: CheckCircle2,
-    badge: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-    card: "border-emerald-500/20 bg-emerald-500/[0.05] dark:bg-emerald-500/[0.07]",
-  },
-  neutral: {
-    Icon: Info,
-    badge: "bg-primary/10 text-primary",
-    card: "border-border/50 bg-muted/25",
-  },
-};
 
 /** Below this many distinct local-calendar days, the overlay is too thin to show meaningful pattern shape. */
 const MIN_DAYS_FOR_OVERLAY = 3;
@@ -318,6 +286,15 @@ export default function PatternsPage() {
     setDismissTick((t) => t + 1);
   };
 
+  useEffect(() => {
+    const hash = window.location.hash.replace("#", "");
+    if (!hash) return;
+    const t = window.setTimeout(() => {
+      document.getElementById(hash)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+    return () => window.clearTimeout(t);
+  }, []);
+
   const hasEnoughData = hypos.length >= 3;
 
   return (
@@ -344,59 +321,29 @@ export default function PatternsPage() {
       ) : (
         <>
           {visibleInsights.length > 0 ? (
-            <Card data-testid="card-patterns-insights">
-              <CardHeader className="pb-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <Sparkles className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden />
-                  <CardTitle className="text-base">What we've noticed</CardTitle>
+            <section data-testid="card-patterns-insights" className="space-y-2.5">
+              <div className="flex items-end justify-between gap-3 px-0.5">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                    From your logs
+                  </p>
+                  <h2 className="mt-0.5 text-base font-semibold tracking-tight text-foreground">
+                    What we've noticed
+                  </h2>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-2.5">
-                {visibleInsights.map((insight) => {
-                  const tone = TONE_STYLES[insight.tone];
-                  const ToneIcon = tone.Icon;
-                  return (
-                    <div
-                      key={insight.id}
-                      data-testid="pattern-insight-row"
-                      className={cn("relative flex items-start gap-3 rounded-xl border px-3 py-3", tone.card)}
-                    >
-                      <span
-                        className={cn("mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full", tone.badge)}
-                        aria-hidden="true"
-                      >
-                        <ToneIcon className="h-4 w-4" />
-                      </span>
-                      <div className="min-w-0 flex-1 space-y-1 pr-6">
-                        <p className="text-sm font-semibold leading-snug text-foreground">{insight.title}</p>
-                        <p className="text-sm leading-relaxed text-muted-foreground">{insight.body}</p>
-                        {insight.actionLabel && insight.actionHref ? (
-                          <Link
-                            href={insight.actionHref}
-                            className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-background px-2.5 py-1 text-xs font-semibold text-primary shadow-sm ring-1 ring-border/60 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                          >
-                            {insight.actionLabel}
-                            <ChevronRight className="h-3 w-3" aria-hidden />
-                          </Link>
-                        ) : null}
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-1.5 top-1.5 h-7 w-7 shrink-0 text-muted-foreground/70 hover:bg-background/80 hover:text-foreground"
-                        aria-label="Dismiss insight"
-                        onClick={() => handleDismiss(insight.id)}
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  );
-                })}
-              </CardContent>
-            </Card>
+                <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                  {visibleInsights.length} note{visibleInsights.length === 1 ? "" : "s"}
+                </span>
+              </div>
+              <div className="space-y-2">
+                {visibleInsights.map((insight) => (
+                  <PatternInsightCard key={insight.id} insight={insight} onDismiss={handleDismiss} />
+                ))}
+              </div>
+            </section>
           ) : null}
 
-          <Card data-testid="card-patterns-hourly">
+          <Card id="when-lows" data-testid="card-patterns-hourly">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between gap-2">
                 <CardTitle className="text-base">When lows happen</CardTitle>
@@ -416,7 +363,7 @@ export default function PatternsPage() {
             </CardContent>
           </Card>
 
-          <Card data-testid="card-patterns-weekday">
+          <Card id="which-days" data-testid="card-patterns-weekday">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between gap-2">
                 <CardTitle className="text-base">Which days</CardTitle>
