@@ -4,6 +4,7 @@ import {
   getBackLabel,
   isRootTabRoute,
   normalizeNavPath,
+  planNavigateBack,
   resolveBackFallback,
   trackNavHistory,
   hasInAppNavHistory,
@@ -80,5 +81,42 @@ describe("nav-back", () => {
     expect(getBackLabel("/settings")).toBe("Settings");
     expect(getBackLabel("/scenarios")).toBe("Guides");
     expect(getBackLabel("/unknown")).toBe("Back");
+  });
+
+  it("returns to the previous page when opened from home, not the Tools hub", () => {
+    trackNavHistory("/");
+    trackNavHistory("/tools/patterns");
+    expect(planNavigateBack("/tools/patterns")).toEqual({ kind: "history" });
+    trackNavHistory("/supplies");
+    expect(planNavigateBack("/supplies")).toEqual({ kind: "history" });
+  });
+
+  it("returns to the previous page when a guide is opened from home", () => {
+    trackNavHistory("/");
+    trackNavHistory("/scenarios/bedtime");
+    expect(planNavigateBack("/scenarios/bedtime")).toEqual({ kind: "history" });
+  });
+
+  it("falls back to the Tools hub when a tool is opened with no in-app previous page", () => {
+    expect(planNavigateBack("/tools/patterns")).toEqual({
+      kind: "href",
+      href: "/tools",
+      clearTab: "tools",
+    });
+  });
+
+  it("falls back to the Guides hub when a guide is opened with no in-app previous page", () => {
+    expect(planNavigateBack("/scenarios/exercise")).toEqual({
+      kind: "href",
+      href: "/scenarios",
+      clearTab: "scenarios",
+    });
+  });
+
+  it("lets an explicit non-hub fallback win when there is no in-app previous page", () => {
+    expect(planNavigateBack("/routines", "/scenarios/exercise")).toEqual({
+      kind: "href",
+      href: "/scenarios/exercise",
+    });
   });
 });

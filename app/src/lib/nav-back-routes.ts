@@ -137,6 +137,41 @@ export function hasInAppNavHistory(pathname: string): boolean {
   return Boolean(getInAppNavPrev(pathname));
 }
 
+function shouldUseHubBack(explicitFallback: string | undefined, hub: string): boolean {
+  // Allow a page-specific fallback (e.g. Routines → Exercise) to win over the hub.
+  if (explicitFallback && explicitFallback !== hub) return false;
+  return true;
+}
+
+export type NavBackPlan =
+  | { kind: "history" }
+  | { kind: "href"; href: string; clearTab?: "tools" | "scenarios" }
+  | { kind: "none" };
+
+/**
+ * Where Back should go. In-app previous page wins over Tools/Guides hub,
+ * so Home → Patterns → Back returns to Home instead of the Tools list.
+ */
+export function planNavigateBack(pathname: string, explicitFallback?: string): NavBackPlan {
+  const path = normalizeNavPath(pathname);
+  const fallback = explicitFallback ?? resolveBackFallback(path);
+
+  if (hasInAppNavHistory(path)) {
+    return { kind: "history" };
+  }
+
+  if (isGuidesDrilldownPath(path) && shouldUseHubBack(explicitFallback, "/scenarios")) {
+    return { kind: "href", href: "/scenarios", clearTab: "scenarios" };
+  }
+  if (isToolsDrilldownPath(path) && shouldUseHubBack(explicitFallback, "/tools")) {
+    return { kind: "href", href: "/tools", clearTab: "tools" };
+  }
+  if (fallback) {
+    return { kind: "href", href: fallback };
+  }
+  return { kind: "none" };
+}
+
 export function canNavigateBack(pathname: string): boolean {
   const path = normalizeNavPath(pathname);
   if (isRootTabRoute(path)) return false;

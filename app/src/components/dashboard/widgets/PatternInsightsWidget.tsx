@@ -11,7 +11,6 @@ import { computeHourlyHypoComparison } from "@/lib/insights/pattern-charts";
 import { listDismissedPatternInsightIds } from "@/lib/insights/insights-dismiss";
 import { OverlappingBarChart } from "@/components/patterns/overlapping-bar-chart";
 import { GlucoseDayOverlayChart } from "@/components/patterns/glucose-day-overlay-chart";
-import { PatternInsightCard } from "@/components/patterns/pattern-insight-card";
 import { isCgmPrefillActive } from "@/lib/cgm/preferences";
 import { fetchLiveCgmHistory } from "@/lib/cgm/live-cgm-history";
 import { countCgmLocalHistoryDays, getCgmLocalHistory } from "@/lib/cgm/cgm-history-store";
@@ -101,12 +100,11 @@ export function PatternInsightsWidget(props: DashboardWidgetLayoutProps) {
   const hourlyBuckets = useMemo(() => computeHourlyHypoComparison(hypoDates, new Date()), [hypoDates]);
   const hasHypoChart = !hasGlucoseChart && hypos.length >= MIN_HYPOS_FOR_CHART;
 
-  const visibleInsights = useMemo(() => {
+  const topInsight = useMemo(() => {
+    if (hasGlucoseChart) return null;
     const dismissed = new Set(listDismissedPatternInsightIds());
-    const limit = compact ? 1 : 2;
-    return computePatternInsights({ hypos, exerciseOutcomes }, 4).filter((i) => !dismissed.has(i.id)).slice(0, limit);
-  }, [compact, hypos, exerciseOutcomes]);
-  const topInsight = visibleInsights[0] ?? null;
+    return computePatternInsights({ hypos, exerciseOutcomes }, 3).find((i) => !dismissed.has(i.id)) ?? null;
+  }, [hasGlucoseChart, hypos, exerciseOutcomes]);
 
   if (!hasGlucoseChart && !hasHypoChart && !topInsight && !cgmConnected) return null;
 
@@ -168,20 +166,11 @@ export function PatternInsightsWidget(props: DashboardWidgetLayoutProps) {
           />
         ) : null}
 
-        {visibleInsights.length > 0 ? (
-          <div className="space-y-2">
-            <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-              What we've noticed
-            </p>
-            {visibleInsights.map((insight) => (
-              <PatternInsightCard key={insight.id} insight={insight} compact />
-            ))}
-            {topInsight ? (
-              <p className="sr-only" data-testid="pattern-insight-summary">
-                {topInsight.title}. {topInsight.body}
-              </p>
-            ) : null}
-          </div>
+        {topInsight ? (
+          <p className="text-sm leading-snug text-foreground/90" data-testid="pattern-insight-summary">
+            <span className="font-medium">{topInsight.title}.</span>{" "}
+            <span className="text-muted-foreground">{topInsight.body}</span>
+          </p>
         ) : null}
 
         {showBuildingTeaser ? (
