@@ -483,6 +483,7 @@ export function ExerciseFuelCalculator() {
   const [intensity, setIntensity] = useState<ExerciseIntensity>("moderate");
   const [duration, setDuration] = useState("45");
   const [minutesUntilStart, setMinutesUntilStart] = useState<number>(30);
+  const [startInCustom, setStartInCustom] = useState("");
   const [fasted, setFasted] = useState(false);
   const [mealCarbs, setMealCarbs] = useState("");
   const [mealCarbsTouched, setMealCarbsTouched] = useState(false);
@@ -791,12 +792,15 @@ export function ExerciseFuelCalculator() {
                     <div className="flex h-11 items-center gap-2 rounded-xl border border-border/60 bg-muted/20 px-3">
                       <Input
                         id="efc-duration"
-                        type="number"
                         inputMode="numeric"
+                        pattern="[0-9]*"
+                        autoComplete="off"
                         value={duration}
-                        onChange={(e) => setDuration(e.target.value)}
+                        onFocus={(e) => e.currentTarget.select()}
+                        onChange={(e) => setDuration(e.target.value.replace(/\D/g, "").slice(0, 3))}
                         className="h-9 border-0 bg-transparent p-0 text-center text-base font-semibold tabular-nums shadow-none focus-visible:ring-0"
                         data-testid="efc-duration"
+                        aria-label="Duration in minutes"
                       />
                       <span className="text-sm text-muted-foreground">min</span>
                     </div>
@@ -822,12 +826,40 @@ export function ExerciseFuelCalculator() {
                             ? "bg-background text-foreground shadow-sm ring-1 ring-border/60"
                             : "bg-muted/30 text-muted-foreground hover:text-foreground",
                         )}
-                        onClick={() => setMinutesUntilStart(m)}
+                        onClick={() => {
+                          setMinutesUntilStart(m);
+                          setStartInCustom("");
+                        }}
                         data-testid={`efc-start-${m}`}
                       >
                         {exerciseStartInLabel(m)}
                       </Button>
                     ))}
+                    <div className="relative">
+                      <Input
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        autoComplete="off"
+                        value={startInCustom}
+                        placeholder="Custom"
+                        onFocus={(e) => {
+                          const el = e.currentTarget;
+                          if (!startInCustom) {
+                            setStartInCustom(String(minutesUntilStart));
+                          }
+                          window.requestAnimationFrame(() => el.select());
+                        }}
+                        onChange={(e) => {
+                          const digits = e.target.value.replace(/\D/g, "").slice(0, 3);
+                          setStartInCustom(digits);
+                          const n = parseInt(digits, 10);
+                          if (Number.isFinite(n)) setMinutesUntilStart(n);
+                        }}
+                        className="h-9 w-[4.75rem] rounded-xl border-border/60 bg-muted/20 px-2 text-center text-xs font-medium tabular-nums shadow-none"
+                        data-testid="efc-start-custom"
+                        aria-label="Custom minutes until start"
+                      />
+                    </div>
                   </div>
                 </div>
 

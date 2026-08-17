@@ -881,7 +881,6 @@ export function ExerciseGuidedCoach() {
   if (!activeSession) {
     const durationPresets = [30, 45, 60, 90] as const;
     const durationNum = parseInt(startDuration, 10);
-    const durationIsPreset = durationPresets.includes(durationNum as (typeof durationPresets)[number]);
 
     return (
       <div className="space-y-4 max-sm:space-y-3" data-testid="exercise-guided-coach-start">
@@ -999,13 +998,19 @@ export function ExerciseGuidedCoach() {
                       <Input
                         id="start-duration"
                         inputMode="numeric"
-                        value={durationIsPreset ? "" : startDuration}
+                        pattern="[0-9]*"
+                        autoComplete="off"
+                        value={startDuration}
                         placeholder="Custom"
-                        onChange={(e) => setStartDuration(e.target.value.replace(/\D/g, ""))}
-                        className="h-10 w-[5.5rem] rounded-xl border-border/60 bg-muted/20 text-center tabular-nums shadow-none"
+                        onFocus={(e) => e.currentTarget.select()}
+                        onChange={(e) => setStartDuration(e.target.value.replace(/\D/g, "").slice(0, 3))}
+                        className="h-10 w-[5.75rem] rounded-xl border-border/60 bg-muted/20 pr-8 text-center tabular-nums shadow-none"
                         data-testid="input-start-duration"
                         aria-label="Custom duration in minutes"
                       />
+                      <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[11px] font-medium text-muted-foreground">
+                        min
+                      </span>
                     </div>
                   </div>
                 </div>
