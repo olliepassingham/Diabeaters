@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  bedtimeExerciseRaisesOvernightCaution,
   buildBedtimePersonalizedCopy,
   resolveBedtimeSnack,
   resolveBedtimeReadinessLevel,
@@ -15,6 +16,7 @@ const baseCtx = {
   bgTrend: "steady" as const,
   recentHypos: false,
   exercisedToday: false,
+  exerciseOvernightCaution: false,
   hadAlcohol: false,
   foodPhrase: null,
   foodHours: null,
@@ -167,5 +169,110 @@ describe("bedtime-readiness", () => {
         isPumpUser: false,
       }),
     ).toBe(true);
+  });
+});
+
+describe("bedtimeExerciseRaisesOvernightCaution", () => {
+  const nowMs = Date.parse("2026-08-17T22:00:00.000Z");
+  const hoursAgo = (hours: number) => new Date(nowMs - hours * 3_600_000).toISOString();
+  const base = {
+    exercisedToday: true,
+    bgTrend: "steady" as const,
+    recentHypos: false,
+    hadAlcohol: false,
+    nowMs,
+  };
+
+  it("does not raise for no exercise", () => {
+    expect(bedtimeExerciseRaisesOvernightCaution({ ...base, exercisedToday: false })).toBe(false);
+  });
+
+  it("does not raise for a ticked box with no session details", () => {
+    expect(bedtimeExerciseRaisesOvernightCaution({ ...base, session: null })).toBe(false);
+  });
+
+  it("does not raise for an earlier light or moderate session", () => {
+    expect(
+      bedtimeExerciseRaisesOvernightCaution({
+        ...base,
+        session: {
+          endedAt: hoursAgo(12),
+          intensity: "moderate",
+          durationMinutes: 45,
+          exerciseType: "walking",
+        },
+      }),
+    ).toBe(false);
+  });
+
+  it("raises for a session in the last 8 hours", () => {
+    expect(
+      bedtimeExerciseRaisesOvernightCaution({
+        ...base,
+        session: {
+          endedAt: hoursAgo(3),
+          intensity: "moderate",
+          durationMinutes: 45,
+          exerciseType: "cardio",
+        },
+      }),
+    ).toBe(true);
+  });
+
+  it("raises for intense or HIIT even if it was earlier", () => {
+    expect(
+      bedtimeExerciseRaisesOvernightCaution({
+        ...base,
+        session: {
+          endedAt: hoursAgo(12),
+          intensity: "intense",
+          durationMinutes: 40,
+          exerciseType: "cardio",
+        },
+      }),
+    ).toBe(true);
+    expect(
+      bedtimeExerciseRaisesOvernightCaution({
+        ...base,
+        session: {
+          endedAt: hoursAgo(12),
+          intensity: "moderate",
+          durationMinutes: 30,
+          exerciseType: "hiit",
+        },
+      }),
+    ).toBe(true);
+  });
+
+  it("raises for a long session even if it was earlier", () => {
+    expect(
+      bedtimeExerciseRaisesOvernightCaution({
+        ...base,
+        session: {
+          endedAt: hoursAgo(12),
+          intensity: "moderate",
+          durationMinutes: 90,
+          exerciseType: "cardio",
+        },
+      }),
+    ).toBe(true);
+  });
+
+  it("raises when stacked with a falling trend, recent hypo, or alcohol", () => {
+    expect(bedtimeExerciseRaisesOvernightCaution({ ...base, bgTrend: "falling" })).toBe(true);
+    expect(bedtimeExerciseRaisesOvernightCaution({ ...base, recentHypos: true })).toBe(true);
+    expect(bedtimeExerciseRaisesOvernightCaution({ ...base, hadAlcohol: true })).toBe(true);
+  });
+
+  it("keeps ready-for-sleep copy when daily training did not raise overnight caution", () => {
+    const copy = buildBedtimePersonalizedCopy({
+      ...baseCtx,
+      level: "steady",
+      exercisedToday: true,
+      exerciseOvernightCaution: false,
+    });
+    expect(copy.title).toMatch(/looking good/i);
+    expect(copy.tips.some((t) => /trained today/i.test(t))).toBe(true);
+    expect(copy.guidance.some((g) => /exercise-related lows/i.test(g))).toBe(false);
   });
 });

@@ -52,6 +52,7 @@ import { useBedtimeLastNight } from "@/hooks/use-bedtime-last-night";
 import { resolveUserTargetBgRange } from "@/lib/target-bg-range";
 import { upsertScenario } from "@/lib/scenarios-supabase";
 import {
+  bedtimeExerciseRaisesOvernightCaution,
   buildBedtimePersonalizedCopy,
   formatBedtimeBgDisplay,
   hoursSinceSelectPhrase,
@@ -167,7 +168,8 @@ const BEDTIME_SECTION_INFO = {
   overnightPattern:
     "Your usual pattern while asleep — we combine this with tonight's reading and, on MDI, when you take long-acting insulin.",
   extras: "Optional details. Meal carbs rarely change the recommendation — BG, trend, and timing matter most.",
-  exercise: "Workouts can raise hypo risk for many hours overnight.",
+  exercise:
+    "A late or harder session can raise overnight hypo risk. Usual daily training with a steady reading often doesn't change the night on its own.",
   alcohol: "Alcohol can delay lows — we weigh this more heavily than hypos alone.",
   recentHypos:
     "A hypo in roughly the last 24 hours. On its own this usually means caution, not needs attention, unless glucose is low or falling too.",
@@ -436,6 +438,23 @@ export default function Bedtime() {
     let concernCount = 0;
     let cautionCount = 0;
 
+    const lastSession = exercisedToday && storage.didExerciseRecently(24) ? storage.getLastExerciseSummary() : null;
+    const exerciseOvernightCaution = bedtimeExerciseRaisesOvernightCaution({
+      exercisedToday,
+      bgTrend,
+      recentHypos,
+      hadAlcohol,
+      session: lastSession
+        ? {
+            endedAt: lastSession.endedAt,
+            intensity: lastSession.intensity,
+            durationMinutes: lastSession.durationMinutes,
+            exerciseType: lastSession.exerciseType,
+            feltSymptomsDuring: lastSession.context?.feltSymptomsDuring,
+          }
+        : null,
+    });
+
     if (bgMmol < targetLowMmol - 1) {
       factors.push({
         label: "Blood glucose",
@@ -596,11 +615,13 @@ export default function Bedtime() {
     if (exercisedToday) {
       factors.push({
         label: "Exercise today",
-        status: "caution",
-        note: "You exercised today",
-        detail: "Hypo risk can stay higher overnight.",
+        status: exerciseOvernightCaution ? "caution" : "good",
+        note: exerciseOvernightCaution ? "Recent or harder session" : "Usual activity today",
+        detail: exerciseOvernightCaution
+          ? "Hypo risk can stay higher overnight."
+          : "Typical daily training with a calm reading usually doesn't change the night on its own.",
       });
-      cautionCount++;
+      if (exerciseOvernightCaution) cautionCount++;
     }
 
     if (hadAlcohol) {
@@ -762,6 +783,7 @@ export default function Bedtime() {
       bgTrend,
       recentHypos,
       exercisedToday,
+      exerciseOvernightCaution,
       hadAlcohol,
       foodPhrase,
       foodHours: foodSelected && Number.isFinite(foodHours) ? foodHours : null,

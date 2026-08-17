@@ -17,6 +17,8 @@ export interface BedtimePersonalizedCopyInput {
   bgTrend: BedtimeBgTrend;
   recentHypos: boolean;
   exercisedToday: boolean;
+  /** True when today's session is late, hard, or stacked with other overnight risks. */
+  exerciseOvernightCaution: boolean;
   hadAlcohol: boolean;
   foodPhrase: string | null;
   foodHours: number | null;
@@ -122,6 +124,54 @@ export function isOvernightRiseLikely(ctx: {
   return false;
 }
 
+/** Hours after a session when a typical workout still commonly changes the night. */
+const BEDTIME_EXERCISE_RECENT_HOURS = 8;
+/** Longer sessions keep delayed hypo risk even if they were earlier in the day. */
+const BEDTIME_EXERCISE_LONG_MINUTES = 75;
+
+export type BedtimeExerciseSessionHint = {
+  endedAt?: string | null;
+  intensity?: "light" | "moderate" | "intense" | null;
+  durationMinutes?: number | null;
+  exerciseType?: string | null;
+  feltSymptomsDuring?: boolean;
+} | null;
+
+function hoursSinceEnded(endedAt: string | null | undefined, nowMs: number): number | null {
+  if (!endedAt?.trim()) return null;
+  const t = new Date(endedAt).getTime();
+  if (!Number.isFinite(t)) return null;
+  return (nowMs - t) / 3_600_000;
+}
+
+/**
+ * Usual daily training should not, on its own, block “ready for sleep”.
+ * Raise overnight caution when the session is recent, hard/long, or stacked with other night risks.
+ */
+export function bedtimeExerciseRaisesOvernightCaution(input: {
+  exercisedToday: boolean;
+  bgTrend: BedtimeBgTrend;
+  recentHypos: boolean;
+  hadAlcohol: boolean;
+  session?: BedtimeExerciseSessionHint;
+  nowMs?: number;
+}): boolean {
+  if (!input.exercisedToday) return false;
+  if (input.recentHypos || input.hadAlcohol || input.bgTrend === "falling") return true;
+
+  const session = input.session;
+  if (!session) return false;
+
+  if (session.feltSymptomsDuring) return true;
+  if (session.intensity === "intense" || session.exerciseType === "hiit") return true;
+  if ((session.durationMinutes ?? 0) >= BEDTIME_EXERCISE_LONG_MINUTES) return true;
+
+  const hoursAgo = hoursSinceEnded(session.endedAt, input.nowMs ?? Date.now());
+  if (hoursAgo != null && hoursAgo >= 0 && hoursAgo <= BEDTIME_EXERCISE_RECENT_HOURS) return true;
+
+  return false;
+}
+
 /**
  * Factor counts are a base; this applies bedtime-specific floors and combos
  * (e.g. above-target BG should not read as fully "ready").
@@ -213,7 +263,7 @@ function buildGuidance(ctx: BedtimePersonalizedCopyInput): string[] {
         );
       }
     }
-    if (ctx.recentHypos && ctx.exercisedToday) {
+    if (ctx.recentHypos && ctx.exerciseOvernightCaution) {
       pushUnique(lines, "Exercise and a recent hypo both raise the chance of lows overnight.");
     } else if (ctx.recentHypos) {
       pushUnique(lines, "A recent hypo means staying alert overnight, even when glucose looks OK now.");
@@ -221,7 +271,7 @@ function buildGuidance(ctx: BedtimePersonalizedCopyInput): string[] {
     if (ctx.hadAlcohol) {
       pushUnique(lines, "Alcohol can cause delayed lows — plan an extra check if you can.");
     }
-    if (ctx.exercisedToday && !ctx.recentHypos) {
+    if (ctx.exerciseOvernightCaution && !ctx.recentHypos) {
       pushUnique(lines, "Exercise today can keep hypo risk higher for many hours.");
     }
     if (ctx.bgTrend === "falling" && !aboveTarget) {
@@ -276,7 +326,7 @@ function buildGuidance(ctx: BedtimePersonalizedCopyInput): string[] {
     if (ctx.recentHypos) {
       pushUnique(lines, "Keep hypo treatment within reach — a recent hypo increases overnight risk.");
     }
-    if (ctx.exercisedToday) {
+    if (ctx.exerciseOvernightCaution) {
       pushUnique(lines, "Have a snack nearby in case exercise-related lows appear overnight.");
     }
     if (ctx.hadAlcohol) {
@@ -294,7 +344,7 @@ function buildGuidance(ctx: BedtimePersonalizedCopyInput): string[] {
     if (ctx.sleepHours != null && ctx.sleepHours > 1.5) {
       pushUnique(lines, "Run this check again closer to lights-out.");
     }
-    if (ctx.hadAlcohol || ctx.recentHypos || ctx.exercisedToday || ctx.bgTrend === "falling") {
+    if (ctx.hadAlcohol || ctx.recentHypos || ctx.exerciseOvernightCaution || ctx.bgTrend === "falling") {
       pushUnique(lines, "Consider setting a phone alarm for an overnight glucose check.");
     }
     if (lines.length === 0) {
@@ -381,13 +431,17 @@ function buildTips(ctx: BedtimePersonalizedCopyInput): string[] {
 
   if (ctx.level === "alert") {
     if (ctx.isPumpUser && ctx.hadAlcohol) tips.push("Check pump IOB before any correction at night");
-    if (ctx.isPumpUser && ctx.exercisedToday) {
+    if (ctx.isPumpUser && ctx.exerciseOvernightCaution) {
       tips.push("Some teams use a slightly lower temp basal overnight after exercise — only if yours agrees");
     }
   }
 
   if (ctx.level === "monitor" || ctx.level === "alert") {
     tips.push("If you wake feeling off, check glucose before going back to sleep");
+  }
+
+  if (ctx.level === "steady" && ctx.exercisedToday) {
+    tips.push("You trained today — keep carbs nearby if nights after exercise sometimes dip");
   }
 
   if (ctx.level === "steady" && ctx.isPumpUser) {
