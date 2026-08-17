@@ -436,24 +436,12 @@ export function StoryViewerDialog({
             onTouchEnd={onTouchEnd}
             onTouchCancel={onTouchEnd}
           >
-            <div
-              className="pointer-events-none absolute inset-x-0 top-0 z-10 h-36 bg-gradient-to-b from-black/75 via-black/35 to-transparent"
-              aria-hidden
-            />
-            <div
-              className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-44 bg-gradient-to-t from-black/80 via-black/35 to-transparent"
-              aria-hidden
-            />
-
-            <div
-              className="pointer-events-none absolute left-1/2 top-[max(0.4rem,env(safe-area-inset-top))] z-30 h-1 w-10 -translate-x-1/2 rounded-full bg-white/35 sm:hidden"
-              aria-hidden
-            />
-
-            <div
-              className="absolute left-0 right-0 top-0 z-30 flex gap-1 px-3 pt-[max(0.9rem,calc(env(safe-area-inset-top)+0.35rem))] sm:pt-3"
-              aria-hidden
-            >
+            <div className="relative z-30 shrink-0 px-3 pt-[max(0.45rem,env(safe-area-inset-top))] sm:pt-3">
+              <div
+                className="mx-auto mb-2 h-1 w-10 rounded-full bg-white/35 sm:hidden"
+                aria-hidden
+              />
+              <div className="mb-2 flex gap-1" aria-hidden>
               {(queue.length > 0 ? queue : [{ authorId: "story" }]).map((entry, i) => (
                 <div
                   key={`${entry.authorId}-${i}`}
@@ -467,9 +455,8 @@ export function StoryViewerDialog({
                   />
                 </div>
               ))}
-            </div>
-
-            <div className="absolute left-0 right-0 top-0 z-20 flex items-center justify-between gap-2 px-3 pb-2 pt-[max(1.85rem,calc(env(safe-area-inset-top)+1.15rem))]">
+              </div>
+            <div className="flex items-center justify-between gap-2 pb-2">
               {current ? (
                 <Link
                   href={profileHref}
@@ -554,10 +541,11 @@ export function StoryViewerDialog({
                 </Button>
               </div>
             </div>
+            </div>
 
             <button
               type="button"
-              className="relative flex min-h-0 flex-1 cursor-default items-center justify-center border-0 bg-transparent p-0 outline-none"
+              className="relative flex min-h-0 flex-1 cursor-default items-center justify-center overflow-hidden border-0 bg-transparent p-0 outline-none"
               onClick={() => {
                 if (suppressClick.current) {
                   suppressClick.current = false;
@@ -574,7 +562,7 @@ export function StoryViewerDialog({
               ) : !mediaUrl ? (
                 <Loader2 className="h-8 w-8 animate-spin text-white/70" aria-hidden />
               ) : (
-                <div className="relative h-full w-full">
+                <div className="relative aspect-[9/16] h-full max-h-full w-auto max-w-full overflow-hidden bg-black">
                   {resolvedStory.media_kind === "image" ? (
                     <img src={mediaUrl} alt="" className="h-full w-full object-cover pointer-events-none" />
                   ) : (
@@ -594,7 +582,7 @@ export function StoryViewerDialog({
             </button>
 
             <div
-              className="absolute bottom-0 left-0 right-0 z-20 px-4 pb-[max(1.1rem,env(safe-area-inset-bottom))]"
+              className="relative z-20 shrink-0 px-4 pb-[max(1.1rem,env(safe-area-inset-bottom))] pt-2"
               onClick={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
             >

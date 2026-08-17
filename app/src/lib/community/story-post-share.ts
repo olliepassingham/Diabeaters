@@ -1,7 +1,8 @@
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { fileFromPostMediaPath } from "@/lib/community/post-media-signed-urls";
 import { parseEventDate } from "@/lib/community/event-display";
 import { parseEventExtra, parsePollExtra } from "@/lib/community/post-kinds";
+import { communityTopicLabel } from "@/lib/community/topics";
 import { resolveProfileImageUrl } from "@/lib/storage-profile";
 import type { CommunityPostRow } from "@/lib/community";
 
@@ -22,6 +23,9 @@ const CREAM = "#f6f1e8";
 const TEAL = "#14b8a6";
 const TEAL_DEEP = "#0f766e";
 const WHITE = "#f8fafc";
+const PAGE_MINT = "#d7ebe4";
+const CARD_WHITE = "#ffffff";
+const PILL = "#e8ecef";
 
 export type StoryPostShareMeta = {
   authorName: string;
@@ -420,59 +424,156 @@ function drawAuthorRow(
   ctx.fillText(handle ? `@${handle}` : "From the feed", x + av + 16, y + 48);
 }
 
-/** Original poster chip for reshared posts — sits below the live story header. */
-function drawOriginalAuthorChip(
+function timeAgo(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return formatDistanceToNow(d, { addSuffix: true });
+}
+
+function drawTopicPill(ctx: CanvasRenderingContext2D, x: number, y: number, label: string): number {
+  ctx.font = `600 22px ${FONT}`;
+  const text = ellipsize(ctx, label, 420);
+  const w = ctx.measureText(text).width + 28;
+  const h = 40;
+  fillRoundRect(ctx, x, y, w, h, h / 2, PILL);
+  ctx.fillStyle = "rgba(18, 20, 26, 0.72)";
+  ctx.fillText(text, x + 14, y + 28);
+  return w;
+}
+
+function drawNameAndCaption(
   ctx: CanvasRenderingContext2D,
+  name: string,
+  caption: string,
+  x: number,
+  baseline: number,
+  maxWidth: number,
+  lineHeight: number,
+  maxLines: number,
+): number {
+  ctx.font = `700 30px ${FONT}`;
+  ctx.fillStyle = INK;
+  const nameText = ellipsize(ctx, name, maxWidth);
+  ctx.fillText(nameText, x, baseline);
+  if (!caption) return lineHeight;
+
+  const nameW = ctx.measureText(nameText).width;
+  ctx.font = `500 30px ${FONT}`;
+  const gap = ctx.measureText(" ").width;
+  const firstMax = Math.max(80, maxWidth - nameW - gap);
+  const words = caption.split(/\s+/).filter(Boolean);
+  let firstLine = "";
+  let used = 0;
+  for (const word of words) {
+    const next = firstLine ? `${firstLine} ${word}` : word;
+    if (ctx.measureText(next).width <= firstMax) {
+      firstLine = next;
+      used += 1;
+    } else {
+      break;
+    }
+  }
+  if (firstLine) ctx.fillText(firstLine, x + nameW + gap, baseline);
+  const rest = words.slice(used).join(" ");
+  if (!rest || maxLines <= 1) return lineHeight;
+  return lineHeight + drawWrapped(ctx, rest, x, baseline + lineHeight, maxWidth, lineHeight, maxLines - 1);
+}
+
+/** Reshared post: a feed card so it’s obvious this is someone else’s post. */
+function drawSharedFeedCard(
+  ctx: CanvasRenderingContext2D,
+  media: CanvasImageSource,
+  caption: string,
   name: string,
   handle: string | null,
   photo: CanvasImageSource | null,
+  topicLabel: string,
+  timeLabel: string,
 ) {
-  const av = 80;
-  const padX = 16;
-  const padY = 14;
-  const gap = 18;
-  const chipH = av + padY * 2;
-  const textMax = 520;
-  ctx.font = `700 34px ${FONT}`;
-  const nameLabel = ellipsize(ctx, name, textMax);
-  const nameW = ctx.measureText(nameLabel).width;
-  ctx.font = `500 24px ${FONT}`;
-  const handleLabel = handle ? ellipsize(ctx, `@${handle}`, textMax) : "";
-  const handleW = handleLabel ? ctx.measureText(handleLabel).width : 0;
-  const textW = Math.max(nameW, handleW);
-  const chipW = Math.min(W - SIDE * 2, padX + av + gap + textW + padX + 12);
-  const x = SIDE;
-  const y = TOP_SAFE;
+  ctx.fillStyle = PAGE_MINT;
+  ctx.fillRect(0, 0, W, H);
+  ctx.save();
+  ctx.filter = "blur(64px)";
+  ctx.globalAlpha = 0.35;
+  drawCover(ctx, media, -100, -100, W + 200, H + 200, 0);
+  ctx.restore();
+  ctx.fillStyle = "rgba(215, 235, 228, 0.78)";
+  ctx.fillRect(0, 0, W, H);
+
+  const cardX = 48;
+  const cardW = W - 96;
+  const radius = 40;
+  const pad = 36;
+  const av = 88;
+  const headerH = pad + av + 28;
+
+  const { w: srcW, h: srcH } = sourceSize(media);
+  const aspect = srcW / Math.max(srcH, 1);
+  const imageH =
+    aspect >= 1
+      ? Math.round(Math.min(880, Math.max(620, cardW / aspect)))
+      : Math.round(Math.min(cardW * 1.12, cardW / Math.max(aspect, 0.72)));
+
+  ctx.font = `500 30px ${FONT}`;
+  const capH = caption ? Math.max(40, wrappedHeight(ctx, caption, cardW - pad * 2, 40, 4) + 8) : 0;
+  const captionBlock = pad + (caption ? capH : 8) + pad;
+  let cardH = headerH + imageH + captionBlock;
+  const maxCardH = H - 96;
+  let drawImageH = imageH;
+  if (cardH > maxCardH) {
+    drawImageH = Math.max(520, imageH - (cardH - maxCardH));
+    cardH = headerH + drawImageH + captionBlock;
+  }
+  const cardY = Math.max(48, Math.round((H - cardH) / 2));
+
+  drawLiftedCard(ctx, cardX, cardY, cardW, cardH, radius, CARD_WHITE);
 
   ctx.save();
-  ctx.shadowColor = "rgba(0,0,0,0.35)";
-  ctx.shadowBlur = 18;
-  ctx.shadowOffsetY = 6;
-  fillRoundRect(ctx, x, y, chipW, chipH, chipH / 2, "rgba(8, 10, 16, 0.62)");
-  ctx.restore();
-  roundRect(ctx, x, y, chipW, chipH, chipH / 2);
-  ctx.strokeStyle = "rgba(255,255,255,0.28)";
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
+  roundRect(ctx, cardX, cardY, cardW, cardH, radius);
+  ctx.clip();
 
-  const avX = x + padX;
-  const avY = y + padY;
-  drawAvatar(ctx, avX, avY, av, name, photo, false);
-  ctx.beginPath();
-  ctx.arc(avX + av / 2, avY + av / 2, av / 2, 0, Math.PI * 2);
-  ctx.strokeStyle = "rgba(255,255,255,0.9)";
-  ctx.lineWidth = 3;
-  ctx.stroke();
+  const avX = cardX + pad;
+  const avY = cardY + pad;
+  drawAvatar(ctx, avX, avY, av, name, photo, true);
 
-  const tx = avX + av + gap;
-  ctx.fillStyle = WHITE;
+  const textX = avX + av + 20;
+  const textMax = cardX + cardW - pad - textX;
+  ctx.fillStyle = INK;
   ctx.font = `700 34px ${FONT}`;
-  ctx.fillText(nameLabel, tx, y + padY + (handleLabel ? 36 : 52));
-  if (handleLabel) {
-    ctx.fillStyle = "rgba(248,250,252,0.72)";
-    ctx.font = `500 24px ${FONT}`;
-    ctx.fillText(handleLabel, tx, y + padY + 68);
+  const nameLabel = ellipsize(ctx, name, handle ? textMax * 0.55 : textMax);
+  ctx.fillText(nameLabel, textX, avY + 34);
+  if (handle) {
+    const nameW = ctx.measureText(nameLabel).width;
+    ctx.fillStyle = INK_MUTED;
+    ctx.font = `500 26px ${FONT}`;
+    ctx.fillText(ellipsize(ctx, `@${handle}`, textMax - nameW - 16), textX + nameW + 14, avY + 34);
   }
+  const pillW = drawTopicPill(ctx, textX, avY + 48, topicLabel);
+  if (timeLabel) {
+    ctx.fillStyle = INK_MUTED;
+    ctx.font = `500 22px ${FONT}`;
+    ctx.fillText(`·  ${timeLabel}`, textX + pillW + 12, avY + 76);
+  }
+
+  drawCover(ctx, media, cardX, cardY + headerH, cardW, drawImageH, 0);
+
+  if (caption) {
+    drawNameAndCaption(
+      ctx,
+      name,
+      caption,
+      cardX + pad,
+      cardY + headerH + drawImageH + pad + 30,
+      cardW - pad * 2,
+      40,
+      4,
+    );
+  }
+  ctx.restore();
+  roundRect(ctx, cardX, cardY, cardW, cardH, radius);
+  ctx.strokeStyle = "rgba(18, 20, 26, 0.10)";
+  ctx.lineWidth = 2;
+  ctx.stroke();
 }
 
 function drawPin(ctx: CanvasRenderingContext2D, x: number, y: number, color: string) {
@@ -623,7 +724,6 @@ function drawMediaStory(
   ctx: CanvasRenderingContext2D,
   media: CanvasImageSource,
   caption: string,
-  originalAuthor: { name: string; handle: string | null; photo: CanvasImageSource | null } | null,
 ) {
   ctx.fillStyle = "#05060a";
   ctx.fillRect(0, 0, W, H);
@@ -643,10 +743,6 @@ function drawMediaStory(
   bot.addColorStop(1, "rgba(0,0,0,0.7)");
   ctx.fillStyle = bot;
   ctx.fillRect(0, H - bottomH, W, bottomH);
-
-  if (originalAuthor) {
-    drawOriginalAuthorChip(ctx, originalAuthor.name, originalAuthor.handle, originalAuthor.photo);
-  }
 
   const textX = 72;
   const textW = W - 144;
@@ -744,7 +840,8 @@ export async function renderPostAsStoryFile(
   const handle = handleOf(meta);
   const name = nameOf(meta);
   const photo = await loadAvatar(meta);
-  const originalAuthor = meta.isOwn ? null : { name, handle, photo };
+  const topicLabel = communityTopicLabel(post.topic);
+  const postedAgo = timeAgo(post.created_at);
 
   if (poll) {
     drawAtmosphere(ctx, null);
@@ -753,7 +850,11 @@ export async function renderPostAsStoryFile(
     drawAtmosphere(ctx, media);
     drawEventCard(ctx, event, media, name, handle);
   } else if (media) {
-    drawMediaStory(ctx, media, caption, originalAuthor);
+    if (meta.isOwn) {
+      drawMediaStory(ctx, media, caption);
+    } else {
+      drawSharedFeedCard(ctx, media, caption, name, handle, photo, topicLabel, postedAgo);
+    }
   } else {
     drawAtmosphere(ctx, null);
     drawQuoteCard(ctx, caption || "Shared from the feed", name, handle, photo);

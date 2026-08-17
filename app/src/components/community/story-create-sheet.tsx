@@ -178,12 +178,12 @@ export function StoryCreateSheet({
             <StoryOverlayEditor
               overlays={overlays}
               onChange={setOverlays}
-              className="mx-auto h-[min(52vh,28rem)] w-full max-w-[16.5rem] rounded-[1.35rem] border-white/10 shadow-lg"
+              className="mx-auto aspect-[9/16] h-[min(52vh,28rem)] w-auto max-w-full rounded-[1.35rem] border-white/10 shadow-lg"
             >
               {file?.type.startsWith("video/") ? (
-                <video src={preview ?? undefined} className="h-full w-full object-cover" controls playsInline />
+                <video src={preview ?? undefined} className="h-full w-full object-contain" controls playsInline />
               ) : (
-                <img src={preview ?? undefined} alt="" className="h-full w-full object-cover" />
+                <img src={preview ?? undefined} alt="" className="h-full w-full object-contain" />
               )}
             </StoryOverlayEditor>
             <button
