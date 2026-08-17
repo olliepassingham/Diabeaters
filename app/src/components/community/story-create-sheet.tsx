@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { StoryOverlayEditor } from "@/components/community/story-overlay-editor";
 import { useToast } from "@/hooks/use-toast";
+import { clickHiddenFileInput, FILE_INPUT_HIDDEN_CLASS } from "@/lib/click-hidden-file-input";
+import { pickSingleImageFromLibrary } from "@/lib/community/pick-post-images";
 import {
   insertCommunityStory,
   MAX_STORY_BYTES,
@@ -109,6 +111,10 @@ export function StoryCreateSheet({
   function onPick(files: FileList | null) {
     const f = files?.[0];
     if (!f) return;
+    applyPickedFile(f);
+  }
+
+  function applyPickedFile(f: File) {
     if (preview) URL.revokeObjectURL(preview);
     setFile(f);
     setPreview(URL.createObjectURL(f));
@@ -155,14 +161,14 @@ export function StoryCreateSheet({
         ref={photoInputRef}
         type="file"
         accept="image/*"
-        className="sr-only"
+        className={FILE_INPUT_HIDDEN_CLASS}
         onChange={(e) => onPick(e.target.files)}
       />
       <input
         ref={videoInputRef}
         type="file"
         accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm"
-        className="sr-only"
+        className={FILE_INPUT_HIDDEN_CLASS}
         onChange={(e) => onPick(e.target.files)}
       />
 
@@ -213,13 +219,18 @@ export function StoryCreateSheet({
                 icon={<ImagePlus className="h-6 w-6" aria-hidden />}
                 title="Photo"
                 hint="JPG or PNG"
-                onClick={() => photoInputRef.current?.click()}
+                onClick={() => {
+                  void (async () => {
+                    const picked = await pickSingleImageFromLibrary(photoInputRef.current);
+                    if (picked) applyPickedFile(picked);
+                  })();
+                }}
               />
               <MediaPickCard
                 icon={<Video className="h-6 w-6" aria-hidden />}
                 title="Video"
                 hint="MP4, MOV, WebM"
-                onClick={() => videoInputRef.current?.click()}
+                onClick={() => clickHiddenFileInput(videoInputRef.current)}
               />
             </div>
             <div className="flex items-center justify-center gap-2 text-[11px] text-muted-foreground">

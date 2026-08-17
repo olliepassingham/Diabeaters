@@ -29,6 +29,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useDoubleTap } from "@/hooks/use-double-tap";
 import { useToast } from "@/hooks/use-toast";
 import { hapticLight } from "@/lib/haptics";
+import { FILE_INPUT_HIDDEN_CLASS } from "@/lib/click-hidden-file-input";
+import { pickSingleImageFromLibrary } from "@/lib/community/pick-post-images";
 import { useAuth } from "@/lib/auth-context";
 import {
   dmThreadQueryKey,
@@ -783,7 +785,7 @@ export default function CommunityThreadPage() {
           ref={fileInputRef}
           type="file"
           accept="image/*"
-          className="sr-only"
+          className={FILE_INPUT_HIDDEN_CLASS}
           aria-hidden
           tabIndex={-1}
           onChange={(e) => {
@@ -808,7 +810,12 @@ export default function CommunityThreadPage() {
             className="h-11 w-11 shrink-0 rounded-full text-muted-foreground hover:text-foreground"
             disabled={sending || !user || messagingBlocked}
             aria-label="Attach photo"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => {
+              void (async () => {
+                const picked = await pickSingleImageFromLibrary(fileInputRef.current);
+                if (picked) setPendingImage(picked);
+              })();
+            }}
           >
             <ImagePlus className="h-5 w-5" strokeWidth={1.75} />
           </Button>

@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Capacitor } from "@capacitor/core";
 import { useToast } from "@/hooks/use-toast";
 import { useCommunityTopicOrder } from "@/hooks/use-community-topic-order";
 import type { ComposerPostKind, FeedComposerFormBodyProps } from "@/components/community/feed-composer-form-body";
@@ -16,6 +15,8 @@ import {
   type CommunityTopicId,
 } from "@/lib/community";
 import { defaultEventStartsAtLocal } from "@/lib/community/event-display";
+import { pickPostImagesFromLibrary } from "@/lib/community/pick-post-images";
+import { clickHiddenFileInput } from "@/lib/click-hidden-file-input";
 import { canEngageWithCommunityFeed, COMMUNITY_FEED_ENGAGE_REQUIRED_MESSAGE, useProfile } from "@/lib/profile";
 
 export type UseFeedComposerOptions = {
@@ -155,33 +156,11 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
   }
 
   async function pickImagesFromLibraryOnly() {
-    if (!Capacitor.isNativePlatform()) {
-      fileInputRef.current?.click();
-      return;
-    }
     try {
-      const remaining = Math.max(0, MAX_POST_IMAGES - composerFiles.length);
-      if (remaining <= 0) return;
-
-      const { Camera } = await import("@capacitor/camera");
-      const res = await Camera.pickImages({ limit: remaining });
-      const photos = res?.photos ?? [];
-      if (photos.length === 0) return;
-
-      const newFiles: File[] = [];
-      for (const p of photos) {
-        const webPath = p.webPath?.trim();
-        if (!webPath) continue;
-        const r = await fetch(webPath);
-        const blob = await r.blob();
-        if (!blob.type.startsWith("image/")) continue;
-        const name = p.path?.split("/").pop()?.trim() || `photo-${Date.now()}.jpg`;
-        newFiles.push(new File([blob], name, { type: blob.type }));
-        if (composerFiles.length + newFiles.length >= MAX_POST_IMAGES) break;
-      }
+      const newFiles = await pickPostImagesFromLibrary(composerFiles.length, fileInputRef.current);
       if (newFiles.length > 0) setComposerFiles((prev) => [...prev, ...newFiles].slice(0, MAX_POST_IMAGES));
     } catch (e) {
-      fileInputRef.current?.click();
+      clickHiddenFileInput(fileInputRef.current);
       toast({
         title: "Could not open Photos",
         description: e instanceof Error ? e.message : "Try selecting from your camera roll.",

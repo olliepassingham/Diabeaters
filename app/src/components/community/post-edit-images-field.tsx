@@ -2,6 +2,7 @@ import { ImagePlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FILE_INPUT_HIDDEN_CLASS } from "@/lib/click-hidden-file-input";
 import { MAX_POST_IMAGES } from "@/lib/community";
 import type { usePostEditImages } from "@/hooks/use-post-edit-images";
 
@@ -71,7 +72,7 @@ export function PostEditImagesField({ images, disabled = false }: Props) {
         type="file"
         accept="image/*"
         multiple
-        className="sr-only"
+        className={FILE_INPUT_HIDDEN_CLASS}
         disabled={disabled || !canAddMore}
         onChange={(e) => onPickFromInput(e.target.files)}
       />

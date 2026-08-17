@@ -8,6 +8,8 @@ import { useAuth } from "@/lib/auth-context";
 import { upsertProfile, updateProfile, useProfile } from "@/lib/profile";
 import { getSupabase } from "@/lib/supabase";
 import { uploadProfileAvatar } from "@/lib/storage-profile";
+import { FILE_INPUT_HIDDEN_CLASS } from "@/lib/click-hidden-file-input";
+import { pickSingleImageFromLibrary } from "@/lib/community/pick-post-images";
 import {
   ProfileActionGrid,
   ProfileAvatarTile,
@@ -278,6 +280,10 @@ export default function Account() {
   async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    await uploadAvatarFile(file);
+  }
+
+  async function uploadAvatarFile(file: File) {
     setUploadSubmitting(true);
     let toUpload: File = file;
     const isHeic =
@@ -472,7 +478,12 @@ export default function Account() {
               alt="Profile photo"
               testId={showAvatarImage ? "avatar-preview" : "avatar-placeholder"}
               onImageError={() => setAvatarImgFailed(true)}
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => {
+                void (async () => {
+                  const picked = await pickSingleImageFromLibrary(fileInputRef.current);
+                  if (picked) await uploadAvatarFile(picked);
+                })();
+              }}
               disabled={uploadSubmitting}
               busy={uploadSubmitting}
             />
@@ -521,7 +532,7 @@ export default function Account() {
             ref={fileInputRef}
             type="file"
             accept="image/*"
-            hidden
+            className={FILE_INPUT_HIDDEN_CLASS}
             id="avatar-file"
             onChange={handleAvatarUpload}
             disabled={uploadSubmitting}

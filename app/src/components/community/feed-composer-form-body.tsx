@@ -17,6 +17,7 @@ import { MAX_POST_IMAGES, MAX_POST_VIDEO_BYTES } from "@/lib/community";
 import type { CommunityTopicId } from "@/lib/community";
 import type { CommunityTopicRow } from "@/lib/community/topics";
 import { eventQuickStartPresets } from "@/lib/community/event-display";
+import { clickHiddenFileInput, FILE_INPUT_HIDDEN_CLASS } from "@/lib/click-hidden-file-input";
 import { cn } from "@/lib/utils";
 
 export const MAX_POLL_OPTIONS = 6;
@@ -449,7 +450,7 @@ export function FeedComposerFormBody({
           type="file"
           accept="image/*"
           multiple
-          className="sr-only"
+          className={FILE_INPUT_HIDDEN_CLASS}
           id="feed-composer-images"
           disabled={
             submitting ||
@@ -464,7 +465,7 @@ export function FeedComposerFormBody({
           ref={videoInputRef}
           type="file"
           accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm"
-          className="sr-only"
+          className={FILE_INPUT_HIDDEN_CLASS}
           id="feed-composer-video"
           disabled={submitting || !user || !canComposeToFeed || composerPostKind !== "standard" || Boolean(composerVideoFile) || composerFiles.length > 0}
           onChange={(e) => onPickVideo(e.target.files)}
@@ -500,7 +501,7 @@ export function FeedComposerFormBody({
               Boolean(composerVideoFile) ||
               composerFiles.length > 0
             }
-            onClick={() => videoInputRef.current?.click()}
+            onClick={() => clickHiddenFileInput(videoInputRef.current)}
             aria-label="Add video to post"
           >
             <Video className="h-4 w-4 mr-1.5" />

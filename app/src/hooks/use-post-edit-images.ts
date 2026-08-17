@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { useToast } from "@/hooks/use-toast";
+import { clickHiddenFileInput } from "@/lib/click-hidden-file-input";
 import { filesFromImageInput, pickPostImagesFromLibrary } from "@/lib/community/pick-post-images";
 import { getPostImageSignedUrls, MAX_POST_IMAGES } from "@/lib/community";
 
@@ -133,7 +134,7 @@ export function usePostEditImages() {
         description: e instanceof Error ? e.message : "Try selecting from your camera roll.",
         variant: "destructive",
       });
-      fileInputRef.current?.click();
+      clickHiddenFileInput(fileInputRef.current);
     }
   }, [appendFiles, canAddMore, toast, totalCount]);
 

@@ -1,4 +1,6 @@
+import { Camera, CameraResultType, CameraSource } from "@capacitor/camera";
 import { Capacitor } from "@capacitor/core";
+import { clickHiddenFileInput, unlockSystemPickerPointerEvents } from "@/lib/click-hidden-file-input";
 
 const MAX_POST_IMAGES = 4;
 
@@ -15,6 +17,14 @@ export function filesFromImageInput(files: FileList | null, currentCount: number
   return next;
 }
 
+async function fileFromWebPath(webPath: string, name: string): Promise<File | null> {
+  const r = await fetch(webPath);
+  const blob = await r.blob();
+  const type = blob.type.startsWith("image/") ? blob.type : "image/jpeg";
+  if (!type.startsWith("image/")) return null;
+  return new File([blob], name, { type });
+}
+
 /** Native photo library picker; on web, triggers the hidden file input instead. */
 export async function pickPostImagesFromLibrary(
   currentCount: number,
@@ -24,25 +34,55 @@ export async function pickPostImagesFromLibrary(
   if (remaining <= 0) return [];
 
   if (!Capacitor.isNativePlatform()) {
-    fallbackInput?.click();
+    clickHiddenFileInput(fallbackInput);
     return [];
   }
 
-  const { Camera } = await import("@capacitor/camera");
-  const res = await Camera.pickImages({ limit: remaining });
-  const photos = res?.photos ?? [];
-  if (photos.length === 0) return [];
+  const restore = unlockSystemPickerPointerEvents();
+  try {
+    const res = await Camera.pickImages({ limit: remaining, quality: 90 });
+    const photos = res?.photos ?? [];
+    if (photos.length === 0) return [];
 
-  const newFiles: File[] = [];
-  for (const p of photos) {
-    const webPath = p.webPath?.trim();
-    if (!webPath) continue;
-    const r = await fetch(webPath);
-    const blob = await r.blob();
-    if (!blob.type.startsWith("image/")) continue;
-    const name = p.path?.split("/").pop()?.trim() || `photo-${Date.now()}.jpg`;
-    newFiles.push(new File([blob], name, { type: blob.type }));
-    if (currentCount + newFiles.length >= MAX_POST_IMAGES) break;
+    const newFiles: File[] = [];
+    for (const p of photos) {
+      const webPath = p.webPath?.trim();
+      if (!webPath) continue;
+      const name = p.path?.split("/").pop()?.trim() || `photo-${Date.now()}.jpg`;
+      const file = await fileFromWebPath(webPath, name);
+      if (!file) continue;
+      newFiles.push(file);
+      if (currentCount + newFiles.length >= MAX_POST_IMAGES) break;
+    }
+    return newFiles;
+  } finally {
+    restore();
   }
-  return newFiles;
+}
+
+/** One photo from the library. On web, clicks the fallback input and returns null. */
+export async function pickSingleImageFromLibrary(
+  fallbackInput?: HTMLInputElement | null,
+): Promise<File | null> {
+  if (!Capacitor.isNativePlatform()) {
+    clickHiddenFileInput(fallbackInput);
+    return null;
+  }
+
+  const restore = unlockSystemPickerPointerEvents();
+  try {
+    const photo = await Camera.getPhoto({
+      source: CameraSource.Photos,
+      resultType: CameraResultType.Uri,
+      quality: 90,
+    });
+    const webPath = photo.webPath?.trim();
+    if (!webPath) return null;
+    const ext = photo.format ? `.${photo.format}` : ".jpg";
+    return await fileFromWebPath(webPath, `photo-${Date.now()}${ext}`);
+  } catch {
+    return null;
+  } finally {
+    restore();
+  }
 }
