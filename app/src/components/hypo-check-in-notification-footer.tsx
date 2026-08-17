@@ -3,6 +3,7 @@ import type { InAppNotificationRow } from "@/lib/carer-notify-types";
 import {
   carerNameFromCheckInNotification,
   checkInIdFromNotificationData,
+  glucoseConcernFromNotification,
 } from "@/lib/hypo-check-ins";
 import { notificationKind } from "@/lib/in-app-notification-display";
 import { requestOpenHypoCheckInRespondSheet } from "@/lib/hypo-check-in-respond-deep-link";
@@ -35,7 +36,11 @@ export function HypoCheckInNotificationFooter({
         className="h-8 w-full rounded-lg text-xs"
         onClick={(e) => {
           e.stopPropagation();
-          requestOpenHypoCheckInRespondSheet({ checkInId, carerName });
+          requestOpenHypoCheckInRespondSheet({
+            checkInId,
+            carerName,
+            glucoseConcern: glucoseConcernFromNotification(row.data),
+          });
         }}
       >
         Respond to {carerName}

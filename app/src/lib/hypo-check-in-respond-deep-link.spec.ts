@@ -17,8 +17,22 @@ describe("hypo-check-in-respond-deep-link", () => {
     expect(consumePendingHypoCheckInRespond()).toEqual({
       checkInId: "abc-123",
       carerName: "Neil",
+      glucoseConcern: "unknown",
     });
     expect(consumePendingHypoCheckInRespond()).toBeNull();
+  });
+
+  it("stores glucose concern from the check-in", () => {
+    storePendingHypoCheckInRespond({
+      checkInId: "abc-123",
+      carerName: "Neil",
+      glucoseConcern: "high",
+    });
+    expect(consumePendingHypoCheckInRespond()).toEqual({
+      checkInId: "abc-123",
+      carerName: "Neil",
+      glucoseConcern: "high",
+    });
   });
 
   it("closes the notification bell before opening the respond sheet", () => {
@@ -36,6 +50,7 @@ describe("hypo-check-in-respond-deep-link", () => {
     expect(consumePendingHypoCheckInRespond()).toEqual({
       checkInId: "abc-123",
       carerName: "Neil",
+      glucoseConcern: "unknown",
     });
 
     window.removeEventListener(CLOSE_NOTIFICATION_BELL_EVENT, closeSpy);

@@ -6,6 +6,11 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { deliverPushToTokenRows, mobilePushDeliveryConfigured } from "../_shared/deliver-push.ts";
 import { fetchLatestPushTokensForUserId } from "../_shared/push-token-query.ts";
+import {
+  checkInPatientPushBody,
+  checkInRequestTitle,
+  parseGlucoseConcern,
+} from "../_shared/check-in-copy.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -78,7 +83,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: checkIn, error: checkInErr } = await admin
       .from("hypo_check_ins")
-      .select("id, carer_id, patient_id, status")
+      .select("id, carer_id, patient_id, status, glucose_concern")
       .eq("id", checkInId)
       .maybeSingle();
 
@@ -146,14 +151,16 @@ Deno.serve(async (req: Request) => {
     const patientHypoOn = patientPrefs.hypo_alerts !== false;
     const patientPushOn = patientPrefs.push === true;
 
-    const title = "Hypo check-in";
-    const bodyText = `${carerLabel} is checking you're OK`;
+    const concern = parseGlucoseConcern((checkIn as { glucose_concern?: unknown }).glucose_concern);
+    const title = checkInRequestTitle();
+    const bodyText = checkInPatientPushBody(carerLabel, concern);
     const payload = {
       kind: "hypo_check_in",
       check_in_id: checkInId,
       carer_id: carerId,
       carer_name: carerLabel,
       patient_user_id: patientId,
+      glucose_concern: concern,
       deep_link: "/",
     };
 

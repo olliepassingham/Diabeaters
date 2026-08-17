@@ -4,6 +4,7 @@ import {
   checkInIdFromNotificationData,
   formatHypoCheckInStatusLabel,
   friendlyCreateCheckInError,
+  glucoseConcernFromNotification,
   isActivePendingHypoCheckIn,
 } from "./hypo-check-ins";
 
@@ -18,9 +19,18 @@ describe("hypo-check-ins", () => {
     expect(carerNameFromCheckInNotification({})).toBe("Your supporter");
   });
 
+  it("reads glucose concern from notification payload", () => {
+    expect(glucoseConcernFromNotification({ glucose_concern: "high" })).toBe("high");
+    expect(glucoseConcernFromNotification({ glucose_concern: "low" })).toBe("low");
+    expect(glucoseConcernFromNotification({})).toBe("unknown");
+  });
+
   it("formats status labels for supporters", () => {
     expect(formatHypoCheckInStatusLabel("pending")).toBe("Waiting for reply");
     expect(formatHypoCheckInStatusLabel("ok")).toBe("They replied they're OK");
+    expect(formatHypoCheckInStatusLabel("treating")).toBe("They're sorting it");
+    expect(formatHypoCheckInStatusLabel("treating", "high")).toBe("They're sorting a high");
+    expect(formatHypoCheckInStatusLabel("treating", "low")).toBe("They're sorting a low");
     expect(formatHypoCheckInStatusLabel("hypo_logged")).toBe("They logged a hypo");
     expect(formatHypoCheckInStatusLabel("expired")).toBe("No reply (timed out)");
   });

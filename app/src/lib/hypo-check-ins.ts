@@ -1,13 +1,20 @@
 /**
- * Proactive supporter hypo check-ins — patient responds; optional link to hypo_logs row.
+ * Proactive supporter check-ins — patient responds; optional link to hypo_logs row.
  */
 import {
   getBearerAuthHeadersForEdgeFunctions,
   invokeEdgeFunctionPost,
 } from "@/lib/edge-function-invoke-auth";
+import {
+  formatCheckInStatusLabel,
+  parseGlucoseConcern,
+  type GlucoseConcern,
+} from "./hypo-check-in-copy";
 import { logEdgeInvokeFailure } from "./dev-log";
 import { notifyInAppNotificationsChanged } from "./in-app-notifications-events";
 import { getSupabase } from "./supabase";
+
+export type { GlucoseConcern };
 
 export type HypoCheckInStatus = "pending" | "ok" | "treating" | "hypo_logged" | "expired";
 
@@ -22,6 +29,7 @@ export type HypoCheckInRow = {
   hypo_log_id: string | null;
   created_at: string;
   responded_at: string | null;
+  glucose_concern: GlucoseConcern;
 };
 
 export type PendingHypoCheckIn = {
@@ -29,6 +37,7 @@ export type PendingHypoCheckIn = {
   carer_id: string;
   carer_name: string;
   created_at: string;
+  glucose_concern: GlucoseConcern;
 };
 
 export type HypoCheckInResponse = "ok" | "treating" | "hypo_logged";
@@ -42,6 +51,7 @@ function mapCheckInRow(row: Record<string, unknown>): HypoCheckInRow {
     hypo_log_id: row.hypo_log_id != null ? String(row.hypo_log_id) : null,
     created_at: String(row.created_at),
     responded_at: row.responded_at != null ? String(row.responded_at) : null,
+    glucose_concern: parseGlucoseConcern(row.glucose_concern),
   };
 }
 
@@ -59,21 +69,16 @@ export function carerNameFromCheckInNotification(data: unknown): string {
   return name || "Your supporter";
 }
 
-export function formatHypoCheckInStatusLabel(status: HypoCheckInStatus): string {
-  switch (status) {
-    case "pending":
-      return "Waiting for reply";
-    case "ok":
-      return "They replied they're OK";
-    case "treating":
-      return "They're treating it";
-    case "hypo_logged":
-      return "They logged a hypo";
-    case "expired":
-      return "No reply (timed out)";
-    default:
-      return status;
-  }
+export function glucoseConcernFromNotification(data: unknown): GlucoseConcern {
+  if (!data || typeof data !== "object") return "unknown";
+  return parseGlucoseConcern((data as Record<string, unknown>).glucose_concern);
+}
+
+export function formatHypoCheckInStatusLabel(
+  status: HypoCheckInStatus,
+  concern: GlucoseConcern = "unknown",
+): string {
+  return formatCheckInStatusLabel(status, concern);
 }
 
 let pendingHypoCheckInForLog: string | null = null;
@@ -209,6 +214,7 @@ export async function fetchPendingHypoCheckIns(): Promise<{
       carer_id: String(row.carer_id),
       carer_name: String(row.carer_name ?? "Your supporter"),
       created_at: String(row.created_at),
+      glucose_concern: parseGlucoseConcern(row.glucose_concern),
     }))
     .filter((row) => isActivePendingHypoCheckIn({ status: "pending", created_at: row.created_at }));
   return { data: rows, error: null };
@@ -236,6 +242,7 @@ export async function fetchHypoCheckInsForCarer(
       hypo_log_id: row.hypo_log_id,
       created_at: row.created_at,
       responded_at: row.responded_at,
+      glucose_concern: row.glucose_concern,
     }),
   );
   return { data: rows, error: null };

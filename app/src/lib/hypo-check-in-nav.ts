@@ -2,6 +2,7 @@ import type { InAppNotificationRow } from "@/lib/carer-notify-types";
 import {
   carerNameFromCheckInNotification,
   checkInIdFromNotificationData,
+  glucoseConcernFromNotification,
   setPendingHypoCheckInForLog,
 } from "@/lib/hypo-check-ins";
 import { getPathForInAppNotification } from "@/lib/in-app-notifications-nav";
@@ -58,6 +59,7 @@ export function navigateForInAppNotification(
         requestOpenHypoCheckInRespondSheet({
           checkInId,
           carerName: carerNameFromCheckInNotification(data),
+          glucoseConcern: glucoseConcernFromNotification(data),
         });
       };
       if (typeof window !== "undefined" && window.location.pathname === "/") {

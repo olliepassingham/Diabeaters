@@ -1,6 +1,10 @@
 import type { PushNotificationSchema } from "@capacitor/push-notifications";
 
-import { carerNameFromCheckInNotification, checkInIdFromNotificationData } from "@/lib/hypo-check-ins";
+import {
+  carerNameFromCheckInNotification,
+  checkInIdFromNotificationData,
+  glucoseConcernFromNotification,
+} from "@/lib/hypo-check-ins";
 import { getPathForInAppNotification } from "@/lib/in-app-notifications-nav";
 import { DIABEATER_OPEN_HYPO_DIALOG_EVENT, isHypoLogDeepLink } from "@/lib/hypo-check-in-events";
 import { requestOpenHypoCheckInRespondSheet } from "@/lib/hypo-check-in-respond-deep-link";
@@ -110,6 +114,7 @@ export function handlePushDeepLinkFromNotification(notification: PushNotificatio
       requestOpenHypoCheckInRespondSheet({
         checkInId,
         carerName: carerNameFromCheckInNotification(data),
+        glucoseConcern: glucoseConcernFromNotification(data),
       });
     }
   }

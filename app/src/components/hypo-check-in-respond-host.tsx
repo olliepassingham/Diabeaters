@@ -34,6 +34,7 @@ export function HypoCheckInRespondHost() {
       onOpenChange={setOpen}
       checkInId={target.checkInId}
       carerName={target.carerName}
+      glucoseConcern={target.glucoseConcern}
       onResponded={() => {
         setTarget(null);
         notifyInAppNotificationsChanged({ skipPageRefresh: true });

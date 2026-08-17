@@ -59,17 +59,18 @@ export type HypoAcknowledgedNotificationPayload = {
   deep_link?: string;
 };
 
-/** Patient inbox when a supporter asks if they are aware of a possible hypo. */
+/** Patient inbox when a supporter asks if they are OK. */
 export type HypoCheckInNotificationPayload = {
   kind: "hypo_check_in";
   check_in_id: string;
   carer_id?: string;
   carer_name?: string;
   patient_user_id?: string;
+  glucose_concern?: "low" | "high" | "unknown";
   deep_link?: string;
 };
 
-/** Supporter inbox when the patient responds to a hypo check-in. */
+/** Supporter inbox when the patient responds to a check-in. */
 export type HypoCheckInResponseNotificationPayload = {
   kind: "hypo_check_in_response";
   check_in_id: string;
@@ -77,6 +78,7 @@ export type HypoCheckInResponseNotificationPayload = {
   patient_user_id?: string;
   patient_name?: string;
   hypo_id?: string;
+  glucose_concern?: "low" | "high" | "unknown";
   deep_link?: string;
 };
 

@@ -6,6 +6,11 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { deliverPushToTokenRows, mobilePushDeliveryConfigured } from "../_shared/deliver-push.ts";
 import { fetchLatestPushTokensForUserId } from "../_shared/push-token-query.ts";
+import {
+  checkInResponseBody,
+  checkInResponseTitle,
+  parseGlucoseConcern,
+} from "../_shared/check-in-copy.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -78,7 +83,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: checkIn, error: checkInErr } = await admin
       .from("hypo_check_ins")
-      .select("id, carer_id, patient_id, status, hypo_log_id")
+      .select("id, carer_id, patient_id, status, hypo_log_id, glucose_concern")
       .eq("id", checkInId)
       .maybeSingle();
 
@@ -117,12 +122,8 @@ Deno.serve(async (req: Request) => {
       (patientProfile as { full_name?: string; public_handle?: string } | null)?.public_handle?.trim() ||
       "Your contact";
 
-    const bodyText =
-      status === "ok"
-        ? `${patientLabel} replied they're OK`
-        : status === "treating"
-          ? `${patientLabel} is treating a possible hypo`
-          : `${patientLabel} logged a hypo`;
+    const concern = parseGlucoseConcern((checkIn as { glucose_concern?: unknown }).glucose_concern);
+    const bodyText = checkInResponseBody(patientLabel, status, concern);
 
     const { data: carerPrefsRow } = await admin
       .from("notification_preferences")
@@ -138,7 +139,7 @@ Deno.serve(async (req: Request) => {
     const carerHypoOn = carerPrefs.hypo_alerts !== false;
     const carerPushOn = carerPrefs.push === true;
 
-    const title = "Hypo check-in update";
+    const title = checkInResponseTitle();
     const payload = {
       kind: "hypo_check_in_response",
       check_in_id: checkInId,
@@ -146,6 +147,7 @@ Deno.serve(async (req: Request) => {
       patient_user_id: patientId,
       patient_name: patientLabel,
       hypo_id: checkIn.hypo_log_id ?? undefined,
+      glucose_concern: concern,
       deep_link: "/carer-view",
     };
 
