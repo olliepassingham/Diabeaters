@@ -155,15 +155,15 @@ export function StoryViewerDialog({
   const viewPostButton = sourcePostId ? (
     <button
       type="button"
-      className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/10 px-3.5 py-2 text-white shadow-[0_8px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition-colors hover:bg-white/16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
+      className="inline-flex items-center gap-1.5 rounded-full bg-black/35 px-3 py-1.5 text-[12px] font-semibold tracking-wide text-white/95 backdrop-blur-md transition-colors hover:bg-black/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
       onClick={(e) => {
         e.stopPropagation();
         openSourcePost();
       }}
       data-testid="button-story-view-post"
     >
-      <ExternalLink className="h-4 w-4 text-white/90" aria-hidden />
-      <span className="text-[13px] font-medium tracking-tight">View post</span>
+      <ExternalLink className="h-3.5 w-3.5 text-white/90" aria-hidden />
+      View post
     </button>
   ) : null;
   const touchStart = useRef<{ x: number; y: number } | null>(null);
@@ -512,7 +512,7 @@ export function StoryViewerDialog({
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="h-9 w-9 rounded-full border border-white/10 bg-white/10 text-white/90 backdrop-blur-md hover:bg-white/20 hover:text-white"
+                    className="h-9 w-9 rounded-full bg-black/25 text-white/90 backdrop-blur-md hover:bg-black/40 hover:text-white focus-visible:ring-white/35"
                     disabled={!resolvedStory || deleteBusy}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -528,7 +528,7 @@ export function StoryViewerDialog({
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="h-9 w-9 rounded-full border border-white/10 bg-white/10 text-white/90 backdrop-blur-md hover:bg-white/20 hover:text-white"
+                    className="h-9 w-9 rounded-full bg-black/25 text-white/90 backdrop-blur-md hover:bg-black/40 hover:text-white focus-visible:ring-white/35"
                     disabled={reportBusy || !resolvedStory}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -543,7 +543,7 @@ export function StoryViewerDialog({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="h-9 w-9 rounded-full border border-white/10 bg-white/10 text-white/90 backdrop-blur-md hover:bg-white/20 hover:text-white"
+                  className="h-9 w-9 rounded-full bg-black/25 text-white/90 backdrop-blur-md hover:bg-black/40 hover:text-white focus-visible:ring-white/35"
                   onClick={(e) => {
                     e.stopPropagation();
                     closeViewer();
@@ -609,14 +609,14 @@ export function StoryViewerDialog({
                   {viewPostButton}
                   <button
                     type="button"
-                    className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/10 px-3.5 py-2 text-white shadow-[0_8px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition-colors hover:bg-white/16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-black/35 px-3 py-1.5 text-[12px] font-semibold tracking-wide text-white/95 backdrop-blur-md transition-colors hover:bg-black/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
                     onClick={(e) => {
                       e.stopPropagation();
                       openViewers();
                     }}
                   >
-                    <Eye className="h-4 w-4 text-white/90" aria-hidden />
-                    <span className="text-[13px] font-medium tracking-tight">Activity</span>
+                    <Eye className="h-3.5 w-3.5 text-white/90" aria-hidden />
+                    Activity
                   </button>
                 </div>
               ) : (

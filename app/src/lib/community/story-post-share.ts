@@ -2,6 +2,7 @@ import { format } from "date-fns";
 import { fileFromPostMediaPath } from "@/lib/community/post-media-signed-urls";
 import { parseEventDate } from "@/lib/community/event-display";
 import { parseEventExtra, parsePollExtra } from "@/lib/community/post-kinds";
+import { resolveProfileImageUrl } from "@/lib/storage-profile";
 import type { CommunityPostRow } from "@/lib/community";
 
 const W = 1080;
@@ -25,6 +26,8 @@ const WHITE = "#f8fafc";
 export type StoryPostShareMeta = {
   authorName: string;
   authorHandle?: string | null;
+  authorAvatarPath?: string | null;
+  authorAvatarFallbackSrc?: string | null;
   isOwn: boolean;
 };
 
@@ -222,6 +225,36 @@ async function loadMedia(path: string | null | undefined): Promise<CanvasImageSo
   }
 }
 
+async function loadImageFromUrl(url: string): Promise<HTMLImageElement | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    try {
+      return await loadImage(objectUrl);
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
+  } catch {
+    return null;
+  }
+}
+
+async function loadAvatar(meta: StoryPostShareMeta): Promise<HTMLImageElement | null> {
+  const path = meta.authorAvatarPath?.trim() || null;
+  if (path) {
+    const url = await resolveProfileImageUrl(path);
+    if (url) {
+      const img = await loadImageFromUrl(url);
+      if (img) return img;
+    }
+  }
+  const fallback = meta.authorAvatarFallbackSrc?.trim() || null;
+  if (fallback) return loadImageFromUrl(fallback);
+  return null;
+}
+
 function canvasToFile(canvas: HTMLCanvasElement): Promise<File | null> {
   return new Promise((resolve) => {
     canvas.toBlob(
@@ -343,6 +376,31 @@ function drawInitialAvatar(
   ctx.textAlign = "left";
 }
 
+function drawAvatar(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  name: string,
+  photo: CanvasImageSource | null,
+  onLight: boolean,
+) {
+  if (photo) {
+    drawCover(ctx, photo, x, y, size, size, size / 2);
+    return;
+  }
+  drawInitialAvatar(ctx, x, y, size, name, onLight);
+}
+
+function ellipsize(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  let out = text;
+  while (out.length > 1 && ctx.measureText(`${out}…`).width > maxWidth) {
+    out = out.slice(0, -1);
+  }
+  return `${out}…`;
+}
+
 function drawAuthorRow(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -350,15 +408,71 @@ function drawAuthorRow(
   name: string,
   handle: string | null,
   onLight: boolean,
+  photo: CanvasImageSource | null = null,
 ) {
   const av = 52;
-  drawInitialAvatar(ctx, x, y, av, name, onLight);
+  drawAvatar(ctx, x, y, av, name, photo, onLight);
   ctx.fillStyle = onLight ? INK : WHITE;
   ctx.font = `600 28px ${FONT}`;
   ctx.fillText(name, x + av + 16, y + 24);
   ctx.fillStyle = onLight ? INK_MUTED : "rgba(248,250,252,0.62)";
   ctx.font = `500 22px ${FONT}`;
   ctx.fillText(handle ? `@${handle}` : "From the feed", x + av + 16, y + 48);
+}
+
+/** Original poster chip for reshared posts — sits below the live story header. */
+function drawOriginalAuthorChip(
+  ctx: CanvasRenderingContext2D,
+  name: string,
+  handle: string | null,
+  photo: CanvasImageSource | null,
+) {
+  const av = 80;
+  const padX = 16;
+  const padY = 14;
+  const gap = 18;
+  const chipH = av + padY * 2;
+  const textMax = 520;
+  ctx.font = `700 34px ${FONT}`;
+  const nameLabel = ellipsize(ctx, name, textMax);
+  const nameW = ctx.measureText(nameLabel).width;
+  ctx.font = `500 24px ${FONT}`;
+  const handleLabel = handle ? ellipsize(ctx, `@${handle}`, textMax) : "";
+  const handleW = handleLabel ? ctx.measureText(handleLabel).width : 0;
+  const textW = Math.max(nameW, handleW);
+  const chipW = Math.min(W - SIDE * 2, padX + av + gap + textW + padX + 12);
+  const x = SIDE;
+  const y = TOP_SAFE;
+
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,0.35)";
+  ctx.shadowBlur = 18;
+  ctx.shadowOffsetY = 6;
+  fillRoundRect(ctx, x, y, chipW, chipH, chipH / 2, "rgba(8, 10, 16, 0.62)");
+  ctx.restore();
+  roundRect(ctx, x, y, chipW, chipH, chipH / 2);
+  ctx.strokeStyle = "rgba(255,255,255,0.28)";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  const avX = x + padX;
+  const avY = y + padY;
+  drawAvatar(ctx, avX, avY, av, name, photo, false);
+  ctx.beginPath();
+  ctx.arc(avX + av / 2, avY + av / 2, av / 2, 0, Math.PI * 2);
+  ctx.strokeStyle = "rgba(255,255,255,0.9)";
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  const tx = avX + av + gap;
+  ctx.fillStyle = WHITE;
+  ctx.font = `700 34px ${FONT}`;
+  ctx.fillText(nameLabel, tx, y + padY + (handleLabel ? 36 : 52));
+  if (handleLabel) {
+    ctx.fillStyle = "rgba(248,250,252,0.72)";
+    ctx.font = `500 24px ${FONT}`;
+    ctx.fillText(handleLabel, tx, y + padY + 68);
+  }
 }
 
 function drawPin(ctx: CanvasRenderingContext2D, x: number, y: number, color: string) {
@@ -381,6 +495,7 @@ function drawQuoteCard(
   body: string,
   name: string,
   handle: string | null,
+  photo: CanvasImageSource | null,
 ) {
   const pad = 56;
   const innerW = W - SIDE * 2;
@@ -415,7 +530,7 @@ function drawQuoteCard(
   ctx.moveTo(SIDE + pad, authorY - 22);
   ctx.lineTo(SIDE + innerW - pad, authorY - 22);
   ctx.stroke();
-  drawAuthorRow(ctx, SIDE + pad, authorY, name, handle, true);
+  drawAuthorRow(ctx, SIDE + pad, authorY, name, handle, true, photo);
 }
 
 function drawEventCard(
@@ -504,43 +619,50 @@ function drawEventCard(
   ctx.fillText(handle ? `${name}  ·  @${handle}` : name, metaX, y + 110);
 }
 
-function drawMediaCard(
+function drawMediaStory(
   ctx: CanvasRenderingContext2D,
   media: CanvasImageSource,
   caption: string,
-  name: string,
-  handle: string | null,
+  originalAuthor: { name: string; handle: string | null; photo: CanvasImageSource | null } | null,
 ) {
-  const innerW = W - SIDE * 2;
-  const maxCardH = H - TOP_SAFE - BOTTOM_SAFE;
-  const imageH = Math.min(1180, maxCardH);
-  const cardY = TOP_SAFE + Math.max(0, (maxCardH - imageH) / 2);
+  ctx.fillStyle = "#05060a";
+  ctx.fillRect(0, 0, W, H);
+  drawCover(ctx, media, 0, 0, W, H, 0);
 
-  drawLiftedCard(ctx, SIDE, cardY, innerW, imageH, 40, "#101826");
-  ctx.save();
-  roundRect(ctx, SIDE, cardY, innerW, imageH, 40);
-  ctx.clip();
-  drawCover(ctx, media, SIDE, cardY, innerW, imageH, 0);
+  const top = ctx.createLinearGradient(0, 0, 0, 460);
+  top.addColorStop(0, "rgba(0,0,0,0.58)");
+  top.addColorStop(0.45, "rgba(0,0,0,0.18)");
+  top.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = top;
+  ctx.fillRect(0, 0, W, 460);
 
-  ctx.font = `600 28px ${FONT}`;
-  const nameW = ctx.measureText(name).width;
-  ctx.font = `500 22px ${FONT}`;
-  const subW = ctx.measureText(handle ? `@${handle}` : "From the feed").width;
-  const chipW = Math.min(innerW - 56, 52 + 16 + Math.max(nameW, subW) + 36);
-  fillRoundRect(ctx, SIDE + 28, cardY + 28, chipW, 64, 32, "rgba(8, 10, 16, 0.58)");
-  drawAuthorRow(ctx, SIDE + 40, cardY + 34, name, handle, false);
+  const bottomH = 620;
+  const bot = ctx.createLinearGradient(0, H - bottomH, 0, H);
+  bot.addColorStop(0, "rgba(0,0,0,0)");
+  bot.addColorStop(0.38, "rgba(0,0,0,0.22)");
+  bot.addColorStop(1, "rgba(0,0,0,0.7)");
+  ctx.fillStyle = bot;
+  ctx.fillRect(0, H - bottomH, W, bottomH);
+
+  if (originalAuthor) {
+    drawOriginalAuthorChip(ctx, originalAuthor.name, originalAuthor.handle, originalAuthor.photo);
+  }
+
+  const textX = 72;
+  const textW = W - 144;
+  ctx.font = `500 36px ${FONT}`;
+  const capH = caption ? wrappedHeight(ctx, caption, textW, 46, 4) : 0;
+  const y = H - BOTTOM_SAFE - 12 - capH;
 
   if (caption) {
-    const fade = ctx.createLinearGradient(0, cardY + imageH - 220, 0, cardY + imageH);
-    fade.addColorStop(0, "rgba(8, 10, 16, 0)");
-    fade.addColorStop(1, "rgba(8, 10, 16, 0.78)");
-    ctx.fillStyle = fade;
-    ctx.fillRect(SIDE, cardY + imageH - 220, innerW, 220);
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.55)";
+    ctx.shadowBlur = 16;
     ctx.fillStyle = WHITE;
-    ctx.font = `500 32px ${FONT}`;
-    drawWrapped(ctx, caption, SIDE + 40, cardY + imageH - 88, innerW - 80, 42, 3);
+    ctx.font = `500 36px ${FONT}`;
+    drawWrapped(ctx, caption, textX, y + 36, textW, 46, 4);
+    ctx.restore();
   }
-  ctx.restore();
 }
 
 function drawPollCard(
@@ -549,6 +671,7 @@ function drawPollCard(
   options: string[],
   name: string,
   handle: string | null,
+  photo: CanvasImageSource | null,
 ) {
   const pad = 48;
   const innerW = W - SIDE * 2;
@@ -593,7 +716,7 @@ function drawPollCard(
     y += 96;
   }
 
-  drawAuthorRow(ctx, SIDE + pad, cardY + cardH - pad - 52, name, handle, false);
+  drawAuthorRow(ctx, SIDE + pad, cardY + cardH - pad - 52, name, handle, false, photo);
 }
 
 /** Renders a 9:16 story card for any feed post (photo + caption, text, poll, or event). */
@@ -620,17 +743,20 @@ export async function renderPostAsStoryFile(
   })();
   const handle = handleOf(meta);
   const name = nameOf(meta);
-
-  drawAtmosphere(ctx, media);
+  const photo = await loadAvatar(meta);
+  const originalAuthor = meta.isOwn ? null : { name, handle, photo };
 
   if (poll) {
-    drawPollCard(ctx, poll.question, poll.options, name, handle);
+    drawAtmosphere(ctx, null);
+    drawPollCard(ctx, poll.question, poll.options, name, handle, photo);
   } else if (event) {
+    drawAtmosphere(ctx, media);
     drawEventCard(ctx, event, media, name, handle);
   } else if (media) {
-    drawMediaCard(ctx, media, caption, name, handle);
+    drawMediaStory(ctx, media, caption, originalAuthor);
   } else {
-    drawQuoteCard(ctx, caption || "Shared from the feed", name, handle);
+    drawAtmosphere(ctx, null);
+    drawQuoteCard(ctx, caption || "Shared from the feed", name, handle, photo);
   }
 
   return canvasToFile(canvas);

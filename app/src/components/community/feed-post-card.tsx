@@ -625,6 +625,8 @@ export function FeedPostCard({
                   onAddToStory?.(post, {
                     authorName: authorDisplayName,
                     authorHandle: authorPublicHandle,
+                    authorAvatarPath,
+                    authorAvatarFallbackSrc: showBeatieAvatar ? BEATIE_FEED_AVATAR_FALLBACK_SRC : null,
                     isOwn: isAuthor,
                   })
                 }
