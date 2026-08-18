@@ -373,7 +373,17 @@ export default function HypoHelpPage() {
       <PageHeader
         leading={<PageBackButton />}
         title="Hypo help"
-        actions={<HypoHelpInfoDialog bgUnits={bgUnits} />}
+        actions={
+          <>
+            <Button variant="outline" size="sm" asChild className="shrink-0">
+              <Link href="/tools/hypo-history">
+                <History className="mr-1 h-3.5 w-3.5" aria-hidden />
+                History
+              </Link>
+            </Button>
+            <HypoHelpInfoDialog bgUnits={bgUnits} />
+          </>
+        }
       />
 
       <Card className="overflow-hidden rounded-[1.35rem] border-red-500/20 bg-gradient-to-b from-red-500/[0.08] via-card to-card shadow-none dark:border-red-400/15 dark:from-red-950/40">
@@ -649,12 +659,6 @@ export default function HypoHelpPage() {
           )}
         </CardContent>
       </Card>
-
-      <p className="text-center text-sm">
-        <Link href="/tools/hypo-history" className="font-medium text-primary underline-offset-4 hover:underline">
-          Hypo treatment history
-        </Link>
-      </p>
     </PageShell>
   );
 }

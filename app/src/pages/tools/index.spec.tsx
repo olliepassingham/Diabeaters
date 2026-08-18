@@ -22,6 +22,7 @@ describe("ToolsHubPage", () => {
 
     const titles = screen.getAllByRole("heading", { name: /meal.*ratios/i });
     expect(titles.length).toBe(1);
+    expect(screen.getByRole("heading", { name: /hypo history/i })).not.toBeNull();
   });
 
   it("supporter hub shows combined section and omits empty Plan", () => {

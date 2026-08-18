@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
-import { LineChart, Radio, Sparkles } from "lucide-react";
+import { LineChart, Radio, Sparkles, History, ChevronRight } from "lucide-react";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -36,6 +36,10 @@ import {
 } from "@/lib/cgm/glucose-day-filters";
 import { resolveUserTargetBgRange } from "@/lib/target-bg-range";
 import { normalizeBgUnits } from "@/lib/alcohol-night-tool";
+import {
+  buildHypoHistoryMonths,
+  currentHypoMonthKey,
+} from "@/lib/hypo-treatment-history";
 
 /** Below this many distinct local-calendar days, the overlay is too thin to show meaningful pattern shape. */
 const MIN_DAYS_FOR_OVERLAY = 3;
@@ -56,6 +60,36 @@ const DAY_KIND_OPTIONS: { id: GlucoseDayKind; label: string }[] = [
 const FILTER_TRIGGER_CLASS =
   "h-9 rounded-lg border-border/60 bg-background/70 px-2.5 text-xs font-medium shadow-none focus:ring-1";
 
+function HypoHistoryEntryCard() {
+  const months = useMemo(() => buildHypoHistoryMonths(storage.getHypoTreatments()), []);
+  const current = months.find((month) => month.key === currentHypoMonthKey()) ?? months.find((month) => month.count > 0);
+  const count = current?.count ?? 0;
+  const topType = current?.types[0];
+  const subtitle =
+    count === 0
+      ? "Treatments you log, by month and type"
+      : topType
+        ? `${count} this month · mostly ${topType.label.toLowerCase()}`
+        : `${count} this month`;
+
+  return (
+    <Link
+      href="/tools/hypo-history"
+      className="pressable group flex min-h-11 items-center gap-3 rounded-2xl border border-border/60 bg-card px-3.5 py-3 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      data-testid="link-patterns-hypo-history"
+    >
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-500/12 text-sky-800 dark:text-sky-100">
+        <History className="h-4 w-4" aria-hidden />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold leading-snug text-foreground">Hypo history</span>
+        <span className="block truncate text-xs text-muted-foreground">{subtitle}</span>
+      </span>
+      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5" aria-hidden />
+    </Link>
+  );
+}
+
 function PatternsInfoDialog() {
   return (
     <PageInfoDialog
@@ -71,7 +105,7 @@ function PatternsInfoDialog() {
       <InfoSection title="Hypo charts">
         <p>
           When lows happen, which days, and weekly trend come from hypo treatments and exercise sessions you have logged
-          in the app on this phone.
+          in the app on this phone. Open Hypo history from this page for monthly counts and what you treated with.
         </p>
       </InfoSection>
       <InfoSection title="Care team">
@@ -311,6 +345,8 @@ export default function PatternsPage() {
       />
 
       <GlucoseDayPatternCard />
+
+      <HypoHistoryEntryCard />
 
       {!hasEnoughData ? (
         <EmptyState

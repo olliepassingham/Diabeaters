@@ -19,6 +19,7 @@ import {
   Activity,
   LineChart,
   ArrowLeftRight,
+  History,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -79,6 +80,13 @@ const PATIENT_TOOLS: ToolDef[] = [
     icon: Droplet,
     title: "Hypo help",
     description: "Fast-carb amounts for a low",
+  },
+  {
+    id: "hypo-history",
+    href: "/tools/hypo-history",
+    icon: History,
+    title: "Hypo history",
+    description: "Monthly counts and what you treated with",
   },
   {
     id: "activity-log",
@@ -419,7 +427,7 @@ export function ToolsHubPage({
       : patientActNowIds;
   const actNow = actNowIds.map((id) => byId.get(id)).filter(Boolean) as ToolDef[];
 
-  const plan = (["patterns", "routines", "appointments", "supply-tracker", "activity-log"] as const)
+  const plan = (["patterns", "hypo-history", "activity-log", "routines", "appointments", "supply-tracker"] as const)
     .map((id) => byId.get(id))
     .filter(Boolean) as ToolDef[];
 
