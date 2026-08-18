@@ -9,9 +9,11 @@ import {
 } from "./carb-source-preferences";
 
 describe("carb-source-preferences", () => {
-  it("convertGramsToServings rounds up", () => {
-    expect(convertGramsToServings(45, 22)).toBe(3);
+  it("convertGramsToServings uses nearest half serving, not a full extra pack", () => {
+    expect(convertGramsToServings(45, 22)).toBe(2);
     expect(convertGramsToServings(15, 4)).toBe(4);
+    expect(convertGramsToServings(15, 30)).toBe(0.5);
+    expect(convertGramsToServings(8, 30)).toBe(0.5);
   });
 
   it("formats favourite line from grams", () => {
@@ -22,7 +24,23 @@ describe("carb-source-preferences", () => {
         carbsPerServing: 22,
         unitLabel: "gel",
       }),
-    ).toBe("about 3 SIS Beta Fuel gel");
+    ).toBe("about 2 SIS Beta Fuel gel");
+    expect(
+      formatCarbsAsFavorite(15, {
+        id: "2",
+        label: "Running gel",
+        carbsPerServing: 30,
+        unitLabel: "gel",
+      }),
+    ).toBe("about ½ Running gel");
+    expect(
+      formatCarbsAsFavorite(5, {
+        id: "3",
+        label: "Running gel",
+        carbsPerServing: 30,
+        unitLabel: "gel",
+      }),
+    ).toBe("Running gel is 30g each — use about 5g");
   });
 
   it("migrates primaryHypoTreatment into hypo + driving defaults", () => {
@@ -47,7 +65,7 @@ describe("carb-source-preferences", () => {
         defaultByScenario: { exercise_during: fav.id },
       }),
     };
-    expect(formatCarbsForScenario(45, profile, "exercise_during")).toBe("about 3 Running gel");
+    expect(formatCarbsForScenario(45, profile, "exercise_during")).toBe("about 2 Running gel");
     expect(formatCarbsForScenario(45, profile, "hypo")).toBeNull();
   });
 

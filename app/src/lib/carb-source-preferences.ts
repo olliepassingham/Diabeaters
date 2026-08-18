@@ -172,14 +172,31 @@ export function getCarbSourcePreferences(profile: Partial<UserProfile> | null | 
 
 export function convertGramsToServings(grams: number, carbsPerServing: number): number {
   if (!Number.isFinite(grams) || grams <= 0 || !Number.isFinite(carbsPerServing) || carbsPerServing <= 0) {
-    return 1;
+    return 0;
   }
-  return Math.max(1, Math.ceil(grams / carbsPerServing));
+  const halves = Math.round((grams / carbsPerServing) * 2) / 2;
+  if (halves < 0.5) return 0.5;
+  return halves;
+}
+
+/** 0.5 → "½", 1 → "1", 1.5 → "1½" */
+export function formatServingCount(count: number): string {
+  if (!Number.isFinite(count) || count <= 0) return "0";
+  const halves = Math.round(count * 2) / 2;
+  const whole = Math.floor(halves);
+  const frac = halves - whole;
+  if (frac === 0.5) return whole === 0 ? "½" : `${whole}½`;
+  return String(whole);
 }
 
 export function formatCarbsAsFavorite(grams: number, favorite: CarbSourceFavorite): string {
   const count = convertGramsToServings(grams, favorite.carbsPerServing);
-  return `about ${count} ${favorite.label}`;
+  const servingGrams = count * favorite.carbsPerServing;
+  if (servingGrams > grams * 1.5) {
+    return `${favorite.label} is ${favorite.carbsPerServing}g each — use about ${Math.round(grams)}g`;
+  }
+  const countLabel = formatServingCount(count);
+  return `about ${countLabel} ${favorite.label}`;
 }
 
 export function formatCarbsAsFavoriteWithGrams(grams: number, favorite: CarbSourceFavorite): string {

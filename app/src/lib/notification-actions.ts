@@ -13,11 +13,14 @@ import { supportsNativeLocalNotifications } from "@/lib/native-platform";
 export const HYPO_CHECK_IN_ACTION_TYPE = "hypo_check_in";
 export const SICK_DAY_MED_ACTION_TYPE = "sick_day_med_reminder";
 export const BEDTIME_REMINDER_ACTION_TYPE = "bedtime_reminder";
+export const EXERCISE_CGM_ALERT_ACTION_TYPE = "exercise_cgm_alert";
 
 export const ACTION_HYPO_CHECK_IN_OK = "hypo_check_in_ok";
 export const ACTION_SICK_DAY_MED_TAKEN = "sick_day_med_taken";
 export const ACTION_BEDTIME_OPEN_GUIDE = "bedtime_open_guide";
 export const ACTION_BEDTIME_NOT_TONIGHT = "bedtime_not_tonight";
+export const ACTION_EXERCISE_OPEN_GUIDE = "exercise_open_guide";
+export const ACTION_EXERCISE_SORTED_IT = "exercise_sorted_it";
 
 let registered = false;
 
@@ -41,6 +44,13 @@ export async function registerNotificationActionTypes(): Promise<void> {
           actions: [
             { id: ACTION_BEDTIME_OPEN_GUIDE, title: "Open guide", foreground: true },
             { id: ACTION_BEDTIME_NOT_TONIGHT, title: "Not tonight" },
+          ],
+        },
+        {
+          id: EXERCISE_CGM_ALERT_ACTION_TYPE,
+          actions: [
+            { id: ACTION_EXERCISE_OPEN_GUIDE, title: "Open exercise", foreground: true },
+            { id: ACTION_EXERCISE_SORTED_IT, title: "I’ve sorted it" },
           ],
         },
       ],
@@ -95,6 +105,19 @@ export async function handleNotificationButtonAction(
     case ACTION_BEDTIME_NOT_TONIGHT:
       // Dismiss quietly — the whole point is not opening the app.
       return true;
+    case ACTION_EXERCISE_SORTED_IT: {
+      try {
+        const { fetchPendingHypoCheckIns, respondHypoCheckIn } = await import("@/lib/hypo-check-ins");
+        const { data } = await fetchPendingHypoCheckIns();
+        const latest = data[0];
+        if (latest) {
+          await respondHypoCheckIn({ checkInId: latest.id, response: "treating" });
+        }
+      } catch {
+        // Offline or nothing pending — dismissing the alert is still the right outcome.
+      }
+      return true;
+    }
     default:
       return false;
   }

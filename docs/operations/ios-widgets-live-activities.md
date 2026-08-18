@@ -3,8 +3,9 @@
 ## What shipped
 
 - **App Group** `group.com.passingtime.diabeaters` on the main app + widget extension.
-- **`OsSurfaces` Capacitor plugin** writes scenario/exercise status into the App Group and starts/updates/ends an **Exercise Live Activity**.
-- **`DiabeatersWidgetExtension`**: Home/Lock Screen status widget + Dynamic Island / Live Activity UI.
+- **`OsSurfaces` Capacitor plugin** writes scenario/exercise status **and last glucose** (value, units, optional trend, recorded-at) into the App Group, starts/updates/ends an **Exercise Live Activity**, and pushes the same status to Apple Watch over WatchConnectivity.
+- **`DiabeatersWidgetExtension`**: Home/Lock Screen status widget (glucose when known) + Dynamic Island / Live Activity UI.
+- **Apple Watch companion**: glance + complications + “I’ve sorted it”. See [apple-watch-deferred.md](./apple-watch-deferred.md).
 - JS sync via [`NativeOsSurfacesSync`](../../app/src/components/native-os-surfaces-sync.tsx).
 
 ## One-time Apple Developer setup
@@ -23,4 +24,4 @@
 
 ## Cap sync
 
-`scripts/ensure-ios-widget-target.mjs` is run from release sync scripts so the Widget target stays wired after Capacitor rewrites the project.
+`scripts/ensure-ios-widget-target.mjs` and `scripts/ensure-ios-watch-target.mjs` are run from release sync scripts so the Widget and Watch targets stay wired after Capacitor rewrites the project.

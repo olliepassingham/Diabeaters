@@ -17,6 +17,7 @@ vi.mock("@/lib/native-platform", () => ({
 
 vi.mock("@/lib/hypo-check-ins", () => ({
   respondHypoCheckIn: (...args: unknown[]) => respondHypoCheckInMock(...args),
+  fetchPendingHypoCheckIns: async () => ({ data: [], error: null }),
 }));
 
 vi.mock("@/lib/sick-day-med-actions", () => ({
@@ -47,6 +48,7 @@ describe("registerNotificationActionTypes", () => {
       "hypo_check_in",
       "sick_day_med_reminder",
       "bedtime_reminder",
+      "exercise_cgm_alert",
     ]);
   });
 
@@ -103,10 +105,10 @@ describe("handleNotificationButtonAction", () => {
     expect(markMedTakenMock).not.toHaveBeenCalled();
   });
 
-  it("treats bedtime 'Not tonight' as handled without side effects", async () => {
+  it("treats exercise 'I've sorted it' as handled, and replies treating when a check-in is waiting", async () => {
     const mod = await freshModule();
-    const handled = await mod.handleNotificationButtonAction("bedtime_not_tonight", {
-      deep_link: "/scenarios/bedtime",
+    const handled = await mod.handleNotificationButtonAction("exercise_sorted_it", {
+      deep_link: "/scenarios/exercise",
     });
     expect(handled).toBe(true);
   });

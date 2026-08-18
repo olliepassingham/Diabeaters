@@ -129,6 +129,8 @@ describe("getRecoveryReadinessVerdict", () => {
     });
     expect(r.verdict).toBe("not_recommended");
     expect(r.title.toLowerCase()).toContain("falling");
+    expect(r.detail.toLowerCase()).toContain("treat-now");
+    expect(r.title).not.toMatch(/not recommended/i);
   });
 
   it("is caution (amber) when in range but falling", () => {
@@ -699,7 +701,7 @@ describe("getExerciseReadinessVerdict active-phase symptom escalation", () => {
       symptomSeverity: "severe",
     });
     expect(r.verdict).toBe("not_recommended");
-    expect(r.title.toLowerCase()).toContain("low bg");
+    expect(r.title.toLowerCase()).toContain("low");
   });
 });
 

@@ -41,4 +41,4 @@ To keep **bundled** store binaries but still patch JS without resubmitting:
 ## Related
 
 - Widgets / Live Activities: [ios-widgets-live-activities.md](./ios-widgets-live-activities.md)
-- Apple Watch (deferred): [apple-watch-deferred.md](./apple-watch-deferred.md)
+- Apple Watch companion (Wear OS deferred): [apple-watch-deferred.md](./apple-watch-deferred.md)

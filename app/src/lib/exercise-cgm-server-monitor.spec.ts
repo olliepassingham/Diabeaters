@@ -46,5 +46,6 @@ describe("buildExerciseCgmAlertCopy (server)", () => {
     });
     expect(copy.body).toContain("Tennis");
     expect(copy.body).toContain("5.2");
+    expect(copy.title).toBe("Treat now");
   });
 });

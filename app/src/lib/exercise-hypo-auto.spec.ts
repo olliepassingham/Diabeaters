@@ -78,8 +78,29 @@ describe("exercise-hypo-auto", () => {
       carbsIfLow: 20,
     });
     expect(r).not.toBeNull();
-    expect(r!.carbsGrams).toBeGreaterThanOrEqual(15);
+    // 5.0 → ~7.0 mmol/L at 70kg is 8g; do not use the plan's 20g / Rule-of-15 floor.
+    expect(r!.carbsGrams).toBe(8);
     expect(r!.clinicalHypo).toBe(false);
+    expect(r!.targetBgLabel).toBe("7");
+  });
+
+  it("computeExerciseHypoSuggestion scales with how far below the exercise-start band", () => {
+    const settings: UserSettings = { targetBgLow: 4, targetBgHigh: 7 };
+    const mild = computeExerciseHypoSuggestion(6.8, settings, "mmol/L", { dateOfBirth: "1990-01-01" }, {
+      trend: "falling",
+      phase: "recovery",
+      exerciseLowThreshold: 5.6,
+    });
+    const lower = computeExerciseHypoSuggestion(4.3, settings, "mmol/L", { dateOfBirth: "1990-01-01" }, {
+      trend: "falling",
+      phase: "active",
+      exerciseLowThreshold: 5.6,
+    });
+    expect(mild).not.toBeNull();
+    expect(lower).not.toBeNull();
+    expect(mild!.carbsGrams).toBe(5);
+    expect(lower!.carbsGrams).toBe(11);
+    expect(lower!.carbsGrams).toBeGreaterThan(mild!.carbsGrams);
   });
 
   it("computeExerciseHypoSuggestion returns carbs for recovery 6.0 falling", () => {
@@ -91,7 +112,7 @@ describe("exercise-hypo-auto", () => {
       carbsIfLow: 20,
     });
     expect(r).not.toBeNull();
-    expect(r!.carbsGrams).toBeGreaterThanOrEqual(15);
+    expect(r!.carbsGrams).toBe(5);
   });
 
   it("needsImmediateExerciseBgTreatment escalates for severe symptoms even without a falling trend", () => {

@@ -244,13 +244,15 @@ export function ExerciseFuelPlanSummary(props: {
 }
 
 function hypoSupportLine(suggestion: ExerciseHypoSuggestion): string {
-  if (suggestion.approximate) {
-    return "Then recheck. Use your care team's hypo plan if it differs.";
-  }
+  const toward = suggestion.targetBgLabel ? `toward ${suggestion.targetBgLabel}` : null;
+  const recheck = suggestion.approximate
+    ? "Then recheck. Use your care team's hypo plan if it differs."
+    : "Recheck in 10–15 min";
   if (suggestion.primaryTreatmentLine) {
-    return `${suggestion.primaryTreatmentLine} · recheck in 10–15 min`;
+    return [suggestion.primaryTreatmentLine, toward, recheck].filter(Boolean).join(" · ");
   }
-  return `~${suggestion.glucoseTablets} tablets or ~${suggestion.juiceMl}ml juice · recheck in 10–15 min`;
+  const fallback = `~${suggestion.glucoseTablets} tablets or ~${suggestion.juiceMl}ml juice`;
+  return [fallback, toward, recheck].filter(Boolean).join(" · ");
 }
 
 export function ExerciseHypoTreatmentHint(props: {

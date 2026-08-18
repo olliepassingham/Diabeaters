@@ -1339,30 +1339,44 @@ export function ExerciseGuidedCoach() {
 
             {readiness ? (
               <div className="space-y-3" data-testid="coach-readiness-card">
-                <div className="flex items-center justify-between gap-2 rounded-2xl border border-border/40 bg-muted/25 px-3.5 py-3">
-                  <div className="flex min-w-0 items-center gap-2.5">
+                <div
+                  className={cn("rounded-2xl border px-3.5 py-3.5", verdictVisuals.cardClass)}
+                  role="status"
+                  aria-live="polite"
+                >
+                  <div className="flex items-start gap-3">
                     <span
                       className={cn(
-                        "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
+                        "mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
                         verdictVisuals.chipClass,
                       )}
                       aria-hidden
                     >
                       <VerdictIcon className="h-4 w-4" />
                     </span>
-                    <p className="truncate text-sm font-semibold leading-tight text-foreground">
-                      {readiness.title}
-                    </p>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-base font-semibold leading-snug tracking-tight text-foreground">
+                        {readiness.title}
+                      </p>
+                      {readiness.detail ? (
+                        <p
+                          className="mt-1.5 text-sm leading-relaxed text-foreground/80"
+                          data-testid="coach-readiness-detail"
+                        >
+                          {readiness.detail}
+                        </p>
+                      ) : null}
+                      {phase !== "active" && phaseTimerLabel ? (
+                        <p
+                          className="mt-2.5 text-xs font-medium tabular-nums text-muted-foreground"
+                          data-testid="coach-phase-timer"
+                          title={phase === "recovery" ? "Time since workout ended" : "Time in this step"}
+                        >
+                          {phase === "recovery" ? "Time in recovery" : "Time in this step"} · {phaseTimerLabel}
+                        </p>
+                      ) : null}
+                    </div>
                   </div>
-                  {phase !== "active" && phaseTimerLabel ? (
-                    <span
-                      className="shrink-0 text-xs tabular-nums text-muted-foreground"
-                      data-testid="coach-phase-timer"
-                      title="Time since workout ended"
-                    >
-                      {phaseTimerLabel}
-                    </span>
-                  ) : null}
                 </div>
                 {fuelPlanLines.length > 0 ? (
                   <ExerciseFuelPlanSummary lines={fuelPlanLines} variant={fuelPlanVariant} />

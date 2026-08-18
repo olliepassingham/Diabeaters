@@ -1,17 +1,35 @@
-# Apple Watch — deferred
+# Apple Watch companion — Wear OS deferred
 
-Watch companion work is **explicitly deferred** until:
+Apple Watch v1 is a **glance companion** in this repo (SwiftUI watchOS target). It is not a port of the Capacitor React app.
 
-1. Bundled store shipping is the default (done).
-2. Lock Screen / Home Screen WidgetKit v1 ships.
-3. Live Activities for active exercise (or sick day) ship.
+**Wear OS, Garmin, and Fitbit stay deferred** until Apple Watch v1 is on TestFlight. Each of those is a separate native project with no shared UI.
 
-Those surfaces establish App Groups, shared status models, and native SwiftUI patterns the Watch app would reuse.
+## What shipped (Apple Watch v1)
 
-## Planned Watch v1 (later)
+- Shared App Group status includes last glucose, units, optional trend, and freshness (`DiabeatersSharedStatus`).
+- iPhone Lock Screen widget shows that glance (educational — not a CGM alarm).
+- `OsSurfaces` pushes the same payload to a paired Watch over **WatchConnectivity**.
+- Watch app: big last-known glucose, age of reading, **I’ve sorted it** (queues if the phone is unreachable).
+- Complications (circular / rectangular / inline / corner) read the Watch-local cache.
+- Phone stays the hub. Meal planner, bedtime, pump IOB, and Guides are **not** on the Watch.
 
-- Complication: scenario status or last known BG (Health) + open-on-phone.
-- One or two actions: hypo “I’m OK”, exercise check-in.
-- Phone remains the hub for guides, community, and packing lists.
+Copy on Watch and widget: “last reading from the phone — not a CGM alarm.” Treat first, then tap I’ve sorted it. Independent Watch-only hypo alarms are out of scope until phone CGM v2 is solid.
 
-Do not add a watchOS target until WidgetKit + Live Activities are in production TestFlight.
+## One-time Apple Developer setup
+
+Register these in [Certificates, Identifiers & Profiles](https://developer.apple.com/account/resources/identifiers/list) (the ensure scripts do **not** create App IDs):
+
+1. App ID `com.passingtime.diabeaters.watchkitapp` (watchOS app) with **App Groups** `group.com.passingtime.diabeaters` and the Watch App capability.
+2. App ID `com.passingtime.diabeaters.watchkitapp.widget` (watchOS WidgetKit extension) with the same App Group.
+3. In Xcode: `ios/App/App.xcworkspace`, confirm signing on **App**, **DiabeatersWatch**, and **DiabeatersWatchWidgets**.
+4. Install the **watchOS** platform (Xcode → Settings → Components). Embedding the Watch app means the iPhone scheme will not build until that SDK is present.
+
+TestFlight needs a real Watch. Simulator is weak for Health + WatchConnectivity.
+
+## Cap sync
+
+`scripts/ensure-ios-widget-target.mjs` then `scripts/ensure-ios-watch-target.mjs` run from `ios:release:sync*` so Capacitor rewrites do not drop the Watch targets.
+
+## Other watches
+
+Do not start Wear OS / Garmin / Fitbit until this Apple Watch companion is in TestFlight.

@@ -64,6 +64,34 @@ if (!pbx.includes("OsSurfacesPlugin.swift in Sources")) {
   );
 }
 
+// --- App target: WatchConnectivity bridge (phone half of the Watch companion) ---
+if (!pbx.includes("OsSurfacesWatchBridge.swift in Sources")) {
+  insertBefore(
+    "/* End PBXBuildFile section */",
+    `\t\tA1WCHBF00FED796500168600 /* OsSurfacesWatchBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1WCHFR00FED796500168600 /* OsSurfacesWatchBridge.swift */; };
+\t\tA1WCHBF01FED796500168601 /* WatchConnectivity.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A1WCHFR01FED796500168601 /* WatchConnectivity.framework */; };
+`,
+  );
+  insertBefore(
+    "/* End PBXFileReference section */",
+    `\t\tA1WCHFR00FED796500168600 /* OsSurfacesWatchBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OsSurfacesWatchBridge.swift; sourceTree = "<group>"; };
+\t\tA1WCHFR01FED796500168601 /* WatchConnectivity.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WatchConnectivity.framework; path = System/Library/Frameworks/WatchConnectivity.framework; sourceTree = SDKROOT; };
+`,
+  );
+  ensureLineInBlock(
+    "\t\t\t\tA1OSURF00FED796500168570 /* OsSurfacesPlugin.swift */,\n",
+    "\t\t\t\tA1WCHFR00FED796500168600 /* OsSurfacesWatchBridge.swift */,\n",
+  );
+  ensureLineInBlock(
+    "\t\t\t\tA1OSURF01FED796500168570 /* OsSurfacesPlugin.swift in Sources */,\n",
+    "\t\t\t\tA1WCHBF00FED796500168600 /* OsSurfacesWatchBridge.swift in Sources */,\n",
+  );
+  ensureLineInBlock(
+    "\t\t\t\t4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */,\n",
+    "\t\t\t\tA1WCHBF01FED796500168601 /* WatchConnectivity.framework in Frameworks */,\n",
+  );
+}
+
 // --- Widget extension target ---
 if (!pbx.includes("DiabeatersWidgetExtension")) {
   insertBefore(

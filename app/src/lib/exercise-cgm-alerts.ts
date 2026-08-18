@@ -16,6 +16,7 @@ import { resolveExerciseCgmAlertThreshold } from "@/lib/exercise-cgm-alert-thres
 import { formatTargetBgInput } from "@/lib/hypo-context";
 import { normalizeBgUnits } from "@/lib/alcohol-night-tool";
 import { showNativeSystemNotificationNow } from "@/lib/native-system-notifications";
+import { EXERCISE_CGM_ALERT_ACTION_TYPE } from "@/lib/notification-actions";
 import { bgForPlannerFromActiveSession } from "@/lib/exercise-planner-href";
 import {
   storage,
@@ -143,7 +144,9 @@ export function evaluateExerciseCgmAlert(input: {
     shouldAlert: true,
     reason,
     carbsGrams: suggestion.carbsGrams,
-    carbLine: suggestion.primaryTreatmentLine ?? `about ${suggestion.carbsGrams}g fast carbs`,
+    carbLine:
+      suggestion.primaryTreatmentLine ??
+      `about ${suggestion.carbsGrams}g fast carbs`,
   };
 }
 
@@ -187,22 +190,31 @@ export function buildExerciseCgmAlertCopy(input: {
   trend: ExerciseBgTrend | null;
   evaluation: ExerciseCgmAlertEvaluation;
   exerciseName?: string;
-}): { title: string; body: string } {
+}): { title: string; body: string; largeBody?: string; inboxList?: string[] } {
   const bgLabel = formatTargetBgInput(input.bg, input.bgUnits);
   const arrow = trendArrow(input.trend);
-  const carbPart = input.evaluation.carbLine ?? "fast carbs";
-  const sessionLabel = input.exerciseName?.trim() ? ` during ${input.exerciseName.trim()}` : "";
+  const grams = input.evaluation.carbsGrams;
+  const carbPart = input.evaluation.carbLine ?? (grams != null ? `${grams}g fast carbs` : "fast carbs");
+  const sessionLabel = input.exerciseName?.trim() || "";
+  const bgLine = `BG ${bgLabel}${arrow ? ` ${arrow}` : ""}${input.bgUnits === "mg/dL" ? " mg/dL" : " mmol/L"}`;
+  const contextBits = [bgLine, sessionLabel].filter(Boolean).join(" · ");
 
   if (input.evaluation.reason === "clinical_hypo") {
+    const title = grams != null ? `Treat low BG · ${grams}g` : "Treat low BG";
     return {
-      title: "Exercise: treat low BG",
-      body: `BG ${bgLabel}${arrow ? ` ${arrow}` : ""}${sessionLabel} — ${carbPart}. Confirm on meter/CGM before treating.`,
+      title,
+      body: `${contextBits}\n${carbPart}\nConfirm on meter or CGM, then treat.`,
+      largeBody: `${contextBits}\n\n${carbPart}\n\nConfirm on meter or CGM before treating.`,
+      inboxList: [bgLine, carbPart, sessionLabel || "Open Exercise to review"].filter(Boolean).slice(0, 5),
     };
   }
 
+  const title = grams != null ? `Treat now · ${grams}g` : "Treat now";
   return {
-    title: "Exercise: carbs may help",
-    body: `BG ${bgLabel}${arrow ? ` ${arrow}` : ""}${sessionLabel} — ${carbPart}. Open your exercise guide to review.`,
+    title,
+    body: `${contextBits}\n${carbPart}\nTreat first, then open Exercise.`,
+    largeBody: `${contextBits}\n\n${carbPart}\n\nTreat first, then open Exercise to review.`,
+    inboxList: [bgLine, carbPart, sessionLabel || "Open Exercise to review"].filter(Boolean).slice(0, 5),
   };
 }
 
@@ -231,9 +243,13 @@ async function showExerciseCgmAlertNotification(input: {
   await showNativeSystemNotificationNow({
     title: copy.title,
     body: copy.body,
+    largeBody: copy.largeBody,
+    inboxList: copy.inboxList,
+    summaryText: "Diabeaters",
     deepLink,
     tag,
-    channelId: "diabeaters_scenarios",
+    channelId: "diabeaters_exercise",
+    actionTypeId: EXERCISE_CGM_ALERT_ACTION_TYPE,
   });
 
   if (!Capacitor.isNativePlatform() && typeof Notification !== "undefined" && Notification.permission === "granted") {

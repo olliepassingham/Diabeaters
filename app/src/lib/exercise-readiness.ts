@@ -158,14 +158,27 @@ function baseVerdict(input: ExerciseReadinessInput): ExerciseReadinessResult {
 
   const highThreshold = exerciseHighThreshold(bgUnits);
   if (bg < lowThreshold) {
-    const grams = exercisePlanResult.pre.carbsIfLow;
+    const phase = input.phase ?? "pre";
+    if (phase === "active") {
+      return {
+        verdict: "not_recommended",
+        title: "Pause — BG is low",
+        detail:
+          "Ease off and treat using the amount below, then re-check in 10–15 minutes before you push on.",
+      };
+    }
+    if (phase === "recovery") {
+      return {
+        verdict: "not_recommended",
+        title: "BG is low after exercise",
+        detail:
+          "Treat using the amount below, then re-check in 10–15 minutes. Delayed lows are common after activity.",
+      };
+    }
     return {
       verdict: "not_recommended",
-      title: "Not recommended (low BG)",
-      detail:
-        grams > 0
-          ? `Treat now with about ${grams}g fast carbs, then re-check in 10–15 minutes.`
-          : "Treat first, then re-check in 10–15 minutes.",
+      title: "Don't start yet — BG is low",
+      detail: "Treat using the amount below, then re-check in 10–15 minutes before you begin.",
     };
   }
 
@@ -376,14 +389,11 @@ export function getRecoveryReadinessVerdict(input: ExerciseReadinessInput): Exer
   const approachLowCeiling = exerciseApproachLowCeilingForPhase(lowThreshold, bgUnits, "recovery");
 
   if (bg < lowThreshold) {
-    const grams = exercisePlanResult.pre.carbsIfLow;
     return {
       verdict: "not_recommended",
-      title: "Not recommended (low BG)",
+      title: "BG is low after exercise",
       detail:
-        grams > 0
-          ? `Low after exercise — treat now with about ${grams}g fast carbs, then re-check per your hypo plan.`
-          : "Low after exercise — treat per your hypo plan, then re-check.",
+        "Treat using the amount below, then re-check in 10–15 minutes. Delayed lows are common after activity.",
     };
   }
 
@@ -394,15 +404,16 @@ export function getRecoveryReadinessVerdict(input: ExerciseReadinessInput): Exer
   // also flags flat readings in this band, so the hero verdict and the hypo "treat now" banner
   // never contradict each other on screen.
   if (trend !== "rising" && bg < approachLowCeiling) {
-    const grams = exercisePlanResult.pre.carbsIfLow;
-    const fallingNote = trend === "falling" ? "and dropping" : "for this soon after activity";
+    const falling = trend === "falling";
+    const strengthLike = input.exerciseType.toLowerCase() === "strength";
     return {
       verdict: "not_recommended",
-      title: trend === "falling" ? "Not recommended (low + falling)" : "Not recommended (borderline low)",
-      detail:
-        grams > 0
-          ? `BG is borderline low ${fallingNote} — treat now with about ${grams}g fast carbs, then re-check. Delayed lows after activity are common.`
-          : `BG is borderline low ${fallingNote} — treat per your hypo plan if your team uses these bands; delayed lows after activity are common.`,
+      title: falling ? "BG is low and falling" : "BG is still on the low side",
+      detail: falling
+        ? strengthLike
+          ? "After strength work, glucose often keeps dropping as muscles refill. Use the treat-now amount below, then re-check in 10–15 minutes."
+          : "Glucose can keep falling after you stop. Use the treat-now amount below, then re-check in 10–15 minutes."
+        : "Delayed lows are common in this window. Stay with recovery, keep fast carbs close, and re-check soon.",
     };
   }
 

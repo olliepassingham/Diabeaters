@@ -78,8 +78,9 @@ export function evaluateExerciseCgmAlert(input: {
     reason = "falling_toward";
   }
 
-  const carbs = typeof carbsIfLow === "number" && carbsIfLow > 0 ? carbsIfLow : 15;
-  const line = carbLine?.trim() || `about ${carbs}g fast carbs`;
+  const carbs =
+    typeof carbsIfLow === "number" && carbsIfLow > 0 ? Math.round(carbsIfLow) : null;
+  const line = carbLine?.trim() || (carbs != null ? `about ${carbs}g fast carbs` : "fast carbs from your usual plan");
 
   return {
     shouldAlert: true,
@@ -127,18 +128,20 @@ export function buildExerciseCgmAlertCopy(input: {
   const bgLabel = formatBg(input.bg, input.bgUnits);
   const arrow = trendArrow(input.trend);
   const carbPart = input.evaluation.carbLine ?? "fast carbs";
-  const sessionLabel = input.exerciseName?.trim() ? ` during ${input.exerciseName.trim()}` : "";
+  const sessionLabel = input.exerciseName?.trim() || "";
+  const bgLine = `BG ${bgLabel}${arrow ? ` ${arrow}` : ""}`;
+  const contextBits = [bgLine, sessionLabel].filter(Boolean).join(" · ");
 
   if (input.evaluation.reason === "clinical_hypo") {
     return {
-      title: "Exercise: treat low BG",
-      body: `BG ${bgLabel}${arrow ? ` ${arrow}` : ""}${sessionLabel} — ${carbPart}. Confirm on meter/CGM before treating.`,
+      title: "Treat low BG",
+      body: `${contextBits}\n${carbPart}\nConfirm on meter or CGM, then treat.`,
     };
   }
 
   return {
-    title: "Exercise: carbs may help",
-    body: `BG ${bgLabel}${arrow ? ` ${arrow}` : ""}${sessionLabel} — ${carbPart}. Open your exercise guide to review.`,
+    title: "Treat now",
+    body: `${contextBits}\n${carbPart}\nTreat first, then open Exercise.`,
   };
 }
 

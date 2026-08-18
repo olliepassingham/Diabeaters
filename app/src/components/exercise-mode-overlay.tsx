@@ -294,7 +294,11 @@ function ExerciseModeContent({
                 <span className="ml-1 text-lg font-semibold text-white/55">g</span>
               </p>
               <p className="mt-1 text-sm font-medium text-amber-100/90">fast carbs now</p>
-              <p className="mt-2 text-xs leading-snug text-amber-100/60">Then recheck in 10–15 minutes.</p>
+              <p className="mt-2 text-xs leading-snug text-amber-100/60">
+                {hypoSuggestion.primaryTreatmentLine
+                  ? `${hypoSuggestion.primaryTreatmentLine}${hypoSuggestion.targetBgLabel ? ` · toward ${hypoSuggestion.targetBgLabel}` : ""}. Then recheck in 10–15 min.`
+                  : "Then recheck in 10–15 minutes."}
+              </p>
             </div>
           ) : null}
         </div>

@@ -123,14 +123,15 @@ describe("buildExerciseCgmAlertCopy", () => {
       evaluation: {
         shouldAlert: true,
         reason: "below_threshold",
-        carbsGrams: 15,
-        carbLine: "about 1 Running gel",
+        carbsGrams: 11,
+        carbLine: "about ½ Running gel",
       },
     });
-    expect(copy.title).toContain("carbs");
+    expect(copy.title).toContain("Treat now");
+    expect(copy.title).toContain("11g");
     expect(copy.body).toContain("5.4");
     expect(copy.body).toContain("↓");
     expect(copy.body).toContain("Tennis");
-    expect(copy.body).toContain("Running gel");
+    expect(copy.body).toContain("½ Running gel");
   });
 });

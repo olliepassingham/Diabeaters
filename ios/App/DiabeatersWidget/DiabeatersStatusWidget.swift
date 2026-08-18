@@ -25,24 +25,74 @@ struct DiabeatersStatusProvider: TimelineProvider {
 struct DiabeatersStatusWidgetView: View {
     var entry: DiabeatersStatusEntry
 
+    @Environment(\.widgetFamily) private var family
+
     var body: some View {
         Group {
             if #available(iOSApplicationExtension 17.0, *) {
-                statusContent
+                familyContent
                     .containerBackground(for: .widget) {
                         Color(.systemBackground)
                     }
             } else {
-                statusContent
+                familyContent
                     .background(Color(.systemBackground))
             }
         }
     }
 
+    @ViewBuilder
+    private var familyContent: some View {
+        switch family {
+        case .accessoryInline:
+            Text(entry.status.glucoseLine ?? entry.status.title)
+        case .accessoryRectangular:
+            compactGlucose
+        default:
+            statusContent
+        }
+    }
+
+    private var compactGlucose: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 4) {
+                Text(entry.status.glucoseDisplay ?? entry.status.title)
+                    .font(.headline.monospacedDigit())
+                if !entry.status.trendArrow.isEmpty {
+                    Text(entry.status.trendArrow)
+                }
+            }
+            Text(entry.status.glucoseAgeLabel ?? entry.status.subtitle)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+    }
+
     private var statusContent: some View {
         VStack(alignment: .leading, spacing: 4) {
+            if let glucose = entry.status.glucoseDisplay {
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text(glucose)
+                        .font(.title2.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(.primary)
+                    if !entry.status.trendArrow.isEmpty {
+                        Text(entry.status.trendArrow)
+                            .font(.headline)
+                            .foregroundStyle(.secondary)
+                    }
+                    Text(entry.status.glucoseUnitsShort)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if let age = entry.status.glucoseAgeLabel {
+                    Text(age)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+            }
             Text(entry.status.title)
-                .font(.headline)
+                .font(entry.status.glucoseDisplay == nil ? .headline : .subheadline)
                 .foregroundStyle(.primary)
                 .lineLimit(2)
             Text(entry.status.subtitle)
@@ -68,7 +118,7 @@ struct DiabeatersStatusWidget: Widget {
                 .widgetURL(entry.status.openURL)
         }
         .configurationDisplayName("Diabeaters status")
-        .description("Shows active travel, sick day, or exercise status.")
+        .description("Shows last glucose (when known) plus travel, sick day, or exercise.")
         .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular, .accessoryInline])
     }
 }

@@ -17,16 +17,26 @@ public class OsSurfacesPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private static let liveActivityIdKey = "exercise_live_activity_id"
 
+    public override func load() {
+        OsSurfacesWatchBridge.shared.plugin = self
+        OsSurfacesWatchBridge.shared.activate()
+    }
+
     @objc func syncStatus(_ call: CAPPluginCall) {
         let status = DiabeatersSharedStatus(
             title: call.getString("title") ?? "Diabeaters",
             subtitle: call.getString("subtitle") ?? "",
             kind: call.getString("kind") ?? "idle",
             deepLinkPath: call.getString("deepLinkPath") ?? "/",
-            updatedAt: call.getString("updatedAt") ?? ISO8601DateFormatter().string(from: Date())
+            updatedAt: call.getString("updatedAt") ?? ISO8601DateFormatter().string(from: Date()),
+            glucoseValue: call.getDouble("glucoseValue"),
+            glucoseUnits: nonempty(call.getString("glucoseUnits")),
+            glucoseTrend: nonempty(call.getString("glucoseTrend")),
+            glucoseRecordedAt: nonempty(call.getString("glucoseRecordedAt"))
         )
         status.save()
         WidgetCenter.shared.reloadAllTimelines()
+        OsSurfacesWatchBridge.shared.pushStatus(status)
         call.resolve()
     }
 
@@ -114,5 +124,10 @@ public class OsSurfacesPlugin: CAPPlugin, CAPBridgedPlugin {
             DiabeatersAppGroup.defaults.removeObject(forKey: Self.liveActivityIdKey)
             call.resolve(["ok": true])
         }
+    }
+
+    private func nonempty(_ value: String?) -> String? {
+        guard let value, !value.isEmpty else { return nil }
+        return value
     }
 }

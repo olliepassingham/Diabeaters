@@ -6,6 +6,7 @@ import {
   ensureNativeNotificationChannels,
 } from "@/lib/native-local-notifications";
 import { supportsNativeLocalNotifications } from "@/lib/native-platform";
+import { registerNotificationActionTypes } from "@/lib/notification-actions";
 import { storage } from "@/lib/storage";
 
 /** Id used by the removed "helpful check-ins" local notification — cancel on boot so old installs do not keep firing. */
@@ -31,11 +32,16 @@ function hashToInt32(input: string): number {
 export async function showNativeSystemNotificationNow(params: {
   title: string;
   body: string;
+  /** Android expanded text. */
+  largeBody?: string | null;
+  summaryText?: string | null;
+  inboxList?: string[] | null;
   /** Deep link path like `/sick-day#sickday-checklist` */
   deepLink?: string | null;
   /** Dedupe key to avoid spamming the same alert repeatedly */
   tag?: string | null;
   channelId?: string;
+  actionTypeId?: string;
 }): Promise<{ shown: boolean; permission?: "granted" | "denied" }> {
   if (!supportsNativeLocalNotifications()) return { shown: false };
 
@@ -43,6 +49,7 @@ export async function showNativeSystemNotificationNow(params: {
   if (!settings.enabled) return { shown: false };
 
   await ensureNativeNotificationChannels();
+  await registerNotificationActionTypes();
 
   const granted = await checkNativeLocalNotificationPermission();
   if (!granted) return { shown: false, permission: "denied" };
@@ -60,6 +67,11 @@ export async function showNativeSystemNotificationNow(params: {
       deep_link: params.deepLink ?? null,
       tag: params.tag ?? null,
     },
+    ...(params.largeBody ? { largeBody: params.largeBody } : {}),
+    ...(params.summaryText ? { summaryText: params.summaryText } : {}),
+    ...(params.inboxList && params.inboxList.length > 0 ? { inboxList: params.inboxList.slice(0, 5) } : {}),
+    ...(params.actionTypeId ? { actionTypeId: params.actionTypeId } : {}),
+    ...(isAndroidDevice() ? { iconColor: "#D97706" } : {}),
     ...(isIosDevice() ? { sound: "default" as const } : {}),
   };
 
