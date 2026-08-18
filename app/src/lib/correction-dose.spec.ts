@@ -53,6 +53,7 @@ describe("computeSimpleCorrectionDose", () => {
     expect(r.status).toBe("dose");
     if (r.status === "dose") {
       expect(r.fullDoseRounded).toBe(2);
+      expect(r.exactDose).toBe(2);
       expect(r.diff).toBe(6);
     }
   });
@@ -68,6 +69,21 @@ describe("computeSimpleCorrectionDose", () => {
     if (r.status === "dose") {
       expect(r.diff).toBe(106);
       expect(r.fullDoseRounded).toBe(2);
+    }
+  });
+
+  it("rounds pump corrections to 0.05u", () => {
+    const r = computeSimpleCorrectionDose({
+      currentBg: 12.2,
+      targetBg: 8,
+      correctionFactor: 3,
+      bgUnits: "mmol/L",
+      roundIncrement: 0.05,
+    });
+    expect(r.status).toBe("dose");
+    if (r.status === "dose") {
+      expect(r.exactDose).toBeCloseTo(1.4);
+      expect(r.fullDoseRounded).toBe(1.4);
     }
   });
 });

@@ -42,6 +42,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { InlineInfoHint } from "@/components/ui/field-label-with-info";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
 import { RatiosEditPanel } from "@/components/ratios-edit-panel";
+import { insulinRoundIncrement, roundInsulinUnits } from "@/lib/insulin-rounding";
+import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { cn } from "@/lib/utils";
 
 type MealKey = "breakfast" | "lunch" | "dinner" | "snack";
@@ -146,10 +148,6 @@ function getAdviserResult(
       "Keep a brief food + BG diary for 5-7 days to spot trends",
     ],
   };
-}
-
-function roundInsulinUnits(value: number): number {
-  return Math.round(value);
 }
 
 function mealLabel(key: MealKey): string {
@@ -432,7 +430,7 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
   const previewCarbsNum = parseFloat(previewCarbs);
   const previewExact =
     Number.isFinite(previewCarbsNum) && previewCarbsNum > 0 ? calculateDoseFromCarbs(previewCarbsNum, previewRatioStr) : 0;
-  const previewRounded = previewExact > 0 ? roundInsulinUnits(previewExact) : 0;
+  const previewRounded = previewExact > 0 ? roundInsulinUnits(previewExact, insulinRoundIncrement(isPumpDeliveryMethod(storage.getProfile()?.insulinDeliveryMethod))) : 0;
   const previewHasRatio = !!previewRatioStr && parseRatioToGramsPerUnit(previewRatioStr);
 
   const stepLabels = ["Select meal", "Post-meal pattern", "When does it happen?", "How often?", "Assessment"];

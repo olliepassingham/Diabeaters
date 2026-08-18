@@ -408,4 +408,34 @@ describe("calculateBedtimeCorrectionDose", () => {
       expect(withAlcohol.suggestedDose).toBeLessThanOrEqual(without.suggestedDose);
     });
   });
+
+  it("subtracts pump IOB from the full dose instead of using hours-since-insulin", () => {
+    const noIob = calculateBedtimeCorrectionDose({ ...base, bgTrend: "steady", insulinHours: 5 });
+    const withIob = calculateBedtimeCorrectionDose({
+      ...base,
+      bgTrend: "steady",
+      insulinHours: 5,
+      pumpIobUnits: 2,
+    });
+    expect(noIob.status).toBe("dose");
+    expect(withIob.status).toBe("dose");
+    if (noIob.status !== "dose" || withIob.status !== "dose") return;
+    expect(withIob.suggestedDose).toBeLessThan(noIob.suggestedDose);
+    expect(withIob.iobWarning).toMatch(/IOB/i);
+    expect(withIob.hasIOB).toBe(true);
+  });
+
+  it("reports dose_too_small when pump IOB covers the standard correction", () => {
+    const result = calculateBedtimeCorrectionDose({
+      ...base,
+      bgTrend: "steady",
+      bgMmol: 10,
+      targetHighMmol: 8,
+      correctionFactor: 3,
+      pumpIobUnits: 8,
+    });
+    expect(result.status).toBe("dose_too_small");
+    if (result.status !== "dose_too_small") return;
+    expect(result.note).toMatch(/IOB already covers/i);
+  });
 });

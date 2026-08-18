@@ -21,9 +21,9 @@ import {
   type PreExerciseInsulinSuppressedReason,
   type PreExerciseMealCarbsSkipReason,
 } from "@/lib/exercise-reading-guidance";
+import { insulinRoundIncrement, roundInsulinUnits } from "@/lib/insulin-rounding";
 import {
   getExerciseMealBolusPreview,
-  roundInsulinUnits,
   type MealExerciseMeta,
 } from "@/lib/meal-dose";
 import type { ExercisePlanResult } from "@/lib/exercise-plan";
@@ -226,6 +226,7 @@ function computePreExerciseCorrectionUnits(
   bgUnits: string,
   settings: UserSettings,
   exerciseReductionPercent: number,
+  isPump: boolean,
 ): { units: number; targetBg: number } | null {
   const units = bgUnits === "mg/dL" ? "mg/dL" : "mmol/L";
   const targetBg = preExerciseIdealHighBg(units);
@@ -234,16 +235,18 @@ function computePreExerciseCorrectionUnits(
   const isf = settings.correctionFactor;
   if (isf == null || !Number.isFinite(isf) || isf <= 0) return null;
 
+  const increment = insulinRoundIncrement(isPump);
   const correction = computeSimpleCorrectionDose({
     currentBg,
     targetBg,
     correctionFactor: isf,
     bgUnits: units,
+    roundIncrement: increment,
   });
   if (correction.status !== "dose" || correction.fullDoseRounded <= 0) return null;
 
   const reducedExact = correction.fullDoseRounded * (1 - exerciseReductionPercent / 100);
-  const unitsOut = Math.max(0, Math.round(reducedExact));
+  const unitsOut = Math.max(0, roundInsulinUnits(reducedExact, increment));
   if (unitsOut <= 0) return null;
 
   return { units: unitsOut, targetBg };
@@ -344,6 +347,7 @@ function computeKnownCarbsInsulin(
     intensity: input.intensity,
     durationMinutes: input.durationMinutes,
   };
+  const increment = insulinRoundIncrement(input.isPump);
   const preview = getExerciseMealBolusPreview(
     mealCarbs,
     input.mealType,
@@ -351,6 +355,7 @@ function computeKnownCarbsInsulin(
     input.bgUnits,
     input.minutesUntilStart,
     meta,
+    increment,
   );
 
   if (preview.error === "no_ratios" || preview.standardDose == null || preview.exerciseReduction == null) {
@@ -379,12 +384,12 @@ function computeKnownCarbsInsulin(
       exactDose = Math.max(preview.exactDose, tunedExact);
     }
 
-    mealBolusUnits = roundInsulinUnits(exactDose);
+    mealBolusUnits = roundInsulinUnits(exactDose, increment);
   }
 
   if (input.bgTrend === "falling") {
     exactDose = exactDose * 0.75;
-    mealBolusUnits = roundInsulinUnits(exactDose);
+    mealBolusUnits = roundInsulinUnits(exactDose, increment);
   }
 
   const projectedBgAtStart =
@@ -398,6 +403,7 @@ function computeKnownCarbsInsulin(
     input.bgUnits,
     input.settings,
     preview.exerciseReduction,
+    input.isPump,
   );
 
   const correctionUnits = correction?.units ?? 0;
@@ -466,6 +472,7 @@ function tryMealInsulinForBg(
     intensity: input.intensity,
     durationMinutes: input.durationMinutes,
   };
+  const increment = insulinRoundIncrement(input.isPump);
   const preview = getExerciseMealBolusPreview(
     mealCarbs,
     input.mealType,
@@ -473,6 +480,7 @@ function tryMealInsulinForBg(
     input.bgUnits,
     input.minutesUntilStart,
     meta,
+    increment,
   );
 
   if (preview.error === "no_ratios" || preview.standardDose == null || preview.exerciseReduction == null) {
@@ -486,6 +494,7 @@ function tryMealInsulinForBg(
           input.bgUnits,
           input.settings,
           preview.exerciseReduction,
+          input.isPump,
         )
       : null;
 

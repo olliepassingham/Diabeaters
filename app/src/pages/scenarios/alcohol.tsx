@@ -803,6 +803,7 @@ export default function AlcoholScenarioPage() {
         drinkingIntensity: intensity,
         carbsG,
         mealType,
+        isPump: isPumpDeliveryMethod(profile?.insulinDeliveryMethod),
       },
     };
   };

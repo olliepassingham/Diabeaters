@@ -170,6 +170,30 @@ describe("bedtime-readiness", () => {
       }),
     ).toBe(true);
   });
+
+  it("detects overnight rise likelihood from a recent pump disconnect", () => {
+    expect(
+      isOvernightRiseLikely({
+        bgMmol: 12,
+        targetHighMmol: 10,
+        bgTrend: "steady",
+        overnightUsualTrend: "not_sure",
+        mdiBasalForBed: null,
+        isPumpUser: true,
+        pumpMissedBasal: true,
+      }),
+    ).toBe(true);
+    expect(
+      isOvernightRiseLikely({
+        bgMmol: 12,
+        targetHighMmol: 10,
+        bgTrend: "steady",
+        overnightUsualTrend: "not_sure",
+        mdiBasalForBed: null,
+        isPumpUser: true,
+      }),
+    ).toBe(false);
+  });
 });
 
 describe("bedtimeExerciseRaisesOvernightCaution", () => {

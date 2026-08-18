@@ -3,6 +3,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Badge } from "@/components/ui/badge";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
 import { ScenarioResultHero, ScenarioResultHeroSuffix } from "@/components/scenarios/scenario-result-hero";
+import { formatInsulinUnits, insulinRoundIncrement } from "@/lib/insulin-rounding";
 import { cn } from "@/lib/utils";
 
 export type BedtimeCorrectionData = {
@@ -182,7 +183,7 @@ function CalculationDetails({
         <p className="text-sm leading-relaxed text-foreground/90">
           Applied ~{bedtimePct}% for bedtime safety
           {correction.fullDose > correction.suggestedDose
-            ? ` → ${correction.suggestedDose}u suggested (full would be ${correction.fullDose}u).`
+            ? ` → ${formatInsulinUnits(correction.suggestedDose, insulinRoundIncrement(isPumpUser))}u suggested (full would be ${formatInsulinUnits(correction.fullDose, insulinRoundIncrement(isPumpUser))}u).`
             : "."}
         </p>
         {correction.extraCautionNote ? (
@@ -192,7 +193,7 @@ function CalculationDetails({
         ) : null}
         {isPumpUser ? (
           <p className="text-sm text-muted-foreground" data-testid="text-pump-correction-tip">
-            Check your pump&apos;s IOB — active insulin may already be working on this high.
+            Check your pump&apos;s IOB — active insulin may already be working on this high. Use the IOB field on this check so the estimate can subtract it.
           </p>
         ) : null}
         <MedicalNumericOutputDisclaimer collapsible />
@@ -215,6 +216,9 @@ export function BedtimeCorrectionPanel({
   const warnings = buildWarnings(correction, hoursUntilSleep);
   const topWarning = warnings[0];
   const chips = reasonChips(correction);
+  const increment = insulinRoundIncrement(isPumpUser);
+  const suggestedLabel = formatInsulinUnits(correction.suggestedDose, increment);
+  const fullLabel = formatInsulinUnits(correction.fullDose, increment);
   const why = compactWhyLine(correction);
 
   if (variant === "details") {
@@ -232,7 +236,7 @@ export function BedtimeCorrectionPanel({
         label="Suggested bedtime dose"
         value={
           <>
-            {correction.suggestedDose}
+            {suggestedLabel}
             <ScenarioResultHeroSuffix>u</ScenarioResultHeroSuffix>
           </>
         }
@@ -240,7 +244,7 @@ export function BedtimeCorrectionPanel({
       >
         <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
           <Badge variant="secondary" className="rounded-full px-2.5 text-xs font-medium">
-            {correction.suggestedDose}u of {correction.fullDose}u
+            {suggestedLabel}u of {fullLabel}u
           </Badge>
           <span className="text-sm tabular-nums text-muted-foreground">
             <span data-testid="text-correction-current-bg">{correction.currentBg}</span>

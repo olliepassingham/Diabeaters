@@ -23,6 +23,8 @@ import {
   type UserSettings,
 } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
+import { insulinRoundIncrement, formatInsulinUnits, roundInsulinUnits } from "@/lib/insulin-rounding";
+import { parseOptionalBolusUnits } from "@/lib/meal-dose";
 import { PumpDosingBanner } from "@/components/pump-dosing-banner";
 import { ageInWholeYearsUtc } from "@/lib/user-age";
 import { useToast } from "@/hooks/use-toast";
@@ -51,6 +53,7 @@ export default function CorrectionHelpPage() {
     autoApplyKey: "correction",
   });
   const [targetOverride, setTargetOverride] = useState("");
+  const [pumpIobInput, setPumpIobInput] = useState("");
   const [postExerciseNudgeRev, setPostExerciseNudgeRev] = useState(0);
   const load = useCallback(() => {
     setProfile(storage.getProfile());
@@ -86,6 +89,9 @@ export default function CorrectionHelpPage() {
 
   const correctionFactor = settings?.correctionFactor;
   const hasValidIsf = typeof correctionFactor === "number" && correctionFactor > 0 && Number.isFinite(correctionFactor);
+  const isPump = isPumpDeliveryMethod(profile?.insulinDeliveryMethod);
+  const roundIncrement = insulinRoundIncrement(isPump);
+  const pumpIobUnits = isPump ? parseOptionalBolusUnits(pumpIobInput) : null;
 
   const parsedBg = parseBgInput(bgInput);
   const result =
@@ -95,11 +101,15 @@ export default function CorrectionHelpPage() {
           targetBg: targetForCalc,
           correctionFactor: correctionFactor!,
           bgUnits,
+          roundIncrement,
         })
       : null;
 
+  const remainingAfterIob =
+    result?.status === "dose" && pumpIobUnits != null
+      ? roundInsulinUnits(Math.max(0, result.exactDose - pumpIobUnits), roundIncrement)
+      : null;
   const unitLabel = bgUnits === "mg/dL" ? "mg/dL" : "mmol/L";
-  const isPump = isPumpDeliveryMethod(profile?.insulinDeliveryMethod);
   const postExerciseCorrectionCopy = useMemo(() => {
     void postExerciseNudgeRev;
     if (!storage.shouldShowPostExerciseEducationalNudges()) return null;
@@ -269,14 +279,37 @@ export default function CorrectionHelpPage() {
                 </div>
               </div>
 
+              {isPump ? (
+                <div className="space-y-1.5">
+                  <Label htmlFor="correction-pump-iob" className="text-xs font-medium text-muted-foreground">
+                    Pump IOB <span className="font-normal">(optional)</span>
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="correction-pump-iob"
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="1.2"
+                      value={pumpIobInput}
+                      onChange={(e) => setPumpIobInput(e.target.value)}
+                      className="h-12 rounded-xl tabular-nums pr-8"
+                      data-testid="input-correction-pump-iob"
+                    />
+                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                      u
+                    </span>
+                  </div>
+                </div>
+              ) : null}
+
               {parsedBg != null && result ? (
                 <div className="space-y-3">
                   {result.status === "dose" ? (
                     <ScenarioResultHero
-                      label="Standard correction"
+                      label={remainingAfterIob != null ? "After pump IOB" : "Standard correction"}
                       value={
                         <>
-                          {result.fullDoseRounded}
+                          {formatInsulinUnits(remainingAfterIob ?? result.fullDoseRounded, roundIncrement)}
                           <ScenarioResultHeroSuffix>u</ScenarioResultHeroSuffix>
                         </>
                       }
@@ -284,8 +317,15 @@ export default function CorrectionHelpPage() {
                       valueTestId="text-correction-dose"
                     >
                       <p className="mt-2 text-xs text-muted-foreground font-mono break-words" data-testid="text-correction-formula">
-                        ({result.currentBg} − {result.targetBg}) ÷ {result.correctionFactor} = {result.fullDoseRounded}u
+                        ({result.currentBg} − {result.targetBg}) ÷ {result.correctionFactor}
+                        {pumpIobUnits != null ? ` − ${pumpIobUnits} IOB` : ""} ={" "}
+                        {formatInsulinUnits(remainingAfterIob ?? result.fullDoseRounded, roundIncrement)}u
                       </p>
+                      {remainingAfterIob != null && remainingAfterIob <= 0 ? (
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          Pump IOB already covers this correction — don&apos;t stack more insulin.
+                        </p>
+                      ) : null}
                     </ScenarioResultHero>
                   ) : null}
                   {result.status === "no_correction_needed" ? (

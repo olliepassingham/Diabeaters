@@ -1,6 +1,6 @@
 import type { AlcoholIntensity, AlcoholTrend } from "@/lib/alcohol-night-tool";
 import { isBgLow } from "@/lib/alcohol-night-tool";
-import { roundInsulinUnits } from "@/lib/meal-dose";
+import { PEN_INSULIN_INCREMENT, roundInsulinUnits } from "@/lib/insulin-rounding";
 
 export type AlcoholDoseSituation = "meal_with_drinks" | "late_snack" | "before_out" | "feels_wrong";
 
@@ -92,6 +92,7 @@ function applyBgToDoseRange(
     bgSkipped: boolean;
     bgTrend: AlcoholTrend | null;
     bgUnits: "mmol/L" | "mg/dL";
+    roundIncrement?: number;
   },
 ): {
   minDose: number;
@@ -137,7 +138,7 @@ function applyBgToDoseRange(
         ? adjMin
         : lean === "higher"
           ? adjMax
-          : roundInsulinUnits((adjMin + adjMax) / 2);
+          : roundInsulinUnits((adjMin + adjMax) / 2, params.roundIncrement ?? PEN_INSULIN_INCREMENT);
 
   return { minDose: adjMin, maxDose: adjMax, lean, suggestedLeanDose, bgNote };
 }
@@ -154,6 +155,7 @@ export function buildAlcoholDoseGuidance(params: {
   bgValue?: number | null;
   bgTrend?: AlcoholTrend | null;
   bgUnits?: "mmol/L" | "mg/dL";
+  roundIncrement?: number;
 }): AlcoholDoseGuidance {
   const meta = REDUCTION_BY_INTENSITY[params.drinkingIntensity];
   const base = params.exactDose > 0 ? params.exactDose : params.standardDose;
@@ -161,12 +163,13 @@ export function buildAlcoholDoseGuidance(params: {
   const mealType = params.mealType ?? "snack";
   const carbsG = params.carbsG ?? null;
 
+  const increment = params.roundIncrement ?? PEN_INSULIN_INCREMENT;
   let considerMinDose = 0;
   let considerMaxDose = params.standardDose;
 
   if (base > 0 && meta.maxPct > 0) {
-    considerMinDose = roundInsulinUnits(Math.max(0, base * (1 - meta.maxPct / 100)));
-    considerMaxDose = roundInsulinUnits(Math.max(0, base * (1 - meta.minPct / 100)));
+    considerMinDose = roundInsulinUnits(Math.max(0, base * (1 - meta.maxPct / 100)), increment);
+    considerMaxDose = roundInsulinUnits(Math.max(0, base * (1 - meta.minPct / 100)), increment);
     if (considerMinDose > considerMaxDose) {
       [considerMinDose, considerMaxDose] = [considerMaxDose, considerMinDose];
     }
@@ -191,6 +194,7 @@ export function buildAlcoholDoseGuidance(params: {
     bgSkipped: params.bgSkipped ?? true,
     bgTrend: params.bgTrend ?? null,
     bgUnits: params.bgUnits ?? "mmol/L",
+    roundIncrement: increment,
   });
 
   considerMinDose = bgAdj.minDose;

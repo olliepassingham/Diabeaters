@@ -40,6 +40,11 @@ export interface BedtimePersonalizedCopyInput {
   mdiBasalForBed: "morning" | "evening" | null;
   basalClockSummary: string | null;
   overnightUsualTrend: OvernightUsualTrend;
+  usesClosedLoop?: boolean;
+  pumpIobUnits?: number | null;
+  pumpRecentSiteChange?: boolean;
+  pumpDisconnectedRecently?: boolean;
+  pumpExerciseActivityOn?: boolean;
 }
 
 export interface BedtimeBgGlance {
@@ -108,7 +113,7 @@ export function isBedtimeBgWellAboveTarget(bgMmol: number, targetHighMmol: numbe
   return bgMmol > targetHighMmol + 2;
 }
 
-/** True when overnight rise is plausible from trend, pattern, or morning MDI. */
+/** True when overnight rise is plausible from trend, pattern, morning MDI, or missed pump basal. */
 export function isOvernightRiseLikely(ctx: {
   bgMmol: number;
   targetHighMmol: number;
@@ -116,11 +121,13 @@ export function isOvernightRiseLikely(ctx: {
   overnightUsualTrend: OvernightUsualTrend;
   mdiBasalForBed: "morning" | "evening" | null;
   isPumpUser: boolean;
+  pumpMissedBasal?: boolean;
 }): boolean {
   const aboveTarget = isBedtimeBgAboveTarget(ctx.bgMmol, ctx.targetHighMmol);
   if (ctx.overnightUsualTrend === "rise") return true;
   if (ctx.bgTrend === "rising" && aboveTarget) return true;
   if (!ctx.isPumpUser && ctx.mdiBasalForBed === "morning" && ctx.bgTrend !== "falling") return true;
+  if (ctx.isPumpUser && ctx.pumpMissedBasal) return true;
   return false;
 }
 
@@ -185,6 +192,7 @@ export function resolveBedtimeReadinessLevel(input: {
   mdiBasalForBed: "morning" | "evening" | null;
   overnightUsualTrend: OvernightUsualTrend;
   isPumpUser: boolean;
+  pumpMissedBasal?: boolean;
 }): BedtimeReadinessLevel {
   let level: BedtimeReadinessLevel;
   if (input.concernCount >= 2 || (input.concernCount >= 1 && input.cautionCount >= 2)) {
@@ -283,6 +291,15 @@ function buildGuidance(ctx: BedtimePersonalizedCopyInput): string[] {
     if (ctx.insulinSelected && ctx.insulinHours != null && ctx.insulinHours < 2 && ctx.bolusPhrase) {
       pushUnique(lines, `Mealtime insulin ${ctx.bolusPhrase} ago may still be active — avoid over-correcting.`);
     }
+    if (ctx.isPumpUser && (ctx.pumpIobUnits ?? 0) >= 1.5) {
+      pushUnique(lines, "Pump IOB is still significant — avoid stacking a bedtime correction on active insulin.");
+    }
+    if (ctx.pumpDisconnectedRecently) {
+      pushUnique(lines, "Missed basal while disconnected can let glucose climb — recheck before sleep.");
+    }
+    if (ctx.pumpRecentSiteChange) {
+      pushUnique(lines, "A fresh site can absorb unpredictably for a few hours — recheck if glucose moves.");
+    }
     if (ctx.sleepHours != null && ctx.sleepHours > 1) {
       pushUnique(lines, "Recheck right before bed — you still have time for glucose to shift.");
     }
@@ -340,6 +357,15 @@ function buildGuidance(ctx: BedtimePersonalizedCopyInput): string[] {
     }
     if (ctx.insulinSelected && ctx.insulinHours != null && ctx.insulinHours < 2 && ctx.bolusPhrase) {
       pushUnique(lines, `Active mealtime insulin (${ctx.bolusPhrase} ago) may still lower glucose.`);
+    }
+    if (ctx.isPumpUser && (ctx.pumpIobUnits ?? 0) >= 1.5) {
+      pushUnique(lines, "Pump IOB is still working — a smaller or no correction is often safer.");
+    }
+    if (ctx.pumpDisconnectedRecently) {
+      pushUnique(lines, "Time off the pump can mean missed basal — watch for a rise.");
+    }
+    if (ctx.pumpExerciseActivityOn) {
+      pushUnique(lines, "Exercise or temp target still on at bedtime can keep insulin lower overnight.");
     }
     if (ctx.sleepHours != null && ctx.sleepHours > 1.5) {
       pushUnique(lines, "Run this check again closer to lights-out.");
@@ -431,8 +457,11 @@ function buildTips(ctx: BedtimePersonalizedCopyInput): string[] {
 
   if (ctx.level === "alert") {
     if (ctx.isPumpUser && ctx.hadAlcohol) tips.push("Check pump IOB before any correction at night");
-    if (ctx.isPumpUser && ctx.exerciseOvernightCaution) {
+    if (ctx.isPumpUser && ctx.exerciseOvernightCaution && !ctx.usesClosedLoop) {
       tips.push("Some teams use a slightly lower temp basal overnight after exercise — only if yours agrees");
+    }
+    if (ctx.usesClosedLoop) {
+      tips.push("If Sleep activity is on, let the loop work overnight rather than stacking a manual correction");
     }
   }
 
@@ -445,7 +474,11 @@ function buildTips(ctx: BedtimePersonalizedCopyInput): string[] {
   }
 
   if (ctx.level === "steady" && ctx.isPumpUser) {
-    tips.push("Your pump basal carries overnight unless you have changed temp basals");
+    tips.push(
+      ctx.usesClosedLoop
+        ? "Your loop basal carries overnight unless Sleep or Exercise activity is set differently"
+        : "Your pump basal carries overnight unless you have changed temp basals",
+    );
   } else if (ctx.level === "steady" && ctx.mdiBasalForBed === "evening" && ctx.basalClockSummary) {
     tips.push(`Evening long-acting (around ${ctx.basalClockSummary}) often supports steadier nights on MDI`);
   }

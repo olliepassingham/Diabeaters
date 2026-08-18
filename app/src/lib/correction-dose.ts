@@ -1,4 +1,5 @@
 import type { UserSettings } from "@/lib/storage";
+import { PEN_INSULIN_INCREMENT, roundInsulinUnits } from "@/lib/insulin-rounding";
 
 /** BG display units as used in profile / ratios. */
 export type BgUnits = "mmol/L" | "mg/dL";
@@ -15,8 +16,10 @@ export type SimpleCorrectionDoseResult =
     }
   | {
       status: "dose";
-      /** Standard (full) correction dose in whole units (pen-friendly). */
+      /** Standard (full) correction dose, rounded to the delivery increment. */
       fullDoseRounded: number;
+      /** Unrounded (BG − target) / ISF, before IOB or increment rounding. */
+      exactDose: number;
       diff: number;
       currentBg: number;
       targetBg: number;
@@ -33,8 +36,9 @@ export function computeSimpleCorrectionDose(params: {
   targetBg: number;
   correctionFactor: number;
   bgUnits: BgUnits;
+  roundIncrement?: number;
 }): SimpleCorrectionDoseResult {
-  const { currentBg, targetBg, correctionFactor, bgUnits } = params;
+  const { currentBg, targetBg, correctionFactor, bgUnits, roundIncrement = PEN_INSULIN_INCREMENT } = params;
   if (!Number.isFinite(correctionFactor) || correctionFactor <= 0) {
     return { status: "invalid_isf" };
   }
@@ -52,10 +56,12 @@ export function computeSimpleCorrectionDose(params: {
       bgUnits,
     };
   }
-  const fullDoseRounded = Math.round(diff / correctionFactor);
+  const exactDose = diff / correctionFactor;
+  const fullDoseRounded = roundInsulinUnits(exactDose, roundIncrement);
   return {
     status: "dose",
     fullDoseRounded,
+    exactDose,
     diff,
     currentBg,
     targetBg,

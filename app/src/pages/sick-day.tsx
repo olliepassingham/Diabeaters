@@ -23,6 +23,7 @@ import {
   DIABEATER_PROFILE_CHANGED_EVENT,
 } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
+import { closedLoopSafetyNote, usesClosedLoop } from "@/lib/closed-loop";
 import { getEffectiveTdd, hasConfiguredTdd } from "@/lib/tdd";
 import { parseRatioToGramsPerUnit, formatRatioForDisplay } from "@/lib/ratio-utils";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
@@ -1596,6 +1597,13 @@ export default function SickDay() {
                             icon: Syringe,
                             title: "Check pump site",
                             body: "If glucose stays high after corrections, change set and site.",
+                          }]
+                        : []),
+                      ...(isPumpUser && usesClosedLoop(settings)
+                        ? [{
+                            icon: Syringe,
+                            title: "Closed loop on a sick day",
+                            body: closedLoopSafetyNote("sickDay", settings) ?? "",
                           }]
                         : []),
                     ].map((rule) => {

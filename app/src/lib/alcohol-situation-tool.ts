@@ -1,5 +1,5 @@
 import type { UserSettings } from "@/lib/storage";
-import { calculateMealDose, type MealDoseResult } from "@/lib/meal-dose";
+import { calculateMealDose, insulinRoundIncrement, type MealDoseResult } from "@/lib/meal-dose";
 import {
   normalizeBgUnits,
   isBgLow,
@@ -22,6 +22,7 @@ export type AlcoholSituationInput = {
   carbsG: number | null;
   /** breakfast | lunch | dinner | snack */
   mealType: string;
+  isPump?: boolean;
 };
 
 export type AlcoholSituationLinks = {
@@ -178,7 +179,8 @@ export function buildAlcoholSituationOutcome(
       return { kind: "needs_carbs", message: "Enter total carbs (grams) for this food or snack to get an estimate." };
     }
 
-    const meal = calculateMealDose(carbs, input.mealType, settings, bgUnits);
+    const increment = insulinRoundIncrement(!!input.isPump);
+    const meal = calculateMealDose(carbs, input.mealType, settings, bgUnits, undefined, undefined, undefined, increment);
     if (meal.error === "no_ratios") {
       return {
         kind: "needs_ratios",
@@ -198,6 +200,7 @@ export function buildAlcoholSituationOutcome(
       bgValue: input.bgValue,
       bgTrend: input.bgTrend,
       bgUnits,
+      roundIncrement: increment,
     });
 
     return {

@@ -2,13 +2,30 @@ import type { UserSettings } from "@/lib/storage";
 import { calculateDoseFromCarbs } from "@/lib/ratio-utils";
 import { getEffectiveTdd } from "@/lib/tdd";
 import type { ExerciseIntensity, ExerciseType } from "@/lib/storage";
+import {
+  PEN_INSULIN_INCREMENT,
+  roundInsulinUnits,
+} from "@/lib/insulin-rounding";
 
-/** Round insulin units to whole numbers (pen-friendly). */
-export function roundInsulinUnits(value: number): number {
-  return Math.round(value);
-}
+export {
+  formatInsulinUnits,
+  insulinRoundIncrement,
+  PEN_INSULIN_INCREMENT,
+  PUMP_INSULIN_INCREMENT,
+  roundInsulinUnits,
+} from "@/lib/insulin-rounding";
 
-export function getRoundingAdvice(exactDose: number, roundedDose: number, bgUnits: string): string {
+export function getRoundingAdvice(
+  exactDose: number,
+  roundedDose: number,
+  bgUnits: string,
+  increment: number = PEN_INSULIN_INCREMENT,
+): string {
+  if (increment < 1) {
+    if (Math.abs(exactDose - roundedDose) < 0.01) return "";
+    return `Rounded to the nearest ${increment}u for typical pump increments. Check IOB on your pump before delivering.`;
+  }
+
   const diff = exactDose - roundedDose;
   if (Math.abs(diff) < 0.05) return "";
 
@@ -46,7 +63,9 @@ export function getMealDoseRoundingGuide(
   exactDose: number,
   roundedDose: number,
   bgUnits: string,
+  increment: number = PEN_INSULIN_INCREMENT,
 ): MealDoseRoundingGuide | null {
+  if (increment < 1) return null;
   const roundedDown = Math.floor(exactDose);
   const roundedUp = Math.ceil(exactDose);
   if (roundedDown === roundedUp) return null;
@@ -133,6 +152,7 @@ export function calculateMealDose(
   exerciseContext?: "before" | "after" | "during",
   hoursAway?: number,
   exerciseMeta?: MealExerciseMeta,
+  roundIncrement: number = PEN_INSULIN_INCREMENT,
 ): MealDoseResult {
   if (!Number.isFinite(carbs) || carbs <= 0) {
     return { carbs, mealType, dose: 0, exactDose: 0, roundingAdvice: "", error: "invalid_carbs" };
@@ -164,13 +184,13 @@ export function calculateMealDose(
   }
 
   if (!exerciseContext) {
-    const rounded = roundInsulinUnits(exactBaseUnits);
+    const rounded = roundInsulinUnits(exactBaseUnits, roundIncrement);
     return {
       carbs,
       mealType,
       dose: rounded,
       exactDose: Math.round(exactBaseUnits * 10) / 10,
-      roundingAdvice: getRoundingAdvice(exactBaseUnits, rounded, bgUnits),
+      roundingAdvice: getRoundingAdvice(exactBaseUnits, rounded, bgUnits, roundIncrement),
     };
   }
 
@@ -184,7 +204,7 @@ export function calculateMealDose(
       exactDose: 0,
       roundingAdvice: "",
       exerciseContext,
-      standardDose: roundInsulinUnits(exactBaseUnits),
+      standardDose: roundInsulinUnits(exactBaseUnits, roundIncrement),
       tips: [
         "Carbs during exercise are usually used immediately by working muscles",
         "For sessions under 90 min: skip insulin for exercise snacks/gels",
@@ -210,8 +230,8 @@ export function calculateMealDose(
   const reductionAdjusted = clamp(reductionPercent + exerciseReductionModifier(exerciseMeta), 0, 60);
 
   const adjustedExact = exactBaseUnits * (1 - reductionAdjusted / 100);
-  const rounded = roundInsulinUnits(adjustedExact);
-  const stdDose = roundInsulinUnits(exactBaseUnits);
+  const rounded = roundInsulinUnits(adjustedExact, roundIncrement);
+  const stdDose = roundInsulinUnits(exactBaseUnits, roundIncrement);
 
   const tips =
     exerciseContext === "before"
@@ -231,7 +251,7 @@ export function calculateMealDose(
     mealType,
     dose: rounded,
     exactDose: Math.round(adjustedExact * 10) / 10,
-    roundingAdvice: getRoundingAdvice(adjustedExact, rounded, bgUnits),
+    roundingAdvice: getRoundingAdvice(adjustedExact, rounded, bgUnits, roundIncrement),
     exerciseContext,
     exerciseReduction: reductionAdjusted,
     standardDose: stdDose,
@@ -256,9 +276,10 @@ export function getExerciseMealBolusPreview(
   bgUnits: string,
   minutesUntilStart: number,
   exerciseMeta?: MealExerciseMeta,
+  roundIncrement: number = PEN_INSULIN_INCREMENT,
 ): MealDoseResult {
   const hours = mealDoseHoursFromPlannerMinutes(minutesUntilStart);
-  return calculateMealDose(carbs, mealType, settings, bgUnits, "before", hours, exerciseMeta);
+  return calculateMealDose(carbs, mealType, settings, bgUnits, "before", hours, exerciseMeta, roundIncrement);
 }
 
 /** Bands for comparing optional user-entered planned units to the exercise-adjusted preview dose. */
@@ -344,11 +365,15 @@ const SPLIT_FAT_TIERS: Record<SplitFatTier, { firstPercent: number; secondDoseDe
  * Shared by the standalone Split dose calculator and the auto-surfaced result-screen preview
  * so both use identical math from a single carbs entry.
  */
-export function calculateSplitDose(exactTotalUnits: number, fatTier: SplitFatTier): SplitDoseResult {
+export function calculateSplitDose(
+  exactTotalUnits: number,
+  fatTier: SplitFatTier,
+  roundIncrement: number = PEN_INSULIN_INCREMENT,
+): SplitDoseResult {
   const tier = SPLIT_FAT_TIERS[fatTier];
-  const totalRounded = roundInsulinUnits(exactTotalUnits);
-  const firstDose = roundInsulinUnits(totalRounded * (tier.firstPercent / 100));
-  const secondDose = roundInsulinUnits(totalRounded - firstDose);
+  const totalRounded = roundInsulinUnits(exactTotalUnits, roundIncrement);
+  const firstDose = roundInsulinUnits(totalRounded * (tier.firstPercent / 100), roundIncrement);
+  const secondDose = roundInsulinUnits(totalRounded - firstDose, roundIncrement);
   return {
     totalUnits: totalRounded,
     firstDose,

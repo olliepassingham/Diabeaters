@@ -8,7 +8,8 @@ import { ScenarioResultHero, ScenarioResultHeroSuffix } from "@/components/scena
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { calculateSplitDose, type MealDoseResult, type SplitFatTier } from "@/lib/meal-dose";
+import { calculateSplitDose, formatInsulinUnits, insulinRoundIncrement, type MealDoseResult, type SplitFatTier } from "@/lib/meal-dose";
+import { closedLoopSafetyNote, usesClosedLoop } from "@/lib/closed-loop";
 import type { MealImpactProfile } from "@/lib/meal-impact";
 import type { RatioFormat, ScenarioState, UserSettings } from "@/lib/storage";
 import { cn } from "@/lib/utils";
@@ -38,20 +39,27 @@ function MealDoseHero({
   mealResult,
   isPumpUser,
   isPage,
+  usesLoop,
 }: {
   mealResult: MealDoseResult;
   isPumpUser: boolean;
   isPage: boolean;
+  usesLoop: boolean;
 }) {
   const compactValue = isPage ? undefined : "text-4xl";
+  const increment = insulinRoundIncrement(isPumpUser);
+  const doseLabel = formatInsulinUnits(mealResult.dose, increment);
+  const standardLabel =
+    mealResult.standardDose != null ? formatInsulinUnits(mealResult.standardDose, increment) : null;
+  const loopNote = usesLoop ? closedLoopSafetyNote("meal", { usesClosedLoop: true }) : null;
 
   if (mealResult.exerciseContext === "during") {
     return (
       <ScenarioResultHero label="During exercise" value={isPumpUser ? "Usually no meal bolus" : "Usually no insulin"} valueClassName="text-3xl sm:text-4xl">
         <p className="mt-2 text-sm text-muted-foreground">
           {mealResult.carbs}g carbs
-          {mealResult.standardDose != null
-            ? ` · standard would be ${mealResult.standardDose}u${isPumpUser ? " (meal bolus)" : ""}`
+          {standardLabel != null
+            ? ` · standard would be ${standardLabel}u${isPumpUser ? " (meal bolus)" : ""}`
             : ""}
         </p>
       </ScenarioResultHero>
@@ -69,7 +77,7 @@ function MealDoseHero({
           }
           value={
             <>
-              {mealResult.dose}
+              {doseLabel}
               <ScenarioResultHeroSuffix>u</ScenarioResultHeroSuffix>
             </>
           }
@@ -78,42 +86,49 @@ function MealDoseHero({
         >
           <p className="mt-2 text-sm text-muted-foreground">
             {mealResult.carbs}g · {mealResult.mealType}
-            {isPumpUser ? " · program on pump" : ""}
+            {isPumpUser ? " · enter on pump" : ""}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            vs <span className="line-through tabular-nums">{mealResult.standardDose}u</span> standard
+            vs <span className="line-through tabular-nums">{standardLabel}u</span> standard
           </p>
         </ScenarioResultHero>
         {isPumpUser ? (
-          <p className="text-center text-xs text-muted-foreground">
-            Check IOB before delivering; your pump may show a different recommended bolus if automation is active.
-          </p>
+          <PumpMealActions loopNote={loopNote} />
         ) : null}
       </div>
     );
   }
 
   return (
-    <ScenarioResultHero
-      label="Suggested dose"
-      value={
-        <>
-          {mealResult.dose}
-          <ScenarioResultHeroSuffix>u</ScenarioResultHeroSuffix>
-        </>
-      }
-      valueTestId="text-meal-dose"
-      valueClassName={compactValue}
-    >
-      <p className="mt-2 text-sm text-muted-foreground">
-        {mealResult.carbs}g · {mealResult.mealType}
-      </p>
-      {isPumpUser ? (
-        <p className="mt-2 text-xs text-muted-foreground">
-          Check IOB on your pump before delivering; use extended or combo bolus if your team recommends it for this meal.
+    <div className="space-y-3">
+      <ScenarioResultHero
+        label={isPumpUser ? "Enter on pump" : "Suggested dose"}
+        value={
+          <>
+            {doseLabel}
+            <ScenarioResultHeroSuffix>u</ScenarioResultHeroSuffix>
+          </>
+        }
+        valueTestId="text-meal-dose"
+        valueClassName={compactValue}
+      >
+        <p className="mt-2 text-sm text-muted-foreground">
+          {mealResult.carbs}g · {mealResult.mealType}
         </p>
-      ) : null}
-    </ScenarioResultHero>
+      </ScenarioResultHero>
+      {isPumpUser ? <PumpMealActions loopNote={loopNote} /> : null}
+    </div>
+  );
+}
+
+function PumpMealActions({ loopNote }: { loopNote: string | null }) {
+  return (
+    <ol className="space-y-1.5 rounded-xl border border-indigo-200/70 bg-indigo-50/40 px-3 py-2.5 text-sm dark:border-indigo-900/50 dark:bg-indigo-950/20" data-testid="list-pump-meal-actions">
+      <li className="text-foreground/90">1. Check IOB on your pump</li>
+      <li className="text-foreground/90">2. Program this bolus on the device</li>
+      <li className="text-foreground/90">3. Use extended or combo bolus if your team recommends it for this meal</li>
+      {loopNote ? <li className="text-xs text-muted-foreground">{loopNote}</li> : null}
+    </ol>
   );
 }
 
@@ -135,12 +150,14 @@ export function MealDoseResultCard({
   variant = "inline",
 }: MealDoseResultCardProps) {
   const isPage = variant === "page";
+  const usesLoop = usesClosedLoop(settings);
+  const roundIncrement = insulinRoundIncrement(isPumpUser);
 
   const splitPreview = useMemo(() => {
     if (!mealImpact?.tailRisk || mealResult.error || !mealResult.exactDose || mealResult.exactDose <= 0) return null;
     const tier: SplitFatTier = mealImpact.composition.hasFat && mealImpact.composition.hasProtein ? "high" : "medium";
-    return calculateSplitDose(mealResult.exactDose, tier);
-  }, [mealImpact, mealResult.error, mealResult.exactDose]);
+    return calculateSplitDose(mealResult.exactDose, tier, roundIncrement);
+  }, [mealImpact, mealResult.error, mealResult.exactDose, roundIncrement]);
 
   return (
     <Card
@@ -181,7 +198,7 @@ export function MealDoseResultCard({
           </div>
         ) : (
           <>
-            <MealDoseHero mealResult={mealResult} isPumpUser={isPumpUser} isPage={isPage} />
+            <MealDoseHero mealResult={mealResult} isPumpUser={isPumpUser} isPage={isPage} usesLoop={usesLoop} />
             {mealImpact ? <MealImpactCard impact={mealImpact} /> : null}
             {splitPreview ? (
               <div
@@ -190,17 +207,20 @@ export function MealDoseResultCard({
               >
                 <p className="flex items-center gap-1.5 text-sm font-medium">
                   <Split className="h-4 w-4 text-primary" aria-hidden />
-                  Consider splitting this dose
+                  {isPumpUser ? "Consider an extended / combo bolus" : "Consider splitting this dose"}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Fat/protein in this meal can cause a delayed rise — spreading the dose may help it match.
+                  {isPumpUser
+                    ? "Fat or protein can cause a delayed rise — an extended bolus may match better than a single hit."
+                    : "Fat/protein in this meal can cause a delayed rise — spreading the dose may help it match."}
                 </p>
                 <div className="flex items-center justify-between gap-2 rounded-lg bg-muted/30 px-3 py-2 text-sm">
                   <span>
-                    Now: <strong className="tabular-nums">{splitPreview.firstDose}u</strong>
+                    {isPumpUser ? "Now" : "Now"}: <strong className="tabular-nums">{formatInsulinUnits(splitPreview.firstDose, roundIncrement)}u</strong>
                   </span>
                   <span>
-                    In {splitPreview.secondDoseDelay}h: <strong className="tabular-nums">{splitPreview.secondDose}u</strong>
+                    {isPumpUser ? `Extended over ${splitPreview.secondDoseDelay}h` : `In ${splitPreview.secondDoseDelay}h`}:{" "}
+                    <strong className="tabular-nums">{formatInsulinUnits(splitPreview.secondDose, roundIncrement)}u</strong>
                   </span>
                 </div>
                 {onOpenSplitCalculator ? (

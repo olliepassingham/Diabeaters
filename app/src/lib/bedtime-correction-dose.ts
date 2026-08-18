@@ -1,5 +1,6 @@
 import { computeSimpleCorrectionDose, type BgUnits } from "@/lib/correction-dose";
 import type { OvernightUsualTrend } from "@/lib/bedtime-readiness";
+import { PEN_INSULIN_INCREMENT, roundInsulinUnits } from "@/lib/insulin-rounding";
 
 export type BedtimeCorrectionTrend = "rising" | "steady" | "falling" | "not_sure";
 
@@ -244,6 +245,11 @@ function iobWarningForHours(insulinHours: number): string {
   return "";
 }
 
+function iobWarningForPumpUnits(iobUnits: number): string {
+  if (iobUnits <= 0) return "";
+  return `This subtracts the ${iobUnits}u IOB you entered from a standard correction, then applies bedtime caution. Confirm the number on your pump before any correction.`;
+}
+
 /**
  * Where we aim the correction, given the user's target range and their self-reported usual
  * overnight pattern. This is also the trigger threshold — i.e. someone who usually drops
@@ -278,6 +284,9 @@ export function calculateBedtimeCorrectionDose(params: {
   hadAlcohol: boolean;
   recentHypos: boolean;
   sickDayActive: boolean;
+  /** When set (pump users), subtract these units instead of using hours-since-insulin. */
+  pumpIobUnits?: number | null;
+  roundIncrement?: number;
 }): BedtimeCorrectionResult {
   const {
     bgMmol,
@@ -292,6 +301,8 @@ export function calculateBedtimeCorrectionDose(params: {
     hadAlcohol,
     recentHypos,
     sickDayActive,
+    pumpIobUnits,
+    roundIncrement = PEN_INSULIN_INCREMENT,
   } = params;
 
   const aimMmol = resolveBedtimeCorrectionAim(targetLowMmol, targetHighMmol, overnightUsualTrend);
@@ -318,6 +329,7 @@ export function calculateBedtimeCorrectionDose(params: {
     targetBg: toDisplay(aimMmol),
     correctionFactor,
     bgUnits,
+    roundIncrement,
   });
   if (simple.status !== "dose") {
     return {
@@ -329,7 +341,10 @@ export function calculateBedtimeCorrectionDose(params: {
   }
 
   const fullDose = simple.fullDoseRounded;
-  const iobReduction = iobReductionForHours(insulinHours);
+  const usingPumpIob = pumpIobUnits != null && Number.isFinite(pumpIobUnits);
+  const pumpIob = usingPumpIob ? Math.max(0, pumpIobUnits!) : 0;
+  const remainingFull = usingPumpIob ? Math.max(0, fullDose - pumpIob) : fullDose;
+  const iobReduction = usingPumpIob ? 0 : iobReductionForHours(insulinHours);
   const severity = classifyBedtimeHighSeverity(bgMmol, targetHighMmol);
   const { multiplier: bedtimeReduction, note: trendNote, overnightNote } = bedtimeTrendReduction(bgTrend, {
     severity,
@@ -349,20 +364,31 @@ export function calculateBedtimeCorrectionDose(params: {
     ? rawMultiplier
     : Math.max(rawMultiplier, correctionSeverityFloor(severity, overnightUsualTrend));
 
-  const rawEffective = fullDose * effectiveMultiplier;
-  const suggestedDose = Math.round(rawEffective);
+  const rawEffective = remainingFull * effectiveMultiplier;
+  const suggestedDose = roundInsulinUnits(rawEffective, roundIncrement);
   const pctOfFullDose = fullDose > 0 ? Math.round((rawEffective / fullDose) * 100) : 0;
 
   if (suggestedDose <= 0) {
     const extraSuffix = extraCautionNote ? ` ${extraCautionNote}` : "";
+    const tooSmallLead =
+      usingPumpIob && pumpIob > 0 && remainingFull <= 0
+        ? "Pump IOB already covers a standard correction."
+        : roundIncrement >= 1
+          ? "A cautious bedtime correction here works out to less than half a unit."
+          : "A cautious bedtime correction here works out to less than a typical pump increment.";
+    const tooSmallTail =
+      usingPumpIob && pumpIob > 0 && remainingFull <= 0
+        ? `${extraSuffix} Recheck glucose rather than stacking more insulin.`
+        : roundIncrement >= 1
+          ? `${extraSuffix} Many people either round up to 1 unit if that fits their plan, or hold off and recheck glucose within an hour.`
+          : `${extraSuffix} Hold off and recheck glucose, or follow your pump and care team.`;
     return {
       status: "dose_too_small",
       currentBg: toDisplay(bgMmol),
       aimBg: toDisplay(aimMmol),
       bgUnits,
       rawDose: Math.round(rawEffective * 10) / 10,
-      note:
-        `A cautious bedtime correction here works out to less than half a unit.${extraSuffix} Many people either round up to 1 unit if that fits their plan, or hold off and recheck glucose within an hour.`,
+      note: `${tooSmallLead}${tooSmallTail}`,
     };
   }
 
@@ -403,10 +429,10 @@ export function calculateBedtimeCorrectionDose(params: {
     targetBg: toDisplay(aimMmol),
     correctionFactor,
     bgUnits,
-    hasIOB: insulinHours < 4,
+    hasIOB: usingPumpIob ? pumpIob > 0 : insulinHours < 4,
     trendNote,
     overnightTrendNote: overnightNote,
-    iobWarning: iobWarningForHours(insulinHours),
+    iobWarning: usingPumpIob ? iobWarningForPumpUnits(pumpIob) : iobWarningForHours(insulinHours),
     exerciseWarning,
     alcoholWarning,
     hypoWarning,

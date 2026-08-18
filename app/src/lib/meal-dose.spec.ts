@@ -103,6 +103,17 @@ describe("calculateMealDose input validation", () => {
     expect(r.dose).toBe(5);
     expect(r.exerciseContext).toBeUndefined();
   });
+
+  it("rounds pump meals to 0.05u instead of whole units", () => {
+    const r = calculateMealDose(55, "snack", settingsWithSnackRatio, "mmol/L", undefined, undefined, undefined, 0.05);
+    expect(r.error).toBeUndefined();
+    expect(r.dose).toBe(5.5);
+  });
+
+  it("still rounds pens to whole units for the same carbs", () => {
+    const r = calculateMealDose(55, "snack", settingsWithSnackRatio, "mmol/L");
+    expect(r.dose).toBe(6);
+  });
 });
 
 describe("calculateSplitDose", () => {
@@ -135,6 +146,13 @@ describe("calculateSplitDose", () => {
     const r = calculateSplitDose(8.6, "high");
     expect(r.totalUnits).toBe(9);
     expect(r.firstDose + r.secondDose).toBe(9);
+  });
+
+  it("splits on pump increments without snapping to whole units", () => {
+    const r = calculateSplitDose(8.6, "high", 0.05);
+    expect(r.totalUnits).toBe(8.6);
+    expect(r.firstDose).toBe(4.3);
+    expect(r.secondDose).toBe(4.3);
   });
 });
 

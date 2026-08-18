@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { BedtimeCorrectionPanel, type BedtimeCorrectionData } from "@/components/scenarios/bedtime-correction-panel";
+import { closedLoopSafetyNote } from "@/lib/closed-loop";
 import { storage } from "@/lib/storage";
 import {
   getMdiBedtimePostExerciseLine,
@@ -59,6 +60,7 @@ export type BedtimeResultViewData = {
 type Props = {
   result: BedtimeResultViewData;
   isPumpUser: boolean;
+  usesClosedLoop?: boolean;
   hoursUntilSleep: string;
   exercisedToday: boolean;
   hadAlcohol: boolean;
@@ -111,6 +113,7 @@ function StatusIcon({ status }: { status: Factor["status"] }) {
 export function BedtimeResultView({
   result,
   isPumpUser,
+  usesClosedLoop: loopOn,
   hoursUntilSleep,
   exercisedToday,
   hadAlcohol,
@@ -307,7 +310,7 @@ export function BedtimeResultView({
                   Pump overnight tips
                 </h3>
                 <div className="space-y-2 text-sm text-foreground/90">
-                  {exercisedToday ? (
+                  {exercisedToday && !loopOn ? (
                     <p data-testid="text-pump-post-exercise">
                       {(() => {
                         const last = storage.getLastExerciseSummary();
@@ -318,10 +321,22 @@ export function BedtimeResultView({
                       })()}
                     </p>
                   ) : null}
-                  {hadAlcohol ? (
+                  {exercisedToday && loopOn ? (
+                    <p data-testid="text-pump-post-exercise">
+                      After exercise, delayed lows are still common on closed loop. Let automation work and plan an extra check rather than stacking a manual basal cut.
+                    </p>
+                  ) : null}
+                  {hadAlcohol && !loopOn ? (
                     <p>Alcohol can cause delayed lows. Consider reducing basal by 10–20% overnight and setting an alarm.</p>
                   ) : null}
-                  <p>If your BG is trending down, a small temporary basal reduction (80–90%) may help prevent an overnight low.</p>
+                  {hadAlcohol && loopOn ? (
+                    <p>Alcohol can cause delayed lows. Let the loop work and plan an extra check — don&apos;t stack a manual basal cut on automation unless your team says to.</p>
+                  ) : null}
+                  {loopOn ? (
+                    <p data-testid="text-pump-closed-loop-overnight">{closedLoopSafetyNote("bedtime", { usesClosedLoop: true })}</p>
+                  ) : (
+                    <p>If your BG is trending down, a small temporary basal reduction (80–90%) may help prevent an overnight low.</p>
+                  )}
                 </div>
               </section>
             ) : null}

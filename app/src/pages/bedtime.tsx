@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Moon, Activity, Wine, AlertTriangle, Sparkles, Plane, Thermometer, ChevronDown, ChevronUp, TrendingDown, TrendingUp, Minus } from "lucide-react";
+import { Moon, Activity, Wine, AlertTriangle, Sparkles, Plane, Thermometer, ChevronDown, ChevronUp, TrendingDown, TrendingUp, Minus, RefreshCw, Unplug, Zap } from "lucide-react";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 import { BedtimeReminderPromptDialog } from "@/components/bedtime-reminder-prompt-dialog";
@@ -34,6 +34,9 @@ import {
   type UserProfile,
 } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
+import { usesClosedLoop } from "@/lib/closed-loop";
+import { insulinRoundIncrement } from "@/lib/insulin-rounding";
+import { parseOptionalBolusUnits } from "@/lib/meal-dose";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import { InlineInfoHint } from "@/components/ui/field-label-with-info";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
@@ -163,11 +166,11 @@ const BEDTIME_SECTION_INFO = {
   glucose:
     "Your reading and whether it is stable, rising, or falling. We use both for overnight risk — not for dosing.",
   foodInsulin:
-    "How long since you ate and took rapid insulin helps estimate food still digesting and insulin still working overnight.",
+    "How long since you ate, and (on a pump) IOB from the device, helps estimate food still digesting and insulin still working overnight.",
   sleep: "If bed is still a while away, we may suggest rechecking closer to sleep — glucose can change.",
   overnightPattern:
     "Your usual pattern while asleep — we combine this with tonight's reading and, on MDI, when you take long-acting insulin.",
-  extras: "Optional details. Meal carbs rarely change the recommendation — BG, trend, and timing matter most.",
+  extras: "Optional details. Meal carbs rarely change the recommendation — BG, trend, and timing matter most. Pump extras cover site changes, disconnects, and loop activity.",
   exercise:
     "A late or harder session can raise overnight hypo risk. Usual daily training with a steady reading often doesn't change the night on its own.",
   alcohol: "Alcohol can delay lows — we weigh this more heavily than hypos alone.",
@@ -265,6 +268,10 @@ export default function Bedtime() {
   const [hoursSinceFood, setHoursSinceFood] = useState("");
   const [mealCarbs, setMealCarbs] = useState("");
   const [hoursSinceInsulin, setHoursSinceInsulin] = useState("");
+  const [pumpIobInput, setPumpIobInput] = useState("");
+  const [pumpRecentSiteChange, setPumpRecentSiteChange] = useState(false);
+  const [pumpDisconnectedRecently, setPumpDisconnectedRecently] = useState(false);
+  const [pumpExerciseActivityOn, setPumpExerciseActivityOn] = useState(false);
   const [hoursUntilSleep, setHoursUntilSleep] = useState("");
   const [overnightUsualTrend, setOvernightUsualTrend] = useState<OvernightUsualTrend>(() => {
     try {
@@ -358,6 +365,8 @@ export default function Bedtime() {
   }, []);
 
   const isPumpUser = isPumpDeliveryMethod(profile?.insulinDeliveryMethod);
+  const loopOn = usesClosedLoop(userSettings);
+  const roundIncrement = insulinRoundIncrement(isPumpUser);
 
   const getTargetRange = () => resolveUserTargetBgRange(userSettings, bgUnits);
 
@@ -424,6 +433,8 @@ export default function Bedtime() {
     const insulinSelected = hoursSinceInsulin.trim() !== "";
     const insulinHoursForIOB = insulinSelected ? parseFloat(hoursSinceInsulin) : 999;
     const bolusPhrase = insulinSelected ? hoursSinceSelectPhrase(hoursSinceInsulin) : null;
+    const pumpIobUnits = isPumpUser ? parseOptionalBolusUnits(pumpIobInput) : null;
+    const pumpIobEntered = pumpIobUnits != null;
     const sleepHours = hoursUntilSleep ? parseFloat(hoursUntilSleep) : null;
     const carbs = mealCarbs ? parseFloat(mealCarbs) : null;
     
@@ -579,7 +590,33 @@ export default function Bedtime() {
       }
     }
 
-    if (insulinSelected && Number.isFinite(insulinHoursForIOB)) {
+    if (isPumpUser) {
+      if (pumpIobEntered) {
+        if (pumpIobUnits >= 1.5) {
+          factors.push({
+            label: "Pump IOB",
+            status: "caution",
+            note: `${pumpIobUnits}u on the pump`,
+            detail: "Active insulin can still bring glucose down overnight.",
+          });
+          cautionCount++;
+        } else {
+          factors.push({
+            label: "Pump IOB",
+            status: "good",
+            note: pumpIobUnits > 0 ? `${pumpIobUnits}u on the pump` : "No IOB entered as 0",
+            detail: "Confirm this matches the IOB on your pump before any correction.",
+          });
+        }
+      } else {
+        factors.push({
+          label: "Pump IOB",
+          status: "good",
+          note: "Pump IOB not entered",
+          detail: "Next time, add IOB from your pump so active insulin is reflected here.",
+        });
+      }
+    } else if (insulinSelected && Number.isFinite(insulinHoursForIOB)) {
       if (insulinHoursForIOB < 2) {
         factors.push({
           label: "Mealtime insulin",
@@ -699,10 +736,31 @@ export default function Bedtime() {
     if (isPumpUser) {
       factors.push({
         label: "Basal delivery",
-        status: "good",
-        note: "Pump basal in the background",
-        detail: "Tonight still depends on boluses, food timing, temp basals, and activity.",
+        status: pumpDisconnectedRecently ? "caution" : "good",
+        note: pumpDisconnectedRecently ? "Pump was disconnected recently" : "Pump basal in the background",
+        detail: pumpDisconnectedRecently
+          ? "Missed basal can let glucose climb — recheck before sleep."
+          : "Tonight still depends on boluses, food timing, temp basals, and activity.",
       });
+      if (pumpDisconnectedRecently) cautionCount++;
+      if (pumpRecentSiteChange) {
+        factors.push({
+          label: "Infusion site",
+          status: "caution",
+          note: "Site changed recently",
+          detail: "A fresh site can absorb unpredictably for a few hours.",
+        });
+        cautionCount++;
+      }
+      if (pumpExerciseActivityOn) {
+        factors.push({
+          label: loopOn ? "Loop activity" : "Temp target",
+          status: "caution",
+          note: loopOn ? "Exercise or temp target still on" : "Exercise / temp target still on",
+          detail: "Can keep insulin lower overnight — watch for a dip.",
+        });
+        cautionCount++;
+      }
     } else if (basalClockSummary) {
       const basalHeadline = `Usual long-acting around ${basalClockSummary} (home clock)`;
       if (mdiBasalForBed === "morning") {
@@ -769,6 +827,7 @@ export default function Bedtime() {
       mdiBasalForBed,
       overnightUsualTrend,
       isPumpUser,
+      pumpMissedBasal: pumpDisconnectedRecently,
     });
 
     const concernLabels = factors.filter((f) => f.status === "concern").map((f) => f.label);
@@ -789,8 +848,8 @@ export default function Bedtime() {
       foodHours: foodSelected && Number.isFinite(foodHours) ? foodHours : null,
       foodSelected,
       bolusPhrase,
-      insulinHours: insulinSelected && Number.isFinite(insulinHoursForIOB) ? insulinHoursForIOB : null,
-      insulinSelected,
+      insulinHours: isPumpUser ? null : insulinSelected && Number.isFinite(insulinHoursForIOB) ? insulinHoursForIOB : null,
+      insulinSelected: isPumpUser ? pumpIobEntered : insulinSelected,
       carbs: carbs != null && Number.isFinite(carbs) ? carbs : null,
       sleepHours: sleepHours != null && Number.isFinite(sleepHours) ? sleepHours : null,
       concernCount,
@@ -805,6 +864,11 @@ export default function Bedtime() {
       mdiBasalForBed,
       basalClockSummary: basalClockSummary,
       overnightUsualTrend,
+      usesClosedLoop: loopOn,
+      pumpIobUnits,
+      pumpRecentSiteChange,
+      pumpDisconnectedRecently,
+      pumpExerciseActivityOn,
     });
 
     const tips = [...personalized.tips];
@@ -836,7 +900,7 @@ export default function Bedtime() {
     if (level === "alert" && hadAlcohol && isPumpUser) {
       tips.push("Check your pump's IOB display before deciding on a correction");
     }
-    if (level === "alert" && exercisedToday && isPumpUser) {
+    if (level === "alert" && exercisedToday && isPumpUser && !loopOn) {
       tips.push("Consider a temporary basal at 80–90% overnight after exercise if your team uses that approach");
     }
 
@@ -853,6 +917,8 @@ export default function Bedtime() {
       hadAlcohol,
       recentHypos,
       sickDayActive: scenarioState.sickDayActive,
+      pumpIobUnits: isPumpUser ? pumpIobUnits : null,
+      roundIncrement,
     });
     const action = resolveBedtimeAction(correctionResult, personalized.snack);
     const actionSuggested: BedtimeActionSuggested =
@@ -1023,7 +1089,8 @@ export default function Bedtime() {
                 <InfoSection title="Pump users">
                   <p>
                     Program boluses on your pump and check IOB before any correction. Any dose numbers are planning aids
-                    only — follow your pump and care team.
+                    only — follow your pump and care team. Closed-loop users: don&apos;t stack a bedtime correction on
+                    automation unless your team has a plan for that.
                   </p>
                 </InfoSection>
               ) : null}
@@ -1073,6 +1140,7 @@ export default function Bedtime() {
         <BedtimeResultView
           result={result}
           isPumpUser={isPumpUser}
+          usesClosedLoop={loopOn}
           hoursUntilSleep={hoursUntilSleep}
           exercisedToday={exercisedToday}
           hadAlcohol={hadAlcohol}
@@ -1228,6 +1296,29 @@ export default function Bedtime() {
                     </Select>
                   </div>
                   <div className="space-y-1.5">
+                    {isPumpUser ? (
+                      <>
+                        <Label htmlFor="pump-iob" className="text-xs font-medium text-muted-foreground">
+                          Pump IOB <span className="font-normal">(optional)</span>
+                        </Label>
+                        <div className="relative">
+                          <Input
+                            id="pump-iob"
+                            type="text"
+                            inputMode="decimal"
+                            placeholder="1.2"
+                            value={pumpIobInput}
+                            onChange={(e) => setPumpIobInput(e.target.value)}
+                            className="h-11 rounded-xl border-border/60 bg-background pr-8"
+                            data-testid="input-bedtime-pump-iob"
+                          />
+                          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                            u
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
                     <div className="flex items-center gap-0.5">
                       <Label htmlFor="hours-insulin" className="text-xs font-medium text-muted-foreground">
                         Since bolus
@@ -1250,6 +1341,8 @@ export default function Bedtime() {
                         <SelectItem value="4">4+ hr</SelectItem>
                       </SelectContent>
                     </Select>
+                      </>
+                    )}
                   </div>
                 </div>
               </section>
@@ -1359,6 +1452,37 @@ export default function Bedtime() {
                       onCheckedChange={setRecentHypos}
                       testId="switch-recent-hypos"
                     />
+                    {isPumpUser ? (
+                      <>
+                        <BedtimeExtraToggle
+                          id="pump-site"
+                          icon={<RefreshCw className="h-4 w-4 text-sky-600 dark:text-sky-400" />}
+                          label="Site changed recently"
+                          hint="A new infusion site can absorb unpredictably for a few hours."
+                          checked={pumpRecentSiteChange}
+                          onCheckedChange={setPumpRecentSiteChange}
+                          testId="switch-pump-site-change"
+                        />
+                        <BedtimeExtraToggle
+                          id="pump-disconnected"
+                          icon={<Unplug className="h-4 w-4 text-amber-700 dark:text-amber-400" />}
+                          label="Pump disconnected recently"
+                          hint="Time off the pump means missed basal, which can let glucose climb."
+                          checked={pumpDisconnectedRecently}
+                          onCheckedChange={setPumpDisconnectedRecently}
+                          testId="switch-pump-disconnected"
+                        />
+                        <BedtimeExtraToggle
+                          id="pump-exercise-activity"
+                          icon={<Zap className="h-4 w-4 text-violet-600 dark:text-violet-400" />}
+                          label={loopOn ? "Exercise activity still on" : "Temp target still on"}
+                          hint="Exercise or temp target left on at bedtime can keep insulin lower overnight."
+                          checked={pumpExerciseActivityOn}
+                          onCheckedChange={setPumpExerciseActivityOn}
+                          testId="switch-pump-exercise-activity"
+                        />
+                      </>
+                    ) : null}
                   </div>
                   <div className="space-y-1.5 border-t border-border/40 px-3.5 py-3">
                     <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">

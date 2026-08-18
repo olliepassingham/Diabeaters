@@ -26,7 +26,7 @@ import { Switch } from "@/components/ui/switch";
 import { storage, UserSettings, UserProfile, ScenarioState, RatioFormat, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { parseRatioToGramsPerUnit, calculateDoseFromCarbs, formatRatioForDisplay } from "@/lib/ratio-utils";
-import { calculateMealDose, calculateSplitDose, type MealDoseResult, type SplitFatTier } from "@/lib/meal-dose";
+import { calculateMealDose, calculateSplitDose, insulinRoundIncrement, type MealDoseResult, type SplitFatTier } from "@/lib/meal-dose";
 import { getEffectiveTdd } from "@/lib/tdd";
 import { Badge } from "@/components/ui/badge";
 import { FaceLogoWatermark } from "@/components/face-logo";
@@ -277,6 +277,7 @@ export default function Adviser() {
 
   const bgUnits = profile.bgUnits || "mmol/L";
   const isPumpUser = isPumpDeliveryMethod(profile?.insulinDeliveryMethod);
+  const roundIncrement = insulinRoundIncrement(isPumpUser);
 
   useEffect(() => {
     setSettings(storage.getSettings());
@@ -359,7 +360,7 @@ export default function Adviser() {
       return;
     }
 
-    const split = calculateSplitDose(totalUnits, splitFatLevel);
+    const split = calculateSplitDose(totalUnits, splitFatLevel, roundIncrement);
 
     setSplitResult({
       totalUnits: split.totalUnits,
@@ -392,7 +393,7 @@ export default function Adviser() {
         ? { exerciseType: lastEx.exerciseType, intensity: lastEx.intensity, durationMinutes: lastEx.durationMinutes }
         : undefined;
 
-    const result = calculateMealDose(carbValue, mealTime, freshSettings, bgUnits, exerciseContext, hoursAway, exerciseMeta);
+    const result = calculateMealDose(carbValue, mealTime, freshSettings, bgUnits, exerciseContext, hoursAway, exerciseMeta, roundIncrement);
 
     try {
       storage.addActivityLog({
