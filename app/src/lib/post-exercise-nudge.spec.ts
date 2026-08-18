@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildSessionContextTipExtras,
   getPostExercisePersonalizedTipBullets,
+  getPostExerciseTipPanel,
   inferPostExerciseLoadTier,
   insulinDeliveryForPostExerciseTips,
 } from "./post-exercise-nudge";
@@ -137,6 +138,41 @@ describe("getPostExercisePersonalizedTipBullets", () => {
       mentionOvernight: false,
     });
     expect(bullets.some((b) => /Lower-impact sessions disturb glucose less/i.test(b))).toBe(false);
-    expect(bullets.some((b) => /Long or brisk sessions in this format/i.test(b))).toBe(true);
+    expect(bullets.some((b) => /long or brisk session/i.test(b))).toBe(true);
+  });
+});
+
+describe("getPostExerciseTipPanel", () => {
+  it("keeps at most three short actions", () => {
+    const panel = getPostExerciseTipPanel(
+      "moderate",
+      sum({
+        exerciseType: "strength",
+        context: {
+          feltSymptomsDuring: true,
+          alcoholLastNight: true,
+          recoveryExerciseTrend: "falling",
+        },
+      }),
+      "pen",
+      { mentionOvernight: false },
+    );
+    expect(panel.actions.length).toBeLessThanOrEqual(3);
+    expect(panel.headline.toLowerCase()).not.toMatch(/moderate load/);
+    for (const action of panel.actions) {
+      expect(action.title.length).toBeLessThanOrEqual(36);
+      expect(action.detail.length).toBeLessThanOrEqual(64);
+    }
+  });
+
+  it("prefers logged context over a generic exercise-type line", () => {
+    const panel = getPostExerciseTipPanel(
+      "moderate",
+      sum({ exerciseType: "cardio", context: { alcoholLastNight: true } }),
+      "unknown",
+      { mentionOvernight: false },
+    );
+    expect(panel.actions.some((a) => /alcohol last night/i.test(a.title))).toBe(true);
+    expect(panel.actions.some((a) => a.id === "type-cardio")).toBe(false);
   });
 });

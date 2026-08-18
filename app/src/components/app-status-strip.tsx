@@ -14,11 +14,7 @@ import {
   Play,
   Moon,
   Activity,
-  Lightbulb,
   Cookie,
-  Droplets,
-  Sparkles,
-  Shield,
   MoreHorizontal,
   Maximize2,
   Pause,
@@ -64,11 +60,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  formatLastExerciseSummaryLine,
-  getPostExerciseEducationalCopy,
-  getPostExercisePersonalizedTipBullets,
+  getPostExerciseTipPanel,
   inferPostExerciseLoadTier,
   insulinDeliveryForPostExerciseTips,
+  type PostExerciseActionKind,
 } from "@/lib/post-exercise-nudge";
 import { tripStyleLabel } from "@/lib/travel-active-guidance";
 import {
@@ -113,48 +108,29 @@ function daysRemaining(endIsoOrDate: string | undefined): number | null {
   return Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-/** Icon + tint for post-exercise tip rows (copy-aware, educational only). */
-function postExerciseTipPresentation(text: string, index: number): { Icon: LucideIcon; iconWrap: string } {
-  const lower = text.toLowerCase();
-  if (/bedtime|overnight|\bat night\b|toward bed/.test(lower)) {
+/** Icon + tint for compact post-exercise actions. */
+function postExerciseTipPresentation(kind: PostExerciseActionKind): { Icon: LucideIcon; iconWrap: string } {
+  if (kind === "overnight") {
     return {
       Icon: Moon,
-      iconWrap: "bg-violet-500/18 text-violet-800 shadow-sm shadow-violet-950/10 dark:text-violet-100",
+      iconWrap: "bg-violet-500/18 text-violet-800 dark:text-violet-100",
     };
   }
-  if (/\bcarb|hypo|fast carb|lows?\b|snack|glucose is/.test(lower)) {
+  if (kind === "carbs" || kind === "trend") {
     return {
       Icon: Cookie,
-      iconWrap: "bg-amber-500/18 text-amber-900 shadow-sm shadow-amber-950/10 dark:text-amber-100",
+      iconWrap: "bg-amber-500/18 text-amber-900 dark:text-amber-100",
     };
   }
-  if (/\biob\b|bolus|insulin|pump|injection|correction|stacking|doses?\b/.test(lower)) {
+  if (kind === "insulin") {
     return {
       Icon: Syringe,
-      iconWrap: "bg-sky-500/16 text-sky-900 shadow-sm shadow-sky-950/10 dark:text-sky-100",
-    };
-  }
-  if (/hydra|water|refuel/.test(lower)) {
-    return {
-      Icon: Droplets,
-      iconWrap: "bg-cyan-500/15 text-cyan-900 shadow-sm shadow-cyan-950/10 dark:text-cyan-100",
-    };
-  }
-  if (/\btrain|workout|session|muscle|cardio|hiit|burst|endurance|sensitivity|dip\b/.test(lower)) {
-    return {
-      Icon: Activity,
-      iconWrap: "bg-emerald-500/18 text-emerald-900 shadow-sm shadow-emerald-950/10 dark:text-emerald-100",
-    };
-  }
-  if (index === 0) {
-    return {
-      Icon: Sparkles,
-      iconWrap: "bg-emerald-500/18 text-emerald-900 shadow-sm shadow-emerald-950/10 dark:text-emerald-100",
+      iconWrap: "bg-sky-500/16 text-sky-900 dark:text-sky-100",
     };
   }
   return {
-    Icon: Lightbulb,
-    iconWrap: "bg-muted/80 text-muted-foreground shadow-sm",
+    Icon: Activity,
+    iconWrap: "bg-emerald-500/18 text-emerald-900 dark:text-emerald-100",
   };
 }
 
@@ -807,10 +783,8 @@ export function AppStatusStrip() {
           {(() => {
             const last = storage.getLastExerciseSummary();
             const tier = inferPostExerciseLoadTier(last);
-            const summaryLine = formatLastExerciseSummaryLine(last);
             const delivery = insulinDeliveryForPostExerciseTips(storage.getProfile());
-            const tipBullets = getPostExercisePersonalizedTipBullets(tier, last, delivery);
-            const edu = getPostExerciseEducationalCopy(tier);
+            const panel = getPostExerciseTipPanel(tier, last, delivery);
             return (
               <>
                 <div
@@ -932,52 +906,48 @@ export function AppStatusStrip() {
                     role="region"
                     aria-label="Post-exercise tips"
                   >
-                    <div className="space-y-3 px-3.5 pb-3.5 pt-3.5 sm:px-4 sm:pb-4 sm:pt-4">
-                      <p className="text-[11px] font-medium uppercase tracking-wide text-emerald-800/90 dark:text-emerald-200/90">
-                        {edu.stripHint}
-                      </p>
-                      {summaryLine ? (
-                        <div
-                          className="flex items-start gap-3 rounded-xl border border-border/50 bg-background/55 px-3 py-2.5 backdrop-blur-sm dark:bg-background/35"
-                          data-testid="status-post-exercise-summary"
-                        >
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-800 dark:text-emerald-100">
-                            <Dumbbell className="h-5 w-5" aria-hidden />
-                          </div>
-                          <div className="min-w-0 pt-0.5">
-                            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Last session</p>
-                            <p className="text-base font-semibold leading-snug text-foreground">{summaryLine}</p>
-                          </div>
-                        </div>
-                      ) : null}
-                      <div className="space-y-2">
-                        {tipBullets.map((b, i) => {
-                          const { Icon, iconWrap } = postExerciseTipPresentation(b, i);
+                    <div className="max-h-[min(42dvh,calc(100dvh-18rem-env(safe-area-inset-bottom,0px)))] space-y-2.5 overflow-y-auto overscroll-contain px-3.5 py-3 [-webkit-overflow-scrolling:touch] touch-pan-y sm:px-4 sm:py-3.5">
+                      <div className="min-w-0">
+                        <p className="text-[15px] font-semibold leading-snug tracking-tight text-foreground">
+                          {panel.headline}
+                        </p>
+                        {panel.sessionLine ? (
+                          <p
+                            className="mt-0.5 truncate text-xs text-muted-foreground"
+                            data-testid="status-post-exercise-summary"
+                          >
+                            After {panel.sessionLine}
+                          </p>
+                        ) : null}
+                      </div>
+                      <div className="space-y-1.5">
+                        {panel.actions.map((tip, i) => {
+                          const { Icon, iconWrap } = postExerciseTipPresentation(tip.kind);
                           return (
                             <div
-                              key={`${i}-${b.slice(0, 48)}`}
-                              className="flex gap-3 rounded-xl border border-border/45 bg-background/50 px-3 py-2.5 backdrop-blur-sm dark:bg-background/30"
+                              key={tip.id}
+                              className="flex items-start gap-2.5 rounded-xl border border-border/45 bg-background/50 px-2.5 py-2 dark:bg-background/30"
                               data-testid={`status-post-exercise-tip-${i}`}
                             >
                               <div
                                 className={cn(
-                                  "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 ring-black/5 dark:ring-white/10",
+                                  "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
                                   iconWrap,
                                 )}
                               >
-                                <Icon className="h-[18px] w-[18px]" aria-hidden />
+                                <Icon className="h-4 w-4" aria-hidden />
                               </div>
-                              <p className="min-w-0 pt-1 text-sm leading-snug text-foreground/90">{b}</p>
+                              <div className="min-w-0 pt-0.5">
+                                <p className="text-sm font-semibold leading-snug text-foreground">{tip.title}</p>
+                                <p className="text-xs leading-snug text-muted-foreground">{tip.detail}</p>
+                              </div>
                             </div>
                           );
                         })}
                       </div>
-                      <div className="flex gap-2 rounded-lg border border-dashed border-border/60 bg-muted/20 px-2.5 py-2 dark:bg-muted/10">
-                        <Shield className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                        <p className="text-[11px] leading-snug text-muted-foreground">
-                          Educational only — follow your diabetes team&apos;s written plan first.
-                        </p>
-                      </div>
+                      <p className="px-0.5 text-[10px] leading-snug text-muted-foreground/90">
+                        Educational only — follow your diabetes team&apos;s plan first.
+                      </p>
                     </div>
                   </div>
                 ) : null}

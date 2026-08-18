@@ -1,18 +1,179 @@
 import type { ExerciseBgTrend, ExerciseType, LastExerciseSummary } from "@/lib/storage";
 
 const MAX_CONTEXT_EXTRAS = 2;
+const MAX_PANEL_ACTIONS = 3;
 
-function bgTrendContextLine(ctx: NonNullable<LastExerciseSummary["context"]>): string | null {
+export type PostExerciseActionKind =
+  | "insulin"
+  | "carbs"
+  | "overnight"
+  | "trend"
+  | "session"
+  | "context";
+
+export type PostExerciseActionTip = {
+  id: string;
+  kind: PostExerciseActionKind;
+  title: string;
+  detail: string;
+};
+
+export type PostExerciseTipPanel = {
+  /** What to watch for — not a load-tier label. */
+  headline: string;
+  sessionLine: string | null;
+  actions: PostExerciseActionTip[];
+};
+
+function formatActionLine(tip: PostExerciseActionTip): string {
+  return `${tip.title} — ${tip.detail}`;
+}
+
+function bgTrendContextTip(ctx: NonNullable<LastExerciseSummary["context"]>): PostExerciseActionTip | null {
   const t: ExerciseBgTrend | undefined =
     ctx.recoveryExerciseTrend ?? ctx.duringExerciseTrend ?? ctx.preExerciseTrend;
   if (!t || t === "not_sure") return null;
   if (t === "falling") {
-    return "Your logged checks trended down at least once — delayed lows can still appear later; keep hypo treatment close and avoid tightening insulin aggressively without a repeat check.";
+    return {
+      id: "trend-falling",
+      kind: "trend",
+      title: "You trended down",
+      detail: "Recheck before tightening insulin.",
+    };
   }
   if (t === "rising") {
-    return "Your logged checks trended up at least once — refuelling and stress hormones can muddy the next few hours; follow your team’s correction rules and confirm the trend.";
+    return {
+      id: "trend-rising",
+      kind: "trend",
+      title: "You trended up",
+      detail: "Confirm the trend before correcting.",
+    };
   }
-  return "Your logged checks looked steadier — still watch the next few hours if you add meal insulin or train again.";
+  return {
+    id: "trend-steady",
+    kind: "trend",
+    title: "Checks looked steadier",
+    detail: "Still watch if you add meal insulin.",
+  };
+}
+
+function sessionContextActionTips(summary: LastExerciseSummary | null): PostExerciseActionTip[] {
+  if (!summary?.context) return [];
+  const c = summary.context;
+  const candidates: PostExerciseActionTip[] = [];
+
+  if (c.feltSymptomsDuring) {
+    candidates.push({
+      id: "symptoms",
+      kind: "context",
+      title: "You had symptoms",
+      detail: "Treat hypos by plan, not by feel.",
+    });
+  }
+  if (c.betaBlockerToday) {
+    candidates.push({
+      id: "beta-blocker",
+      kind: "context",
+      title: "Beta blocker today",
+      detail: "Trust CGM or meter, not adrenaline signs.",
+    });
+  }
+  if (c.alcoholLastNight) {
+    candidates.push({
+      id: "alcohol-last-night",
+      kind: "context",
+      title: "Alcohol last night",
+      detail: "Extra care with corrections and overnight.",
+    });
+  }
+  if (c.alcoholTonight) {
+    candidates.push({
+      id: "alcohol-tonight",
+      kind: "context",
+      title: "Alcohol later",
+      detail: "Pair with your evening plan.",
+    });
+  }
+  if (c.fasted) {
+    candidates.push({
+      id: "fasted",
+      kind: "context",
+      title: "Trained fasted",
+      detail: "Watch delayed lows after meal boluses.",
+    });
+  }
+  if (c.glp1Last24h) {
+    candidates.push({
+      id: "glp1",
+      kind: "context",
+      title: "GLP-1 recently",
+      detail: "Align boluses with your clinician’s plan.",
+    });
+  }
+  const bedtimeHours = c.bedtimeInHours;
+  if (typeof bedtimeHours === "number" && Number.isFinite(bedtimeHours) && bedtimeHours <= 4) {
+    candidates.push(
+      bedtimeHours <= 1
+        ? {
+            id: "bedtime-soon",
+            kind: "overnight",
+            title: "Bedtime soon",
+            detail: "Run Bedtime check before you turn in.",
+          }
+        : {
+            id: "bedtime-later",
+            kind: "overnight",
+            title: `Bedtime in about ${Math.round(bedtimeHours)}h`,
+            detail: "Run Bedtime check tonight.",
+          },
+    );
+  }
+  const carbsDuring = c.midCarbsGramsTotal;
+  if (typeof carbsDuring === "number" && carbsDuring >= 20) {
+    candidates.push({
+      id: "carbs-during",
+      kind: "carbs",
+      title: `~${Math.round(carbsDuring)}g during the session`,
+      detail: "Confirm the trend before extra insulin.",
+    });
+  }
+  if (c.competitive) {
+    candidates.push({
+      id: "competitive",
+      kind: "session",
+      title: "Competitive session",
+      detail: "A delayed dip can follow once effort stops.",
+    });
+  }
+  if (c.environment === "outdoor_hot") {
+    candidates.push({
+      id: "hot",
+      kind: "context",
+      title: "Hot conditions",
+      detail: "Recheck before bold insulin changes.",
+    });
+  }
+  if (c.environment === "outdoor_cold") {
+    candidates.push({
+      id: "cold",
+      kind: "context",
+      title: "Cold conditions",
+      detail: "Warm fingers and sensor before acting.",
+    });
+  }
+  const sleep = c.sleepHoursLastNight;
+  if (typeof sleep === "number" && sleep > 0 && sleep <= 5) {
+    candidates.push({
+      id: "short-sleep",
+      kind: "overnight",
+      title: "Short sleep",
+      detail: "Favour gentle corrections overnight.",
+    });
+  }
+  const trend = bgTrendContextTip(c);
+  if (trend) candidates.push(trend);
+
+  return candidates;
 }
 
 /**
@@ -20,82 +181,11 @@ function bgTrendContextLine(ctx: NonNullable<LastExerciseSummary["context"]>): s
  * Used by the status strip; capped so the panel stays scannable.
  */
 export function buildSessionContextTipExtras(summary: LastExerciseSummary | null): string[] {
-  if (!summary?.context) return [];
-  const c = summary.context;
-  const candidates: string[] = [];
-
-  if (c.feltSymptomsDuring) {
-    candidates.push(
-      "You noted symptoms during this session — take the hours after exercise seriously: favour your hypo plan and avoid guessing insulin changes without a trend.",
-    );
-  }
-  if (c.betaBlockerToday) {
-    candidates.push(
-      "Beta blockers can hide adrenaline warning signs for some people — lean on meter or CGM trends and your written hypo steps, not only how you feel.",
-    );
-  }
-  if (c.alcoholLastNight) {
-    candidates.push(
-      "You flagged alcohol last night — it can still interact with sensitivity today; be extra careful with corrections and overnight lows.",
-    );
-  }
-  if (c.alcoholTonight) {
-    candidates.push(
-      "You flagged alcohol planned later — pair that with your team’s evening guidance and extra caution after today’s session.",
-    );
-  }
-  if (c.fasted) {
-    candidates.push(
-      "You trained fasted or with minimal fuel — refuel thoughtfully and watch for delayed lows after any meal boluses.",
-    );
-  }
-  if (c.glp1Last24h) {
-    candidates.push(
-      "You flagged a GLP-1 medicine recently — appetite and stomach emptying can shift; align boluses with your clinician’s plan.",
-    );
-  }
-  const bedtimeHours = c.bedtimeInHours;
-  if (typeof bedtimeHours === "number" && Number.isFinite(bedtimeHours) && bedtimeHours <= 4) {
-    candidates.push(
-      bedtimeHours <= 1
-        ? "You logged bedtime very soon — this is a good moment to run the Bedtime check tool for a trend-aware correction or snack recommendation."
-        : `You logged bedtime in about ${Math.round(bedtimeHours)}h — worth running the Bedtime check tool before you turn in tonight.`,
-    );
-  }
-  const carbsDuring = c.midCarbsGramsTotal;
-  if (typeof carbsDuring === "number" && carbsDuring >= 20) {
-    candidates.push(
-      `You logged roughly ${Math.round(carbsDuring)}g carbs during the session — if glucose rises afterward, confirm the trend before stacking corrections.`,
-    );
-  }
-  if (c.competitive) {
-    candidates.push(
-      "You marked a competitive session — adrenaline can skew how hard it felt; some people see a delayed dip once effort stops.",
-    );
-  }
-  if (c.environment === "outdoor_hot") {
-    candidates.push(
-      "You logged hot conditions — hydration and heat can shift glucose; favour repeat checks before bold insulin changes.",
-    );
-  }
-  if (c.environment === "outdoor_cold") {
-    candidates.push(
-      "You logged cold conditions — keep fingers and sensors warm enough to trust readings before acting on them.",
-    );
-  }
-  const sleep = c.sleepHoursLastNight;
-  if (typeof sleep === "number" && sleep > 0 && sleep <= 5) {
-    candidates.push(
-      "Short sleep before training can blunt warning signs — favour gentle corrections and your usual overnight safety habits.",
-    );
-  }
-  const bgLine = bgTrendContextLine(c);
-  if (bgLine) candidates.push(bgLine);
-
   const out: string[] = [];
   const seen = new Set<string>();
-  for (const line of candidates) {
+  for (const tip of sessionContextActionTips(summary)) {
     if (out.length >= MAX_CONTEXT_EXTRAS) break;
+    const line = formatActionLine(tip);
     const key = line.slice(0, 88);
     if (seen.has(key)) continue;
     seen.add(key);
@@ -278,42 +368,142 @@ export function insulinDeliveryForPostExerciseTips(
   return "unknown";
 }
 
-function exerciseTailTip(summary: LastExerciseSummary | null, tier: PostExerciseLoadTier): string | null {
+function insulinActionTip(tier: PostExerciseLoadTier, delivery: InsulinDeliveryForTips): PostExerciseActionTip {
+  if (tier === "light") {
+    if (delivery === "pump") {
+      return {
+        id: "insulin",
+        kind: "insulin",
+        title: "Check IOB first",
+        detail: "Sensitivity only shifts a little.",
+      };
+    }
+    return {
+      id: "insulin",
+      kind: "insulin",
+      title: "Don’t stack doses",
+      detail: "Sensitivity only shifts a little.",
+    };
+  }
+  if (tier === "moderate") {
+    if (delivery === "pump") {
+      return {
+        id: "insulin",
+        kind: "insulin",
+        title: "Don’t stack boluses",
+        detail: "Check IOB before topping up.",
+      };
+    }
+    if (delivery === "pen") {
+      return {
+        id: "insulin",
+        kind: "insulin",
+        title: "Don’t stack injections",
+        detail: "Space meal and correction doses.",
+      };
+    }
+    return {
+      id: "insulin",
+      kind: "insulin",
+      title: "Don’t stack insulin",
+      detail: "Recheck before adding more.",
+    };
+  }
+  if (delivery === "pump") {
+    return {
+      id: "insulin",
+      kind: "insulin",
+      title: "Go easy on insulin",
+      detail: "Ask your team about a temp basal.",
+    };
+  }
+  return {
+    id: "insulin",
+    kind: "insulin",
+    title: "Go easy on insulin",
+    detail: "Avoid stacking meal and correction doses.",
+  };
+}
+
+function safetyActionTip(overnight: boolean): PostExerciseActionTip {
+  if (overnight) {
+    return {
+      id: "overnight",
+      kind: "overnight",
+      title: "Watch overnight",
+      detail: "If falling toward bed, follow your hypo plan.",
+    };
+  }
+  return {
+    id: "carbs",
+    kind: "carbs",
+    title: "Keep fast carbs close",
+    detail: "Delayed lows can still show up later.",
+  };
+}
+
+function exerciseTypeActionTip(
+  summary: LastExerciseSummary | null,
+  tier: PostExerciseLoadTier,
+): PostExerciseActionTip | null {
   if (!summary) return null;
   switch (summary.exerciseType) {
     case "hiit":
     case "cardio":
-      return "Sustained or high-intensity cardio often raises the chance of delayed lows — an extra check before bed can help.";
+      return {
+        id: "type-cardio",
+        kind: "session",
+        title: "Cardio delayed lows",
+        detail: "An extra check before bed helps.",
+      };
     case "strength":
-      return "After strength work, glucose can drift unpredictably while muscles refuel — respond to trends rather than chasing numbers quickly.";
+      return {
+        id: "type-strength",
+        kind: "session",
+        title: "Muscles are refuelling",
+        detail: "Follow the trend — don’t chase numbers.",
+      };
     case "yoga":
     case "walking":
       if (tier === "heavy") {
-        return "Long or brisk sessions in this format can still widen the hypo-risk window — keep fast carbs handy and watch trends, especially if glucose is sliding.";
+        return {
+          id: "type-long-low-impact",
+          kind: "session",
+          title: "Long or brisk session",
+          detail: "Still a wider hypo-risk window — watch slides.",
+        };
       }
-      if (tier === "moderate") {
-        return "Moderate sessions like this usually move glucose less than hard cardio — still use your usual caution if you stack doses or train again today.";
-      }
-      return "Lower-impact sessions disturb glucose less for many people, but a late-day downward trend still deserves your usual caution.";
+      return null;
     case "court":
     case "field":
     case "swimming":
-      return "Mixed bursts and endurance can both affect sensitivity — watch for a delayed dip later on.";
+      return {
+        id: "type-mixed",
+        kind: "session",
+        title: "Mixed effort",
+        detail: "Watch for a delayed dip later.",
+      };
     default:
       return null;
   }
 }
 
+function postExerciseHeadline(tier: PostExerciseLoadTier): string {
+  if (tier === "light") return "Slight extra sensitivity";
+  if (tier === "moderate") return "Insulin may hit harder for hours";
+  return "Higher delayed-low risk today";
+}
+
 /**
- * Tips for the home status strip (expanded). Uses last session + load tier + pump vs pen vs unknown,
- * plus up to two lines from pre/during/recovery context when the user logged it.
+ * Compact actions for the status-strip tips panel. Always insulin + safety,
+ * plus at most one personalised extra (logged context wins over exercise type).
  */
-export function getPostExercisePersonalizedTipBullets(
+export function getPostExerciseTipPanel(
   tier: PostExerciseLoadTier,
   summary: LastExerciseSummary | null,
   delivery: InsulinDeliveryForTips,
   opts?: { mentionOvernight?: boolean },
-): string[] {
+): PostExerciseTipPanel {
   const overnight =
     opts?.mentionOvernight ??
     (() => {
@@ -321,40 +511,27 @@ export function getPostExercisePersonalizedTipBullets(
       return h >= 17 || h < 5;
     })();
 
-  const primary = (() => {
-    if (tier === "light") {
-      if (delivery === "pump") {
-        return "Hydrate and refuel as your BG allows. Lighter sessions usually shift sensitivity only a little — still check IOB before stacking boluses on your pump.";
-      }
-      if (delivery === "pen") {
-        return "Hydrate and refuel as your BG allows. Lighter sessions usually shift sensitivity only a little — still go easy stacking meal and correction doses the same day.";
-      }
-      return "Hydrate and refuel as your BG allows. Lighter sessions usually shift sensitivity only a little — still be careful stacking extra insulin the same day.";
-    }
-    if (tier === "moderate") {
-      if (delivery === "pump") {
-        return "For several hours you may run more insulin-sensitive than usual — spread corrections and weigh IOB or your pump bolus calculator before topping up.";
-      }
-      if (delivery === "pen") {
-        return "For several hours you may run more insulin-sensitive than usual — space correction and meal doses rather than stacking injections.";
-      }
-      return "For several hours you may run more insulin-sensitive than usual — avoid stacking extra insulin doses without your team’s plan.";
-    }
-    if (delivery === "pump") {
-      return "Hard or long sessions can extend the hypo risk window — favour gradual corrections, watch IOB, and ask your team about temporary basal changes on heavy training days.";
-    }
-    if (delivery === "pen") {
-      return "Hard or long sessions can extend the hypo risk window — avoid aggressive correction or meal dose stacking; keep fast carbs within reach for many hours.";
-    }
-    return "Hard or long sessions can extend the hypo risk window — be cautious with extra insulin and keep fast carbs within reach for many hours.";
-  })();
+  const extra = sessionContextActionTips(summary)[0] ?? exerciseTypeActionTip(summary, tier);
+  const actions = [insulinActionTip(tier, delivery), safetyActionTip(overnight), extra].filter(
+    (tip): tip is PostExerciseActionTip => Boolean(tip),
+  );
 
-  const secondary = overnight
-    ? "If glucose is trending down toward bedtime, follow your hypo plan and any overnight guidance from your diabetes team."
-    : "Keep fast carbs within reach for several hours, and repeat your usual pre-exercise checks if you train again today.";
+  return {
+    headline: postExerciseHeadline(tier),
+    sessionLine: formatLastExerciseSummaryLine(summary),
+    actions: actions.slice(0, MAX_PANEL_ACTIONS),
+  };
+}
 
-  const contextExtras = buildSessionContextTipExtras(summary);
-  const tail = exerciseTailTip(summary, tier);
-  const core = [primary, secondary, ...contextExtras];
-  return tail ? [...core, tail] : core;
+/**
+ * Tips for the home status strip (expanded). Uses last session + load tier + pump vs pen vs unknown,
+ * plus one line from pre/during/recovery context when the user logged it.
+ */
+export function getPostExercisePersonalizedTipBullets(
+  tier: PostExerciseLoadTier,
+  summary: LastExerciseSummary | null,
+  delivery: InsulinDeliveryForTips,
+  opts?: { mentionOvernight?: boolean },
+): string[] {
+  return getPostExerciseTipPanel(tier, summary, delivery, opts).actions.map(formatActionLine);
 }
