@@ -10,12 +10,8 @@ import {
   ArrowRight,
   CheckCircle2,
   X,
-  History,
-  ChevronDown,
-  ChevronUp,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
 import {
   storage,
@@ -31,15 +27,10 @@ import {
   Supply as LocalSupply,
   ScenarioState,
   UserProfile,
-  HypoTreatment,
   SettingsCompletionItem,
 } from "@/lib/storage";
 import { getActiveAppMode } from "@/lib/carer-session";
-import { formatAppDate, formatAppTime } from "@/lib/region";
-import { carbSourceLogLabel } from "@/lib/hypo-treatment-display";
 import { useToast } from "@/hooks/use-toast";
-import { InfoTooltip } from "@/components/info-tooltip";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -50,9 +41,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { WelcomeWidget, shouldOfferWelcomeWidget } from "@/components/widgets/welcome-widget";
@@ -69,8 +57,7 @@ import { invokeNotifyCarersOnHypo } from "@/lib/invoke-notify-carers-hypo";
 import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
 import { PageHeader, PageShell } from "@/components/layout";
 import { PendingHypoCheckInBanner } from "@/components/pending-hypo-check-in-banner";
-import { CgmPrefillButton } from "@/components/cgm-prefill-button";
-import { useAutoCgmBgField } from "@/hooks/use-auto-cgm-bg-field";
+import { LogHypoTreatmentSheet } from "@/components/log-hypo-treatment-sheet";
 import { SupplyTrackerTodaySection } from "@/components/dashboard/SupplyTrackerTodaySection";
 import { isAiCoachEnabled, isCommunityEnabled } from "@/lib/flags";
 import { useOffline } from "@/hooks/use-offline";
@@ -323,35 +310,11 @@ function HeroCard({
   const isUrgent = status === "action";
   const { toast } = useToast();
   const [hypoDialogOpen, setHypoDialogOpen] = useState(false);
-  const [hypoGlucose, setHypoGlucose] = useState("");
-  const dashHypoCgm = useAutoCgmBgField({
-    bgValue: hypoGlucose,
-    onApplyBg: setHypoGlucose,
-    autoApplyKey: hypoDialogOpen ? "dashboard-hypo" : undefined,
-  });
-  const [hypoTreatment, setHypoTreatment] = useState("");
-  const [hypoNotes, setHypoNotes] = useState("");
-  const [showHypoHistory, setShowHypoHistory] = useState(false);
-  const [hypoHistory, setHypoHistory] = useState<HypoTreatment[]>([]);
   const [quickHypoConfirmOpen, setQuickHypoConfirmOpen] = useState(false);
-  const bgUnitsLabel: "mmol/L" | "mg/dL" =
-    profile?.bgUnits === "mg/dL" ? "mg/dL" : "mmol/L";
-  const glucoseStep = bgUnitsLabel === "mg/dL" ? "1" : "0.1";
-  const glucosePlaceholder = bgUnitsLabel === "mg/dL" ? "e.g., 58" : "e.g., 3.2";
 
   const handleHypoDialogOpenChange = (open: boolean) => {
     setHypoDialogOpen(open);
   };
-
-  useEffect(() => {
-    if (!hypoDialogOpen) return;
-    setHypoHistory(storage.getHypoTreatments());
-    setShowHypoHistory(false);
-    const label = carbSourceLogLabel(profile, "hypo");
-    if (label) {
-      setHypoTreatment((prev) => prev || label);
-    }
-  }, [hypoDialogOpen, profile]);
 
   useEffect(() => {
     const openHypo = () => setHypoDialogOpen(true);
@@ -369,21 +332,14 @@ function HeroCard({
     window.history.replaceState({}, "", next);
   }, []);
 
-  const handleLogHypo = () => {
-    void runHypoTreatmentPipeline(
-      { glucoseInput: hypoGlucose, treatment: hypoTreatment, notes: hypoNotes },
-      {
-        userId: user?.id,
-        toast,
-        onAfterLocalSave: () => {
-          handleHypoDialogOpenChange(false);
-          setHypoGlucose("");
-          setHypoTreatment("");
-          setHypoNotes("");
-          setHypoHistory(storage.getHypoTreatments());
-        },
+  const handleLogHypo = (fields: { glucoseInput: string; treatment: string; notes: string }) => {
+    void runHypoTreatmentPipeline(fields, {
+      userId: user?.id,
+      toast,
+      onAfterLocalSave: () => {
+        handleHypoDialogOpenChange(false);
       },
-    );
+    });
   };
 
   const handleTreatedHypoClick = () => {
@@ -545,134 +501,12 @@ function HeroCard({
         </CardContent>
       </Card>
 
-      <Dialog open={hypoDialogOpen} onOpenChange={handleHypoDialogOpenChange}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-1">
-              <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600 dark:text-green-400" />
-              <span className="min-w-0 flex-1">Log Hypo Treatment</span>
-              <InfoTooltip
-                term="Saving hypo treatments"
-                explanation="Your hypo treatment is saved locally. When you are signed in with cloud enabled, we also save to your account and notify any linked supporters (push / in-app)."
-              />
-            </DialogTitle>
-            <DialogDescription>
-              Record details about your hypo treatment.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 pt-2">
-            <div className="space-y-2">
-              <Label htmlFor="dash-hypo-glucose">{`Blood glucose (${bgUnitsLabel}) — optional`}</Label>
-              <Input
-                id="dash-hypo-glucose"
-                type="number"
-                step={glucoseStep}
-                placeholder={glucosePlaceholder}
-                value={hypoGlucose}
-                onChange={(e) => dashHypoCgm.onBgChange(e.target.value)}
-                data-testid="input-dashboard-hypo-glucose"
-              />
-              <CgmPrefillButton
-                prefill={dashHypoCgm.prefill}
-                loading={dashHypoCgm.loading}
-                bgUnits={bgUnitsLabel}
-                currentValue={hypoGlucose}
-                onApply={dashHypoCgm.onBgChange}
-                onRefresh={dashHypoCgm.refresh}
-                emptyHint={dashHypoCgm.emptyHint}
-                allowSync
-                testId="button-dashboard-hypo-cgm-prefill"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>What did you take?</Label>
-              <Select value={hypoTreatment} onValueChange={setHypoTreatment}>
-                <SelectTrigger data-testid="select-dashboard-hypo-treatment">
-                  <SelectValue placeholder="Select treatment" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Glucose tablets">Glucose tablets</SelectItem>
-                  <SelectItem value="Juice">Juice</SelectItem>
-                  <SelectItem value="Sweets">Sweets</SelectItem>
-                  <SelectItem value="Sugary drink">Sugary drink</SelectItem>
-                  <SelectItem value="Gel">Glucose gel</SelectItem>
-                  <SelectItem value="Other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="dash-hypo-notes">Notes (optional)</Label>
-              <Input
-                id="dash-hypo-notes"
-                placeholder="e.g., Felt shaky before lunch"
-                value={hypoNotes}
-                onChange={(e) => setHypoNotes(e.target.value)}
-                data-testid="input-dashboard-hypo-notes"
-              />
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="min-h-11 w-full gap-2 text-muted-foreground"
-              onClick={() => setShowHypoHistory(!showHypoHistory)}
-              data-testid="button-toggle-hypo-history"
-            >
-              <History className="h-4 w-4" />
-              Previous Treatments ({hypoHistory.length})
-              {showHypoHistory ? <ChevronUp className="h-3 w-3 ml-auto" /> : <ChevronDown className="h-3 w-3 ml-auto" />}
-            </Button>
-            {showHypoHistory && (
-              <div className="max-h-48 overflow-y-auto space-y-2" data-testid="list-hypo-history">
-                {hypoHistory.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-3">No treatments logged yet.</p>
-                ) : (
-                  hypoHistory.map((entry) => {
-                    const date = new Date(entry.timestamp);
-                    const timeStr = formatAppTime(date, profile, { hour: "2-digit", minute: "2-digit" });
-                    const dateStr = formatAppDate(date, profile, { day: "numeric", month: "short" });
-                    return (
-                      <div key={entry.id} className="flex items-start gap-3 p-2 rounded-md bg-muted/30 text-sm" data-testid={`item-hypo-${entry.id}`}>
-                        <div className="text-muted-foreground text-xs whitespace-nowrap pt-0.5">
-                          <div>{dateStr}</div>
-                          <div>{timeStr}</div>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            {entry.treatment && <Badge variant="secondary" className="text-xs">{entry.treatment}</Badge>}
-                            {entry.glucoseLevel !== undefined && (
-                              <span className="text-xs text-muted-foreground">{entry.glucoseLevel} {bgUnitsLabel}</span>
-                            )}
-                          </div>
-                          {entry.notes && <p className="text-xs text-muted-foreground mt-1 truncate">{entry.notes}</p>}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            )}
-            <div className="flex flex-wrap justify-end gap-x-3 border-t border-border/40 pt-2">
-              <Button variant="ghost" className="h-auto px-2 text-xs font-medium text-primary hover:text-primary" asChild>
-                <Link href="/tools/hypo-history" data-testid="link-hypo-full-history">
-                  Hypo history
-                </Link>
-              </Button>
-              <Button variant="ghost" className="h-auto px-2 text-xs font-medium text-primary hover:text-primary" asChild>
-                <Link href="/tools/activity" data-testid="link-activity-log">
-                  Activity log
-                </Link>
-              </Button>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => handleHypoDialogOpenChange(false)}>Cancel</Button>
-            <Button onClick={handleLogHypo} className="bg-green-600 dark:bg-green-700 gap-2" data-testid="button-dashboard-confirm-hypo">
-              <CheckCircle2 className="h-4 w-4" />
-              Log Treatment
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <LogHypoTreatmentSheet
+        open={hypoDialogOpen}
+        onOpenChange={handleHypoDialogOpenChange}
+        profile={profile}
+        onSubmit={handleLogHypo}
+      />
 
       <AlertDialog open={quickHypoConfirmOpen} onOpenChange={setQuickHypoConfirmOpen}>
         <AlertDialogContent data-testid="dialog-quick-hypo-confirm">
