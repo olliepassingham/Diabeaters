@@ -1,7 +1,15 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import Travel from "./travel";
 import { storage } from "@/lib/storage";
+
+vi.mock("@/lib/auth-context", () => ({
+  useAuth: () => ({ user: { id: "u1", email: "test@example.com" } as import("@supabase/supabase-js").User }),
+}));
+
+vi.mock("@/lib/appointments-supabase", () => ({
+  syncAppointments: vi.fn(async () => undefined),
+}));
 
 describe("Travel page", () => {
   beforeEach(() => {
@@ -13,7 +21,7 @@ describe("Travel page", () => {
     expect(screen.queryByTestId("button-start-travel-plan")).not.toBeNull();
   });
 
-  it("opens on What do you need even when a plan draft exists", () => {
+  it("opens on Plan your trip even when a plan draft exists", () => {
     storage.saveTravelWizardDraft({
       step: "results",
       plan: {
@@ -46,7 +54,7 @@ describe("Travel page", () => {
 
     render(<Travel />);
     expect(screen.queryByTestId("button-start-travel-plan")).not.toBeNull();
-    expect(screen.queryByText("What do you need?")).not.toBeNull();
+    expect(screen.queryByText("Plan your trip")).not.toBeNull();
   });
 
   it("renders active travel dashboard without crashing", () => {

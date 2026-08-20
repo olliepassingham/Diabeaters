@@ -1,5 +1,6 @@
 import {
-  holidaySupplyDaysNeeded,
+  tripSupplyDaysNeeded,
+  tripSupplyOrderByDate,
   travelPlanStockBufferMultiplier,
   travelWeatherPlanSliceFromStoredPlan,
   travelWeatherSupplyShortfallMultiplier,
@@ -2469,9 +2470,34 @@ export const storage = {
       }
     }
 
-    if (scenarioState.travelModeActive && scenarioState.travelStartDate && scenarioState.travelEndDate) {
-      const tripDuration = tripCalendarDaysBetween(scenarioState.travelStartDate, scenarioState.travelEndDate);
-      const savedTravelPlan = this.getTravelPlan();
+    const upcomingPrep = this.getHolidayPrep();
+    const savedTravelPlan = this.getTravelPlan() as
+      | {
+          startDate?: string;
+          endDate?: string;
+          destination?: string;
+          travelType?: string;
+          accessRisk?: string;
+        }
+      | null;
+    const tripStart =
+      (scenarioState.travelModeActive && scenarioState.travelStartDate) ||
+      upcomingPrep?.departureDate ||
+      savedTravelPlan?.startDate ||
+      null;
+    const tripEnd =
+      (scenarioState.travelModeActive && scenarioState.travelEndDate) ||
+      upcomingPrep?.returnDate ||
+      savedTravelPlan?.endDate ||
+      null;
+    const tripDestination =
+      (scenarioState.travelModeActive && scenarioState.travelDestination) ||
+      upcomingPrep?.destination ||
+      savedTravelPlan?.destination ||
+      "trip";
+
+    if (tripStart && tripEnd) {
+      const tripDuration = tripCalendarDaysBetween(tripStart, tripEnd);
       const stockBuffer = travelPlanStockBufferMultiplier(savedTravelPlan);
       const weatherSlice = travelWeatherPlanSliceFromStoredPlan(savedTravelPlan);
       const intervalCfg = {
@@ -2510,10 +2536,16 @@ export const storage = {
             weatherMult > 1.001
               ? `, ${weatherSlice.weatherChange} ${weatherSlice.weatherSeverity} climate`
               : "";
+          const orderBy = tripSupplyOrderByDate({
+            departureDate: tripStart,
+            daysRemaining,
+            leadTimeDays: leadTime,
+          });
+          const orderHint = orderBy ? ` — order by ${orderBy}` : "";
           travelExtras.push({
             supply,
             extraNeeded: shortfall,
-            reason: `Your ${scenarioState.travelDestination || "trip"} (${tripDuration} days, ${stockBuffer.toFixed(1)}× buffer${wx}) needs extra ${supply.name} — order ${shortfall} more with your prescription`,
+            reason: `Your ${tripDestination} (${tripDuration} days, ${stockBuffer.toFixed(1)}× buffer${wx}) needs extra ${supply.name} — order ${shortfall} more with your prescription${orderHint}`,
           });
         }
       }
@@ -5244,26 +5276,36 @@ export const storage = {
   },
 
   /**
-   * Holiday prep: compare forecast "days of supply left" to ~2× calendar trip length,
-   * consistent with common travel guidance to pack extra (not medical advice — follow your team).
+   * Trip supply coverage: compare forecast days left to packing-aligned travel buffer
+   * (domestic/international + access risk), with an order-by date for shortfalls.
+   * Uses holiday prep dates when present, otherwise saved travel plan dates.
    */
   getHolidaySupplyCoverage(): {
     supply: Supply;
     daysRemaining: number;
     /** Whole calendar days between departure and return (midnight dates). */
     calendarTripDays: number;
-    /** Target duration of cover used for % / shortfall (multiplier × calendar trip). */
+    /** Target duration of cover used for % / shortfall (buffer × calendar trip). */
     daysNeeded: number;
     shortfall: number;
     coveragePercent: number;
+    /** Suggested order-by date (YYYY-MM-DD) when coverage is tight or short. */
+    orderByDate: string | null;
   }[] {
     const prep = this.getHolidayPrep();
-    if (!prep) return [];
-    const supplies = this.getSupplies();
-    const calendarTripDays = tripCalendarDaysBetween(prep.departureDate, prep.returnDate);
-    const daysNeeded = holidaySupplyDaysNeeded(calendarTripDays);
+    const plan = this.getTravelPlan() as
+      | { startDate?: string; endDate?: string; travelType?: string; accessRisk?: string }
+      | null;
+    const departureDate = prep?.departureDate || plan?.startDate;
+    const returnDate = prep?.returnDate || plan?.endDate;
+    if (!departureDate || !returnDate) return [];
 
-    return supplies.map(supply => {
+    const supplies = this.getSupplies();
+    const calendarTripDays = tripCalendarDaysBetween(departureDate, returnDate);
+    const daysNeeded = tripSupplyDaysNeeded({ calendarTripDays, plan });
+    const leadTimeDays = this.getPrescriptionCycle()?.leadTimeDays ?? 5;
+
+    return supplies.map((supply) => {
       const daysRemaining = this.getDaysRemaining(supply);
       if (daysRemaining >= 999) {
         return {
@@ -5273,11 +5315,20 @@ export const storage = {
           daysNeeded,
           shortfall: 0,
           coveragePercent: 100,
+          orderByDate: null,
         };
       }
       const coveragePercent = Math.min(100, Math.round((daysRemaining / daysNeeded) * 100));
       const shortfall = Math.max(0, daysNeeded - daysRemaining);
-      return { supply, daysRemaining, calendarTripDays, daysNeeded, shortfall, coveragePercent };
+      const orderByDate =
+        shortfall > 0 || daysRemaining <= daysNeeded + leadTimeDays
+          ? tripSupplyOrderByDate({
+              departureDate,
+              daysRemaining,
+              leadTimeDays,
+            })
+          : null;
+      return { supply, daysRemaining, calendarTripDays, daysNeeded, shortfall, coveragePercent, orderByDate };
     });
   },
 

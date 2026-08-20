@@ -275,7 +275,7 @@ function PrescriptionCyclePanel({
   return (
     <div
       data-testid="card-prescription-cycle"
-      className={`space-y-3 ${advice.collectSoon.length > 0 ? "rounded-lg border border-amber-500/40 p-3" : ""}`}
+      className={`space-y-3 ${advice.collectSoon.length > 0 || advice.travelExtras.length > 0 ? "rounded-lg border border-amber-500/40 p-3" : ""}`}
     >
         {!needsSetup && !editing ? (
           <div className="flex justify-end">
@@ -481,6 +481,20 @@ function PrescriptionCyclePanel({
                     </p>
                   );
                 })}
+              </div>
+            ) : null}
+
+            {advice.travelExtras.length > 0 ? (
+              <div className="space-y-1.5" data-testid="section-travel-extras">
+                {advice.travelExtras.map(({ supply, reason }) => (
+                  <p
+                    key={`travel-${supply.id}`}
+                    className="text-xs leading-snug text-sky-800 dark:text-sky-200"
+                    data-testid={`travel-extra-${supply.id}`}
+                  >
+                    ✈ {reason}
+                  </p>
+                ))}
               </div>
             ) : null}
 

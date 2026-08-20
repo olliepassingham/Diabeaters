@@ -14,6 +14,8 @@ import {
   travelWeatherSupplyShortfallMultiplier,
   travelWeatherTestStripMultiplier,
   tripCalendarDaysBetween,
+  tripSupplyDaysNeeded,
+  tripSupplyOrderByDate,
 } from "./travel-supply-policy";
 
 describe("tripCalendarDaysBetween", () => {
@@ -30,6 +32,56 @@ describe("holidaySupplyDaysNeeded", () => {
   it("doubles trip length at minimum 1", () => {
     expect(holidaySupplyDaysNeeded(7)).toBe(14);
     expect(holidaySupplyDaysNeeded(1)).toBe(2);
+  });
+});
+
+describe("tripSupplyDaysNeeded", () => {
+  it("uses packing buffer for domestic easy access", () => {
+    expect(tripSupplyDaysNeeded({ calendarTripDays: 7, plan: null })).toBe(11); // ceil(7 * 1.5)
+  });
+
+  it("uses international buffer when plan says so", () => {
+    expect(
+      tripSupplyDaysNeeded({
+        calendarTripDays: 7,
+        plan: { travelType: "international", accessRisk: "easy" },
+      }),
+    ).toBe(14);
+  });
+});
+
+describe("tripSupplyOrderByDate", () => {
+  it("picks the earlier of trip lead-time and stock run-out", () => {
+    const today = new Date(2026, 5, 1); // 1 Jun 2026 local
+    expect(
+      tripSupplyOrderByDate({
+        departureDate: "2026-06-20",
+        daysRemaining: 40,
+        leadTimeDays: 5,
+        today,
+      }),
+    ).toBe("2026-06-15"); // departure - 5
+
+    expect(
+      tripSupplyOrderByDate({
+        departureDate: "2026-07-20",
+        daysRemaining: 10,
+        leadTimeDays: 5,
+        today,
+      }),
+    ).toBe("2026-06-06"); // today + 10 - 5
+  });
+
+  it("clamps past dates to today", () => {
+    const today = new Date(2026, 5, 10);
+    expect(
+      tripSupplyOrderByDate({
+        departureDate: "2026-06-12",
+        daysRemaining: 3,
+        leadTimeDays: 5,
+        today,
+      }),
+    ).toBe("2026-06-10");
   });
 });
 

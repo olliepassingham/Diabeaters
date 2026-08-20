@@ -29,6 +29,61 @@ export function holidaySupplyDaysNeeded(calendarTripDays: number): number {
   return Math.max(1, Math.ceil(calendarTripDays * HOLIDAY_SUPPLY_COVERAGE_TRIP_MULTIPLIER));
 }
 
+/**
+ * Days of cover to aim for before/during a trip.
+ * Uses the same domestic/international + pharmacy-access buffers as packing
+ * (defaults to domestic + easy access when no plan is saved yet).
+ */
+export function tripSupplyDaysNeeded(params: {
+  calendarTripDays: number;
+  plan?: unknown;
+}): number {
+  const days = Math.max(1, params.calendarTripDays);
+  const buffer = travelPlanStockBufferMultiplier(params.plan);
+  return Math.max(1, Math.ceil(days * buffer));
+}
+
+/** YYYY-MM-DD local calendar date from a Date. */
+export function formatLocalYmd(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/**
+ * Suggest ordering by the earlier of:
+ * - departure minus prescription lead time
+ * - stock run-out minus lead time
+ * Returns null when stock is effectively unlimited.
+ */
+export function tripSupplyOrderByDate(params: {
+  departureDate: string;
+  daysRemaining: number;
+  leadTimeDays?: number;
+  /** Optional “today” for tests (local midnight). */
+  today?: Date;
+}): string | null {
+  if (params.daysRemaining >= 999) return null;
+  const lead = Math.max(0, params.leadTimeDays ?? 5);
+  const today = params.today ? new Date(params.today) : new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const departure = new Date(params.departureDate);
+  if (!Number.isFinite(departure.getTime())) return null;
+  departure.setHours(0, 0, 0, 0);
+
+  const byTrip = new Date(departure);
+  byTrip.setDate(byTrip.getDate() - lead);
+
+  const byStock = new Date(today);
+  byStock.setDate(byStock.getDate() + Math.max(0, params.daysRemaining) - lead);
+
+  const orderBy = byTrip.getTime() <= byStock.getTime() ? byTrip : byStock;
+  if (orderBy.getTime() < today.getTime()) return formatLocalYmd(today);
+  return formatLocalYmd(orderBy);
+}
+
 /** Matches travel packing list: more spare stock when flying long-haul / abroad. */
 export function travelPackingBufferMultiplier(travelType: TravelTypeForBuffer): number {
   return travelType === "international" ? 2 : 1.5;

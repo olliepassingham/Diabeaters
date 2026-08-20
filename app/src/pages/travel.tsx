@@ -1,5 +1,6 @@
-import { useState, useEffect, useLayoutEffect, useMemo } from "react";
+import { useState, useEffect, useLayoutEffect, useMemo, useCallback } from "react";
 import { Link } from "wouter";
+import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,7 +47,21 @@ import {
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { storage, Supply, UserSettings, UserProfile, HolidayPrep, DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
+import {
+  storage,
+  Supply,
+  UserSettings,
+  UserProfile,
+  HolidayPrep,
+  Appointment,
+  DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT,
+  DIABEATER_ACTIVE_USER_CHANGED_EVENT,
+  DIABEATER_APPOINTMENTS_CHANGED_EVENT,
+  DIABEATER_PROFILE_CHANGED_EVENT,
+  isAppointmentsStorageKey,
+} from "@/lib/storage";
+import { useAuth } from "@/lib/auth-context";
+import { syncAppointments } from "@/lib/appointments-supabase";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { getEffectiveTdd } from "@/lib/tdd";
 import { recordLastInteraction } from "@/lib/last-interaction";
@@ -106,6 +121,25 @@ interface TravelPlan {
 function travelTripStyleForCloud(tripStyle: TravelTripStyle | undefined): string | null {
   if (!tripStyle || tripStyle === "not_sure") return null;
   return tripStyle;
+}
+
+/** Parse date-only strings as local calendar dates (avoids UTC-midnight timezone skew). */
+function parseAppointmentDateLocal(dateStr: string | undefined): Date | null {
+  if (!dateStr) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr.trim());
+  if (m) {
+    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  const d = new Date(dateStr);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function formatNextAppointmentWhen(appointment: Appointment): string {
+  const d = parseAppointmentDateLocal(appointment.date);
+  if (!d) return "Date TBC";
+  const datePart = format(d, "EEE d MMM");
+  return appointment.time?.trim() ? `${datePart} · ${appointment.time.trim()}` : datePart;
 }
 
 function buildTravelScenarioSummary(plan: TravelPlan): string {
@@ -1039,6 +1073,7 @@ const EMERGENCY_PHRASES: Record<string, { lang: string; iAmDiabetic: string; nee
 };
 
 export default function Travel() {
+  const { user } = useAuth();
   const [step, setStep] = useState<"entry" | "inputs" | "results">("entry");
   const TRAVEL_INPUT_STEPS = 3;
   const INPUT_STEP_TITLES = ["Trip details", "Timezone & style", "Conditions"] as const;
@@ -1047,6 +1082,7 @@ export default function Travel() {
   const [isTravelModeActive, setIsTravelModeActive] = useState(false);
   const [isSickDayAlsoActive, setIsSickDayAlsoActive] = useState(false);
   const [sickDaySeverity, setSickDaySeverity] = useState<string | undefined>();
+  const [nextAppointment, setNextAppointment] = useState<Appointment | null>(null);
   
   const getDefaultDates = () => {
     const today = new Date();
@@ -1139,6 +1175,48 @@ export default function Travel() {
       recordLastInteraction("scenario:travel");
     }
   }, []);
+
+  const loadNextAppointment = useCallback(() => {
+    const uid = user?.id;
+    if (!uid) {
+      setNextAppointment(null);
+      return;
+    }
+    try {
+      const upcoming = storage.getUpcomingAppointmentsForUser(uid);
+      setNextAppointment(upcoming[0] ?? null);
+    } catch {
+      setNextAppointment(null);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    loadNextAppointment();
+    void syncAppointments({ throttleMs: 0 }).then(() => loadNextAppointment());
+
+    const onStorage = (e: StorageEvent) => {
+      if (isAppointmentsStorageKey(e.key)) loadNextAppointment();
+    };
+    const onAppointmentsChanged = () => loadNextAppointment();
+    const onActiveUser = () => {
+      void syncAppointments({ throttleMs: 0 }).then(() => loadNextAppointment());
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        void syncAppointments().then(() => loadNextAppointment());
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    window.addEventListener(DIABEATER_APPOINTMENTS_CHANGED_EVENT, onAppointmentsChanged);
+    window.addEventListener(DIABEATER_ACTIVE_USER_CHANGED_EVENT, onActiveUser);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener(DIABEATER_APPOINTMENTS_CHANGED_EVENT, onAppointmentsChanged);
+      window.removeEventListener(DIABEATER_ACTIVE_USER_CHANGED_EVENT, onActiveUser);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [loadNextAppointment]);
 
   const [tripExerciseTick, setTripExerciseTick] = useState(0);
   useEffect(() => {
@@ -1248,6 +1326,16 @@ export default function Travel() {
   }, [step, plan, packingList, resultsTab]);
 
   const handleStartPlan = () => {
+    if (holidayPrep) {
+      const duration = tripCalendarDaysBetween(holidayPrep.departureDate, holidayPrep.returnDate);
+      setPlan((prev) => ({
+        ...prev,
+        destination: holidayPrep.destination || prev.destination,
+        duration,
+        startDate: holidayPrep.departureDate,
+        endDate: holidayPrep.returnDate,
+      }));
+    }
     const draft = storage.getTravelWizardDraft();
     if (draft?.step === "results" && packingList.length > 0) {
       setStep("results");
@@ -1311,7 +1399,20 @@ export default function Travel() {
     storage.saveHolidayPrep(prep);
     setHolidayPrep(prep);
     setShowPrepForm(false);
-    toast({ title: "Holiday prep saved", description: `Trip to ${prep.destination} is being tracked` });
+    // Keep travel plan dates in sync so packing/supply math share one trip.
+    const duration = tripCalendarDaysBetween(prep.departureDate, prep.returnDate);
+    const nextPlan: TravelPlan = {
+      ...plan,
+      destination: prep.destination,
+      duration,
+      startDate: prep.departureDate,
+      endDate: prep.returnDate,
+    };
+    setPlan(nextPlan);
+    if (!storage.getScenarioState().travelModeActive) {
+      storage.saveTravelPlan(nextPlan);
+    }
+    toast({ title: "Trip saved", description: `${prep.destination} is on your travel guide` });
   };
 
   const handleDeleteHolidayPrep = () => {
@@ -1321,7 +1422,7 @@ export default function Travel() {
     setPrepDeparture("");
     setPrepReturn("");
     setPrepNotes("");
-    toast({ title: "Holiday prep cleared", description: "Trip planning data removed" });
+    toast({ title: "Trip cleared", description: "Countdown and checklist removed" });
   };
 
   const handleTogglePrepChecklist = (itemId: string) => {
@@ -1496,6 +1597,23 @@ export default function Travel() {
     setPackingList(list);
     setRiskWarnings(warnings);
     setStep("results");
+    storage.saveTravelPlan(plan);
+
+    // Keep countdown / checklist trip aligned with the packing plan.
+    if (plan.startDate && plan.endDate && plan.destination.trim()) {
+      const existing = storage.getHolidayPrep();
+      const synced: HolidayPrep = {
+        id: existing?.id || crypto.randomUUID(),
+        destination: plan.destination.trim(),
+        departureDate: plan.startDate,
+        returnDate: plan.endDate,
+        notes: existing?.notes,
+        checklist: existing?.checklist?.length ? existing.checklist : defaultChecklist,
+        createdAt: existing?.createdAt || new Date().toISOString(),
+      };
+      storage.saveHolidayPrep(synced);
+      setHolidayPrep(synced);
+    }
 
     storage.addActivityLog({
       activityType: "travel_plan",
@@ -2061,51 +2179,61 @@ export default function Travel() {
         />
 
         <section className="space-y-3">
-          <h2 className="text-base font-semibold text-foreground">What do you need?</h2>
-          <div className="grid gap-3">
-            <button
-              type="button"
-              onClick={handleStartPlan}
-              className={cn(
-                "group flex w-full items-center gap-3.5 rounded-[1.35rem] border border-sky-500/20 bg-gradient-to-b from-sky-500/[0.07] via-card to-card px-4 py-4 text-left transition-all",
-                "hover:border-sky-500/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              )}
-              data-testid="button-start-travel-plan"
-            >
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500/20 to-indigo-500/10 text-sky-700 ring-1 ring-sky-500/20 dark:text-sky-200">
-                <MapPin className="h-5 w-5" aria-hidden />
+          <h2 className="text-base font-semibold text-foreground">Plan your trip</h2>
+          <button
+            type="button"
+            onClick={handleStartPlan}
+            className={cn(
+              "group flex w-full items-center gap-3.5 rounded-[1.35rem] border border-sky-500/20 bg-gradient-to-b from-sky-500/[0.07] via-card to-card px-4 py-4 text-left transition-all",
+              "hover:border-sky-500/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            )}
+            data-testid="button-start-travel-plan"
+          >
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500/20 to-indigo-500/10 text-sky-700 ring-1 ring-sky-500/20 dark:text-sky-200">
+              <MapPin className="h-5 w-5" aria-hidden />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-display text-base font-semibold text-foreground">
+                {holidayPrep ? "Continue packing & timezone plan" : "Travel plan"}
               </span>
-              <span className="min-w-0 flex-1">
-                <span className="block font-display text-base font-semibold text-foreground">Travel plan</span>
-                <span className="mt-0.5 block text-sm text-muted-foreground">Dates, packing, timezone</span>
+              <span className="mt-0.5 block text-sm text-muted-foreground">
+                {holidayPrep
+                  ? `${holidayPrep.destination} · dates, packing, climate`
+                  : "Dates, packing list, timezone & climate"}
               </span>
-              <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground/70" aria-hidden />
-            </button>
+            </span>
+            <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground/70" aria-hidden />
+          </button>
+          {!holidayPrep && !showPrepForm ? (
             <button
               type="button"
               onClick={() => setShowPrepForm(true)}
               className={cn(
-                "group flex w-full items-center gap-3.5 rounded-[1.35rem] border border-border/60 bg-card/70 px-4 py-4 text-left transition-all",
+                "group flex w-full items-center gap-3.5 rounded-[1.35rem] border border-border/60 bg-card/70 px-4 py-3.5 text-left transition-all",
                 "hover:border-primary/40 hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               )}
               data-testid="button-start-holiday-prep"
             >
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-muted/60 text-foreground ring-1 ring-border/50">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-muted/60 text-foreground ring-1 ring-border/50">
                 <Luggage className="h-5 w-5" aria-hidden />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block font-display text-base font-semibold text-foreground">Holiday prep</span>
-                <span className="mt-0.5 block text-sm text-muted-foreground">Countdown and supplies</span>
+                <span className="block text-sm font-semibold text-foreground">Save trip dates first</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Countdown, supply gaps, and a prep checklist
+                </span>
               </span>
-              <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground/70" aria-hidden />
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/70" aria-hidden />
             </button>
-          </div>
+          ) : null}
         </section>
 
         {(showPrepForm || holidayPrep) && (
           <Card className="overflow-hidden rounded-[1.35rem] border-border/50 shadow-none" data-testid="card-travel-entry-hub">
             <CardHeader className="px-4 pb-2 pt-4">
-              <CardTitle className="font-display text-lg font-semibold tracking-tight">Holiday prep</CardTitle>
+              <CardTitle className="font-display text-lg font-semibold tracking-tight">
+                {holidayPrep ? "Your trip" : "Trip dates"}
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 px-4 pb-4 pt-0">
               {showPrepForm && !holidayPrep ? (
@@ -2240,10 +2368,16 @@ export default function Travel() {
                     <div className="space-y-2">
                       <h4 className="text-sm font-semibold flex items-center gap-1.5">
                         <Package className="h-4 w-4" />
-                        Supplies · 2× {tripDays}d
+                        Supplies vs this trip
                       </h4>
+                      <p className="text-xs text-muted-foreground">
+                        Aim for about {coverage[0]?.daysNeeded ?? tripDays} days of cover
+                        {coverage[0]?.calendarTripDays
+                          ? ` for a ${coverage[0].calendarTripDays}-day trip (includes travel buffer).`
+                          : "."}
+                      </p>
                       <div className="grid grid-cols-2 gap-1.5">
-                        {coverage.map(({ supply, daysRemaining, shortfall, coveragePercent }) => (
+                        {coverage.map(({ supply, daysRemaining, shortfall, coveragePercent, orderByDate }) => (
                           <div
                             key={supply.id}
                             className={cn(
@@ -2261,8 +2395,16 @@ export default function Travel() {
                                 ? "N/A"
                                 : shortfall > 0
                                   ? `${shortfall}d short`
-                                  : "Covered"}
+                                  : `${daysRemaining}d left`}
                             </p>
+                            {daysRemaining < 999 && shortfall === 0 ? (
+                              <p className="text-[10px] text-muted-foreground">Covered for trip</p>
+                            ) : null}
+                            {orderByDate && shortfall > 0 ? (
+                              <p className="mt-0.5 text-[10px] font-medium text-red-700 dark:text-red-300" data-testid={`prep-supply-order-by-${supply.id}`}>
+                                Order by {formatTripDate(orderByDate, profile, { day: "numeric", month: "short" }) || orderByDate}
+                              </p>
+                            ) : null}
                             {daysRemaining < 999 ? (
                               <Progress
                                 value={coveragePercent}
@@ -2274,7 +2416,7 @@ export default function Travel() {
                       </div>
                       {hasSupplyShortfall && (
                         <p className="text-sm text-red-600 dark:text-red-400">
-                          Some supplies won&apos;t last the trip.
+                          Some supplies won&apos;t last this trip — order before you go.
                         </p>
                       )}
                     </div>
@@ -2381,7 +2523,7 @@ export default function Travel() {
                   {!isDepartureNear && !hasDeparted && !isTravelModeActive && (
                     <Button variant="outline" onClick={handleActivateFromPrep} className="h-11 w-full rounded-xl" data-testid="button-start-plan-from-prep">
                       <Plane className="h-4 w-4 mr-2" />
-                      Start travel plan
+                      Continue packing & timezone plan
                     </Button>
                   )}
                 </div>
@@ -2409,9 +2551,30 @@ export default function Travel() {
                   }
                 />
               </div>
+              {nextAppointment ? (
+                <Link
+                  href="/appointments"
+                  className="block rounded-xl border border-border/60 bg-background/70 px-3 py-2.5 transition-colors hover:border-border hover:bg-background"
+                  data-testid="link-pretravel-next-appointment"
+                >
+                  <p className="text-sm font-semibold text-foreground truncate">
+                    {nextAppointment.title?.trim() || "Appointment"}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Next: {formatNextAppointmentWhen(nextAppointment)}
+                    {nextAppointment.location?.trim()
+                      ? ` · ${nextAppointment.location.trim()}`
+                      : ""}
+                  </p>
+                </Link>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  No upcoming appointments saved yet.
+                </p>
+              )}
               <Link href="/appointments" className="block">
                 <Button variant="secondary" className="h-10 w-full rounded-xl" size="sm" data-testid="link-pretravel-appointments">
-                  View appointments
+                  {nextAppointment ? "View all appointments" : "Add appointment"}
                 </Button>
               </Link>
             </div>
