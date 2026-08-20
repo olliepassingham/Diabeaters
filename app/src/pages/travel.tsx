@@ -942,7 +942,7 @@ function travelTileClass(active: boolean) {
 }
 
 const travelDateInputClass =
-  "h-12 w-full min-w-0 max-w-full rounded-xl text-base tabular-nums [&::-webkit-calendar-picker-indicator]:shrink-0 [&::-webkit-date-and-time-value]:text-left [&::-webkit-datetime-edit]:min-w-0";
+  "travel-date-input h-11 w-full min-w-0 max-w-full rounded-xl text-base tabular-nums";
 
 function TravelSegmentGroup<T extends string>({
   labelledBy,
@@ -2224,7 +2224,7 @@ export default function Travel() {
 
   if (step === "entry") {
     return (
-      <PageShell variant="narrow" density="compact" className="space-y-4">
+      <PageShell variant="narrow" density="compact" className="space-y-3 overflow-x-hidden pb-6">
         <PageHeader
           leading={<PageBackButton />}
           title="Travel"
@@ -2235,77 +2235,88 @@ export default function Travel() {
           }
         />
 
-        {!holidayPrep ? (
-          <section className="space-y-3">
-            <h2 className="text-base font-semibold text-foreground">Plan your trip</h2>
+        {!holidayPrep && !showPrepForm ? (
+          <section className="space-y-2.5">
             <button
               type="button"
               onClick={handleStartPlan}
               className={cn(
-                "group flex w-full items-center gap-3.5 rounded-[1.35rem] border border-sky-500/20 bg-gradient-to-b from-sky-500/[0.07] via-card to-card px-4 py-4 text-left transition-all",
+                "group flex w-full items-center gap-3 rounded-2xl border border-sky-500/20 bg-gradient-to-b from-sky-500/[0.07] via-card to-card px-3.5 py-3.5 text-left transition-all",
                 "hover:border-sky-500/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               )}
               data-testid="button-start-travel-plan"
             >
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500/20 to-indigo-500/10 text-sky-700 ring-1 ring-sky-500/20 dark:text-sky-200">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500/20 to-indigo-500/10 text-sky-700 ring-1 ring-sky-500/20 dark:text-sky-200">
                 <MapPin className="h-5 w-5" aria-hidden />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block font-display text-base font-semibold text-foreground">Travel plan</span>
-                <span className="mt-0.5 block text-sm text-muted-foreground">
-                  Packing list, timezone & climate
+                <span className="block text-[15px] font-semibold text-foreground">Travel plan</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Packing, timezone & climate
                 </span>
               </span>
-              <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground/70" aria-hidden />
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/70" aria-hidden />
             </button>
-            {!showPrepForm ? (
-              <button
-                type="button"
-                onClick={() => setShowPrepForm(true)}
-                className={cn(
-                  "group flex w-full items-center gap-3.5 rounded-[1.35rem] border border-border/60 bg-card/70 px-4 py-3.5 text-left transition-all",
-                  "hover:border-primary/40 hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                )}
-                data-testid="button-start-holiday-prep"
-              >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-muted/60 text-foreground ring-1 ring-border/50">
-                  <Luggage className="h-5 w-5" aria-hidden />
+            <button
+              type="button"
+              onClick={() => setShowPrepForm(true)}
+              className={cn(
+                "group flex w-full items-center gap-3 rounded-2xl border border-border/60 bg-card/70 px-3.5 py-3 text-left transition-all",
+                "hover:border-primary/40 hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              )}
+              data-testid="button-start-holiday-prep"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted/60 text-foreground ring-1 ring-border/50">
+                <Luggage className="h-4 w-4" aria-hidden />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-semibold text-foreground">Save trip dates</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Countdown and supply check
                 </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-semibold text-foreground">Save trip dates</span>
-                  <span className="mt-0.5 block text-xs text-muted-foreground">
-                    Countdown and supply check
-                  </span>
-                </span>
-                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/70" aria-hidden />
-              </button>
-            ) : null}
+              </span>
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/70" aria-hidden />
+            </button>
           </section>
         ) : null}
 
         {(showPrepForm || holidayPrep) && (
-          <Card className="overflow-hidden rounded-[1.35rem] border-border/50 shadow-none" data-testid="card-travel-entry-hub">
-            <CardHeader className="px-4 pb-2 pt-4">
-              <CardTitle className="font-display text-lg font-semibold tracking-tight">
+          <Card className="overflow-hidden rounded-2xl border-border/50 shadow-none" data-testid="card-travel-entry-hub">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 px-3.5 pb-2 pt-3.5">
+              <CardTitle className="font-display text-base font-semibold tracking-tight">
                 {holidayPrep ? "Your trip" : "Trip dates"}
               </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4 px-4 pb-4 pt-0">
               {showPrepForm && !holidayPrep ? (
-              <div className="space-y-4" data-testid="holiday-prep-form">
-                <div className="space-y-2">
-                  <Label>Where are you going?</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 rounded-lg px-2 text-muted-foreground"
+                  onClick={() => setShowPrepForm(false)}
+                  data-testid="button-cancel-holiday-prep"
+                >
+                  Cancel
+                </Button>
+              ) : null}
+            </CardHeader>
+            <CardContent className="space-y-3.5 px-3.5 pb-3.5 pt-0">
+              {showPrepForm && !holidayPrep ? (
+              <div className="space-y-3" data-testid="holiday-prep-form">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Where are you going?</Label>
                   <Input 
-                    placeholder="e.g. Spain, Lake District, Florida"
+                    placeholder="e.g. Spain, Lake District"
                     value={prepDestination}
                     onChange={(e) => setPrepDestination(e.target.value)}
-                    className="h-11 rounded-xl"
+                    className="h-11 rounded-xl text-base"
+                    autoComplete="off"
+                    enterKeyHint="next"
                     data-testid="input-prep-destination"
                   />
                 </div>
-                <div className="grid grid-cols-1 gap-3">
-                  <div className="space-y-2">
-                    <Label>Departure</Label>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="min-w-0 space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">Departure</Label>
                     <Input 
                       type="date"
                       value={prepDeparture}
@@ -2315,8 +2326,8 @@ export default function Travel() {
                       data-testid="input-prep-departure"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Return</Label>
+                  <div className="min-w-0 space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">Return</Label>
                     <Input 
                       type="date"
                       value={prepReturn}
@@ -2327,24 +2338,19 @@ export default function Travel() {
                     />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Notes (optional)</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Notes (optional)</Label>
                   <Input 
-                    placeholder="e.g. All-inclusive, hiking trip"
+                    placeholder="e.g. Hiking, wedding"
                     value={prepNotes}
                     onChange={(e) => setPrepNotes(e.target.value)}
-                    className="h-11 rounded-xl"
+                    className="h-11 rounded-xl text-base"
                     data-testid="input-prep-notes"
                   />
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button onClick={handleSaveHolidayPrep} className="h-11 rounded-xl" data-testid="button-save-holiday-prep">
-                    Save trip
-                  </Button>
-                  <Button variant="ghost" onClick={() => setShowPrepForm(false)} className="h-11 rounded-xl" data-testid="button-cancel-holiday-prep">
-                    Cancel
-                  </Button>
-                </div>
+                <Button onClick={handleSaveHolidayPrep} className="h-11 w-full rounded-xl text-[15px] font-semibold" data-testid="button-save-holiday-prep">
+                  Save trip
+                </Button>
               </div>
               ) : null}
 
@@ -2360,11 +2366,11 @@ export default function Travel() {
               const hasDeparted = daysUntil !== null && daysUntil < 0;
 
               return (
-                <div className="space-y-4" data-testid="holiday-prep-active">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <h3 className="font-semibold text-base">{holidayPrep.destination}</h3>
-                      <p className="text-sm text-muted-foreground">
+                <div className="space-y-3.5" data-testid="holiday-prep-active">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <h3 className="truncate text-[15px] font-semibold">{holidayPrep.destination}</h3>
+                      <p className="text-xs text-muted-foreground">
                         {formatTripDate(holidayPrep.departureDate, profile, { day: "numeric", month: "short" }) ||
                           "Departure"} 
                         {" — "}
@@ -2373,15 +2379,17 @@ export default function Travel() {
                           month: "short",
                           year: "numeric",
                         }) || "Return"}
-                        {" "}({tripDays} days)
+                        {" · "}
+                        {tripDays}d
                       </p>
                       {holidayPrep.notes && (
-                        <p className="mt-1 text-sm text-muted-foreground">{holidayPrep.notes}</p>
+                        <p className="mt-1 truncate text-xs text-muted-foreground">{holidayPrep.notes}</p>
                       )}
                     </div>
                     <Button
                       variant="ghost"
                       size="icon"
+                      className="h-9 w-9 shrink-0"
                       onClick={handleDeleteHolidayPrep}
                       aria-label="Delete holiday prep"
                       data-testid="button-delete-holiday-prep"
@@ -2393,7 +2401,7 @@ export default function Travel() {
                   {daysUntil !== null && daysUntil >= 0 && (
                     <div
                       className={cn(
-                        "overflow-hidden rounded-[1.35rem] border px-4 py-4 text-center",
+                        "overflow-hidden rounded-2xl border px-3 py-3 text-center",
                         daysUntil <= 3
                           ? "border-orange-500/30 bg-orange-500/[0.08]"
                           : daysUntil <= 7
@@ -2402,8 +2410,8 @@ export default function Travel() {
                       )}
                       data-testid="text-prep-countdown"
                     >
-                      <p className="font-display text-5xl font-bold tabular-nums tracking-tight text-foreground">{daysUntil}</p>
-                      <p className="mt-1 text-sm text-muted-foreground">
+                      <p className="font-display text-4xl font-bold tabular-nums tracking-tight text-foreground">{daysUntil}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
                         {daysUntil === 0 ? "Departing today" : daysUntil === 1 ? "day to go" : "days to go"}
                       </p>
                     </div>
@@ -2599,12 +2607,12 @@ export default function Travel() {
             </CardContent>
           </Card>
         )}
-        <section className="space-y-3" aria-labelledby="travel-extras-heading">
-          <h2 id="travel-extras-heading" className="text-sm font-semibold text-muted-foreground">
+        <section className="space-y-2.5" aria-labelledby="travel-extras-heading">
+          <h2 id="travel-extras-heading" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Before you go
           </h2>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-2 rounded-[1.35rem] border border-border/50 bg-card/70 p-3.5" data-testid="card-pretravel-appointment">
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            <div className="space-y-2 rounded-2xl border border-border/50 bg-card/70 p-3" data-testid="card-pretravel-appointment">
               <div className="flex flex-wrap items-center gap-1">
                 <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
                 <span className="text-sm font-semibold">Appointments</span>
@@ -2644,7 +2652,7 @@ export default function Travel() {
                 </Button>
               </Link>
             </div>
-            <div className="space-y-2 rounded-[1.35rem] border border-border/50 bg-card/70 p-3.5">
+            <div className="space-y-2 rounded-2xl border border-border/50 bg-card/70 p-3">
               <div className="flex flex-wrap items-center gap-1">
                 <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
                 <span className="text-sm font-semibold">Emergency card</span>
@@ -2676,7 +2684,7 @@ export default function Travel() {
     const matchedDurationPreset = TRAVEL_DURATION_PRESETS.find((preset) => preset.days === plan.duration);
     return (
       <>
-      <PageShell variant="narrow" density="compact" className="space-y-4 pb-28">
+      <PageShell variant="narrow" density="compact" className="space-y-3 overflow-x-hidden pb-28">
         <PageHeader
           leading={
             <Button type="button" variant="ghost" size="icon" className="mr-2" aria-label="Go back" onClick={backTravelWizard}>
@@ -2689,13 +2697,13 @@ export default function Travel() {
 
         {(holidayPrep || plan.destination.trim()) && (
           <div
-            className="rounded-xl border border-border/50 bg-muted/20 px-3.5 py-2.5"
+            className="rounded-xl border border-border/50 bg-muted/15 px-3 py-2"
             data-testid="travel-wizard-trip-summary"
           >
-            <p className="text-sm font-semibold text-foreground truncate">
+            <p className="truncate text-[13px] font-semibold text-foreground">
               {holidayPrep?.destination || plan.destination}
             </p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-[11px] text-muted-foreground">
               {(formatTripDate(holidayPrep?.departureDate || plan.startDate, profile, {
                 day: "numeric",
                 month: "short",
@@ -2709,8 +2717,8 @@ export default function Travel() {
           </div>
         )}
 
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between text-sm font-medium text-muted-foreground">
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
             <span>
               Step {tripDatesLocked ? travelWizardStep : travelWizardStep + 1} of{" "}
               {tripDatesLocked ? TRAVEL_INPUT_STEPS - 1 : TRAVEL_INPUT_STEPS}
@@ -2728,26 +2736,26 @@ export default function Travel() {
           />
         </div>
 
-        <Card className="overflow-hidden rounded-[1.35rem] border-sky-500/20 bg-gradient-to-b from-sky-500/[0.07] via-card to-card shadow-none dark:border-sky-400/15 dark:from-sky-950/40">
-          <CardHeader className="space-y-0 px-4 pb-3 pt-4">
-            <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500/20 to-indigo-500/10 text-sky-700 ring-1 ring-sky-500/20 dark:text-sky-200">
-                <Plane className="h-5 w-5" aria-hidden />
+        <Card className="overflow-hidden rounded-2xl border-sky-500/20 bg-gradient-to-b from-sky-500/[0.07] via-card to-card shadow-none dark:border-sky-400/15 dark:from-sky-950/40">
+          <CardHeader className="space-y-0 px-3.5 pb-2.5 pt-3.5">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500/20 to-indigo-500/10 text-sky-700 ring-1 ring-sky-500/20 dark:text-sky-200">
+                <Plane className="h-4 w-4" aria-hidden />
               </span>
-              <CardTitle className="font-display text-lg font-semibold tracking-tight">{INPUT_STEP_TITLES[travelWizardStep]}</CardTitle>
+              <CardTitle className="font-display text-base font-semibold tracking-tight">{INPUT_STEP_TITLES[travelWizardStep]}</CardTitle>
             </div>
           </CardHeader>
-          <CardContent className="space-y-6 border-t border-sky-500/10 px-4 pb-5 pt-5">
+          <CardContent className="space-y-4 border-t border-sky-500/10 px-3.5 pb-4 pt-4">
             {travelWizardStep === 0 ? (
               <>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor="destination" className="text-xs font-medium text-muted-foreground">Destination</Label>
               <Input
                 id="destination"
                 placeholder="City, country"
                 value={plan.destination}
                 onChange={(e) => setPlan(prev => ({ ...prev, destination: e.target.value }))}
-                className="h-12 rounded-xl text-base"
+                className="h-11 rounded-xl text-base"
                 data-testid="input-destination"
               />
             </div>
@@ -2825,8 +2833,8 @@ export default function Travel() {
               )}
             </div>
 
-            <div className="space-y-3">
-              <div className="min-w-0 space-y-2">
+            <div className="grid grid-cols-2 gap-2.5">
+              <div className="min-w-0 space-y-1.5">
                 <Label htmlFor="start-date" className="text-xs font-medium text-muted-foreground">Start</Label>
                 <Input
                   id="start-date"
@@ -2847,7 +2855,7 @@ export default function Travel() {
                   data-testid="input-start-date"
                 />
               </div>
-              <div className="min-w-0 space-y-2">
+              <div className="min-w-0 space-y-1.5">
                 <Label htmlFor="end-date" className="text-xs font-medium text-muted-foreground">End</Label>
                 <Input
                   id="end-date"
@@ -3073,7 +3081,7 @@ export default function Travel() {
   const packingPct = packingList.length > 0 ? Math.round((checkedCount / packingList.length) * 100) : 0;
 
   return (
-    <PageShell variant="narrow" density="compact" className="space-y-4">
+    <PageShell variant="narrow" density="compact" className="space-y-3 overflow-x-hidden pb-6">
       <PageHeader
         leading={
           <Button
@@ -3092,22 +3100,22 @@ export default function Travel() {
         actions={<ScenarioCoachLink topic="travel" from="travel-results" />}
       />
 
-      <div className="overflow-hidden rounded-[1.35rem] border border-sky-500/25 bg-gradient-to-br from-sky-500/[0.10] via-card to-card shadow-[0_12px_40px_-24px_rgba(14,165,233,0.45)]">
-        <div className="px-4 pb-4 pt-4 sm:px-5">
+      <div className="overflow-hidden rounded-2xl border border-sky-500/25 bg-gradient-to-br from-sky-500/[0.10] via-card to-card shadow-[0_12px_40px_-24px_rgba(14,165,233,0.45)]">
+        <div className="px-3.5 pb-3.5 pt-3.5 sm:px-5">
           <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">Packed</p>
-          <p className="mt-1 font-display text-[2.5rem] font-bold leading-none tabular-nums tracking-tight text-foreground">
+          <p className="mt-1 font-display text-[2.25rem] font-bold leading-none tabular-nums tracking-tight text-foreground">
             {checkedCount}
-            <span className="text-xl font-semibold text-muted-foreground">/{packingList.length}</span>
+            <span className="text-lg font-semibold text-muted-foreground">/{packingList.length}</span>
           </p>
-          <div className="mt-3.5 flex flex-wrap gap-2 border-t border-border/40 pt-3.5">
-            <span className="inline-flex items-center rounded-xl bg-background/80 px-3 py-1.5 text-sm font-semibold tabular-nums ring-1 ring-border/50">
+          <div className="mt-3 flex flex-wrap gap-1.5 border-t border-border/40 pt-3">
+            <span className="inline-flex items-center rounded-lg bg-background/80 px-2.5 py-1 text-xs font-semibold tabular-nums ring-1 ring-border/50">
               {plan.duration}d
             </span>
-            <span className="inline-flex items-center rounded-xl bg-background/50 px-3 py-1.5 text-sm font-medium ring-1 ring-border/40">
+            <span className="inline-flex items-center rounded-lg bg-background/50 px-2.5 py-1 text-xs font-medium ring-1 ring-border/40">
               {formatTripDate(plan.startDate, profile, { day: "numeric", month: "short" }) || "Start"} –{" "}
               {formatTripDate(plan.endDate, profile, { day: "numeric", month: "short" }) || "End"}
             </span>
-            <span className="inline-flex items-center rounded-xl bg-background/50 px-3 py-1.5 text-sm font-medium capitalize ring-1 ring-border/40">
+            <span className="inline-flex items-center rounded-lg bg-background/50 px-2.5 py-1 text-xs font-medium capitalize ring-1 ring-border/40">
               {plan.travelType} · {packingPct}%
             </span>
           </div>
