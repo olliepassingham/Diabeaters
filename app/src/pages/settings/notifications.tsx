@@ -263,7 +263,7 @@ export function NotificationsTab({
               />
               <SettingsToggleRow
                 label="Quick hypo log"
-                description='When on, the dashboard "Treated a Hypo" button logs a hypo and notifies linked supporters without asking for glucose or treatment first.'
+                description='When on, the dashboard "Treated a Hypo" button logs a hypo quickly (and notifies linked supporters if you have any). Turn off to add glucose and treatment details first.'
                 checked={notifSettings.hypoDashboardQuickNotify === true}
                 onCheckedChange={(checked) => onToggle("hypoDashboardQuickNotify", checked)}
                 testId="switch-hypo-dashboard-quick"

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, type ReactElement } from "react";
 import { useLocation, useSearch } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,7 @@ import {
 } from "@/lib/storage";
 import { getActiveAppMode } from "@/lib/carer-session";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -70,6 +71,7 @@ import {
   shouldShowHeroGlanceLine,
   type HealthStatus,
 } from "@/lib/dashboard-health-status";
+import { listCarerLinksForPatient } from "@/lib/carers";
 import { cn } from "@/lib/utils";
 
 const VERIFIED_WELCOME_PENDING_KEY = "diabeater_verified_welcome_pending";
@@ -84,6 +86,8 @@ async function runHypoTreatmentPipeline(
     userId: string | undefined;
     toast: ToastLike;
     onAfterLocalSave?: () => void;
+    /** Navigate to Family & supporters when suggesting a link. */
+    onOpenFamilySupporters?: () => void;
   },
 ): Promise<void> {
   const glucoseLevel = fields.glucoseInput.trim() ? parseFloat(fields.glucoseInput) : undefined;
@@ -100,7 +104,8 @@ async function runHypoTreatmentPipeline(
 
   ctx.onAfterLocalSave?.();
 
-  let description = "Your hypo treatment has been recorded.";
+  let description = "Saved to your hypo history.";
+  let toastAction: ReactElement | undefined;
   let notifyInvokeFailed = false;
   let notifyFailure: { detail?: string; error?: string } | null = null;
 
@@ -134,8 +139,29 @@ async function runHypoTreatmentPipeline(
           description =
             "Hypo logged. No alerts were delivered — ask your supporter to enable push in Diabeaters (Settings → Notifications) on their phone.";
         } else if (eligible === 0) {
-          description =
-            "Saved to your record. No linked supporters received an alert — check Family & supporters and that Hypo logs sharing is on.";
+          const links = await listCarerLinksForPatient();
+          const linkedCount = links.data?.length ?? 0;
+          if (linkedCount === 0) {
+            description =
+              "Saved to your history. Link a supporter if you want someone alerted next time.";
+            if (ctx.onOpenFamilySupporters) {
+              toastAction = (
+                <ToastAction altText="Link a supporter" onClick={ctx.onOpenFamilySupporters}>
+                  Link supporter
+                </ToastAction>
+              );
+            }
+          } else {
+            description =
+              "Saved to your record. Linked supporters did not get an alert — turn on Hypo logs sharing in Family & supporters.";
+            if (ctx.onOpenFamilySupporters) {
+              toastAction = (
+                <ToastAction altText="Open Family and supporters" onClick={ctx.onOpenFamilySupporters}>
+                  Check sharing
+                </ToastAction>
+              );
+            }
+          }
         }
       }
     } else {
@@ -147,6 +173,7 @@ async function runHypoTreatmentPipeline(
   ctx.toast({
     title: "Hypo treatment logged",
     description,
+    action: toastAction,
   });
   if (notifyInvokeFailed && notifyFailure) {
     ctx.toast({
@@ -307,14 +334,36 @@ function HeroCard({
   onEditWidgets: () => void;
 }) {
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
   const isUrgent = status === "action";
   const { toast } = useToast();
   const [hypoDialogOpen, setHypoDialogOpen] = useState(false);
   const [quickHypoConfirmOpen, setQuickHypoConfirmOpen] = useState(false);
+  const [hasLinkedSupporters, setHasLinkedSupporters] = useState<boolean | null>(null);
 
   const handleHypoDialogOpenChange = (open: boolean) => {
     setHypoDialogOpen(open);
   };
+
+  const openFamilySupporters = () => setLocation("/family-carers");
+
+  const refreshLinkedSupporters = () => {
+    if (!user?.id || !getSupabase()) {
+      setHasLinkedSupporters(null);
+      return;
+    }
+    void listCarerLinksForPatient().then((res) => {
+      if (res.error) {
+        setHasLinkedSupporters(null);
+        return;
+      }
+      setHasLinkedSupporters((res.data?.length ?? 0) > 0);
+    });
+  };
+
+  useEffect(() => {
+    refreshLinkedSupporters();
+  }, [user?.id]);
 
   useEffect(() => {
     const openHypo = () => setHypoDialogOpen(true);
@@ -336,14 +385,16 @@ function HeroCard({
     void runHypoTreatmentPipeline(fields, {
       userId: user?.id,
       toast,
+      onOpenFamilySupporters: openFamilySupporters,
       onAfterLocalSave: () => {
         handleHypoDialogOpenChange(false);
       },
-    });
+    }).then(() => refreshLinkedSupporters());
   };
 
   const handleTreatedHypoClick = () => {
     if (storage.getNotificationSettings().hypoDashboardQuickNotify === true) {
+      refreshLinkedSupporters();
       setQuickHypoConfirmOpen(true);
       return;
     }
@@ -354,9 +405,11 @@ function HeroCard({
     setQuickHypoConfirmOpen(false);
     void runHypoTreatmentPipeline(
       { glucoseInput: "", treatment: "", notes: "" },
-      { userId: user?.id, toast },
-    );
+      { userId: user?.id, toast, onOpenFamilySupporters: openFamilySupporters },
+    ).then(() => refreshLinkedSupporters());
   };
+
+  const quickConfirmHasSupporters = hasLinkedSupporters !== false;
 
   const greeting = () => {
     const hour = new Date().getHours();
@@ -511,10 +564,13 @@ function HeroCard({
       <AlertDialog open={quickHypoConfirmOpen} onOpenChange={setQuickHypoConfirmOpen}>
         <AlertDialogContent data-testid="dialog-quick-hypo-confirm">
           <AlertDialogHeader>
-            <AlertDialogTitle>Log treated hypo and tell supporters?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {quickConfirmHasSupporters ? "Log treated hypo and tell supporters?" : "Log treated hypo?"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              This logs a hypo treatment now and notifies any linked supporters. You can turn off
-              quick-notify in Settings → Notifications if you would rather add details first.
+              {quickConfirmHasSupporters
+                ? "This logs a hypo treatment now and notifies any linked supporters. You can turn off quick-notify in Settings → Notifications if you would rather add details first."
+                : "This logs a hypo treatment to your history now. Link a supporter later if you want someone alerted next time. You can turn off quick-notify in Settings → Notifications if you would rather add details first."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -524,7 +580,7 @@ function HeroCard({
               onClick={confirmQuickHypo}
               data-testid="button-quick-hypo-confirm"
             >
-              Log + tell supporters
+              {quickConfirmHasSupporters ? "Log + tell supporters" : "Log hypo"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
