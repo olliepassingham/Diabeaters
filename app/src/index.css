@@ -641,6 +641,39 @@
     border-color: rgb(var(--color-border) / 0.5);
   }
 
+  /**
+   * Full-size file control over a visible icon. Keep this outside `backdrop-filter`
+   * ancestors — Chromium/WebView often opens the picker but never fires `change`.
+   * Large font-size fills iOS's inner "Choose File" hit target.
+   */
+  .file-input-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    opacity: 0;
+    cursor: pointer;
+    font-size: 32px;
+    touch-action: manipulation;
+  }
+
+  .file-input-overlay:disabled {
+    cursor: not-allowed;
+  }
+
+  .file-input-overlay::-webkit-file-upload-button {
+    display: block;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    cursor: pointer;
+  }
+
   /* Optional: make cards/tiles feel more tactile when they opt-in */
   .card-interactive {
     transition-property: transform, box-shadow, border-color, background-color;

@@ -18,6 +18,7 @@ import {
   parsePostExtra,
   type CommunityPostKind,
 } from "./post-kinds";
+import { isLikelyImageFile } from "./pick-post-images";
 import { buildMentionsForPost } from "./post-mentions";
 import {
   getPostMediaSignedUrl,
@@ -551,7 +552,7 @@ function validateImageFiles(files: File[]): Error | null {
     if (f.size > MAX_POST_IMAGE_BYTES) {
       return new Error("Each image must be 5MB or smaller.");
     }
-    if (!f.type.startsWith("image/")) {
+    if (!isLikelyImageFile(f)) {
       return new Error("Only image files are allowed.");
     }
   }

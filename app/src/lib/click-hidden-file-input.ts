@@ -44,9 +44,8 @@ export function unlockSystemPickerPointerEvents(): () => void {
   };
 }
 
-/** Programmatic file-input click that keeps the first Photos tap working. */
-export function clickHiddenFileInput(input: HTMLInputElement | null | undefined): void {
-  if (!input || input.disabled) return;
+/** Unlock body pointer-events until the system picker is dismissed. */
+export function armSystemPickerPointerUnlock(): void {
   const restore = unlockSystemPickerPointerEvents();
   const finish = () => {
     window.removeEventListener("focus", finish);
@@ -58,5 +57,11 @@ export function clickHiddenFileInput(input: HTMLInputElement | null | undefined)
   };
   window.addEventListener("focus", finish);
   document.addEventListener("visibilitychange", onVis);
+}
+
+/** Programmatic file-input click that keeps the first Photos tap working. */
+export function clickHiddenFileInput(input: HTMLInputElement | null | undefined): void {
+  if (!input || input.disabled) return;
+  armSystemPickerPointerUnlock();
   input.click();
 }

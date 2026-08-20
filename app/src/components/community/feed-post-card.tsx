@@ -50,8 +50,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { CommunityPeopleSheet } from "@/components/community/community-people-sheet";
 import { MentionTextarea } from "@/components/community/mention-textarea";
-import { FILE_INPUT_HIDDEN_CLASS } from "@/lib/click-hidden-file-input";
-import { pickSingleImageFromLibrary } from "@/lib/community/pick-post-images";
+import { armSystemPickerPointerUnlock } from "@/lib/click-hidden-file-input";
+import { isLikelyImageFile } from "@/lib/community/pick-post-images";
 import { MAX_POST_IMAGE_BYTES } from "@/lib/community/posts-supabase";
 import { renderBodyWithMentions } from "@/components/community/render-body-with-mentions";
 import { Textarea } from "@/components/ui/textarea";
@@ -276,7 +276,6 @@ export function FeedPostCard({
   const [shareRecentLoading, setShareRecentLoading] = useState(false);
   const [shareRecentError, setShareRecentError] = useState<string | null>(null);
   const [pendingDeleteCommentId, setPendingDeleteCommentId] = useState<string | null>(null);
-  const commentImageInputRef = useRef<HTMLInputElement | null>(null);
   const [commentImagePreviewUrl, setCommentImagePreviewUrl] = useState<string | null>(null);
   const applyCommentImage = (file: File | null) => {
     if (file && file.size > MAX_POST_IMAGE_BYTES) {
@@ -287,7 +286,7 @@ export function FeedPostCard({
       });
       return;
     }
-    if (file && !file.type.startsWith("image/")) {
+    if (file && !isLikelyImageFile(file)) {
       toast({
         title: "Photo only",
         description: "You can attach one image to a comment.",
@@ -977,19 +976,6 @@ export function FeedPostCard({
             </div>
           )}
           <div className="space-y-2">
-            <input
-              ref={commentImageInputRef}
-              type="file"
-              accept="image/*"
-              className={FILE_INPUT_HIDDEN_CLASS}
-              aria-hidden
-              tabIndex={-1}
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) applyCommentImage(f);
-                e.target.value = "";
-              }}
-            />
             {commentImagePreviewUrl ? (
               <div className="flex items-start gap-2 rounded-2xl border border-border/50 bg-muted/30 p-2">
                 <img src={commentImagePreviewUrl} alt="" className="max-h-28 rounded-xl object-cover" />
@@ -1004,49 +990,57 @@ export function FeedPostCard({
                 </Button>
               </div>
             ) : null}
-            <div className="text-composer-shell rounded-[1.35rem] pl-1.5 pr-2 py-1">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="mb-0.5 h-10 w-10 shrink-0 rounded-full text-muted-foreground hover:text-foreground"
-                disabled={!mayEngage}
-                aria-label="Attach photo"
-                onClick={() => {
-                  void (async () => {
-                    const picked = await pickSingleImageFromLibrary(commentImageInputRef.current);
-                    if (picked) applyCommentImage(picked);
-                  })();
-                }}
+            <div className="flex items-end gap-1">
+              <label
+                className={cn(
+                  "relative mb-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground",
+                  !mayEngage && "pointer-events-none opacity-50",
+                )}
               >
-                <ImagePlus className="h-5 w-5" strokeWidth={1.75} />
-              </Button>
-              <div className="min-w-0 flex-1">
-                <MentionTextarea
-                  textareaRef={commentInputRef}
-                  value={commentDraft}
-                  onChange={onCommentDraftChange}
-                  currentUserId={viewerId}
-                  rows={1}
-                  maxLength={4000}
-                  hideHint
-                  autoGrow
-                  maxGrowPx={148}
-                  bare
-                  placeholder={mayEngage ? "Add a comment…" : "Set up your @handle to comment"}
+                <ImagePlus className="pointer-events-none h-5 w-5" strokeWidth={1.75} aria-hidden />
+                <input
+                  type="file"
+                  accept="image/*,image/heic,image/heif,.heic,.heif"
                   disabled={!mayEngage}
-                  className="min-h-10 resize-none px-0 py-2 text-[15px] leading-snug"
+                  aria-label="Attach photo"
+                  data-testid="input-comment-photo"
+                  className="file-input-overlay"
+                  onClick={() => armSystemPickerPointerUnlock()}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) applyCommentImage(f);
+                    e.target.value = "";
+                  }}
                 />
+              </label>
+              <div className="text-composer-shell min-w-0 flex-1 rounded-[1.35rem] pl-1.5 pr-2 py-1">
+                <div className="min-w-0 flex-1">
+                  <MentionTextarea
+                    textareaRef={commentInputRef}
+                    value={commentDraft}
+                    onChange={onCommentDraftChange}
+                    currentUserId={viewerId}
+                    rows={1}
+                    maxLength={4000}
+                    hideHint
+                    autoGrow
+                    maxGrowPx={148}
+                    bare
+                    placeholder={mayEngage ? "Add a comment…" : "Set up your @handle to comment"}
+                    disabled={!mayEngage}
+                    className="min-h-10 resize-none px-0 py-2 text-[15px] leading-snug"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="mb-0.5 h-10 shrink-0 rounded-full px-4 text-sm font-semibold shadow-none"
+                  disabled={!mayEngage || (!commentDraft.trim() && !commentImage)}
+                  onClick={onSubmitComment}
+                >
+                  Post
+                </Button>
               </div>
-              <Button
-                type="button"
-                size="sm"
-                className="mb-0.5 h-10 shrink-0 rounded-full px-4 text-sm font-semibold shadow-none"
-                disabled={!mayEngage || (!commentDraft.trim() && !commentImage)}
-                onClick={onSubmitComment}
-              >
-                Post
-              </Button>
             </div>
           </div>
         </div>

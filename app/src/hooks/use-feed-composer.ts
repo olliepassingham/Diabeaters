@@ -15,7 +15,7 @@ import {
   type CommunityTopicId,
 } from "@/lib/community";
 import { defaultEventStartsAtLocal } from "@/lib/community/event-display";
-import { pickPostImagesFromLibrary } from "@/lib/community/pick-post-images";
+import { isLikelyImageFile, pickPostImagesFromLibrary } from "@/lib/community/pick-post-images";
 import { clickHiddenFileInput } from "@/lib/click-hidden-file-input";
 import { canEngageWithCommunityFeed, COMMUNITY_FEED_ENGAGE_REQUIRED_MESSAGE, useProfile } from "@/lib/profile";
 
@@ -129,7 +129,7 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
       const f = files[i];
       if (!f) continue;
       if (next.length >= MAX_POST_IMAGES) break;
-      if (!f.type.startsWith("image/")) continue;
+      if (!isLikelyImageFile(f)) continue;
       next.push(f);
     }
     setComposerFiles(next);

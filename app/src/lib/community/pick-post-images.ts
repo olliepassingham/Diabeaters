@@ -4,13 +4,27 @@ import { clickHiddenFileInput, unlockSystemPickerPointerEvents } from "@/lib/cli
 
 const MAX_POST_IMAGES = 4;
 
+const IMAGE_NAME_RE = /\.(jpe?g|png|gif|webp|heic|heif|avif|bmp|tiff?)$/i;
+
+/**
+ * Android/iOS library picks often omit MIME or use `application/octet-stream`
+ * (HEIC, content URIs). Treat those as images unless the type is clearly not.
+ */
+export function isLikelyImageFile(file: File): boolean {
+  const t = (file.type || "").toLowerCase().trim();
+  if (t.startsWith("image/")) return true;
+  if (t && t !== "application/octet-stream") return false;
+  if (!file.name || !file.name.includes(".")) return true;
+  return IMAGE_NAME_RE.test(file.name);
+}
+
 /** Collect image files from a file input, respecting the per-post cap. */
 export function filesFromImageInput(files: FileList | null, currentCount: number): File[] {
   if (!files?.length) return [];
   const next: File[] = [];
   for (let i = 0; i < files.length; i++) {
     const f = files[i];
-    if (!f || !f.type.startsWith("image/")) continue;
+    if (!f || !isLikelyImageFile(f)) continue;
     if (currentCount + next.length >= MAX_POST_IMAGES) break;
     next.push(f);
   }
