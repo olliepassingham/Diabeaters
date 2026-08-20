@@ -41,13 +41,15 @@ If the redirect in the signup request is **not** allowed, Supabase often returns
 
 **Authentication** (or **Project Settings**) → **Attack Protection** / **CAPTCHA**
 
-If **CAPTCHA is required for sign-up**, the app must send a captcha token with `signUp`. This codebase **does not** integrate CAPTCHA yet.
+If **CAPTCHA is required** for sign-up, sign-in, or password recovery, the app must send a Turnstile token. Login, signup, and password-reset request all do this when `VITE_TURNSTILE_SITE_KEY` is set.
 
-**Fix options:**
+**Check:**
 
-1. **Implement Turnstile in the app (recommended if you want CAPTCHA on)**  
-   - In Supabase, choose **Cloudflare Turnstile** for Auth CAPTCHA.\n+   - Set `VITE_TURNSTILE_SITE_KEY` in the app’s env (Vite) so the signup screen can render Turnstile and submit `options.captchaToken`.\n+2. **Disable CAPTCHA for sign-up (fastest unblock)**  
-   - Turn **off** CAPTCHA for sign-up in Supabase (or only enforce it after you add the UI integration).
+1. **Supabase Attack Protection** — CAPTCHA coverage should match the screens you protect (sign-in and recovery as well as sign-up).
+2. **Vercel env** — `VITE_TURNSTILE_SITE_KEY` must be the Cloudflare Turnstile **site** key, and the secret must be in Supabase (not the app). Redeploy after changing it.
+3. **Auth logs** — `captcha_failed` on `/token` or `/recover` means the request had no valid token.
+
+If login and reset both fail together while signup works, CAPTCHA is usually required for sign-in/recovery in Supabase but was missing from those requests.
 
 ---
 

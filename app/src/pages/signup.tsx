@@ -22,7 +22,7 @@ import {
   authInlineLinkClass,
   authMutedNavLinkClass,
 } from "@/components/auth/auth-link-styles";
-import { TurnstileCaptcha } from "@/components/auth/Turnstile";
+import { TurnstileCaptcha, useTurnstileCaptcha } from "@/components/auth/Turnstile";
 import { PasswordRequirements } from "@/components/auth/password-requirements";
 import { PASSWORD_MIN_LENGTH, validatePassword } from "@/lib/password-policy";
 import { Eye, EyeOff } from "lucide-react";
@@ -35,17 +35,19 @@ export default function Signup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const {
+    siteKey: turnstileSiteKey,
+    required: captchaRequired,
+    token: captchaToken,
+    setToken: setCaptchaToken,
+    resetKey: captchaResetKey,
+    reset: resetCaptcha,
+  } = useTurnstileCaptcha();
 
   const communitySignup = useMemo(() => getOnboardingAccountPath() === "community", []);
-
-  const turnstileSiteKey = String(
-    import.meta.env.VITE_TURNSTILE_SITE_KEY ?? "",
-  ).trim();
-  const captchaRequired = Boolean(turnstileSiteKey);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -71,6 +73,7 @@ export default function Signup() {
     setSubmitting(false);
 
     if (error) {
+      resetCaptcha();
       const styled = describeAuthErrorForDisplay(error);
       if (styled.suggestCheckEmail) {
         setLocation(
@@ -183,8 +186,9 @@ export default function Signup() {
             </div>
             {captchaRequired && (
               <TurnstileCaptcha
+                key={captchaResetKey}
                 siteKey={turnstileSiteKey}
-                onToken={(t) => setCaptchaToken(t)}
+                onToken={setCaptchaToken}
               />
             )}
             {communitySignup && (

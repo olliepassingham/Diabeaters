@@ -1,9 +1,8 @@
 import type { Session, User } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { getCurrentUser, onAuthStateChange } from "@/lib/auth";
+import { onAuthStateChange } from "@/lib/auth";
 import { clearCarerClientSessionKeys, onboardingAccountPathFromUserMetadata } from "@/lib/carer-session";
 import { restoreAccountSessionFromCloud } from "@/lib/account-session-restore";
-import { isOnline } from "@/lib/offline";
 import { setActiveUserIdForLocalStorage } from "@/lib/storage";
 import { setSentryUserId } from "@/observability/sentry";
 import { getSupabase } from "@/lib/supabase";
@@ -84,13 +83,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const sessionRes = await supabase.auth.getSession();
         const session = sessionRes.data.session ?? null;
-        let user = session?.user ?? null;
-
-        // `getUser()` validates with the server; skip when offline and use the cached session.
-        if (isOnline()) {
-          const { data: userResult } = await getCurrentUser();
-          if (userResult?.user) user = userResult.user;
-        }
+        // Use the cached session only. `getUser()` hits the server and can
+        // wipe local auth if Android reports online but the refresh fails.
+        const user = session?.user ?? null;
 
         if (!isMounted) return;
         const uid = user?.id ?? null;

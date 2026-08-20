@@ -1,29 +1,41 @@
 import { FormEvent, useState } from "react";
 import { Link } from "wouter";
-import { sendPasswordResetEmail } from "@/lib/auth";
+import { describeAuthErrorForDisplay, describeAuthNetworkError, sendPasswordResetEmail } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { authInlineLinkClass, authMutedNavLinkClass } from "@/components/auth/auth-link-styles";
+import { TurnstileCaptcha, useTurnstileCaptcha } from "@/components/auth/Turnstile";
 
 export default function ResetRequest() {
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const {
+    siteKey: turnstileSiteKey,
+    required: captchaRequired,
+    token: captchaToken,
+    setToken: setCaptchaToken,
+    resetKey: captchaResetKey,
+    reset: resetCaptcha,
+  } = useTurnstileCaptcha();
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (captchaRequired && !captchaToken) return;
     setSubmitting(true);
     setError(null);
 
-    const { error } = await sendPasswordResetEmail(email);
+    const { error } = await sendPasswordResetEmail(email, captchaToken ?? undefined);
     setSubmitting(false);
 
     if (error) {
-      setError(error.message);
+      resetCaptcha();
+      const styled = describeAuthErrorForDisplay(error);
+      setError(describeAuthNetworkError(styled.message));
       return;
     }
 
@@ -99,10 +111,17 @@ export default function ResetRequest() {
                 data-testid="input-reset-email"
               />
             </div>
+            {captchaRequired && (
+              <TurnstileCaptcha
+                key={captchaResetKey}
+                siteKey={turnstileSiteKey}
+                onToken={setCaptchaToken}
+              />
+            )}
             <Button
               type="submit"
               className="w-full"
-              disabled={submitting}
+              disabled={submitting || (captchaRequired && !captchaToken)}
               data-testid="btn-send-reset-link"
             >
               {submitting ? "Sending…" : "Send reset link"}

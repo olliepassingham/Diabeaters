@@ -17,6 +17,12 @@ type AuthResult<T> = {
 export type OAuthProvider = "apple" | "google" | "azure";
 
 const AUTH_TRY_AGAIN = "Try again.";
+const AUTH_CAPTCHA_RETRY = "Please complete the security check and try again.";
+
+/** Trim and lowercase so Android autofill spaces do not fail login or reset. */
+export function normalizeAuthEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
 
 function isTechnicalAuthMessage(message: string): boolean {
   const m = message.toLowerCase();
@@ -56,6 +62,13 @@ export function describeAuthErrorForDisplay(error: AuthError | Error): {
         "Check your email to verify your account, then try again. You can resend the link from the check-email page.",
       suggestCheckEmail: true,
     };
+  }
+  if (
+    code === "captcha_failed" ||
+    msg.includes("captcha") ||
+    msg.includes("security challenge")
+  ) {
+    return { message: AUTH_CAPTCHA_RETRY };
   }
   if (
     msg.includes("invalid login") ||
@@ -102,7 +115,7 @@ export async function signup(
 
   try {
     const { data, error } = await supabase.auth.signUp({
-      email,
+      email: normalizeAuthEmail(email),
       password,
       options: {
         emailRedirectTo: getEmailAuthRedirectUrl(),
@@ -155,7 +168,7 @@ export async function resendVerification(
   try {
     const { error } = await supabase.auth.resend({
       type: "signup",
-      email,
+      email: normalizeAuthEmail(email),
       options: {
         emailRedirectTo: getEmailAuthRedirectUrl(),
       },
@@ -172,14 +185,16 @@ export async function resendVerification(
 export async function login(
   email: string,
   password: string,
+  captchaToken?: string,
 ): Promise<AuthResult<{ user: User | null; session: Session | null }>> {
   const supabase = getSupabase();
   if (!supabase) return { data: null, error: NOT_CONFIGURED };
 
   try {
     const { data, error } = await supabase.auth.signInWithPassword({
-      email,
+      email: normalizeAuthEmail(email),
       password,
+      ...(captchaToken ? { options: { captchaToken } } : {}),
     });
     return { data, error };
   } catch (e) {
@@ -263,6 +278,7 @@ export async function handleAuthCallback(): Promise<{ user: User }> {
 
 export async function sendPasswordResetEmail(
   email: string,
+  captchaToken?: string,
 ): Promise<AuthResult<{}>> {
   const supabase = getSupabase();
   if (!supabase) return { data: {}, error: NOT_CONFIGURED };
@@ -272,8 +288,9 @@ export async function sendPasswordResetEmail(
     (typeof window !== "undefined" ? `${window.location.origin}/reset-password` : "");
 
   try {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    const { error } = await supabase.auth.resetPasswordForEmail(normalizeAuthEmail(email), {
       redirectTo,
+      ...(captchaToken ? { captchaToken } : {}),
     });
     return { data: {}, error };
   } catch (e) {

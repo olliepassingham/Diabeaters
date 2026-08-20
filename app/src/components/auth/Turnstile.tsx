@@ -1,3 +1,4 @@
+import { useCallback, useState } from "react";
 import { Turnstile } from "@marsidev/react-turnstile";
 
 type Props = {
@@ -18,3 +19,16 @@ export function TurnstileCaptcha({ siteKey, onToken }: Props) {
   );
 }
 
+export function useTurnstileCaptcha() {
+  const siteKey = String(import.meta.env.VITE_TURNSTILE_SITE_KEY ?? "").trim();
+  const required = Boolean(siteKey);
+  const [token, setToken] = useState<string | null>(null);
+  const [resetKey, setResetKey] = useState(0);
+
+  const reset = useCallback(() => {
+    setToken(null);
+    setResetKey((k) => k + 1);
+  }, []);
+
+  return { siteKey, required, token, setToken, resetKey, reset };
+}
