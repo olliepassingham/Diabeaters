@@ -1842,7 +1842,7 @@ export default function CarerViewPage() {
               <CardHeader className={carerCardHeaderClass}>
                 <CardTitle className={carerCardTitleClass}>
                   <Heart className="h-4 w-4 text-primary shrink-0" aria-hidden />
-                  Recent hypos
+                  Recent treated hypos
                 </CardTitle>
               </CardHeader>
               <CardContent className={carerCardContentClass}>
@@ -1850,8 +1850,8 @@ export default function CarerViewPage() {
                   <CarerCardEmpty
                     compact
                     icon={Heart}
-                    title="No hypos shared yet"
-                    description="When they log a hypo and share alerts with you, it will appear here."
+                    title="No treated hypos shared yet"
+                    description="When they tap Treated a Hypo and share alerts with you, it will appear here — not every sensor low."
                   />
                 ) : (
                   <div className="space-y-2">
@@ -1871,7 +1871,7 @@ export default function CarerViewPage() {
                         return (
                           <CarerHypoTimelineItem
                             key={h.id}
-                            bgLabel={bg == null ? "Hypo logged" : `BG ${bg}`}
+                            bgLabel={bg == null ? "Treated hypo" : `BG ${bg}`}
                             whenText={whenText}
                             treatment={h.treatment}
                             notes={h.notes}
@@ -1897,7 +1897,8 @@ export default function CarerViewPage() {
                         ) : (
                           <>
                             Show {Math.min(hypoLogs.length, RECENT_HYPOS_MAX_COUNT) - RECENT_HYPOS_COLLAPSED_COUNT}{" "}
-                            more recent {hypoLogs.length - RECENT_HYPOS_COLLAPSED_COUNT === 1 ? "hypo" : "hypos"}
+                            more treated{" "}
+                            {hypoLogs.length - RECENT_HYPOS_COLLAPSED_COUNT === 1 ? "hypo" : "hypos"}
                             <ChevronDown className="ml-1.5 h-3.5 w-3.5" aria-hidden />
                           </>
                         )}
