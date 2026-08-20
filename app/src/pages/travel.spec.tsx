@@ -21,7 +21,7 @@ describe("Travel page", () => {
     expect(screen.queryByTestId("button-start-travel-plan")).not.toBeNull();
   });
 
-  it("opens on Plan your trip even when a plan draft exists", () => {
+  it("opens on Your trip when a plan draft has destination dates", () => {
     storage.saveTravelWizardDraft({
       step: "results",
       plan: {
@@ -53,8 +53,9 @@ describe("Travel page", () => {
     });
 
     render(<Travel />);
-    expect(screen.queryByTestId("button-start-travel-plan")).not.toBeNull();
-    expect(screen.queryByText("Plan your trip")).not.toBeNull();
+    expect(screen.queryByTestId("card-travel-entry-hub")).not.toBeNull();
+    expect(screen.queryByText("Your trip")).not.toBeNull();
+    expect(screen.queryByText("Spain")).not.toBeNull();
   });
 
   it("renders active travel dashboard without crashing", () => {

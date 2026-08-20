@@ -1277,8 +1277,10 @@ export default function Travel() {
         );
         setRiskWarnings(warnings);
       }
+      const prepWhileActive = storage.getHolidayPrep();
+      if (prepWhileActive) setHolidayPrep(prepWhileActive);
     } else {
-      // Prefill from draft if present, but always land on "What do you need?" —
+      // Prefill from draft if present, but always land on entry —
       // do not auto-jump into the travel plan wizard/results on open.
       const draft = storage.getTravelWizardDraft();
       if (draft && (draft.step === "inputs" || draft.step === "results")) {
@@ -1299,11 +1301,39 @@ export default function Travel() {
           setResultsTab(draft.resultsTab);
         }
       }
-    }
 
-    const savedPrep = storage.getHolidayPrep();
-    if (savedPrep) {
-      setHolidayPrep(savedPrep);
+      const savedPrep = storage.getHolidayPrep();
+      if (savedPrep) {
+        setHolidayPrep(savedPrep);
+      } else {
+        // Restore trip card from a saved packing plan / draft if prep was never created.
+        const fromPlan = (storage.getTravelPlan() || draft?.plan) as TravelPlan | null | undefined;
+        if (fromPlan?.destination?.trim() && fromPlan.startDate && fromPlan.endDate) {
+          const restored: HolidayPrep = {
+            id: crypto.randomUUID(),
+            destination: fromPlan.destination.trim(),
+            departureDate: fromPlan.startDate,
+            returnDate: fromPlan.endDate,
+            checklist: [
+              { id: "gp_letter", label: "Get GP letter confirming diabetes diagnosis and medication list", checked: false },
+              { id: "prescription", label: "Check prescription is up to date and collect early if needed", checked: false },
+              { id: "carry_on", label: "Pack all insulin and supplies in hand luggage (never in hold)", checked: false },
+              { id: "sharps_bin", label: "Pack a travel sharps container for used needles", checked: false },
+              { id: "cool_bag", label: "Get an insulin cool bag or Frio wallet for hot climates", checked: false },
+              { id: "spare_meter", label: "Pack a spare blood glucose meter and batteries", checked: false },
+              { id: "hypo_kit", label: "Pack hypo treatment (glucose tablets, juice boxes, glucagon)", checked: false },
+              { id: "id_bracelet", label: "Wear medical ID bracelet or necklace", checked: false },
+              { id: "insurance", label: "Arrange travel insurance that covers Type 1 diabetes", checked: false },
+              { id: "timezone", label: "Discuss insulin timing adjustments with diabetes team if crossing time zones", checked: false },
+              { id: "emergency_card", label: "Set up Emergency Card with translations for your destination", checked: false },
+              { id: "snacks", label: "Pack carb snacks for journey delays", checked: false },
+            ],
+            createdAt: new Date().toISOString(),
+          };
+          storage.saveHolidayPrep(restored);
+          setHolidayPrep(restored);
+        }
+      }
     }
   }, []);
 
@@ -1383,7 +1413,18 @@ export default function Travel() {
     handleGeneratePlan();
   };
 
+  const tripDatesLocked = Boolean(
+    (holidayPrep?.destination?.trim() && holidayPrep.departureDate && holidayPrep.returnDate) ||
+      (plan.destination?.trim() && plan.startDate && plan.endDate),
+  );
+
   const backTravelWizard = () => {
+    // Dates already live on the trip card — don't dump people into a blank Trip details form.
+    if (travelWizardStep <= 1 && tripDatesLocked) {
+      setStep("entry");
+      setTravelWizardStep(0);
+      return;
+    }
     if (travelWizardStep > 0) {
       setTravelWizardStep((s) => s - 1);
       return;
@@ -2244,12 +2285,12 @@ export default function Travel() {
 
         {(showPrepForm || holidayPrep) && (
           <Card className="overflow-hidden rounded-[1.35rem] border-border/50 shadow-none" data-testid="card-travel-entry-hub">
-            {!holidayPrep ? (
-              <CardHeader className="px-4 pb-2 pt-4">
-                <CardTitle className="font-display text-lg font-semibold tracking-tight">Trip dates</CardTitle>
-              </CardHeader>
-            ) : null}
-            <CardContent className={cn("space-y-4 px-4 pb-4", holidayPrep ? "pt-4" : "pt-0")}>
+            <CardHeader className="px-4 pb-2 pt-4">
+              <CardTitle className="font-display text-lg font-semibold tracking-tight">
+                {holidayPrep ? "Your trip" : "Trip dates"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 px-4 pb-4 pt-0">
               {showPrepForm && !holidayPrep ? (
               <div className="space-y-4" data-testid="holiday-prep-form">
                 <div className="space-y-2">
@@ -2646,14 +2687,45 @@ export default function Travel() {
           actions={<ScenarioCoachLink topic="travel" from="travel-setup" />}
         />
 
+        {(holidayPrep || plan.destination.trim()) && (
+          <div
+            className="rounded-xl border border-border/50 bg-muted/20 px-3.5 py-2.5"
+            data-testid="travel-wizard-trip-summary"
+          >
+            <p className="text-sm font-semibold text-foreground truncate">
+              {holidayPrep?.destination || plan.destination}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {(formatTripDate(holidayPrep?.departureDate || plan.startDate, profile, {
+                day: "numeric",
+                month: "short",
+              }) || "Start") +
+                " – " +
+                (formatTripDate(holidayPrep?.returnDate || plan.endDate, profile, {
+                  day: "numeric",
+                  month: "short",
+                }) || "End")}
+            </p>
+          </div>
+        )}
+
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-sm font-medium text-muted-foreground">
             <span>
-              Step {travelWizardStep + 1} of {TRAVEL_INPUT_STEPS}
+              Step {tripDatesLocked ? travelWizardStep : travelWizardStep + 1} of{" "}
+              {tripDatesLocked ? TRAVEL_INPUT_STEPS - 1 : TRAVEL_INPUT_STEPS}
             </span>
             <span>{INPUT_STEP_TITLES[travelWizardStep]}</span>
           </div>
-          <Progress value={inputWizardProgressPct} className="h-1.5" data-testid="travel-input-progress" />
+          <Progress
+            value={
+              tripDatesLocked
+                ? (travelWizardStep / (TRAVEL_INPUT_STEPS - 1)) * 100
+                : inputWizardProgressPct
+            }
+            className="h-1.5"
+            data-testid="travel-input-progress"
+          />
         </div>
 
         <Card className="overflow-hidden rounded-[1.35rem] border-sky-500/20 bg-gradient-to-b from-sky-500/[0.07] via-card to-card shadow-none dark:border-sky-400/15 dark:from-sky-950/40">
@@ -3003,7 +3075,19 @@ export default function Travel() {
   return (
     <PageShell variant="narrow" density="compact" className="space-y-4">
       <PageHeader
-        leading={<PageBackButton fallbackHref="/scenarios" />}
+        leading={
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="-ml-2 h-9 w-9 shrink-0"
+            aria-label="Back to your trip"
+            onClick={() => setStep("entry")}
+            data-testid="button-travel-results-back"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+        }
         title={plan.destination || "Trip"}
         actions={<ScenarioCoachLink topic="travel" from="travel-results" />}
       />
