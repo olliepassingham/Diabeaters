@@ -5,6 +5,7 @@ import type {
   User,
 } from "@supabase/supabase-js";
 import { getAuthCallbackUrl, getEmailAuthRedirectUrl, getResetPasswordUrl } from "./auth-app-url";
+import { isCapacitorNativeShell } from "./native-platform";
 import { getSupabase } from "./supabase";
 
 const NOT_CONFIGURED = new Error("Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env");
@@ -71,6 +72,15 @@ export function describeAuthErrorForDisplay(error: AuthError | Error): {
     return { message: AUTH_CAPTCHA_RETRY };
   }
   if (
+    code === "over_email_send_rate_limit" ||
+    code === "over_request_rate_limit" ||
+    msg.includes("rate limit") ||
+    msg.includes("too many requests") ||
+    msg.includes("for security purposes")
+  ) {
+    return { message: "Please wait a few minutes before requesting another email." };
+  }
+  if (
     msg.includes("invalid login") ||
     msg.includes("invalid credentials") ||
     code === "invalid_credentials" ||
@@ -132,6 +142,15 @@ export async function signup(
   }
 }
 
+/** Supabase returns a user with no identities (and no session) when the email is already registered. */
+export function isLikelyExistingAccountSignup(
+  user: User | null | undefined,
+  session: Session | null | undefined,
+): boolean {
+  if (!user || session) return false;
+  return (user.identities?.length ?? 0) === 0;
+}
+
 export function isUserVerified(user: User | null | undefined): boolean {
   if (!user) return false;
   if (user.email_confirmed_at) return true;
@@ -161,6 +180,7 @@ export function requireVerified(
 
 export async function resendVerification(
   email: string,
+  captchaToken?: string,
 ): Promise<AuthResult<{}>> {
   const supabase = getSupabase();
   if (!supabase) return { data: {}, error: NOT_CONFIGURED };
@@ -171,6 +191,7 @@ export async function resendVerification(
       email: normalizeAuthEmail(email),
       options: {
         emailRedirectTo: getEmailAuthRedirectUrl(),
+        ...(captchaToken ? { captchaToken } : {}),
       },
     });
     return { data: {}, error };
@@ -448,6 +469,7 @@ const EMAIL_CONFIRMATION_TYPES = new Set(["signup", "email", "invite", "magiclin
  */
 export async function handleEmailVerificationOnly(): Promise<{
   verified: boolean;
+  keepSession?: boolean;
   message?: string;
 }> {
   const supabase = getSupabase();
@@ -467,24 +489,31 @@ export async function handleEmailVerificationOnly(): Promise<{
     return { verified: false, message: `Unsupported verification link type: ${tokenType}` };
   }
 
+  const hadLinkParams = Boolean(
+    authQueryParams().get("token_hash") ||
+      authQueryParams().get("code") ||
+      authHashParams().get("access_token"),
+  );
+
   const linkResult = await establishAuthSessionFromEmailLink();
 
+  // Use the cached session. `getUser()` can wipe auth on a flaky mobile network
+  // even after verifyOtp already confirmed the address.
   const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-  if (userError && !linkResult.ok) {
-    return { verified: false, message: linkResult.message ?? userError.message };
+    data: { session },
+  } = await supabase.auth.getSession();
+  const verified = isUserVerified(session?.user) || (linkResult.ok && hadLinkParams);
+  const keepSession = verified && isCapacitorNativeShell();
+
+  if (!keepSession) {
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      // Best-effort — verification already persisted when link succeeded.
+    }
   }
 
-  const verified = isUserVerified(user);
-  try {
-    await supabase.auth.signOut();
-  } catch {
-    // Best-effort — verification already persisted when link succeeded.
-  }
-
-  if (verified) return { verified: true };
+  if (verified) return { verified: true, keepSession };
   if (!linkResult.ok) {
     return {
       verified: false,

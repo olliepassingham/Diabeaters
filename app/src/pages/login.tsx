@@ -19,7 +19,7 @@ import {
   authFieldActionClass,
   authMutedNavLinkClass,
 } from "@/components/auth/auth-link-styles";
-import { TurnstileCaptcha, useTurnstileCaptcha } from "@/components/auth/Turnstile";
+import { AuthCaptcha, useTurnstileCaptcha } from "@/components/auth/Turnstile";
 import { Eye, EyeOff } from "lucide-react";
 
 const LAST_LOGIN_EMAIL_KEY = "diabeater_last_login_email";
@@ -59,14 +59,12 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const captcha = useTurnstileCaptcha();
   const {
-    siteKey: turnstileSiteKey,
     required: captchaRequired,
     token: captchaToken,
-    setToken: setCaptchaToken,
-    resetKey: captchaResetKey,
     reset: resetCaptcha,
-  } = useTurnstileCaptcha();
+  } = captcha;
   const verifiedToastShown = useRef(false);
 
   useEffect(() => {
@@ -224,13 +222,7 @@ export default function Login() {
                 </button>
               </div>
             </div>
-            {captchaRequired && (
-              <TurnstileCaptcha
-                key={captchaResetKey}
-                siteKey={turnstileSiteKey}
-                onToken={setCaptchaToken}
-              />
-            )}
+            <AuthCaptcha captcha={captcha} />
             <Button
               type="submit"
               className="h-12 w-full rounded-xl text-base font-semibold"

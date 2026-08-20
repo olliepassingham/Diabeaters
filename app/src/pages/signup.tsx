@@ -3,7 +3,9 @@ import { Link, useLocation } from "wouter";
 import {
   describeAuthErrorForDisplay,
   describeAuthNetworkError,
+  isLikelyExistingAccountSignup,
   isUserVerified,
+  normalizeAuthEmail,
   signup,
 } from "@/lib/auth";
 import { useAuth } from "@/lib/auth-context";
@@ -22,7 +24,7 @@ import {
   authInlineLinkClass,
   authMutedNavLinkClass,
 } from "@/components/auth/auth-link-styles";
-import { TurnstileCaptcha, useTurnstileCaptcha } from "@/components/auth/Turnstile";
+import { AuthCaptcha, useTurnstileCaptcha } from "@/components/auth/Turnstile";
 import { PasswordRequirements } from "@/components/auth/password-requirements";
 import { PASSWORD_MIN_LENGTH, validatePassword } from "@/lib/password-policy";
 import { Eye, EyeOff } from "lucide-react";
@@ -38,14 +40,12 @@ export default function Signup() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const captcha = useTurnstileCaptcha();
   const {
-    siteKey: turnstileSiteKey,
     required: captchaRequired,
     token: captchaToken,
-    setToken: setCaptchaToken,
-    resetKey: captchaResetKey,
     reset: resetCaptcha,
-  } = useTurnstileCaptcha();
+  } = captcha;
 
   const communitySignup = useMemo(() => getOnboardingAccountPath() === "community", []);
 
@@ -84,6 +84,20 @@ export default function Signup() {
       const description = describeAuthNetworkError(styled.message);
       setError(description);
       toast({ title: "Sign up failed", description, variant: "destructive" });
+      return;
+    }
+
+    if (isLikelyExistingAccountSignup(data?.user, data?.session)) {
+      try {
+        localStorage.setItem("diabeater_last_login_email", normalizeAuthEmail(email));
+      } catch {
+        // ignore
+      }
+      toast({
+        title: "Account already exists",
+        description: "Log in with that email, or reset your password if you need to.",
+      });
+      setLocation("/login");
       return;
     }
 
@@ -184,13 +198,7 @@ export default function Signup() {
               </div>
               <PasswordRequirements password={password} />
             </div>
-            {captchaRequired && (
-              <TurnstileCaptcha
-                key={captchaResetKey}
-                siteKey={turnstileSiteKey}
-                onToken={setCaptchaToken}
-              />
-            )}
+            <AuthCaptcha captcha={captcha} />
             {communitySignup && (
               <div className="flex items-start gap-3 rounded-xl border border-border/60 bg-muted/20 p-3">
                 <Checkbox

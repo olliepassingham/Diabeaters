@@ -14,7 +14,7 @@ export default function EmailVerify() {
       const result = await handleEmailVerificationOnly();
       if (cancelled) return;
       if (result.verified) {
-        setLocation("/verified-return");
+        setLocation(result.keepSession ? "/welcome?verified=1" : "/verified-return");
         return;
       }
       setError(

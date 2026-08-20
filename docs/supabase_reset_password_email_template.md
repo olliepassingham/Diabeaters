@@ -40,7 +40,4 @@ After deploying the app fix and updating the template:
 2. Open the new email on your phone (or any browser).
 3. You should land on **Set new password**, not “Invalid or expired link”.
 
-## Related
-
-- [troubleshooting_auth_email.md](troubleshooting_auth_email.md) — Site URL / redirect allowlist
-- [Supabase: Password-based auth (PKCE)](https://supabase.com/docs/guides/auth/passwords?flow=pkce)
+The same `token_hash` pattern is required for **Confirm signup** (use `type=signup`). See [troubleshooting_auth_email.md](troubleshooting_auth_email.md#8-email-templates-required-for-links-to-work-on-a-phone).

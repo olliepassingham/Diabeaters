@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { establishAuthSessionFromEmailLink } from "@/lib/auth";
+import { nextPathAfterAuthConfirm } from "@/lib/auth-app-url";
+import { isCapacitorNativeShell } from "@/lib/native-platform";
 
 /** Handles Supabase email links that use `?token_hash=…&type=…` (PKCE-safe across browsers). */
 export default function AuthConfirm() {
@@ -10,16 +12,17 @@ export default function AuthConfirm() {
     let cancelled = false;
 
     (async () => {
-      const nextParam = new URLSearchParams(window.location.search).get("next");
-      const next =
-        nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")
-          ? nextParam
-          : "/reset-password";
+      const search = window.location.search;
+      const next = nextPathAfterAuthConfirm(search);
 
       const result = await establishAuthSessionFromEmailLink();
       if (cancelled) return;
 
       if (result.ok) {
+        if (next === "/verified-return" && isCapacitorNativeShell()) {
+          setLocation("/welcome?verified=1");
+          return;
+        }
         setLocation(next);
         return;
       }
@@ -27,6 +30,10 @@ export default function AuthConfirm() {
       const message = result.message ?? "Invalid or expired link";
       if (next === "/reset-password" || next.includes("reset-password")) {
         setLocation(`/reset-password?error=${encodeURIComponent(message)}`);
+        return;
+      }
+      if (next === "/verified-return") {
+        setLocation("/check-email");
         return;
       }
       setLocation(`/login?error=${encodeURIComponent(message)}`);

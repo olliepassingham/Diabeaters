@@ -1,6 +1,4 @@
-import { Capacitor } from "@capacitor/core";
-
-/** Custom URL scheme registered in iOS (Info.plist) for auth deep links back into the Capacitor shell. */
+/** Custom URL scheme registered in iOS (Info.plist) and Android for older verification emails. */
 export const NATIVE_AUTH_URL_SCHEME = "diabeaters";
 
 /**
@@ -11,8 +9,9 @@ export const NATIVE_AUTH_URL_SCHEME = "diabeaters";
  * from a different origin than that list (preview deployments, extra domains, some WebViews),
  * Supabase may reject the redirect or fail to send confirmation mail reliably.
  *
- * **Email verification (native):** also add `diabeaters://auth/email-verify` under Supabase →
- * Authentication → URL Configuration → Redirect URLs so the confirmation link can reopen the app.
+ * Email links always use this HTTPS origin (not `diabeaters://`) so Gmail/Outlook can open them
+ * and so Android remote WebViews do not send a custom-scheme redirect that is easy to reject.
+ * Keep `diabeaters://auth/email-verify` in Redirect URLs so older emails still work.
  */
 export function getPublicAppOrigin(): string {
   const raw = String(import.meta.env.VITE_PUBLIC_SITE_URL ?? "").trim();
@@ -39,23 +38,31 @@ export function getAuthCallbackUrl(): string {
   return `${getPublicAppOrigin()}/auth/callback`;
 }
 
-/**
- * Redirect after email confirmation / re-verify / email change — lands on a route that sends users
- * to the login screen. On Capacitor iOS/Android, uses a custom scheme so Mail’s link can reopen the app.
- * Production https links can also reopen the app once Universal / App Links are configured
- * (see docs/universal_links.md).
- */
-/** Full native deep link for Supabase “Redirect URLs” (same value as {@link getEmailAuthRedirectUrl} on iOS/Android). */
+/** Older native deep link still listed in Supabase Redirect URLs. */
 export const NATIVE_EMAIL_VERIFY_REDIRECT_URL = `${NATIVE_AUTH_URL_SCHEME}://auth/email-verify`;
 
 export function getEmailAuthRedirectUrl(): string {
-  if (typeof window !== "undefined" && Capacitor.isNativePlatform?.()) {
-    return NATIVE_EMAIL_VERIFY_REDIRECT_URL;
-  }
-  const origin = getPublicAppOrigin() || (typeof window !== "undefined" ? window.location.origin : "");
-  return `${origin.replace(/\/$/, "")}/auth/email-verify`;
+  return `${getPublicAppOrigin().replace(/\/$/, "")}/auth/email-verify`;
 }
 
 export function getResetPasswordUrl(): string {
   return `${getPublicAppOrigin()}/reset-password`;
+}
+
+/**
+ * Where `/auth/confirm` should send the user after a token_hash link.
+ * Defaults used to be `/reset-password`, which broke signup confirmation links.
+ */
+export function nextPathAfterAuthConfirm(search: string): string {
+  const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
+  const nextParam = params.get("next");
+  if (nextParam?.startsWith("/") && !nextParam.startsWith("//")) {
+    return nextParam;
+  }
+  const type = params.get("type");
+  if (type === "recovery") return "/reset-password";
+  if (type === "signup" || type === "email" || type === "invite" || type === "magiclink") {
+    return "/verified-return";
+  }
+  return "/login";
 }

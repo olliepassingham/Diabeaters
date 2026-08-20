@@ -1,11 +1,11 @@
 import { Link } from "wouter";
-import { Capacitor } from "@capacitor/core";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/layout";
+import { isCapacitorNativeShell } from "@/lib/native-platform";
 
 export default function VerifiedReturn() {
-  const openedInNativeApp = Capacitor.isNativePlatform?.() ?? false;
+  const openedInNativeApp = isCapacitorNativeShell();
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -18,8 +18,8 @@ export default function VerifiedReturn() {
             <CardContent className="space-y-5">
               <p className="text-sm text-muted-foreground">
                 {openedInNativeApp
-                  ? "Your email is confirmed. Return to the Diabeaters app and log in with your email and password to continue."
-                  : "Your email is confirmed. Close this browser tab, open the Diabeaters app on your phone, and log in with your email and password."}
+                  ? "Your email is confirmed. Log in with your email and password to continue."
+                  : "Your email is confirmed. Open the Diabeaters app on your phone and log in with your email and password."}
               </p>
               {!openedInNativeApp && (
                 <p className="text-xs text-muted-foreground">
@@ -28,12 +28,10 @@ export default function VerifiedReturn() {
               )}
 
               <div className="flex flex-col gap-3">
-                {!openedInNativeApp && (
-                  <Button asChild className="w-full">
-                    <Link href="/login">Log in on the web</Link>
-                  </Button>
-                )}
-                <Button asChild variant={openedInNativeApp ? "default" : "outline"} className="w-full">
+                <Button asChild className="w-full">
+                  <Link href="/login">Log in</Link>
+                </Button>
+                <Button asChild variant="outline" className="w-full">
                   <Link href="/welcome">Back to welcome</Link>
                 </Button>
               </div>

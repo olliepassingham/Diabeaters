@@ -7,21 +7,19 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { authInlineLinkClass, authMutedNavLinkClass } from "@/components/auth/auth-link-styles";
-import { TurnstileCaptcha, useTurnstileCaptcha } from "@/components/auth/Turnstile";
+import { AuthCaptcha, useTurnstileCaptcha } from "@/components/auth/Turnstile";
 
 export default function ResetRequest() {
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const captcha = useTurnstileCaptcha();
   const {
-    siteKey: turnstileSiteKey,
     required: captchaRequired,
     token: captchaToken,
-    setToken: setCaptchaToken,
-    resetKey: captchaResetKey,
     reset: resetCaptcha,
-  } = useTurnstileCaptcha();
+  } = captcha;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -111,13 +109,7 @@ export default function ResetRequest() {
                 data-testid="input-reset-email"
               />
             </div>
-            {captchaRequired && (
-              <TurnstileCaptcha
-                key={captchaResetKey}
-                siteKey={turnstileSiteKey}
-                onToken={setCaptchaToken}
-              />
-            )}
+            <AuthCaptcha captcha={captcha} />
             <Button
               type="submit"
               className="w-full"
@@ -127,6 +119,9 @@ export default function ResetRequest() {
               {submitting ? "Sending…" : "Send reset link"}
             </Button>
           </form>
+          <p className="text-xs text-muted-foreground">
+            Check junk and spam if it does not arrive within a few minutes.
+          </p>
           <p className="text-center">
             <Link href="/login" className={authMutedNavLinkClass}>
               Back to log in

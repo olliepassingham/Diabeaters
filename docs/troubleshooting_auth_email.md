@@ -18,9 +18,9 @@ Work through this in order. The app uses Supabase Auth (`signUp` + `resend` with
 | Field | Must match your live app |
 |--------|---------------------------|
 | **Site URL** | e.g. `https://diabeaters.vercel.app` |
-| **Redirect URLs** | Include `https://diabeaters.vercel.app/auth/callback`, `.../auth/confirm`, and `.../reset-password` |
+| **Redirect URLs** | Include `https://diabeaters.vercel.app/auth/callback`, `.../auth/confirm`, `.../auth/email-verify`, and `.../reset-password` |
 
-**Password reset:** if links open but show “Invalid or expired link”, update the **Reset password** email template to use `token_hash` (not `{{ .ConfirmationURL }}`). See [supabase_reset_password_email_template.md](supabase_reset_password_email_template.md).
+**Confirm signup and password reset:** if links open but show “Invalid or expired link”, update those email templates to use `token_hash` (not `{{ .ConfirmationURL }}`). See [supabase_reset_password_email_template.md](supabase_reset_password_email_template.md) and section 8 below.
 
 **Vercel:** `VITE_PUBLIC_SITE_URL` = **same origin** as Site URL (no trailing slash). **Redeploy** after changing it.
 
@@ -41,7 +41,7 @@ If the redirect in the signup request is **not** allowed, Supabase often returns
 
 **Authentication** (or **Project Settings**) → **Attack Protection** / **CAPTCHA**
 
-If **CAPTCHA is required** for sign-up, sign-in, or password recovery, the app must send a Turnstile token. Login, signup, and password-reset request all do this when `VITE_TURNSTILE_SITE_KEY` is set.
+If **CAPTCHA is required** for sign-up, sign-in, password recovery, or resend, the app must send a Turnstile token. Login, signup, password-reset request, and resend-verification all do this when `VITE_TURNSTILE_SITE_KEY` is set.
 
 **Check:**
 
@@ -92,11 +92,25 @@ If the email is already registered (confirmed or not), behaviour depends on Supa
 
 ---
 
-## 8. Email template
+## 8. Email templates (required for links to work on a phone)
 
-**Authentication → Email Templates → Confirm signup**
+Default Supabase templates use `{{ .ConfirmationURL }}`, which only works in the **same browser** that requested the email. Gmail on Android opens Chrome, so the link looks expired.
 
-- Ensure the template is present and not disabled (rare misconfiguration).
+**Authentication → Email Templates → Confirm signup** — replace the link with:
+
+```html
+<h2>Confirm your email</h2>
+<p>Follow this link to confirm your Diabeaters account:</p>
+<p><a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=signup">Confirm email</a></p>
+```
+
+**Authentication → Email Templates → Reset password** — same pattern (`type=recovery`). See [supabase_reset_password_email_template.md](supabase_reset_password_email_template.md).
+
+**Authentication → Email Templates → Magic link** and **Change email address** (if you use them):
+
+```html
+<p><a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email">Confirm email</a></p>
+```
 
 ---
 

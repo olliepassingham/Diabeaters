@@ -25,6 +25,7 @@ Include at least:
 - `http://localhost:5173/auth/callback`
 - `http://localhost:5173/reset-password`
 - Production: `https://YOUR_DOMAIN/auth/callback`
+- Production: `https://YOUR_DOMAIN/auth/email-verify`
 - Production: `https://YOUR_DOMAIN/reset-password`
 
 Email verification links and OAuth redirects are rejected if the final URL is not allowlisted.

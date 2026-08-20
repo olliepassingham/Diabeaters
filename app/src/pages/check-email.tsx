@@ -1,6 +1,10 @@
 import { FormEvent, useState } from "react";
 import { Link } from "wouter";
-import { resendVerification } from "@/lib/auth";
+import {
+  describeAuthErrorForDisplay,
+  describeAuthNetworkError,
+  resendVerification,
+} from "@/lib/auth";
 import { getSupportEmail } from "@/lib/support";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -8,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
+import { AuthCaptcha, useTurnstileCaptcha } from "@/components/auth/Turnstile";
 
 export default function CheckEmail() {
   const { toast } = useToast();
@@ -18,6 +23,12 @@ export default function CheckEmail() {
   const [email, setEmail] = useState(initialEmail);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const captcha = useTurnstileCaptcha();
+  const {
+    required: captchaRequired,
+    token: captchaToken,
+    reset: resetCaptcha,
+  } = captcha;
 
   const messageParam =
     typeof window !== "undefined"
@@ -30,36 +41,31 @@ export default function CheckEmail() {
 
   async function handleResend(e: FormEvent) {
     e.preventDefault();
+    if (captchaRequired && !captchaToken) return;
     setSubmitting(true);
     setError(null);
 
-    const { error } = await resendVerification(email);
+    const { error } = await resendVerification(email, captchaToken ?? undefined);
     setSubmitting(false);
 
     if (error) {
-      const msg = error.message.toLowerCase();
-      const isRateLimited =
-        msg.includes("rate") ||
-        msg.includes("limit") ||
-        msg.includes("too many") ||
-        msg.includes("60");
-      if (isRateLimited) {
-        toast({
-          title: "Too many requests",
-          description:
-            "Please wait a few minutes before requesting another verification email.",
-          variant: "destructive",
-        });
-      } else {
-        setError(error.message);
-      }
+      resetCaptcha();
+      const styled = describeAuthErrorForDisplay(error);
+      const description = describeAuthNetworkError(styled.message);
+      setError(description);
+      toast({
+        title: "Could not send email",
+        description,
+        variant: "destructive",
+      });
       return;
     }
 
+    resetCaptcha();
     toast({
       title: "Verification email sent",
       description:
-        "If an account exists for that email, we've sent a new verification link.",
+        "If an account exists for that email, we've sent a new verification link. Check junk and spam too.",
     });
   }
 
@@ -142,6 +148,7 @@ export default function CheckEmail() {
                 aria-label="Email address for resending verification"
               />
             </div>
+            <AuthCaptcha captcha={captcha} />
             {error && (
               <Alert variant="destructive">
                 <AlertTitle>Something went wrong</AlertTitle>
@@ -152,7 +159,7 @@ export default function CheckEmail() {
               type="submit"
               variant="outline"
               className="w-full"
-              disabled={submitting}
+              disabled={submitting || (captchaRequired && !captchaToken)}
               aria-label="Resend verification email"
             >
               {submitting ? "Sending…" : "Resend verification email"}
