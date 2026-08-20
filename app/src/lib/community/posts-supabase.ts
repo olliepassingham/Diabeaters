@@ -79,6 +79,11 @@ function wrapFeedRpcError(err: { message: string }): Error {
       `${msg} Apply migration 20260621120000_community_post_video.sql, then reload the API schema in Supabase Dashboard → Settings → API.`,
     );
   }
+  if (msg.includes("image_storage_path") && msg.includes("community_post_comments")) {
+    return new Error(
+      `${msg} Apply migration 20260820120000_community_comment_images.sql, then reload the API schema in Supabase Dashboard → Settings → API.`,
+    );
+  }
   return new Error(msg);
 }
 
@@ -447,6 +452,7 @@ function parseImageUrls(raw: unknown): string[] {
 }
 
 function mapComment(r: Record<string, unknown>): CommunityPostCommentRow {
+  const img = r.image_storage_path;
   return {
     id: String(r.id),
     post_id: String(r.post_id),
@@ -458,6 +464,7 @@ function mapComment(r: Record<string, unknown>): CommunityPostCommentRow {
     like_count: typeof r.like_count === "number" ? r.like_count : Number(r.like_count ?? 0) || 0,
     liked_by_me: false,
     created_at: String(r.created_at ?? ""),
+    image_storage_path: typeof img === "string" && img.trim() ? img : null,
   };
 }
 
@@ -500,6 +507,25 @@ async function enrichCommentsWithLikes(
       liked_by_me: myLikes.has(c.id),
     };
   });
+}
+
+async function enrichCommentsWithImages(
+  comments: CommunityPostCommentRow[],
+): Promise<CommunityPostCommentRow[]> {
+  const paths = comments.map((c) => c.image_storage_path).filter(Boolean) as string[];
+  if (paths.length === 0) return comments;
+  const urls = await getPostMediaSignedUrls(paths);
+  const urlByPath = new Map<string, string | null>();
+  paths.forEach((p, i) => urlByPath.set(p, urls[i] ?? null));
+  return comments.map((c) => ({
+    ...c,
+    image_signed_url: c.image_storage_path ? urlByPath.get(c.image_storage_path) ?? null : null,
+  }));
+}
+
+async function enrichComments(comments: CommunityPostCommentRow[]): Promise<CommunityPostCommentRow[]> {
+  const withLikes = await enrichCommentsWithLikes(comments);
+  return enrichCommentsWithImages(withLikes);
 }
 
 function extFromFile(f: File): string {
@@ -1114,14 +1140,18 @@ export async function fetchCommentsForPost(
 
   if (error) return { data: null, error: new Error(error.message) };
   const mapped = (data ?? []).map((r) => mapComment(r as Record<string, unknown>));
-  const enriched = await enrichCommentsWithLikes(mapped);
+  const enriched = await enrichComments(mapped);
   return {
     data: enriched,
     error: null,
   };
 }
 
-export async function insertCommunityComment(postId: string, body: string): Promise<{
+export async function insertCommunityComment(
+  postId: string,
+  body: string,
+  options?: { imageFile?: File | null },
+): Promise<{
   data: CommunityPostCommentRow | null;
   error: Error | null;
 }> {
@@ -1136,27 +1166,54 @@ export async function insertCommunityComment(postId: string, body: string): Prom
   if (!gate.ok) return { data: null, error: gate.error };
 
   const trimmed = body.trim();
-  if (!trimmed) return { data: null, error: new Error("Comment cannot be empty") };
+  const file = options?.imageFile ?? null;
+  if (file) {
+    const v = validateImageFiles([file]);
+    if (v) return { data: null, error: v };
+  }
+  if (!trimmed && !file) return { data: null, error: new Error("Add a comment or a photo.") };
 
-  const mentions = await buildMentionsForPost(trimmed, uid);
+  const mentions = trimmed ? await buildMentionsForPost(trimmed, uid) : { userIds: [] as string[], mentionMap: {} as Record<string, string> };
   const mentioned_user_ids = [...new Set(mentions.userIds.filter((x) => x && x !== uid))].slice(0, 12);
   const mention_map = { ...mentions.mentionMap };
 
+  let imagePath: string | null = null;
+  if (file) {
+    const ext = extFromFile(file);
+    const path = `${uid}/comment/${postId}/${crypto.randomUUID()}.${ext}`;
+    const { error: upErr } = await supabase.storage.from(COMMUNITY_POST_IMAGES_BUCKET).upload(path, file, {
+      cacheControl: "3600",
+      upsert: false,
+      contentType: file.type || undefined,
+    });
+    if (upErr) return { data: null, error: new Error(upErr.message) };
+    imagePath = path;
+  }
+
+  const insertPayload: Record<string, unknown> = {
+    post_id: postId,
+    author_id: uid,
+    body: trimmed,
+    mention_map,
+    mentioned_user_ids,
+  };
+  if (imagePath) insertPayload.image_storage_path = imagePath;
+
   const { data, error } = await supabase
     .from("community_post_comments")
-    .insert({
-      post_id: postId,
-      author_id: uid,
-      body: trimmed,
-      mention_map,
-      mentioned_user_ids,
-    })
+    .insert(insertPayload)
     .select("*")
     .single();
 
-  if (error) return { data: null, error: wrapFeedRpcError(error) };
+  if (error) {
+    if (imagePath) {
+      await supabase.storage.from(COMMUNITY_POST_IMAGES_BUCKET).remove([imagePath]);
+    }
+    return { data: null, error: wrapFeedRpcError(error) };
+  }
   if (!data) return { data: null, error: new Error("No row returned") };
-  const out = mapComment(data as Record<string, unknown>);
+  const [out] = await enrichComments([mapComment(data as Record<string, unknown>)]);
+  if (!out) return { data: null, error: new Error("No row returned") };
 
   void supabase.functions
     .invoke("notify_feed_push", { body: { kind: "feed_post_comment", post_id: postId, comment_id: out.id } })
@@ -1368,6 +1425,14 @@ export async function deleteCommunityComment(commentId: string): Promise<{ error
   const uid = sessionData.session?.user?.id;
   if (!uid) return { error: new Error("Not signed in") };
 
+  const { data: existing, error: loadErr } = await supabase
+    .from("community_post_comments")
+    .select("image_storage_path")
+    .eq("id", commentId)
+    .eq("author_id", uid)
+    .maybeSingle();
+  if (loadErr) return { error: new Error(loadErr.message) };
+
   const { error } = await supabase
     .from("community_post_comments")
     .delete()
@@ -1375,6 +1440,12 @@ export async function deleteCommunityComment(commentId: string): Promise<{ error
     .eq("author_id", uid);
 
   if (error) return { error: new Error(error.message) };
+
+  const imagePath =
+    typeof existing?.image_storage_path === "string" ? existing.image_storage_path.trim() : "";
+  if (imagePath) {
+    await supabase.storage.from(COMMUNITY_POST_IMAGES_BUCKET).remove([imagePath]);
+  }
   return { error: null };
 }
 

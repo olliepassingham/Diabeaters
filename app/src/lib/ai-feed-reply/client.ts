@@ -28,6 +28,7 @@ function mapComment(row: Record<string, unknown>): CommunityPostCommentRow | nul
     mentioned_user_ids: [],
     like_count: 0,
     liked_by_me: false,
+    image_storage_path: null,
   };
 }
 

@@ -1,9 +1,11 @@
 import { Link } from "wouter";
+import { useState } from "react";
 import { Flag, Heart, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
+import { FeedMediaLightbox } from "@/components/community/feed-media-lightbox";
 import { renderBodyWithMentions } from "@/components/community/render-body-with-mentions";
 import { formatDistanceToNow } from "date-fns";
 import { AI_ASSISTANT_NAME } from "@/lib/ai-coach/persona";
@@ -18,6 +20,8 @@ export type FeedCommentItemProps = {
   body: string;
   createdAt: string;
   mentionMap: Record<string, string> | null | undefined;
+  imageUrl?: string | null;
+  imageStoragePath?: string | null;
   meta: FeedAuthorMeta;
   beatieFeedBotUserId?: string | null;
   viewerId?: string;
@@ -35,6 +39,8 @@ export function FeedCommentItem({
   body,
   createdAt,
   mentionMap,
+  imageUrl,
+  imageStoragePath,
   meta,
   beatieFeedBotUserId,
   viewerId,
@@ -50,6 +56,10 @@ export function FeedCommentItem({
   const canReport = Boolean(viewerId && viewerId !== authorId && onReport);
   const canDelete = Boolean(viewerId && viewerId === authorId && onDelete);
   const showLikeRow = canLike || likeCount > 0;
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const bodyText = body.trim();
+  const showImage = Boolean(imageUrl);
+  const imageFailed = Boolean(imageStoragePath && !imageUrl);
 
   return (
     <li
@@ -87,8 +97,30 @@ export function FeedCommentItem({
                   AI coach
                 </Badge>
               ) : null}
-              {renderBodyWithMentions(body, mentionMap ?? {})}
+              {bodyText ? renderBodyWithMentions(body, mentionMap ?? {}) : null}
             </p>
+            {showImage ? (
+              <>
+                <button
+                  type="button"
+                  className="mt-1.5 block max-w-[min(100%,16rem)] overflow-hidden rounded-xl text-left"
+                  onClick={() => setLightboxOpen(true)}
+                  aria-label="View comment photo"
+                >
+                  <img
+                    src={imageUrl!}
+                    alt=""
+                    className="max-h-56 w-full object-cover"
+                  />
+                </button>
+                <FeedMediaLightbox open={lightboxOpen} onOpenChange={setLightboxOpen} slideLabel="Comment photo">
+                  <img src={imageUrl!} alt="" className="max-h-[90vh] w-auto max-w-full object-contain" />
+                </FeedMediaLightbox>
+              </>
+            ) : null}
+            {imageFailed ? (
+              <p className="mt-1 text-[11px] text-muted-foreground">Could not load image</p>
+            ) : null}
           </div>
           <span className="flex shrink-0 items-center">
             {canReport ? (

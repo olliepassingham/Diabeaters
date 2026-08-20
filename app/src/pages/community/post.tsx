@@ -84,6 +84,7 @@ export default function CommunityPostPage() {
   const [expanded, setExpanded] = useState(true);
   const [comments, setComments] = useState<CommunityPostCommentRow[]>([]);
   const [commentDraft, setCommentDraft] = useState("");
+  const [commentImage, setCommentImage] = useState<File | null>(null);
   const [loadingComments, setLoadingComments] = useState(false);
   const commentInputRef = useRef<HTMLTextAreaElement | null>(null);
   const beatieFeedBotUserId = useMemo(() => getBeatieFeedBotUserIdFromEnv(), []);
@@ -290,13 +291,14 @@ export default function CommunityPostPage() {
       return;
     }
     const text = commentDraft.trim();
-    if (!text) return;
-    const res = await insertCommunityComment(postId, text);
+    if (!text && !commentImage) return;
+    const res = await insertCommunityComment(postId, text, { imageFile: commentImage });
     if (res.error) {
       toast({ title: "Comment failed", description: res.error.message, variant: "destructive" });
       return;
     }
     setCommentDraft("");
+    setCommentImage(null);
     if (res.data) {
       setComments((prev) => [...prev, res.data!]);
       setPost((p) => (p ? { ...p, comment_count: p.comment_count + 1 } : p));
@@ -490,6 +492,8 @@ export default function CommunityPostPage() {
         comments={comments}
         commentDraft={commentDraft}
         onCommentDraftChange={setCommentDraft}
+        commentImage={commentImage}
+        onCommentImageChange={setCommentImage}
         commentInputRef={(el) => {
           commentInputRef.current = el;
         }}

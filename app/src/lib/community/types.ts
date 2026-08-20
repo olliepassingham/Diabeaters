@@ -55,6 +55,10 @@ export type CommunityPostCommentRow = {
   like_count: number;
   liked_by_me: boolean;
   created_at: string;
+  /** Path in `community_post_images` (`{author_id}/comment/{post_id}/…`). */
+  image_storage_path: string | null;
+  /** Client-enriched after fetch. */
+  image_signed_url?: string | null;
 };
 
 export type DmThreadRow = {

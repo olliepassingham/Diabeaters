@@ -163,6 +163,7 @@ export function FeedPostList(props: {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [commentsByPost, setCommentsByPost] = useState<Record<string, CommunityPostCommentRow[]>>({});
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
+  const [commentImages, setCommentImages] = useState<Record<string, File | null>>({});
   const [loadingComments, setLoadingComments] = useState<Record<string, boolean>>({});
   const commentInputRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
   const beatieFeedBotUserId = useMemo(() => getBeatieFeedBotUserIdFromEnv(), []);
@@ -513,13 +514,15 @@ export function FeedPostList(props: {
       return;
     }
     const draft = (commentDrafts[postId] ?? "").trim();
-    if (!draft) return;
-    const res = await insertCommunityComment(postId, draft);
+    const image = commentImages[postId] ?? null;
+    if (!draft && !image) return;
+    const res = await insertCommunityComment(postId, draft, { imageFile: image });
     if (res.error) {
       toast({ title: "Could not comment", description: res.error.message, variant: "destructive" });
       return;
     }
     setCommentDrafts((m) => ({ ...m, [postId]: "" }));
+    setCommentImages((m) => ({ ...m, [postId]: null }));
     setCommentsByPost((m) => ({ ...m, [postId]: [...(m[postId] ?? []), ...(res.data ? [res.data] : [])] }));
     patchPostsInCache((p) => (p.id === postId ? { ...p, comment_count: p.comment_count + 1 } : p));
   }
@@ -899,6 +902,8 @@ export function FeedPostList(props: {
                 comments={commentsByPost[post.id] ?? []}
                 commentDraft={commentDrafts[post.id] ?? ""}
                 onCommentDraftChange={(value) => setCommentDrafts((d) => ({ ...d, [post.id]: value }))}
+                commentImage={commentImages[post.id] ?? null}
+                onCommentImageChange={(file) => setCommentImages((d) => ({ ...d, [post.id]: file }))}
                 commentInputRef={(el) => {
                   commentInputRefs.current[post.id] = el;
                 }}

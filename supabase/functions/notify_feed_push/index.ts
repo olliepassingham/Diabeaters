@@ -165,16 +165,18 @@ Deno.serve(async (req: Request) => {
       }
       const { data: c } = await admin
         .from("community_post_comments")
-        .select("body")
+        .select("body, image_storage_path")
         .eq("id", commentId)
         .eq("post_id", postId)
         .maybeSingle();
       const raw = typeof (c as any)?.body === "string" ? String((c as any).body).trim() : "";
+      const hasImage = typeof (c as any)?.image_storage_path === "string" && String((c as any).image_storage_path).trim().length > 0;
       let preview = raw.slice(0, 120);
       if (raw.length > 120) preview += "…";
+      if (!preview) preview = hasImage ? "sent a photo" : "commented on your post.";
       recipientId = authorId;
       title = "New comment on your post";
-      bodyText = `${actor}: ${preview || "commented on your post."}`;
+      bodyText = `${actor}: ${preview}`;
       deepLink = `/community/post/${postId}`;
       payload = { kind: "feed_post_comment", post_id: postId, actor_user_id: callerId, comment_id: commentId, deep_link: deepLink };
     } else if (body.kind === "feed_comment_like") {
@@ -188,7 +190,7 @@ Deno.serve(async (req: Request) => {
       }
       const { data: c } = await admin
         .from("community_post_comments")
-        .select("author_id, body")
+        .select("author_id, body, image_storage_path")
         .eq("id", commentId)
         .eq("post_id", postId)
         .maybeSingle();
@@ -200,8 +202,10 @@ Deno.serve(async (req: Request) => {
         });
       }
       const raw = typeof (c as any)?.body === "string" ? String((c as any).body).trim() : "";
+      const hasImage = typeof (c as any)?.image_storage_path === "string" && String((c as any).image_storage_path).trim().length > 0;
       let preview = raw.slice(0, 80);
       if (raw.length > 80) preview += "…";
+      if (!preview && hasImage) preview = "photo";
       recipientId = authorId;
       title = "New like on your comment";
       bodyText = preview ? `${actor} liked your comment: ${preview}` : `${actor} liked your comment.`;

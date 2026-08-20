@@ -4,6 +4,7 @@ import {
   Bookmark,
   Flag,
   Heart,
+  ImagePlus,
   Loader2,
   MessageSquare,
   MoreHorizontal,
@@ -49,6 +50,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { CommunityPeopleSheet } from "@/components/community/community-people-sheet";
 import { MentionTextarea } from "@/components/community/mention-textarea";
+import { FILE_INPUT_HIDDEN_CLASS } from "@/lib/click-hidden-file-input";
+import { pickSingleImageFromLibrary } from "@/lib/community/pick-post-images";
+import { MAX_POST_IMAGE_BYTES } from "@/lib/community/posts-supabase";
 import { renderBodyWithMentions } from "@/components/community/render-body-with-mentions";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -169,6 +173,8 @@ type FeedPostCardProps = {
   comments: CommunityPostCommentRow[];
   commentDraft: string;
   onCommentDraftChange: (value: string) => void;
+  commentImage: File | null;
+  onCommentImageChange: (file: File | null) => void;
   commentInputRef: (el: HTMLTextAreaElement | null) => void;
   onToggleComments: () => void;
   onReplyFocus: () => void;
@@ -216,6 +222,8 @@ export function FeedPostCard({
   comments,
   commentDraft,
   onCommentDraftChange,
+  commentImage,
+  onCommentImageChange,
   commentInputRef,
   onToggleComments,
   onReplyFocus,
@@ -268,6 +276,37 @@ export function FeedPostCard({
   const [shareRecentLoading, setShareRecentLoading] = useState(false);
   const [shareRecentError, setShareRecentError] = useState<string | null>(null);
   const [pendingDeleteCommentId, setPendingDeleteCommentId] = useState<string | null>(null);
+  const commentImageInputRef = useRef<HTMLInputElement | null>(null);
+  const [commentImagePreviewUrl, setCommentImagePreviewUrl] = useState<string | null>(null);
+  const applyCommentImage = (file: File | null) => {
+    if (file && file.size > MAX_POST_IMAGE_BYTES) {
+      toast({
+        title: "Photo too large",
+        description: "Images must be 5MB or smaller.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (file && !file.type.startsWith("image/")) {
+      toast({
+        title: "Photo only",
+        description: "You can attach one image to a comment.",
+        variant: "destructive",
+      });
+      return;
+    }
+    onCommentImageChange(file);
+  };
+
+  useEffect(() => {
+    if (!commentImage) {
+      setCommentImagePreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(commentImage);
+    setCommentImagePreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [commentImage]);
 
   const [likersOpen, setLikersOpen] = useState(false);
   const [likersLoading, setLikersLoading] = useState(false);
@@ -918,6 +957,8 @@ export function FeedPostCard({
                       body={c.body}
                       createdAt={c.created_at}
                       mentionMap={c.mention_map}
+                      imageUrl={c.image_signed_url}
+                      imageStoragePath={c.image_storage_path}
                       meta={commentMeta(c.author_id)}
                       beatieFeedBotUserId={beatieFeedBotUserId}
                       viewerId={viewerId}
@@ -935,33 +976,78 @@ export function FeedPostCard({
               )}
             </div>
           )}
-          <div className="text-composer-shell rounded-full px-3.5 py-1">
-            <div className="min-w-0 flex-1">
-              <MentionTextarea
-                textareaRef={commentInputRef}
-                value={commentDraft}
-                onChange={onCommentDraftChange}
-                currentUserId={viewerId}
-                rows={1}
-                maxLength={4000}
-                hideHint
-                autoGrow
-                maxGrowPx={148}
-                bare
-                placeholder={mayEngage ? "Add a comment…" : "Set up your @handle to comment"}
+          <div className="space-y-2">
+            <input
+              ref={commentImageInputRef}
+              type="file"
+              accept="image/*"
+              className={FILE_INPUT_HIDDEN_CLASS}
+              aria-hidden
+              tabIndex={-1}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) applyCommentImage(f);
+                e.target.value = "";
+              }}
+            />
+            {commentImagePreviewUrl ? (
+              <div className="flex items-start gap-2 rounded-2xl border border-border/50 bg-muted/30 p-2">
+                <img src={commentImagePreviewUrl} alt="" className="max-h-28 rounded-xl object-cover" />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="shrink-0 rounded-xl"
+                  onClick={() => onCommentImageChange(null)}
+                >
+                  Remove
+                </Button>
+              </div>
+            ) : null}
+            <div className="text-composer-shell rounded-[1.35rem] pl-1.5 pr-2 py-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="mb-0.5 h-10 w-10 shrink-0 rounded-full text-muted-foreground hover:text-foreground"
                 disabled={!mayEngage}
-                className="min-h-10 resize-none px-0 py-2 text-[15px] leading-snug"
-              />
+                aria-label="Attach photo"
+                onClick={() => {
+                  void (async () => {
+                    const picked = await pickSingleImageFromLibrary(commentImageInputRef.current);
+                    if (picked) applyCommentImage(picked);
+                  })();
+                }}
+              >
+                <ImagePlus className="h-5 w-5" strokeWidth={1.75} />
+              </Button>
+              <div className="min-w-0 flex-1">
+                <MentionTextarea
+                  textareaRef={commentInputRef}
+                  value={commentDraft}
+                  onChange={onCommentDraftChange}
+                  currentUserId={viewerId}
+                  rows={1}
+                  maxLength={4000}
+                  hideHint
+                  autoGrow
+                  maxGrowPx={148}
+                  bare
+                  placeholder={mayEngage ? "Add a comment…" : "Set up your @handle to comment"}
+                  disabled={!mayEngage}
+                  className="min-h-10 resize-none px-0 py-2 text-[15px] leading-snug"
+                />
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                className="mb-0.5 h-10 shrink-0 rounded-full px-4 text-sm font-semibold shadow-none"
+                disabled={!mayEngage || (!commentDraft.trim() && !commentImage)}
+                onClick={onSubmitComment}
+              >
+                Post
+              </Button>
             </div>
-            <Button
-              type="button"
-              size="sm"
-              className="mb-0.5 h-10 shrink-0 rounded-full px-4 text-sm font-semibold shadow-none"
-              disabled={!mayEngage || !commentDraft.trim()}
-              onClick={onSubmitComment}
-            >
-              Post
-            </Button>
           </div>
         </div>
       ) : null}
