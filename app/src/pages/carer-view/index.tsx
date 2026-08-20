@@ -1361,7 +1361,7 @@ function deriveCarerHeaderContext(
         message: travel.destination ? `Travel mode active — ${travel.destination}` : "Travel mode active",
       };
   } else {
-    glance = { type: "ok", message: "All clear for now" };
+    glance = { type: "ok", message: "All looking good" };
   }
 
   return {
@@ -1663,6 +1663,16 @@ export default function CarerViewPage() {
     return "ok";
   }, [scopes.supplies, supplies]);
 
+  const hasRecentTreatedHypo = useMemo(() => {
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    return hypoLogs.some((h) => {
+      const t = new Date(h.created_at).getTime();
+      return Number.isFinite(t) && t >= cutoff;
+    });
+  }, [hypoLogs]);
+
+  const suppliesNeedAttention = suppliesTone === "critical" || suppliesTone === "low";
+
   const patientSupplyPackPrefs = useMemo((): PatientSupplyPackPrefs | null => {
     if (!profile) return null;
     return {
@@ -1799,10 +1809,6 @@ export default function CarerViewPage() {
             patientName={displayName}
           />
 
-          {activeLink?.patientId ? (
-            <CarerClinicalPrefsCard patientId={activeLink.patientId} enabled={scopes.clinical_settings ?? false} />
-          ) : null}
-
         </div>
 
       {linkedBanner && (
@@ -1837,11 +1843,17 @@ export default function CarerViewPage() {
           {(scopes.hypo_alerts ?? false) && (
             <CarerUrgentCard
               testId="carer-view-hypos"
-              accent={hypoLogs.length > 0 ? "rose" : "default"}
+              accent={hasRecentTreatedHypo ? "rose" : "default"}
             >
               <CardHeader className={carerCardHeaderClass}>
                 <CardTitle className={carerCardTitleClass}>
-                  <Heart className="h-4 w-4 text-primary shrink-0" aria-hidden />
+                  <Heart
+                    className={cn(
+                      "h-4 w-4 shrink-0",
+                      hasRecentTreatedHypo ? "text-rose-600 dark:text-rose-400" : "text-primary",
+                    )}
+                    aria-hidden
+                  />
                   Recent treated hypos
                 </CardTitle>
               </CardHeader>
@@ -1918,72 +1930,75 @@ export default function CarerViewPage() {
             />
           ) : null}
 
-          {(scopes.supplies ?? false) && (
-            <CarerUrgentCard
-              testId="carer-view-supplies"
-              accent={suppliesTone === "critical" ? "amber" : suppliesTone === "low" ? "amber" : "default"}
-            >
-              <CardHeader className={carerCardHeaderClass}>
-                <CardTitle className={carerCardTitleClass}>
-                  <Package className="h-4 w-4 shrink-0 text-primary" aria-hidden />
-                  <span className="min-w-0 flex-1">{displayName}&apos;s supplies</span>
-                  <InlineInfoHint
-                    ariaLabel="About supplies"
-                    content={<p>Cloud stock they have chosen to share with you.</p>}
-                    className="-mr-2 shrink-0"
-                  />
-                </CardTitle>
-              </CardHeader>
-              <CardContent className={carerCardContentClass}>
-                {supplies.length === 0 ? (
-                  <CarerCardEmpty
-                    compact
-                    icon={Package}
-                    title="No supplies shared yet"
-                    description="They can enable supply sharing in their supporter link settings."
-                  />
-                ) : (
-                  <ul className="space-y-2 m-0 list-none p-0">
-                    {sortedSupplies.map((s) => {
-                      const tone = supplyTone(s);
-                      return (
-                        <li
-                          key={s.id}
-                          className={cn(
-                            "flex items-center gap-2.5 rounded-lg border px-2.5 py-2 text-sm",
-                            tone === "critical" && "border-destructive/35 bg-destructive/[0.04]",
-                            tone === "low" && "border-amber-500/30 bg-amber-500/[0.04]",
-                            tone === "ok" && "border-border/60 bg-background/40",
-                          )}
-                        >
-                          <SupplyStockIndicator tone={tone} />
-                          <span className="font-medium truncate min-w-0 flex-1">{s.name}</span>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span className="text-muted-foreground tabular-nums text-right text-xs sm:text-sm">
-                              {formatCarerSupplyQuantity(s, patientSupplyPackPrefs)}
-                            </span>
-                            {tone === "critical" && (
-                              <Badge variant="destructive" className="text-xs">
-                                Out
-                              </Badge>
+          {(scopes.supplies ?? false) && (() => {
+            const SuppliesShell = suppliesNeedAttention ? CarerUrgentCard : CarerMutedCard;
+            return (
+              <SuppliesShell
+                testId="carer-view-supplies"
+                {...(suppliesNeedAttention ? { accent: "amber" as const } : {})}
+              >
+                <CardHeader className={carerCardHeaderClass}>
+                  <CardTitle className={carerCardTitleClass}>
+                    <Package className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+                    <span className="min-w-0 flex-1">{displayName}&apos;s supplies</span>
+                    <InlineInfoHint
+                      ariaLabel="About supplies"
+                      content={<p>Cloud stock they have chosen to share with you.</p>}
+                      className="-mr-2 shrink-0"
+                    />
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className={carerCardContentClass}>
+                  {supplies.length === 0 ? (
+                    <CarerCardEmpty
+                      compact
+                      icon={Package}
+                      title="No supplies shared yet"
+                      description="They can enable supply sharing in their supporter link settings."
+                    />
+                  ) : (
+                    <ul className="space-y-2 m-0 list-none p-0">
+                      {sortedSupplies.map((s) => {
+                        const tone = supplyTone(s);
+                        return (
+                          <li
+                            key={s.id}
+                            className={cn(
+                              "flex items-center gap-2.5 rounded-lg border px-2.5 py-2 text-sm",
+                              tone === "critical" && "border-destructive/35 bg-destructive/[0.04]",
+                              tone === "low" && "border-amber-500/30 bg-amber-500/[0.04]",
+                              tone === "ok" && "border-border/60 bg-background/40",
                             )}
-                            {tone === "low" && (
-                              <Badge
-                                variant="secondary"
-                                className="text-xs bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-100"
-                              >
-                                Low
-                              </Badge>
-                            )}
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </CardContent>
-            </CarerUrgentCard>
-          )}
+                          >
+                            <SupplyStockIndicator tone={tone} />
+                            <span className="font-medium truncate min-w-0 flex-1">{s.name}</span>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-muted-foreground tabular-nums text-right text-xs sm:text-sm">
+                                {formatCarerSupplyQuantity(s, patientSupplyPackPrefs)}
+                              </span>
+                              {tone === "critical" && (
+                                <Badge variant="destructive" className="text-xs">
+                                  Out
+                                </Badge>
+                              )}
+                              {tone === "low" && (
+                                <Badge
+                                  variant="secondary"
+                                  className="text-xs bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-100"
+                                >
+                                  Low
+                                </Badge>
+                              )}
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </CardContent>
+              </SuppliesShell>
+            );
+          })()}
 
           {(scopes.scenarios ?? false) && (
             <CarerMutedCard id="carer-scenarios" testId="carer-view-scenarios">
@@ -2217,6 +2232,10 @@ export default function CarerViewPage() {
             </Card>
           )}
         </div>
+
+      {activeLink?.patientId ? (
+        <CarerClinicalPrefsCard patientId={activeLink.patientId} enabled={scopes.clinical_settings ?? false} />
+      ) : null}
 
       <SupporterPageFooter />
       </PageShell>

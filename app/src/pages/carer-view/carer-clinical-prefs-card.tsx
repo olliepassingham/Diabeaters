@@ -97,7 +97,7 @@ export function CarerClinicalPrefsCard({
     <Card
       id="carer-clinical-settings"
       variant="glass-strong"
-      className={cn(carerCardShellClass, "scroll-mt-24")}
+      className={cn(carerCardShellClass, "scroll-mt-24 bg-muted/20 dark:bg-muted/10")}
       data-testid="carer-clinical-prefs"
     >
       <CardHeader className={carerCardHeaderClass}>

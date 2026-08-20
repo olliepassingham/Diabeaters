@@ -19,7 +19,8 @@ export function SupporterHypoCheckInButton({
   patientId: string;
   patientName: string;
   className?: string;
-  prominence?: "primary" | "outline";
+  /** primary = brand CTA; urgent = rose (e.g. live low); outline = secondary */
+  prominence?: "primary" | "outline" | "urgent";
 }) {
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
@@ -61,14 +62,19 @@ export function SupporterHypoCheckInButton({
     void refresh();
   };
 
+  const variant = hasPending ? "outline" : prominence === "outline" ? "outline" : "default";
+
   return (
     <Button
       type="button"
-      variant={prominence === "primary" ? "default" : "outline"}
+      variant={variant}
       className={cn(
         "min-h-10 w-full rounded-xl text-sm font-semibold shadow-none",
-        prominence === "primary" &&
+        !hasPending &&
+          prominence === "urgent" &&
           "border-rose-600/20 bg-rose-600 text-white hover:bg-rose-600/90 dark:border-rose-500/30 dark:bg-rose-700 dark:hover:bg-rose-700/90",
+        hasPending &&
+          "border-border/60 bg-muted/40 text-muted-foreground hover:bg-muted/40 hover:text-muted-foreground",
         className,
       )}
       disabled={busy || hasPending}

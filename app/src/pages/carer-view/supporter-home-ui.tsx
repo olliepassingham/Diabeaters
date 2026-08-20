@@ -1,5 +1,17 @@
 import { Link, useLocation } from "wouter";
-import { Check, History, MessageCircle, Phone, Plane, Sparkles, Thermometer, User as UserIcon } from "lucide-react";
+import {
+  AlertTriangle,
+  Check,
+  CheckCircle2,
+  History,
+  Info,
+  MessageCircle,
+  Phone,
+  Plane,
+  Sparkles,
+  Thermometer,
+  User as UserIcon,
+} from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useResolvedProfileImageUrl } from "@/hooks/use-resolved-profile-image-url";
@@ -12,7 +24,6 @@ import {
   HomeCardEmpty,
   HomeHypoTimelineItem,
   HomeMutedCard,
-  HomePrimaryStatusPill,
   HomeSectionHeading,
   HomeTrustFooter,
   HomeUrgentCard,
@@ -142,6 +153,46 @@ function PersonSwitcherChip({
   );
 }
 
+function SupporterStatusBanner({
+  type,
+  message,
+}: {
+  type: CarerGlanceType;
+  message: string;
+}) {
+  const StatusIcon = type === "warning" ? AlertTriangle : type === "info" ? Info : CheckCircle2;
+  return (
+    <div
+      className={cn(
+        "flex items-start gap-3 rounded-2xl border px-3.5 py-3",
+        type === "warning" &&
+          "border-amber-500/30 bg-amber-500/[0.08] dark:border-amber-500/25 dark:bg-amber-950/25",
+        type === "info" &&
+          "border-sky-500/25 bg-sky-500/[0.06] dark:border-sky-500/20 dark:bg-sky-950/20",
+        type === "ok" &&
+          "border-emerald-500/25 bg-emerald-500/[0.07] dark:border-emerald-500/20 dark:bg-emerald-950/20",
+      )}
+      data-testid="carer-primary-status"
+      role="status"
+    >
+      <span
+        className={cn(
+          "mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
+          type === "warning" && "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+          type === "info" && "bg-sky-500/15 text-sky-700 dark:text-sky-300",
+          type === "ok" && "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+        )}
+        aria-hidden
+      >
+        <StatusIcon className="h-5 w-5" />
+      </span>
+      <p className="min-w-0 flex-1 pt-1.5 text-sm font-semibold leading-snug tracking-tight text-foreground text-balance">
+        {message}
+      </p>
+    </div>
+  );
+}
+
 export function SupporterHero({
   displayName,
   avatarUrl,
@@ -164,17 +215,21 @@ export function SupporterHero({
   onPatientChange: (patientId: string) => void;
 }) {
   const multiPerson = linkedPeople.length > 1;
+  const calm = glance.type === "ok";
 
   return (
     <Card
       variant="glass-strong"
       className={cn(
         carerCardShellClass,
-        "dashboard-card-hover animate-soft-in overflow-hidden rounded-[1.35rem] bg-gradient-to-br from-primary/[0.05] via-transparent to-transparent",
+        "dashboard-card-hover animate-soft-in overflow-hidden rounded-[1.35rem]",
+        calm
+          ? "bg-gradient-to-br from-emerald-500/[0.06] via-primary/[0.03] to-transparent"
+          : "bg-gradient-to-br from-primary/[0.06] via-transparent to-transparent",
       )}
       data-testid="carer-view-header"
     >
-      <CardContent className="flex flex-col gap-3 p-3.5 sm:gap-4 sm:p-5">
+      <CardContent className="flex flex-col gap-3.5 p-3.5 sm:gap-4 sm:p-5">
         <div className="flex items-start gap-3">
           <div
             className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-primary/10 ring-2 ring-background shadow-sm sm:h-14 sm:w-14"
@@ -201,9 +256,12 @@ export function SupporterHero({
             <a
               href="#carer-emergency"
               className={cn(
-                "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-destructive/25 bg-destructive/[0.06] text-destructive",
-                "hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                "sm:h-9 sm:w-auto sm:gap-1.5 sm:rounded-full sm:px-2.5 sm:text-xs sm:font-semibold sm:text-foreground",
+                "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border",
+                "hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "sm:h-9 sm:w-auto sm:gap-1.5 sm:rounded-full sm:px-2.5 sm:text-xs sm:font-semibold",
+                calm
+                  ? "border-border/60 bg-background/70 text-muted-foreground sm:text-foreground"
+                  : "border-destructive/25 bg-destructive/[0.06] text-destructive hover:bg-destructive/10 sm:text-foreground",
               )}
               aria-label="Jump to emergency details"
               onClick={(e) => {
@@ -241,7 +299,7 @@ export function SupporterHero({
           </div>
         ) : null}
 
-        <HomePrimaryStatusPill type={glance.type} message={glance.message} testId="carer-primary-status" />
+        <SupporterStatusBanner type={glance.type} message={glance.message} />
 
         {(showSickChip || showTravelChip) && (
           <div className="flex flex-wrap items-center gap-1.5" data-testid="wrap-carer-active-chips">

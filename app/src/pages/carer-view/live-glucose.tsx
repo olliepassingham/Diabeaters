@@ -152,7 +152,7 @@ export default function CarerLiveGlucosePage() {
               <SupporterHypoCheckInButton
                 patientId={patientId}
                 patientName={patientName ?? "them"}
-                prominence="primary"
+                prominence={isLow ? "urgent" : "primary"}
               />
             ) : null}
 
