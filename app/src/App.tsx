@@ -482,14 +482,22 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) {
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
+        <div className="animate-pulse text-muted-foreground">Taking you to sign in…</div>
+      </div>
+    );
   }
 
   if (!isUserVerified(user)) {
     if (pathOnly === "/account") {
       return <>{children}</>;
     }
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
+        <div className="animate-pulse text-muted-foreground">Redirecting…</div>
+      </div>
+    );
   }
 
   return <>{children}</>;
@@ -1544,23 +1552,19 @@ function AuthenticatedShell() {
 }
 
 /**
- * Top-level shell (auth, public pages). The catch-all branches by auth state:
- * signed-in users land in the protected app shell; signed-out users see the
- * public `NotFound` page directly rather than being silently redirected to
- * `/login`. Legitimate authenticated routes (`/`, `/dashboard`, `/tools`, …)
- * still resolve through `InnerRouter` once the protected layout mounts.
+ * Top-level shell (auth, public pages). The catch-all mounts the protected app
+ * shell once auth has settled. Signed-out users are redirected to `/login` by
+ * `ProtectedLayout` (with a calm loading state) — never a flashing 404 while
+ * Android/session storage is still hydrating.
  */
 function RootCatchAll() {
-  const { user, loading } = useAuth();
+  const { loading } = useAuth();
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
         <div className="animate-pulse text-muted-foreground">Checking session…</div>
       </div>
     );
-  }
-  if (!user) {
-    return <NotFound />;
   }
   return (
     <ProtectedLayout>

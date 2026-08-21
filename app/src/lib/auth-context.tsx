@@ -93,7 +93,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(session);
         setActiveUserIdForLocalStorage(uid);
         setSentryUserId(uid);
-        setLoading(false);
+        // If storage already has a session, unblock the shell. If not, keep
+        // loading until INITIAL_SESSION — on Android, getSession can briefly
+        // return null before the auth client finishes hydrating.
+        if (session) {
+          setLoading(false);
+        }
       } catch {
         if (!isMounted) return;
         try {
@@ -105,17 +110,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setSession(session);
           setActiveUserIdForLocalStorage(uid);
           setSentryUserId(uid);
+          if (session) {
+            setLoading(false);
+          }
         } catch {
           setUser(null);
           setSession(null);
           setActiveUserIdForLocalStorage(null);
           setSentryUserId(null);
+          setLoading(false);
         }
-        setLoading(false);
       }
     })();
 
     if (initialE2EUser) return;
+
+    const safetyTimer = window.setTimeout(() => {
+      if (isMounted) setLoading(false);
+    }, 2500);
 
     const { data } = onAuthStateChange((event, nextSession) => {
       if (!isMounted) return;
@@ -123,6 +135,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         clearCarerClientSessionKeys();
       }
       syncAuthSession(nextSession ?? null);
+      if (event === "INITIAL_SESSION") {
+        setLoading(false);
+      }
       if (
         nextSession?.user?.id &&
         (event === "INITIAL_SESSION" || event === "SIGNED_IN" || event === "USER_UPDATED")
@@ -143,6 +158,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       isMounted = false;
+      window.clearTimeout(safetyTimer);
       data?.unsubscribe();
     };
   }, [initialE2EUser, syncAuthSession]);
