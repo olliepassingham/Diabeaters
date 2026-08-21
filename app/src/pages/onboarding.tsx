@@ -51,11 +51,14 @@ import {
 import {
   clearOnboardingAccountPath,
   clearPersistedCommunityAccount,
+  clearPersistedSupporterAccount,
   getOnboardingAccountPath,
+  isPersistedSupporterAccount,
   setActiveAppMode,
   setOnboardingAccountPath,
   setPrimaryAppRole,
 } from "@/lib/carer-session";
+import { resolveAccountPathAfterPatientUpgrade } from "@/lib/patient-upgrade-onboarding";
 import { getCommunityMemberOnboardingCompletePath } from "@/lib/community-landing";
 import { markCommunityPushPromptPending } from "@/lib/community-push-prompt";
 import {
@@ -577,16 +580,26 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     localStorage.setItem("diabeater_onboarding_completed", "true");
     recordOnboardingFinishedAt();
     markBedtimeReminderPromptPending();
+    const previousAccountPath = getOnboardingAccountPath();
+    const hadSupporterMarkers =
+      previousAccountPath === "supporter" ||
+      previousAccountPath === "both" ||
+      isPersistedSupporterAccount();
     setPrimaryAppRole("patient");
-    const onboardingPath = getOnboardingAccountPath();
-    if (onboardingPath !== "both") {
-      setOnboardingAccountPath(onboardingPath === "supporter" ? "both" : onboardingPath ?? "patient");
+    if (previousAccountPath !== "both") {
+      setOnboardingAccountPath(previousAccountPath === "supporter" ? "both" : previousAccountPath ?? "patient");
     }
     if (upgradeFlow) {
       setActiveAppMode("patient");
       clearPersistedCommunityAccount();
+      clearPersistedSupporterAccount();
       clearOnboardingAccountPath();
-      setOnboardingAccountPath("patient");
+      setOnboardingAccountPath(
+        resolveAccountPathAfterPatientUpgrade({
+          previousPath: previousAccountPath,
+          hadSupporterMarkers,
+        }),
+      );
     }
     if (user?.id) {
       const fullName = data.name.trim() ? data.name.trim() : null;
@@ -631,13 +644,16 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
         void syncRegionToCloud(user.id);
       }
     }
+    const dualRoleUpgrade = upgradeFlow && hadSupporterMarkers;
     toast({
       title: upgradeFlow
         ? "Clinical tools unlocked"
         : `Welcome to Diabeaters${data.name ? `, ${data.name}` : ""}!`,
-      description: upgradeFlow
-        ? "Supplies, meal planning, situation guides, and the rest of the app are ready when you are."
-        : "Let's get started.",
+      description: dualRoleUpgrade
+        ? "User Mode is ready — switch back to Supporter Mode anytime from Account or your supporter home."
+        : upgradeFlow
+          ? "Supplies, meal planning, situation guides, and the rest of the app are ready when you are."
+          : "Let's get started.",
     });
     if (onComplete) {
       onComplete(pathOverride);

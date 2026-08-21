@@ -24,7 +24,9 @@ describe("supplies status + days remaining", () => {
     const reread = storage.getSupplies().find((s) => s.id === supply.id)!;
     const info = storage.getActiveItemInfo(reread);
     expect(info).not.toBeNull();
-    const expected = (info?.daysLeft || 0) + Math.floor(storage.getAdjustedQuantity(reread) * 10);
+    // Active remaining + spare sensors (qty includes the one in use).
+    const expected =
+      (info?.daysLeft || 0) + Math.floor(Math.max(0, storage.getAdjustedQuantity(reread) - 1) * 10);
     expect(storage.getDaysRemaining(reread)).toBe(expected);
   });
 

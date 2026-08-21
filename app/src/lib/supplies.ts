@@ -472,9 +472,12 @@ export async function reconcileSupplies(): Promise<void> {
   const unmatchedCloud = cloudRows.filter((r) => !matchedCloudIds.has(r.id));
 
   for (const local of locals.filter((l) => !l.cloud_id)) {
-    const idx = unmatchedCloud.findIndex(
-      (c) => namesMatch(c.name, local.name) && (c.category || "") === (local.type || ""),
-    );
+    const idx = unmatchedCloud.findIndex((c) => {
+      if (!namesMatch(c.name, local.name)) return false;
+      // Match when category is missing/legacy, or equals local type.
+      if (!c.category) return true;
+      return (c.category || "") === (local.type || "");
+    });
     if (idx === -1) continue;
     const c = unmatchedCloud[idx];
     unmatchedCloud.splice(idx, 1);

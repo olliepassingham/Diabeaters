@@ -2911,7 +2911,11 @@ export const storage = {
           ? (settings.siteChangeDays || 3) 
           : (settings.reservoirChangeDays || 3);
       
-      const stockDays = Math.floor(adjustedQty * itemDuration);
+      // Quantity includes the active item; don't count it twice when one is in use.
+      const spareQty = supply.activeItemStartDate
+        ? Math.max(0, adjustedQty - 1)
+        : Math.max(0, adjustedQty);
+      const stockDays = Math.floor(spareQty * itemDuration);
       
       if (supply.activeItemStartDate) {
         const activeStart = new Date(supply.activeItemStartDate);
@@ -5153,6 +5157,8 @@ export const storage = {
   /**
    * Supply cloud reconciliation: import a cloud row as a new local supply.
    * Used by `app/src/lib/supplies.ts`.
+   * Merges onto an existing local row with the same name + type so orphaned
+   * cloud duplicates (e.g. starter seed re-synced) do not create local clones.
    */
   importSupplyFromCloudReconcile(row: {
     id: string;
@@ -5165,13 +5171,39 @@ export const storage = {
   }): Supply {
     const supplies = this.getSupplies();
     const type = (row.category as Supply["type"]) || "other";
+    const qty = Math.max(0, Math.round(Number(row.quantity)));
+    const nameKey = row.name.toLowerCase().trim();
+    const existingIndex = supplies.findIndex(
+      (s) => s.name.toLowerCase().trim() === nameKey && s.type === type,
+    );
+
+    if (existingIndex !== -1) {
+      const existing = supplies[existingIndex];
+      // Already linked to a different cloud row — keep local, skip clone.
+      if (existing.cloud_id && existing.cloud_id !== row.id) {
+        return existing;
+      }
+      supplies[existingIndex] = {
+        ...existing,
+        name: row.name,
+        type,
+        currentQuantity: qty,
+        quantityAtPickup: qty,
+        notes: row.notes ?? existing.notes,
+        cloud_id: row.id,
+        updated_at: row.updated_at,
+      };
+      localStorage.setItem(STORAGE_KEYS.SUPPLIES, JSON.stringify(supplies));
+      return supplies[existingIndex];
+    }
+
     const newSupply: Supply = {
       id: generateId(),
       name: row.name,
       type,
-      currentQuantity: Math.max(0, Math.round(Number(row.quantity))),
+      currentQuantity: qty,
       dailyUsage: 0,
-      quantityAtPickup: Math.max(0, Math.round(Number(row.quantity))),
+      quantityAtPickup: qty,
       lastPickupDate: new Date().toISOString(),
       notes: row.notes ?? undefined,
       cloud_id: row.id,
@@ -5180,6 +5212,42 @@ export const storage = {
     supplies.push(newSupply);
     localStorage.setItem(STORAGE_KEYS.SUPPLIES, JSON.stringify(supplies));
     return newSupply;
+  },
+
+  /**
+   * Collapse local rows that share the same name + type (keeps one).
+   * Prefers a row with cloud_id, then higher stock. Returns removed ids.
+   */
+  dedupeSuppliesByNameAndType(): string[] {
+    const supplies = this.getSupplies();
+    const keepByKey = new Map<string, Supply>();
+    const removed: string[] = [];
+
+    const score = (s: Supply): number => {
+      const stock = Math.max(0, Math.round(Number(s.currentQuantity) || 0));
+      return (s.cloud_id ? 1_000_000 : 0) + stock;
+    };
+
+    for (const s of supplies) {
+      const key = `${s.name.toLowerCase().trim()}::${s.type}`;
+      const prev = keepByKey.get(key);
+      if (!prev) {
+        keepByKey.set(key, s);
+        continue;
+      }
+      if (score(s) > score(prev)) {
+        removed.push(prev.id);
+        keepByKey.set(key, s);
+      } else {
+        removed.push(s.id);
+      }
+    }
+
+    if (removed.length === 0) return [];
+    const keepIds = new Set([...keepByKey.values()].map((s) => s.id));
+    const next = supplies.filter((s) => keepIds.has(s.id));
+    localStorage.setItem(STORAGE_KEYS.SUPPLIES, JSON.stringify(next));
+    return removed;
   },
 
   getCarerMode(): boolean {

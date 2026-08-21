@@ -1,23 +1,28 @@
 import { isPenDeliveryMethod, isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { seedPumpSuppliesIfNeeded, type PumpSupplySeedOptions } from "@/lib/pump-supplies";
 import { ensureStarterCgmIfNeeded, seedMdiSuppliesIfNeeded } from "@/lib/starter-supplies";
+import { seedStarterExerciseRoutineIfNeeded } from "@/lib/starter-exercise-routine";
 import { seedDefaultTargetBgRangeIfNeeded } from "@/lib/starter-target-range";
 import { isCommunityAccountProfile, storage } from "@/lib/storage";
 
 /**
  * First-run (and empty-account) defaults for patient mode:
- * typical target range + delivery-method starter supplies.
+ * typical target range + delivery-method starter supplies + example quick exercise.
  */
 export function seedPatientFirstRunDefaultsIfNeeded(opts: PumpSupplySeedOptions = {}): {
   targetSeeded: boolean;
   suppliesSeeded: boolean;
   supplyCount: number;
+  exerciseSeeded: boolean;
 } {
-  const empty = { targetSeeded: false, suppliesSeeded: false, supplyCount: 0 };
+  const empty = { targetSeeded: false, suppliesSeeded: false, supplyCount: 0, exerciseSeeded: false };
   const profile = storage.getProfile();
   if (!profile || isCommunityAccountProfile(profile) || profile.usingInsulin === false) {
     return empty;
   }
+
+  // Collapse clones from cloud reconcile / repeated starter seeds.
+  storage.dedupeSuppliesByNameAndType();
 
   const target = seedDefaultTargetBgRangeIfNeeded();
 
@@ -40,9 +45,12 @@ export function seedPatientFirstRunDefaultsIfNeeded(opts: PumpSupplySeedOptions 
     supplyCount += 1;
   }
 
+  const exercise = seedStarterExerciseRoutineIfNeeded();
+
   return {
     targetSeeded: target.seeded,
     suppliesSeeded,
     supplyCount,
+    exerciseSeeded: exercise.seeded,
   };
 }

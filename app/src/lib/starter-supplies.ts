@@ -43,18 +43,20 @@ function markMdiSuppliesSeeded(): void {
 
 /**
  * Add default MDI supply rows once (CGM, needles, short + long insulin).
- * Safe to call multiple times — no-ops when already seeded or any supplies exist.
+ * Safe to call multiple times — no-ops when MDI core rows already exist.
+ * Ignores a stale seeded flag when those rows are missing (e.g. CGM-only accounts).
  */
 export function seedMdiSuppliesIfNeeded(): { seeded: boolean; count: number } {
-  if (!shouldSeedMdiSupplies()) return { seeded: false, count: 0 };
-
   const profile = storage.getProfile();
   if (!isPenDeliveryMethod(profile?.insulinDeliveryMethod)) {
     return { seeded: false, count: 0 };
   }
 
   const existing = storage.getSupplies();
-  if (existing.length > 0) {
+  const hasMdiCore = existing.some(
+    (s) => s.type === "needle" || s.type === "insulin_short" || s.type === "insulin_long",
+  );
+  if (hasMdiCore) {
     markMdiSuppliesSeeded();
     if (existing.some((s) => s.type === "cgm")) markStarterCgmSeeded();
     return { seeded: false, count: 0 };
@@ -62,9 +64,10 @@ export function seedMdiSuppliesIfNeeded(): { seeded: boolean; count: number } {
 
   const started = todayNoonIso();
   const insulinUnits = unitsForStarterPens(STARTER_MDI_PEN_COUNT);
+  const hasCgm = existing.some((s) => s.type === "cgm");
 
   const rows: Omit<Supply, "id">[] = [
-    starterCgmSupplyRow(),
+    ...(hasCgm ? [] : [starterCgmSupplyRow()]),
     {
       name: "Pen Needles",
       type: "needle",

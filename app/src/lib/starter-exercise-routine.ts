@@ -5,6 +5,9 @@ export const STARTER_EXERCISE_ROUTINE_ID = "starter-example-moderate-run";
 
 export const STARTER_EXERCISE_SEEDED_KEY = "diabeaters_starter_exercise_seeded_v1";
 
+/** Set when the user deletes the starter — do not bring it back. */
+export const STARTER_EXERCISE_DISMISSED_KEY = "diabeaters_starter_exercise_dismissed_v1";
+
 export const STARTER_EXERCISE_ROUTINE = {
   id: STARTER_EXERCISE_ROUTINE_ID,
   name: "5km Run",
@@ -28,6 +31,14 @@ export function hasStarterExerciseBeenSeeded(): boolean {
   }
 }
 
+export function hasStarterExerciseBeenDismissed(): boolean {
+  try {
+    return localStorage.getItem(STARTER_EXERCISE_DISMISSED_KEY) === "1";
+  } catch {
+    return true;
+  }
+}
+
 function markStarterExerciseSeeded(): void {
   try {
     localStorage.setItem(STARTER_EXERCISE_SEEDED_KEY, "1");
@@ -36,33 +47,42 @@ function markStarterExerciseSeeded(): void {
   }
 }
 
+/** Call when the user deletes the starter example so it does not reappear. */
+export function markStarterExerciseDismissed(): void {
+  try {
+    localStorage.setItem(STARTER_EXERCISE_DISMISSED_KEY, "1");
+    localStorage.setItem(STARTER_EXERCISE_SEEDED_KEY, "1");
+  } catch {
+    // ignore
+  }
+}
+
 /**
  * Add one labeled example workout when the user has no exercise routines yet.
- * Marks a local flag so deleting the example does not bring it back.
- * Also renames an existing starter if the canonical title changed.
+ * Re-seeds empty accounts even if an older device-wide "seeded" flag was set
+ * (e.g. after unlocking User Mode). Does not return after an intentional delete.
  */
 export function seedStarterExerciseRoutineIfNeeded(): {
   seeded: boolean;
   routine: ExerciseRoutine | null;
 } {
   const existingStarter = storage.getExerciseRoutine(STARTER_EXERCISE_ROUTINE_ID);
-  if (existingStarter && existingStarter.name !== STARTER_EXERCISE_ROUTINE.name) {
-    storage.updateExerciseRoutine(STARTER_EXERCISE_ROUTINE_ID, {
-      name: STARTER_EXERCISE_ROUTINE.name,
-    });
+  if (existingStarter) {
+    if (existingStarter.name !== STARTER_EXERCISE_ROUTINE.name) {
+      storage.updateExerciseRoutine(STARTER_EXERCISE_ROUTINE_ID, {
+        name: STARTER_EXERCISE_ROUTINE.name,
+      });
+    }
+    markStarterExerciseSeeded();
+    return { seeded: false, routine: null };
   }
 
-  if (hasStarterExerciseBeenSeeded()) {
+  if (hasStarterExerciseBeenDismissed()) {
     return { seeded: false, routine: null };
   }
 
   const existing = storage.getExerciseRoutines();
   if (existing.length > 0) {
-    markStarterExerciseSeeded();
-    return { seeded: false, routine: null };
-  }
-
-  if (storage.getExerciseRoutine(STARTER_EXERCISE_ROUTINE_ID)) {
     markStarterExerciseSeeded();
     return { seeded: false, routine: null };
   }

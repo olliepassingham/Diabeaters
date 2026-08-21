@@ -75,6 +75,7 @@ import {
 import { getSupabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSupporterSession } from "@/hooks/use-supporter-session";
+import { getOnboardingAccountPath } from "@/lib/carer-session";
 import { SettingsAppearanceRoute } from "./appearance";
 import { SettingsUsageRoute } from "./usage";
 import { SettingsNotificationsRoute } from "./notifications";
@@ -994,6 +995,13 @@ export default function Settings() {
   const { profile: cloudProfile } = useProfile();
   const [location, setLocation] = useLocation();
   const { hasCarerLink, inSupporterSession } = useSupporterSession();
+  // Show in Supporter Mode unless this account is already dual-role (User path markers).
+  // Avoid isSupporterOnlyAccount() — stale cloud/local patient markers hide the CTA.
+  const supporterAccountPath = getOnboardingAccountPath();
+  const showSupporterPatientUpgrade =
+    inSupporterSession &&
+    supporterAccountPath !== "both" &&
+    supporterAccountPath !== "patient";
   const showBedtimeCheckReminders = shouldReceiveBedtimeCheckReminders({
     hasCarerLink,
     cloudCommunityProfile: cloudProfile?.account_type === "community",
@@ -1046,6 +1054,7 @@ export default function Settings() {
   
   const isCommunityAccount = profile?.accountType === "community";
   const hidePatientClinicalHub = inSupporterSession || isCommunityAccount;
+  const showAccountTypeGroup = isCommunityAccount || showSupporterPatientUpgrade;
 
   const [notifSettings, setNotifSettings] = useState<NotificationSettings>({
     enabled: true,
@@ -1288,7 +1297,11 @@ export default function Settings() {
     };
   }, [location, pathOnly]);
 
-  const handleSaveProfile = async (opts?: { quietSuccess?: boolean }): Promise<{
+  const handleSaveProfile = async (opts?: {
+    quietSuccess?: boolean;
+    /** When false, skip hypo weight gate (usage page saves CGM days etc.). Default true. */
+    requireWeightForHypo?: boolean;
+  }): Promise<{
     ok: boolean;
     dateOfBirthCloudSkipped?: boolean;
     insulinDeliveryMethodCloudSkipped?: boolean;
@@ -1307,7 +1320,11 @@ export default function Settings() {
     }
     const normalizedDob = normalizeDateOfBirthInput(base.dateOfBirth?.trim() || null);
     const parsedKg = parseWeightInputToKg(bodyWeightInput, weightDisplayUnit);
-    if (profileWeightRequiredForHypo(normalizedDob) && parsedKg == null) {
+    if (
+      opts?.requireWeightForHypo !== false &&
+      profileWeightRequiredForHypo(normalizedDob) &&
+      parsedKg == null
+    ) {
       toast({
         title: "Weight required",
         description: "Add body weight for hypo treatment estimates (required for under-18s and when date of birth is not set).",
@@ -1605,7 +1622,7 @@ export default function Settings() {
   };
 
   const handleSaveUsagePage = async () => {
-    const save = await handleSaveProfile({ quietSuccess: true });
+    const save = await handleSaveProfile({ quietSuccess: true, requireWeightForHypo: false });
     if (!save.ok) return;
     const tddReconciled = handleSaveUsage({ quietSuccess: true });
     let tddCloudSkipped = save.tddCloudSkipped;
@@ -2095,22 +2112,28 @@ export default function Settings() {
           </SettingsHubGroup>
         )}
 
-        {isCommunityAccount && (
+        {showAccountTypeGroup ? (
           <SettingsHubGroup title="Account type">
-            <SettingsHubNavLink
-              href="/carer-setup"
-              label="Become a supporter"
-              description="Enter their invite code for Supporter Mode — read-only views and alerts"
-              icon={HeartHandshake}
-            />
+            {isCommunityAccount ? (
+              <SettingsHubNavLink
+                href="/carer-setup"
+                label="Become a supporter"
+                description="Enter their invite code for Supporter Mode — read-only views and alerts"
+                icon={HeartHandshake}
+              />
+            ) : null}
             <SettingsHubNavLink
               href="/onboarding?upgrade=1"
               label="I have Type 1 diabetes / use insulin"
-              description="Unlock supplies, meal planner, ratios, situation guides, and the full dashboard"
+              description={
+                showSupporterPatientUpgrade
+                  ? "Add User Mode — keep supporting them too"
+                  : "Unlock supplies, meal planner, ratios, and situation guides"
+              }
               icon={Sparkles}
             />
           </SettingsHubGroup>
-        )}
+        ) : null}
 
         {!inSupporterSession && (
           <SettingsHubGroup title="Health data">

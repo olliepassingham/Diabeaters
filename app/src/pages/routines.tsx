@@ -19,7 +19,7 @@ import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { hasInAppNavHistory } from "@/lib/nav-back";
-import { isStarterExerciseRoutine, seedStarterExerciseRoutineIfNeeded } from "@/lib/starter-exercise-routine";
+import { isStarterExerciseRoutine, markStarterExerciseDismissed, seedStarterExerciseRoutineIfNeeded } from "@/lib/starter-exercise-routine";
 
 const MEAL_LOG_HINT_DISMISS_KEY = "diabeaters_routines_meal_log_hint_dismissed_v1";
 const EXERCISE_LOG_HINT_DISMISS_KEY = "diabeaters_routines_exercise_log_hint_dismissed_v1";
@@ -272,6 +272,7 @@ export function RoutinesContent() {
   };
 
   const handleExerciseDelete = (id: string) => {
+    if (isStarterExerciseRoutine({ id })) markStarterExerciseDismissed();
     storage.deleteExerciseRoutine(id);
     setExerciseRoutines(storage.getExerciseRoutines());
   };

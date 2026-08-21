@@ -64,13 +64,27 @@ describe("seedMdiSuppliesIfNeeded", () => {
 
   it("does not seed twice", () => {
     seedMdiSuppliesIfNeeded();
+    storageMock.getSupplies.mockReturnValue([
+      { id: "1", type: "needle", name: "Pen Needles" },
+      { id: "2", type: "insulin_short", name: "Short" },
+      { id: "3", type: "insulin_long", name: "Long" },
+    ]);
     const r2 = seedMdiSuppliesIfNeeded();
     expect(r2.seeded).toBe(false);
     expect(storageMock.addSupply).toHaveBeenCalledTimes(4);
   });
 
-  it("skips when supplies already exist", () => {
-    storageMock.getSupplies.mockReturnValue([{ id: "1", type: "other", name: "Wipes" }]);
+  it("still seeds MDI core when only a CGM starter row exists", () => {
+    storageMock.getSupplies.mockReturnValue([{ id: "cgm", type: "cgm", name: "CGM Sensors" }]);
+    const r = seedMdiSuppliesIfNeeded();
+    expect(r.seeded).toBe(true);
+    expect(r.count).toBe(3);
+    expect(storageMock.addSupply).toHaveBeenCalledTimes(3);
+    expect(storageMock.addSupply).not.toHaveBeenCalledWith(expect.objectContaining({ type: "cgm" }));
+  });
+
+  it("skips when MDI core supplies already exist", () => {
+    storageMock.getSupplies.mockReturnValue([{ id: "1", type: "needle", name: "Pen Needles" }]);
     const r = seedMdiSuppliesIfNeeded();
     expect(r.seeded).toBe(false);
     expect(storageMock.addSupply).not.toHaveBeenCalled();

@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  STARTER_EXERCISE_DISMISSED_KEY,
   STARTER_EXERCISE_ROUTINE_ID,
   STARTER_EXERCISE_SEEDED_KEY,
   hasStarterExerciseBeenSeeded,
   isStarterExerciseRoutine,
+  markStarterExerciseDismissed,
   seedStarterExerciseRoutineIfNeeded,
 } from "./starter-exercise-routine";
 
@@ -57,20 +59,31 @@ describe("starter-exercise-routine", () => {
     expect(hasStarterExerciseBeenSeeded()).toBe(true);
   });
 
-  it("does not seed twice", () => {
+  it("does not seed twice while the starter still exists", () => {
     seedStarterExerciseRoutineIfNeeded();
+    storageMock.getExerciseRoutine.mockReturnValue({ id: STARTER_EXERCISE_ROUTINE_ID, name: "5km Run" });
+    storageMock.getExerciseRoutines.mockReturnValue([{ id: STARTER_EXERCISE_ROUTINE_ID, name: "5km Run" }]);
     const r2 = seedStarterExerciseRoutineIfNeeded();
     expect(r2.seeded).toBe(false);
     expect(storageMock.addExerciseRoutine).toHaveBeenCalledTimes(1);
   });
 
+  it("re-seeds an empty account even if an older seeded flag was left behind", () => {
+    localStorage.setItem(STARTER_EXERCISE_SEEDED_KEY, "1");
+    const r = seedStarterExerciseRoutineIfNeeded();
+    expect(r.seeded).toBe(true);
+    expect(storageMock.addExerciseRoutine).toHaveBeenCalledTimes(1);
+  });
+
   it("does not re-seed after the example was deleted", () => {
     seedStarterExerciseRoutineIfNeeded();
+    markStarterExerciseDismissed();
     storageMock.getExerciseRoutines.mockReturnValue([]);
     storageMock.getExerciseRoutine.mockReturnValue(null);
     const r2 = seedStarterExerciseRoutineIfNeeded();
     expect(r2.seeded).toBe(false);
     expect(storageMock.addExerciseRoutine).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem(STARTER_EXERCISE_DISMISSED_KEY)).toBe("1");
   });
 
   it("marks seeded without adding when other routines already exist", () => {

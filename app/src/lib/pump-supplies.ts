@@ -9,6 +9,13 @@ import { storage, type Supply } from "@/lib/storage";
 
 export const PUMP_SUPPLIES_SEEDED_KEY = "diabeaters_pump_supplies_seeded_v1";
 
+/** Example backup rows from older starter seeds — removed on normalize. */
+const EXAMPLE_BACKUP_SUPPLY_NAMES = [
+  "Backup Rapid-Acting Pen",
+  "Backup Long-Acting Pen",
+  "Backup Pen Needles",
+] as const;
+
 export type PumpSupplySeedOptions = {
   tdd?: number;
   siteChangeDays?: number;
@@ -20,6 +27,15 @@ function todayNoonIso(): string {
   const d = new Date();
   d.setHours(12, 0, 0, 0);
   return d.toISOString();
+}
+
+function resolveTdd(opts: PumpSupplySeedOptions): number {
+  return opts.tdd && opts.tdd > 0 ? opts.tdd : getEffectiveTdd(storage.getSettings()) ?? 40;
+}
+
+/** Example stock: one 1000u vial/cartridge so runway stays healthy (not critical). */
+function starterPumpInsulinUnits(): number {
+  return 1000;
 }
 
 function hasPumpSupplyTypes(): boolean {
@@ -45,12 +61,61 @@ function markPumpSuppliesSeeded(): void {
   }
 }
 
+function queueCloudDelete(local: Supply): void {
+  void import("@/lib/supplies").then((m) => void m.deleteFromCloud(local));
+}
+
+function queueCloudSync(localId: string): void {
+  void import("@/lib/supplies").then((m) => {
+    const local = storage.getSupplies().find((s) => s.id === localId);
+    if (local) void m.syncToCloud(local);
+  });
+}
+
 /**
- * Add default pump supply rows once (CGM, infusion sets, reservoirs, insulin, backup pens).
- * Safe to call multiple times — no-ops when already seeded or pump types exist.
+ * Clean up older example pump seeds: drop backup pens/needles and bump starter
+ * pump insulin stock so it isn't flagged critical.
+ */
+export function normalizeExamplePumpSupplies(opts: PumpSupplySeedOptions = {}): void {
+  const profile = storage.getProfile();
+  if (!isPumpDeliveryMethod(profile?.insulinDeliveryMethod)) return;
+
+  const backupNames = new Set(EXAMPLE_BACKUP_SUPPLY_NAMES.map((n) => n.toLowerCase()));
+  const tdd = resolveTdd(opts);
+  const healthyQty = starterPumpInsulinUnits();
+
+  for (const s of [...storage.getSupplies()]) {
+    if (backupNames.has(s.name.toLowerCase().trim())) {
+      storage.deleteSupply(s.id);
+      queueCloudDelete(s);
+      continue;
+    }
+
+    const isStarterPumpInsulin =
+      s.type === "insulin_vial" &&
+      (s.notes === STARTER_SUPPLY_NOTE || /^pump insulin/i.test(s.name.trim()));
+    if (!isStarterPumpInsulin) continue;
+    if (s.currentQuantity === healthyQty && s.dailyUsage === tdd) continue;
+
+    const updated = storage.updateSupply(s.id, {
+      currentQuantity: healthyQty,
+      quantityAtPickup: healthyQty,
+      dailyUsage: tdd,
+      lastPickupDate: todayNoonIso(),
+    });
+    if (updated) queueCloudSync(updated.id);
+  }
+}
+
+/**
+ * Add default pump supply rows once (CGM, infusion sets, reservoirs, insulin).
+ * Safe to call multiple times — no-ops when pump types already exist.
+ * Ignores a stale device-wide seeded flag when the account has no pump rows yet
+ * (e.g. after unlocking User Mode on a browser that had seeded before).
  */
 export function seedPumpSuppliesIfNeeded(opts: PumpSupplySeedOptions = {}): { seeded: boolean; count: number } {
-  if (!shouldSeedPumpSupplies()) return { seeded: false, count: 0 };
+  normalizeExamplePumpSupplies(opts);
+
   if (hasPumpSupplyTypes()) {
     markPumpSuppliesSeeded();
     if (storage.getSupplies().some((s) => s.type === "cgm")) markStarterCgmSeeded();
@@ -62,12 +127,15 @@ export function seedPumpSuppliesIfNeeded(opts: PumpSupplySeedOptions = {}): { se
     return { seeded: false, count: 0 };
   }
 
-  const tdd = opts.tdd && opts.tdd > 0 ? opts.tdd : getEffectiveTdd(storage.getSettings()) ?? 40;
+  const tdd = resolveTdd(opts);
   const started = todayNoonIso();
-  const backupNote = "Backup for pump failure — confirm doses with your diabetes team.";
+  const insulinUnits = starterPumpInsulinUnits();
+
+  const existing = storage.getSupplies();
+  const hasCgm = existing.some((s) => s.type === "cgm");
 
   const rows: Omit<Supply, "id">[] = [
-    starterCgmSupplyRow(),
+    ...(hasCgm ? [] : [starterCgmSupplyRow()]),
     {
       name: "Infusion Sets",
       type: "infusion_set",
@@ -87,39 +155,35 @@ export function seedPumpSuppliesIfNeeded(opts: PumpSupplySeedOptions = {}): { se
     {
       name: "Pump Insulin (vial/cartridge)",
       type: "insulin_vial",
-      currentQuantity: 3,
+      currentQuantity: insulinUnits,
       dailyUsage: tdd,
       lastPickupDate: started,
-      quantityAtPickup: 3,
+      quantityAtPickup: insulinUnits,
       notes: STARTER_SUPPLY_NOTE,
-    },
-    {
-      name: "Backup Rapid-Acting Pen",
-      type: "insulin_short",
-      currentQuantity: 100,
-      dailyUsage: 0,
-      notes: backupNote,
-    },
-    {
-      name: "Backup Long-Acting Pen",
-      type: "insulin_long",
-      currentQuantity: 100,
-      dailyUsage: 0,
-      notes: backupNote,
-    },
-    {
-      name: "Backup Pen Needles",
-      type: "needle",
-      currentQuantity: 30,
-      dailyUsage: 0,
-      notes: "For backup pens if your pump fails.",
     },
   ];
 
   let count = 0;
   for (const row of rows) {
+    const current = storage.getSupplies();
+    const nameTaken = current.some(
+      (s) => s.name.toLowerCase().trim() === row.name.toLowerCase().trim(),
+    );
+    const uniqueTypeTaken =
+      (row.type === "infusion_set" ||
+        row.type === "reservoir" ||
+        row.type === "insulin_vial" ||
+        row.type === "cgm") &&
+      current.some((s) => s.type === row.type);
+    if (nameTaken || uniqueTypeTaken) continue;
     storage.addSupply(row);
     count += 1;
+  }
+
+  if (count === 0) {
+    markPumpSuppliesSeeded();
+    if (storage.getSupplies().some((s) => s.type === "cgm")) markStarterCgmSeeded();
+    return { seeded: false, count: 0 };
   }
 
   const settingsPatch: Record<string, number> = {};

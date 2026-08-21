@@ -635,6 +635,7 @@ function isCarerAllowedPath(pathOnly: string): boolean {
   if (p === "/settings/about") return true;
   if (p === "/settings/feedback") return true;
   if (p === "/settings/emergency") return true;
+  if (p === "/onboarding") return true;
   if (p === "/privacy" || p === "/support") return true;
   if (isCommunityPath(p)) return true;
   return false;
