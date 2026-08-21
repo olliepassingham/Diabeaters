@@ -46,7 +46,6 @@ import {
   type CarbSourceScenario,
 } from "@/lib/carb-source-preferences";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
-import { pumpTipsCardTitle } from "@/lib/exercise-closed-loop";
 import {
   storage,
   DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT,
@@ -318,31 +317,28 @@ function KnownCarbsPlanHero({
 
 function ExerciseFuelPlanDetails({
   result,
-  bgUnits,
-  sessionLine,
   profile,
 }: {
   result: ExerciseFuelCalculatorResult;
-  bgUnits: string;
-  sessionLine: string;
   profile: Partial<UserProfile> | undefined;
 }) {
-  const settings = storage.getSettings();
   const onHandTreatment = formatCarbsForScenario(result.sessionFuel.carryGrams, profile, "exercise_on_hand");
   const duringTreatment =
     result.sessionFuel.duringTotalGrams > 0
       ? formatCarbsForScenario(result.sessionFuel.duringTotalGrams, profile, "exercise_during")
       : null;
   const showMealInDetails = result.mealCarbs > 0 && !result.userEnteredMealCarbs;
+  const whyNotes = result.notes.slice(0, 2);
+  const band = result.projection?.targetBand ?? result.targetBg;
 
   return (
     <div className="space-y-3">
-      {result.notes.length > 0 ? (
-        <PlanDetailSection title="Worth knowing">
+      {whyNotes.length > 0 ? (
+        <PlanDetailSection title="Why this plan">
           <ul className="space-y-1.5">
-            {result.notes.map((n, i) => (
+            {whyNotes.map((n, i) => (
               <li key={i} className="flex gap-2">
-                <span className="text-primary">-</span>
+                <span className="text-primary">·</span>
                 <span>{n}</span>
               </li>
             ))}
@@ -350,127 +346,38 @@ function ExerciseFuelPlanDetails({
         </PlanDetailSection>
       ) : null}
 
-      <PlanDetailSection title="Summary">
-        <p>{result.headline}</p>
-        <p className="mt-1 text-muted-foreground">{sessionLine}</p>
-        <p className="mt-1 text-muted-foreground">Target BG {result.targetBg} · educational only</p>
-      </PlanDetailSection>
-
-      {showMealInDetails || onHandTreatment || duringTreatment ? (
-        <PlanDetailSection title="In your usual treatment">
-          {showMealInDetails ? (
-            <p>
-              Before exercise: {result.mealCarbs}g
-              {result.mealCarbsIsSuggested ? " (suggested)" : ""}
-            </p>
-          ) : null}
-          {onHandTreatment ? (
-            <p className={showMealInDetails ? "mt-1" : undefined}>Carry with you: {onHandTreatment}</p>
-          ) : null}
-          {duringTreatment ? (
-            <p className={showMealInDetails || onHandTreatment ? "mt-1" : undefined}>During: {duringTreatment}</p>
-          ) : null}
-        </PlanDetailSection>
-      ) : null}
-
-      {result.insulin ? (
-        <PlanDetailSection title="Meal insulin estimate">
-          <p>
-            Usually ~{result.insulin.standardUnits}u for {result.insulin.carbsGrams}g {result.insulin.mealType},
-            reduced by {result.insulin.reductionPercent}% for this session → {result.insulin.adjustedUnits}u meal bolus
-            {result.insulin.correctionUnits > 0
-              ? ` + ${result.insulin.correctionUnits}u correction → ${result.insulin.totalUnits}u total`
-              : ` → ${result.insulin.totalUnits}u total`}
-            .
-          </p>
-          {result.projection?.projectedBgAtStart != null ? (
-            <p className="mt-1">
-              Projected BG at exercise start: ~{result.projection.projectedBgAtStart} {bgUnits} (target{" "}
-              {result.projection.targetBand}).
-            </p>
-          ) : null}
-        </PlanDetailSection>
-      ) : null}
-
-      {result.exerciseEffectNote ? (
-        <PlanDetailSection title="Exercise effect">
-          <p>{result.exerciseEffectNote}</p>
-        </PlanDetailSection>
-      ) : null}
-
-      {result.insulinSuppressedReason && !result.insulin ? (
-        <PlanDetailSection title="Why no meal insulin">
-          <p>{preExerciseInsulinSuppressedMessage(result.insulinSuppressedReason, bgUnits, settings)}</p>
-        </PlanDetailSection>
-      ) : null}
-
-      {result.insulinNoRatios && result.mealCarbs > 0 ? (
-        <PlanDetailSection title="Insulin estimate">
-          <p>
-            Add meal ratios in Settings for a dose in units. Many teams use about {result.bolusReductionBand} less meal
-            insulin before exercise.
-          </p>
-        </PlanDetailSection>
-      ) : null}
-
-      <PlanDetailSection title="How we calculated this">
+      <PlanDetailSection title="Numbers">
         <ul className="list-disc space-y-1 pl-4">
-          <li>
-            Session: {result.breakdown.intensityLabel} {result.breakdown.activityLabel} ·{" "}
-            {result.breakdown.durationMinutes} min
-          </li>
-          <li>Pre buffer (if you need fuel): ~{result.breakdown.preBufferGrams}g</li>
-          <li>During session (fast carbs ready): ~{result.breakdown.duringGrams}g</li>
-          <li>Carry with you: ~{result.sessionFuel.carryGrams}g</li>
-          {result.sessionFuel.doseGrams != null && result.sessionFuel.intervalMinutes != null ? (
+          {showMealInDetails ? (
             <li>
-              During interval: ~{result.sessionFuel.doseGrams}g every {result.sessionFuel.intervalMinutes} min
+              Pre-exercise carbs: ~{result.mealCarbs}g
+              {result.mealCarbsIsSuggested ? " (suggested)" : ""}
             </li>
           ) : null}
-          {result.breakdown.mealCarbsSource === "user" ? (
-            <li>Pre-meal carbs: your entry ({result.mealCarbs}g)</li>
-          ) : result.breakdown.mealCarbsSource === "suggested" ? (
-            <li>
-              {result.breakdown.lowBgCarbTopUpGrams ? (
-                <>
-                  Session buffer ~{result.breakdown.preBufferGrams}g + ~{result.breakdown.lowBgCarbTopUpGrams}g extra
-                  for your low BG → ~{result.mealCarbs}g suggested
-                </>
-              ) : (
-                <>Pre-meal carbs suggested from buffer: ~{result.mealCarbs}g (BG/trend/fasted)</>
-              )}
-            </li>
-          ) : result.breakdown.mealCarbsSkipReason ? (
-            <li>{preExerciseMealCarbsSkipMessage(result.breakdown.mealCarbsSkipReason, bgUnits)}</li>
-          ) : (
-            <li>No pre-meal carbs suggested — keep fast carbs on hand for the full session.</li>
-          )}
+          {onHandTreatment ? <li>Carry: {onHandTreatment}</li> : null}
+          {duringTreatment ? <li>During: {duringTreatment}</li> : null}
           {result.insulin ? (
-            <>
-              <li>{result.breakdown.ratioDescription ?? "Ratio from Settings"}</li>
-              <li>
-                Standard dose ~{result.breakdown.standardUnits}u → {result.breakdown.reductionPercent}% exercise
-                reduction → {result.insulin.adjustedUnits}u meal bolus
-                {result.insulin.correctionUnits > 0
-                  ? ` + ${result.insulin.correctionUnits}u correction → ${result.insulin.totalUnits}u total`
-                  : ""}
-                {result.breakdown.adjustedUnitsExact != null &&
-                result.breakdown.adjustedUnitsExact !== result.insulin.adjustedUnits
-                  ? ` (exact meal ${result.breakdown.adjustedUnitsExact}u before rounding)`
-                  : ""}
-              </li>
-            </>
-          ) : result.insulinSuppressedReason ? (
-            <li>{preExerciseInsulinSuppressedMessage(result.insulinSuppressedReason, bgUnits, settings)}</li>
+            <li>
+              Meal bolus: usually ~{result.insulin.standardUnits}u → {result.insulin.reductionPercent}% less for
+              exercise → {result.insulin.adjustedUnits}u
+              {result.insulin.correctionUnits > 0
+                ? ` + ${result.insulin.correctionUnits}u correction → ${result.insulin.totalUnits}u total`
+                : ""}
+            </li>
           ) : null}
+          {result.preCorrection ? (
+            <li>
+              Reduced correction toward {band}: ~{result.preCorrection.fullUnitsBeforeReduction}u full →{" "}
+              {result.preCorrection.reductionPercent}% less → ~{result.preCorrection.units}u
+            </li>
+          ) : null}
+          {result.insulinNoRatios && result.mealCarbs > 0 ? (
+            <li>Add meal ratios in Settings for a dose in units (about {result.bolusReductionBand} less is common).</li>
+          ) : null}
+          {result.pumpTip ? <li>{result.pumpTip}</li> : null}
+          <li className="text-muted-foreground">Target {result.targetBg} · educational only</li>
         </ul>
       </PlanDetailSection>
-
-      {result.pumpTip ? (
-        <PlanDetailSection title={pumpTipsCardTitle(settings)}>
-          <p>{result.pumpTip}</p>
-        </PlanDetailSection>
-      ) : null}
     </div>
   );
 }
@@ -1227,6 +1134,30 @@ export function ExerciseFuelCalculator() {
               />
             ) : null}
 
+            {result.preCorrection ? (
+              <InsulinResultBadge
+                tone={result.preCorrection.severity === "very_high" ? "caution" : "insulin"}
+                title={
+                  result.preCorrection.severity === "very_high"
+                    ? "Reduced correction (ketones first)"
+                    : "Reduced correction"
+                }
+                value={`~${result.preCorrection.units} units`}
+                testId="efc-correction-badge"
+                info={
+                  <p className="text-sm leading-relaxed">
+                    {result.preCorrection.severity === "very_high"
+                      ? "BG is very high — follow your team on ketones and fluids before hard effort. "
+                      : "BG is above the usual pre-exercise band. "}
+                    Toward {result.preCorrection.targetBg} {bgUnits}, a full correction would be about{" "}
+                    {result.preCorrection.fullUnitsBeforeReduction}u; this estimate is{" "}
+                    {result.preCorrection.reductionPercent}% lower because exercise can still drop glucose. Confirm
+                    with your care team — educational only.
+                  </p>
+                }
+              />
+            ) : null}
+
             <Collapsible open={detailsOpen} onOpenChange={setDetailsOpen}>
               <CollapsibleTrigger asChild>
                 <button
@@ -1237,7 +1168,7 @@ export function ExerciseFuelCalculator() {
                   <div className="flex min-w-0 items-center gap-2">
                     <BookOpen className="h-4 w-4 shrink-0 text-primary" aria-hidden />
                     <span className="text-sm font-medium">More detail</span>
-                    <span className="truncate text-xs text-muted-foreground">Notes, breakdown, safety info</span>
+                    <span className="truncate text-xs text-muted-foreground">Why this plan + numbers</span>
                   </div>
                   <ChevronDown
                     className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180"
@@ -1247,7 +1178,7 @@ export function ExerciseFuelCalculator() {
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <div className="space-y-3 pt-2">
-                  <ExerciseFuelPlanDetails result={result} bgUnits={bgUnits} sessionLine={sessionLine} profile={profile} />
+                  <ExerciseFuelPlanDetails result={result} profile={profile} />
                   <MedicalNumericOutputDisclaimer collapsible />
                   <MedicalSourcesLink anchor="exercise" />
                 </div>

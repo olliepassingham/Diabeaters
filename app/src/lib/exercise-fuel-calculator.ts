@@ -9,7 +9,6 @@ import { isBgBelowHypoThreshold } from "@/lib/exercise-hypo-auto";
 import { getBodyWeightKgFromProfile } from "@/lib/body-weight";
 import { hypoCalculatorRequiresExplicitWeight } from "@/lib/user-age";
 import {
-  getExerciseGuidanceForReading,
   isExerciseStartLow,
   preExerciseInsulinSuppressedMessage,
   preExerciseMealCarbsSkipMessage,
@@ -88,6 +87,20 @@ export type ExerciseFuelInsulinResult = {
   totalUnits: number;
 };
 
+/**
+ * Standalone reduced correction when BG is above the usual start band and there is
+ * no meal bolus path (or meal insulin is suppressed). Educational estimate only.
+ */
+export type ExercisePreCorrectionAdvice = {
+  units: number;
+  /** Full correction before exercise reduction (for “how we calculated”). */
+  fullUnitsBeforeReduction: number;
+  targetBg: number;
+  reductionPercent: number;
+  /** elevated = above 7–10; very_high = ketones/fluids first. */
+  severity: "elevated" | "very_high";
+};
+
 export type ExerciseSessionFuel = {
   /** Fast carbs to keep with you for the whole session. */
   carryGrams: number;
@@ -120,6 +133,11 @@ export type ExerciseFuelCalculatorResult = {
   duringCarbs: number;
   sessionFuel: ExerciseSessionFuel;
   insulin: ExerciseFuelInsulinResult | null;
+  /**
+   * Reduced correction toward the top of the pre-exercise band when BG is high and
+   * there is no meal-bolus correction already on `insulin`.
+   */
+  preCorrection: ExercisePreCorrectionAdvice | null;
   /** BG projection when user entered their own pre-meal carbs. */
   projection: ExerciseFuelProjection | null;
   /** How this session type affects glucose and insulin reduction. */
@@ -227,7 +245,7 @@ function computePreExerciseCorrectionUnits(
   settings: UserSettings,
   exerciseReductionPercent: number,
   isPump: boolean,
-): { units: number; targetBg: number } | null {
+): { units: number; targetBg: number; fullUnits: number } | null {
   const units = bgUnits === "mg/dL" ? "mg/dL" : "mmol/L";
   const targetBg = preExerciseIdealHighBg(units);
   if (currentBg <= targetBg) return null;
@@ -249,7 +267,68 @@ function computePreExerciseCorrectionUnits(
   const unitsOut = Math.max(0, roundInsulinUnits(reducedExact, increment));
   if (unitsOut <= 0) return null;
 
-  return { units: unitsOut, targetBg };
+  return { units: unitsOut, targetBg, fullUnits: correction.fullDoseRounded };
+}
+
+function sessionExerciseReductionPercent(input: ExerciseFuelCalculatorInput): number {
+  const meta: MealExerciseMeta = {
+    exerciseType: input.exerciseType,
+    intensity: input.intensity,
+    durationMinutes: input.durationMinutes,
+  };
+  const increment = insulinRoundIncrement(input.isPump);
+  const preview = getExerciseMealBolusPreview(
+    10,
+    input.mealType || "snack",
+    input.settings,
+    input.bgUnits,
+    input.minutesUntilStart,
+    meta,
+    increment,
+  );
+  return preview.exerciseReduction ?? 30;
+}
+
+/**
+ * When BG is above the usual start band and meal insulin isn't already covering a
+ * correction, offer a reduced correction estimate (educational).
+ */
+function computeStandalonePreCorrection(
+  input: ExerciseFuelCalculatorInput,
+  mealInsulin: ExerciseFuelInsulinResult | null,
+): ExercisePreCorrectionAdvice | null {
+  if (mealInsulin && mealInsulin.correctionUnits > 0) return null;
+
+  const currentBg = input.currentBg;
+  if (currentBg == null || !Number.isFinite(currentBg)) return null;
+
+  const bgUnits = input.bgUnits === "mg/dL" ? "mg/dL" : "mmol/L";
+  if (isBgBelowHypoThreshold(currentBg, input.settings, bgUnits)) return null;
+  if (isExerciseStartLow(currentBg, bgUnits)) return null;
+  if (input.bgTrend === "falling") return null;
+  if (currentBg <= preExerciseIdealHighBg(bgUnits)) return null;
+
+  let reduction = sessionExerciseReductionPercent(input);
+  const veryHigh = isPreExerciseHighBg(currentBg, bgUnits);
+  // Extra caution before hard effort when very high — smaller estimate.
+  if (veryHigh) reduction = Math.min(60, reduction + 10);
+
+  const correction = computePreExerciseCorrectionUnits(
+    currentBg,
+    input.bgUnits,
+    input.settings,
+    reduction,
+    input.isPump,
+  );
+  if (!correction) return null;
+
+  return {
+    units: correction.units,
+    fullUnitsBeforeReduction: correction.fullUnits,
+    targetBg: correction.targetBg,
+    reductionPercent: reduction,
+    severity: veryHigh ? "very_high" : "elevated",
+  };
 }
 
 function mealRatioGramsPerUnit(mealType: string, settings: UserSettings): number | null {
@@ -584,6 +663,7 @@ function buildHeadline(
   insulin: ExerciseFuelInsulinResult | null,
   insulinSuppressed: boolean,
   insulinSuppressedReason: PreExerciseInsulinSuppressedReason | null,
+  preCorrection: ExercisePreCorrectionAdvice | null,
 ): string {
   const session = sessionLabel(input);
   if (userEnteredMealCarbs && mealCarbs > 0) {
@@ -614,6 +694,9 @@ function buildHeadline(
     }
     return `${session}. ${mealCarbs}g ${mealTypeLabel(input.mealType)} before you start.`;
   }
+  if (preCorrection) {
+    return `${session}. Keep about ${onHandCarbs}g fast carbs within reach. Reduced correction estimate ~${preCorrection.units}u toward ${planTargetBand(input.bgUnits)}.`;
+  }
   return `${session}. Keep about ${onHandCarbs}g fast carbs within reach.`;
 }
 
@@ -626,14 +709,28 @@ function pickNotes(
   userEnteredMealCarbs: boolean,
   projection: ExerciseFuelProjection | null,
   lowBgCarbTopUpGrams: number,
+  preCorrection: ExercisePreCorrectionAdvice | null,
 ): string[] {
   const notes: string[] = [];
   const units = input.bgUnits;
   const bgUnits = units === "mg/dL" ? "mg/dL" : "mmol/L";
-  const high = units === "mmol/L" ? 13.9 : 250;
 
-  if (mealCarbsSkipReason) {
+  // Skip repeating the same elevated/high skip message already on the plan card.
+  if (mealCarbsSkipReason && mealCarbsSkipReason !== "elevated_bg" && mealCarbsSkipReason !== "high_bg") {
     notes.push(preExerciseMealCarbsSkipMessage(mealCarbsSkipReason, units));
+  }
+
+  if (preCorrection) {
+    const band = planTargetBand(units);
+    if (preCorrection.severity === "very_high") {
+      notes.push(
+        `BG is very high — check ketones/fluids with your team before hard effort. If they agree a correction is appropriate, a reduced estimate toward ${band} is ~${preCorrection.units}u (${preCorrection.reductionPercent}% less than a full correction).`,
+      );
+    } else {
+      notes.push(
+        `BG is above the usual start band (${band}). A reduced correction estimate is ~${preCorrection.units}u (${preCorrection.reductionPercent}% less than a full correction) — exercise can still drop you, so confirm with your team.`,
+      );
+    }
   }
 
   if (lowBgCarbTopUpGrams > 0 && input.currentBg != null) {
@@ -647,7 +744,12 @@ function pickNotes(
     notes.push(
       `Your ${mealCarbs}g pre-exercise meal should bring you to about ${projection.projectedBgAtStart} ${units} at start (target ${projection.targetBand}).`,
     );
-  } else if (insulinSuppressedReason && !(userEnteredMealCarbs && insulinSuppressedReason === "falling")) {
+  } else if (
+    insulinSuppressedReason &&
+    !(userEnteredMealCarbs && insulinSuppressedReason === "falling") &&
+    insulinSuppressedReason !== "high_bg" &&
+    !preCorrection
+  ) {
     notes.push(preExerciseInsulinSuppressedMessage(insulinSuppressedReason, units, input.settings));
   }
 
@@ -671,36 +773,15 @@ function pickNotes(
     if (!insulinSuppressedReason) {
       notes.push("Your BG is below a typical exercise-start range — treat and recheck before hard effort.");
     }
-  } else if (input.currentBg != null && input.currentBg > high) {
-    notes.push("BG looks high — follow your team's advice on ketones and fluids before hard effort.");
-  }
-
-  if (input.currentBg != null && Number.isFinite(input.currentBg)) {
-    const readingTips = getExerciseGuidanceForReading({
-      bg: input.currentBg,
-      trend: input.bgTrend ?? undefined,
-      bgUnits: units,
-      exerciseType: input.exerciseType,
-      intensity: input.intensity,
-      phase: "pre",
-    });
-    for (const tip of readingTips) {
-      if (notes.length >= 3) break;
-      if (!notes.includes(tip)) notes.push(tip);
-    }
   }
 
   if (input.rapidInsulinLast2h) {
     notes.push("Rapid insulin in the last 2 hours can stack with exercise — keep extra fast carbs nearby.");
   }
 
-  if (input.bgTrend === "falling") {
-    notes.push("You noted BG is falling — ease in and recheck if effort ramps up.");
-  }
-
   if (input.fasted && mealCarbs > 0) {
     notes.push("You are training fasted but planning pre-workout carbs — that is often a good safety buffer for harder sessions.");
-  } else if (input.fasted && mealCarbs <= 0 && plan.pre.carbsIfLow > 0) {
+  } else if (input.fasted && mealCarbs <= 0 && plan.pre.carbsIfLow > 0 && !preCorrection) {
     notes.push("Fasted session — many people use a small carb buffer before harder work; discuss with your team.");
   }
 
@@ -711,9 +792,9 @@ function pickNotes(
   }
 
   const contextual = plan.pre.contextualNotes?.[0];
-  if (contextual && notes.length < 3) notes.push(contextual);
+  if (contextual && notes.length < 2) notes.push(contextual);
 
-  return notes.slice(0, 3);
+  return notes.slice(0, 2);
 }
 
 function computeSessionFuel(
@@ -813,6 +894,8 @@ export function computeExerciseFuelPlan(input: ExerciseFuelCalculatorInput): Exe
     }
   }
 
+  const preCorrection = computeStandalonePreCorrection(input, insulin);
+
   const headline = buildHeadline(
     input,
     mealCarbs,
@@ -822,6 +905,7 @@ export function computeExerciseFuelPlan(input: ExerciseFuelCalculatorInput): Exe
     insulin,
     insulinSuppressedReason != null && insulin == null,
     insulinSuppressedReason,
+    preCorrection,
   );
 
   const breakdown: ExerciseFuelCalculationBreakdown = {
@@ -836,7 +920,7 @@ export function computeExerciseFuelPlan(input: ExerciseFuelCalculatorInput): Exe
     ratioDescription:
       mealCarbs > 0 ? describeRatioUsed(input.mealType, input.settings) : undefined,
     standardUnits: insulin?.standardUnits,
-    reductionPercent: insulin?.reductionPercent,
+    reductionPercent: insulin?.reductionPercent ?? preCorrection?.reductionPercent,
     adjustedUnitsExact: insulin?.exactAdjusted,
     lowBgCarbTopUpGrams: lowBgCarbTopUpGrams > 0 ? lowBgCarbTopUpGrams : undefined,
   };
@@ -851,6 +935,7 @@ export function computeExerciseFuelPlan(input: ExerciseFuelCalculatorInput): Exe
     duringCarbs,
     sessionFuel,
     insulin,
+    preCorrection,
     projectedInsulinAtTarget,
     insulinSuppressedReason,
     insulinNoRatios,
@@ -865,6 +950,7 @@ export function computeExerciseFuelPlan(input: ExerciseFuelCalculatorInput): Exe
       userEnteredMealCarbs,
       projection,
       lowBgCarbTopUpGrams,
+      preCorrection,
     ),
     mealCarbsSkipReason,
     projection,

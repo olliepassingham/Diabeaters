@@ -264,6 +264,72 @@ describe("computeExerciseFuelPlan", () => {
     expect(r.insulin).not.toBeNull();
     expect(r.insulin!.correctionUnits).toBeGreaterThan(0);
     expect(r.insulin!.totalUnits).toBeGreaterThan(r.insulin!.adjustedUnits);
+    expect(r.preCorrection).toBeNull();
+  });
+
+  it("offers a reduced correction when BG is elevated and no meal carbs are planned", () => {
+    const r = computeExerciseFuelPlan({
+      exerciseType: "cardio",
+      intensity: "moderate",
+      durationMinutes: 45,
+      minutesUntilStart: 30,
+      fasted: false,
+      mealType: "snack",
+      currentBg: 12.8,
+      bgTrend: "flat",
+      bgUnits: "mmol/L",
+      settings,
+      isPump: false,
+    });
+    expect(r.mealCarbs).toBe(0);
+    expect(r.mealCarbsSkipReason).toBe("elevated_bg");
+    expect(r.insulin).toBeNull();
+    expect(r.preCorrection).not.toBeNull();
+    expect(r.preCorrection!.severity).toBe("elevated");
+    expect(r.preCorrection!.units).toBeGreaterThan(0);
+    expect(r.preCorrection!.reductionPercent).toBeGreaterThan(0);
+    expect(r.preCorrection!.units).toBeLessThanOrEqual(r.preCorrection!.fullUnitsBeforeReduction);
+    expect(r.headline).toContain("Reduced correction");
+    expect(r.notes.length).toBeLessThanOrEqual(2);
+    expect(r.notes.some((n) => n.toLowerCase().includes("reduced correction"))).toBe(true);
+  });
+
+  it("marks very-high BG correction as secondary to ketones/fluids", () => {
+    const r = computeExerciseFuelPlan({
+      exerciseType: "cardio",
+      intensity: "moderate",
+      durationMinutes: 45,
+      minutesUntilStart: 30,
+      fasted: false,
+      mealType: "snack",
+      currentBg: 15,
+      bgTrend: "flat",
+      bgUnits: "mmol/L",
+      settings,
+      isPump: false,
+    });
+    expect(r.mealCarbsSkipReason).toBe("high_bg");
+    expect(r.preCorrection).not.toBeNull();
+    expect(r.preCorrection!.severity).toBe("very_high");
+    expect(r.preCorrection!.units).toBeGreaterThan(0);
+    expect(r.notes.some((n) => n.includes("ketones"))).toBe(true);
+  });
+
+  it("does not offer a standalone correction while BG is falling", () => {
+    const r = computeExerciseFuelPlan({
+      exerciseType: "cardio",
+      intensity: "moderate",
+      durationMinutes: 45,
+      minutesUntilStart: 30,
+      fasted: false,
+      mealType: "snack",
+      currentBg: 12.8,
+      bgTrend: "falling",
+      bgUnits: "mmol/L",
+      settings,
+      isPump: false,
+    });
+    expect(r.preCorrection).toBeNull();
   });
 
   it("computes session fuel from exercise type, intensity, and duration for known carbs", () => {
