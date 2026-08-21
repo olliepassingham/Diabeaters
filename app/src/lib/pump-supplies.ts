@@ -1,6 +1,11 @@
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
-import { storage, type Supply } from "@/lib/storage";
 import { getEffectiveTdd } from "@/lib/tdd";
+import {
+  markStarterCgmSeeded,
+  starterCgmSupplyRow,
+  STARTER_SUPPLY_NOTE,
+} from "@/lib/starter-supply-shared";
+import { storage, type Supply } from "@/lib/storage";
 
 export const PUMP_SUPPLIES_SEEDED_KEY = "diabeaters_pump_supplies_seeded_v1";
 
@@ -41,13 +46,14 @@ function markPumpSuppliesSeeded(): void {
 }
 
 /**
- * Add default pump supply rows once (infusion sets, reservoirs, insulin, backup pens).
+ * Add default pump supply rows once (CGM, infusion sets, reservoirs, insulin, backup pens).
  * Safe to call multiple times — no-ops when already seeded or pump types exist.
  */
 export function seedPumpSuppliesIfNeeded(opts: PumpSupplySeedOptions = {}): { seeded: boolean; count: number } {
   if (!shouldSeedPumpSupplies()) return { seeded: false, count: 0 };
   if (hasPumpSupplyTypes()) {
     markPumpSuppliesSeeded();
+    if (storage.getSupplies().some((s) => s.type === "cgm")) markStarterCgmSeeded();
     return { seeded: false, count: 0 };
   }
 
@@ -61,13 +67,14 @@ export function seedPumpSuppliesIfNeeded(opts: PumpSupplySeedOptions = {}): { se
   const backupNote = "Backup for pump failure — confirm doses with your diabetes team.";
 
   const rows: Omit<Supply, "id">[] = [
+    starterCgmSupplyRow(),
     {
       name: "Infusion Sets",
       type: "infusion_set",
       currentQuantity: 10,
       dailyUsage: 0,
       activeItemStartDate: started,
-      notes: "Update quantity and last change date after your next pickup.",
+      notes: STARTER_SUPPLY_NOTE,
     },
     {
       name: "Reservoirs / Cartridges",
@@ -75,6 +82,7 @@ export function seedPumpSuppliesIfNeeded(opts: PumpSupplySeedOptions = {}): { se
       currentQuantity: 10,
       dailyUsage: 0,
       activeItemStartDate: started,
+      notes: STARTER_SUPPLY_NOTE,
     },
     {
       name: "Pump Insulin (vial/cartridge)",
@@ -83,6 +91,7 @@ export function seedPumpSuppliesIfNeeded(opts: PumpSupplySeedOptions = {}): { se
       dailyUsage: tdd,
       lastPickupDate: started,
       quantityAtPickup: 3,
+      notes: STARTER_SUPPLY_NOTE,
     },
     {
       name: "Backup Rapid-Acting Pen",
@@ -126,6 +135,7 @@ export function seedPumpSuppliesIfNeeded(opts: PumpSupplySeedOptions = {}): { se
   }
 
   markPumpSuppliesSeeded();
+  markStarterCgmSeeded();
   return { seeded: true, count };
 }
 

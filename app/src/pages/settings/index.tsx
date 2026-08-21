@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
+import { isPenDeliveryMethod, isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import {
   storage,
   UserProfile,
@@ -39,7 +39,7 @@ import { SettingsHubInfoDialog } from "./settings-page-info";
 import { rescheduleBedtimeReminders } from "@/lib/bedtime-reminders";
 import { shouldReceiveBedtimeCheckReminders } from "@/lib/bedtime-reminder-eligibility";
 import { reschedulePumpChangeReminders } from "@/lib/pump-change-reminders";
-import { seedPumpSuppliesIfNeeded } from "@/lib/pump-supplies";
+import { seedPatientFirstRunDefaultsIfNeeded } from "@/lib/starter-patient-defaults";
 import { syncNotificationPreferences } from "@/lib/notification-preferences";
 import { ensureNativePushRegistered, resetNativePushRegistrationState } from "@/lib/push-tokens";
 import { Link, useLocation } from "wouter";
@@ -1331,14 +1331,14 @@ export default function Settings() {
     storage.saveProfile(updatedProfile);
     setProfile(updatedProfile);
 
-    if (isPumpDeliveryMethod(deliveryMethod)) {
-      seedPumpSuppliesIfNeeded({
+    if (isPumpDeliveryMethod(deliveryMethod) || isPenDeliveryMethod(deliveryMethod)) {
+      seedPatientFirstRunDefaultsIfNeeded({
         tdd: settings.tdd,
         siteChangeDays: siteChangeDays ? parseInt(siteChangeDays, 10) : undefined,
         reservoirChangeDays: reservoirChangeDays ? parseInt(reservoirChangeDays, 10) : undefined,
         reservoirCapacity: reservoirCapacity ? parseInt(reservoirCapacity, 10) : undefined,
       });
-      if (!wasPump) void reschedulePumpChangeReminders();
+      if (isPumpDeliveryMethod(deliveryMethod) && !wasPump) void reschedulePumpChangeReminders();
     }
 
     let cloud: Awaited<ReturnType<typeof syncClinicalPrefsToCloud>> = { error: null };

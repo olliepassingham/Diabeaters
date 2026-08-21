@@ -27,8 +27,9 @@ describe("seedPumpSuppliesIfNeeded", () => {
   it("seeds starter rows for pump users once", () => {
     const r = seedPumpSuppliesIfNeeded({ tdd: 40, siteChangeDays: 3, reservoirCapacity: 300 });
     expect(r.seeded).toBe(true);
-    expect(r.count).toBe(6);
-    expect(storageMock.addSupply).toHaveBeenCalledTimes(6);
+    expect(r.count).toBe(7);
+    expect(storageMock.addSupply).toHaveBeenCalledTimes(7);
+    expect(storageMock.addSupply).toHaveBeenCalledWith(expect.objectContaining({ type: "cgm" }));
     expect(localStorage.getItem(PUMP_SUPPLIES_SEEDED_KEY)).toBe("1");
   });
 
@@ -36,7 +37,7 @@ describe("seedPumpSuppliesIfNeeded", () => {
     seedPumpSuppliesIfNeeded({});
     const r2 = seedPumpSuppliesIfNeeded({});
     expect(r2.seeded).toBe(false);
-    expect(storageMock.addSupply).toHaveBeenCalledTimes(6);
+    expect(storageMock.addSupply).toHaveBeenCalledTimes(7);
   });
 
   it("skips non-pump profiles", () => {

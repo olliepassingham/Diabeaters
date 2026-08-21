@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { storage, Supply, LastPrescription, UsualPrescription, UsualPrescriptionItem, PrescriptionCycle, ScenarioState, getSupplyIncrement, getUnitsPerPen, getInsulinContainerLabel, DIABEATER_SCENARIO_STATE_CHANGED_EVENT, DIABEATER_PROFILE_CHANGED_EVENT, type UserProfile } from "@/lib/storage";
 import { INSULIN_STOCK_QUANTITY_HINT } from "@/lib/insulin-pen-units";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
+import { seedPatientFirstRunDefaultsIfNeeded } from "@/lib/starter-patient-defaults";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { Link, useSearch } from "wouter";
 import { formatDistanceToNow, format, differenceInDays, addDays, startOfDay } from "date-fns";
@@ -1668,6 +1669,7 @@ export default function Supplies() {
   const lastSupplyDeepLinkKey = useRef<string | null>(null);
 
   useEffect(() => {
+    seedPatientFirstRunDefaultsIfNeeded();
     storage.autoAdvanceActiveItemDates();
     setSupplies(storage.getSupplies());
     setLastPrescription(storage.getLastPrescription());

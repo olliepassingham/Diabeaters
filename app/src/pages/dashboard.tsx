@@ -30,6 +30,7 @@ import {
   SettingsCompletionItem,
 } from "@/lib/storage";
 import { getActiveAppMode } from "@/lib/carer-session";
+import { seedPatientFirstRunDefaultsIfNeeded } from "@/lib/starter-patient-defaults";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import {
@@ -772,6 +773,7 @@ export default function Dashboard() {
       setSettingsCompletion(storage.getSettingsCompletion());
     };
 
+    seedPatientFirstRunDefaultsIfNeeded();
     refreshData();
     if (getSupabase()) {
       void repairSickDayCloudIfLocalInactive();

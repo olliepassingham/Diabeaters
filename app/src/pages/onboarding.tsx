@@ -65,7 +65,7 @@ import {
 import { markBedtimeReminderPromptPending } from "@/lib/bedtime-reminder-prompt";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { reschedulePumpChangeReminders } from "@/lib/pump-change-reminders";
-import { seedPumpSuppliesIfNeeded } from "@/lib/pump-supplies";
+import { seedPatientFirstRunDefaultsIfNeeded } from "@/lib/starter-patient-defaults";
 import {
   APP_REGION_OPTIONS,
   applyRegionUnitDefaults,
@@ -565,13 +565,13 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     }
 
     handleSaveProfile();
+    seedPatientFirstRunDefaultsIfNeeded({
+      tdd: data.tdd ? parseFloat(data.tdd) : undefined,
+      siteChangeDays: data.siteChangeDays ? parseInt(data.siteChangeDays, 10) : undefined,
+      reservoirChangeDays: data.reservoirChangeDays ? parseInt(data.reservoirChangeDays, 10) : undefined,
+      reservoirCapacity: data.reservoirCapacity ? parseInt(data.reservoirCapacity, 10) : undefined,
+    });
     if (isPumpDeliveryMethod(data.insulinDeliveryMethod)) {
-      seedPumpSuppliesIfNeeded({
-        tdd: data.tdd ? parseFloat(data.tdd) : undefined,
-        siteChangeDays: data.siteChangeDays ? parseInt(data.siteChangeDays, 10) : undefined,
-        reservoirChangeDays: data.reservoirChangeDays ? parseInt(data.reservoirChangeDays, 10) : undefined,
-        reservoirCapacity: data.reservoirCapacity ? parseInt(data.reservoirCapacity, 10) : undefined,
-      });
       void reschedulePumpChangeReminders();
     }
     localStorage.setItem("diabeater_onboarding_completed", "true");
