@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { ExternalLink, Eye, Flag, Loader2, MessageCircle, Send, Trash2, X } from "lucide-react";
+import { Eye, Flag, Loader2, MessageCircle, Send, Trash2, X } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { StoryOverlayLayer } from "@/components/community/story-overlay-layer";
+import { StorySharedPostStage } from "@/components/community/story-shared-post-stage";
 import { StoryViewersSheet } from "@/components/community/story-viewers-sheet";
 import { Button } from "@/components/ui/button";
 import {
@@ -152,20 +153,13 @@ export function StoryViewerDialog({
     closeViewer();
     setLocation(`/community/post/${sourcePostId}`);
   }, [sourcePostId, closeViewer, setLocation]);
-  const viewPostButton = sourcePostId ? (
-    <button
-      type="button"
-      className="inline-flex items-center gap-1.5 rounded-full bg-black/35 px-3 py-1.5 text-[12px] font-semibold tracking-wide text-white/95 backdrop-blur-md transition-colors hover:bg-black/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
-      onClick={(e) => {
-        e.stopPropagation();
-        openSourcePost();
-      }}
-      data-testid="button-story-view-post"
-    >
-      <ExternalLink className="h-3.5 w-3.5 text-white/90" aria-hidden />
-      View post
-    </button>
-  ) : null;
+  const openSourceAuthor = useCallback(
+    (authorId: string) => {
+      closeViewer();
+      setLocation(`/community/profile/${encodeURIComponent(authorId)}`);
+    },
+    [closeViewer, setLocation],
+  );
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const dragRef = useRef({ x: 0, y: 0 });
   const suppressClick = useRef(false);
@@ -418,13 +412,13 @@ export function StoryViewerDialog({
     <>
       <Dialog open={open} onOpenChange={onOpenChange} mobileSheet={false}>
         <DialogContent
-          className="inset-0 flex h-[100dvh] max-h-[100dvh] w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-0 bg-black p-0 left-0 top-0 sm:inset-auto sm:left-[50%] sm:top-[50%] sm:h-[min(100dvh,760px)] sm:w-full sm:max-w-md sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-[1.75rem] [&>button]:hidden"
+          className="inset-0 flex h-[100dvh] max-h-[100dvh] w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-0 bg-gradient-to-b from-teal-950 via-slate-950 to-slate-950 p-0 left-0 top-0 sm:inset-auto sm:left-[50%] sm:top-[50%] sm:h-[min(100dvh,820px)] sm:w-full sm:max-w-md sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-[1.75rem] [&>button]:hidden"
           aria-describedby={undefined}
         >
           <DialogTitle className="sr-only">{displayName}'s story</DialogTitle>
           <div
             className={cn(
-              "relative flex min-h-0 flex-1 flex-col overflow-hidden bg-black",
+              "relative flex min-h-0 flex-1 flex-col overflow-hidden",
               dragging ? "transition-none" : "transition-transform duration-200 ease-out",
             )}
             style={{
@@ -543,32 +537,40 @@ export function StoryViewerDialog({
             </div>
             </div>
 
-            <button
-              type="button"
-              className="relative flex min-h-0 flex-1 cursor-default items-center justify-center overflow-hidden border-0 bg-transparent p-0 outline-none"
-              onClick={() => {
-                if (suppressClick.current) {
-                  suppressClick.current = false;
-                  return;
-                }
-                advance();
-              }}
-              aria-label={isLast ? "Close story" : "Next story"}
-            >
+            <div className="relative min-h-0 flex-1 overflow-hidden">
               {loading ? (
-                <Loader2 className="h-8 w-8 animate-spin text-white/70" aria-hidden />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-white/70" aria-hidden />
+                </div>
               ) : failed || !resolvedStory ? (
-                <p className="px-6 text-center text-sm text-white/70">This story is no longer available.</p>
+                <p className="absolute inset-0 flex items-center justify-center px-6 text-center text-sm text-white/70">
+                  This story is no longer available.
+                </p>
+              ) : sourcePostId ? (
+                <>
+                  <StorySharedPostStage
+                    postId={sourcePostId}
+                    onOpenPost={openSourcePost}
+                    onOpenAuthor={openSourceAuthor}
+                  />
+                  {resolvedStory.overlays?.length ? (
+                    <div className="pointer-events-none absolute inset-0 z-[11]">
+                      <StoryOverlayLayer overlays={resolvedStory.overlays} />
+                    </div>
+                  ) : null}
+                </>
               ) : !mediaUrl ? (
-                <Loader2 className="h-8 w-8 animate-spin text-white/70" aria-hidden />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-white/70" aria-hidden />
+                </div>
               ) : (
-                <div className="relative aspect-[9/16] h-full max-h-full w-auto max-w-full overflow-hidden bg-black">
+                <div className="absolute inset-0 overflow-hidden">
                   {resolvedStory.media_kind === "image" ? (
-                    <img src={mediaUrl} alt="" className="h-full w-full object-cover pointer-events-none" />
+                    <img src={mediaUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
                   ) : (
                     <video
                       src={mediaUrl}
-                      className="h-full w-full object-cover pointer-events-none"
+                      className="absolute inset-0 h-full w-full object-cover"
                       controls={false}
                       playsInline
                       autoPlay
@@ -579,10 +581,58 @@ export function StoryViewerDialog({
                   <StoryOverlayLayer overlays={resolvedStory.overlays} />
                 </div>
               )}
-            </button>
+
+              {/* Edge taps: previous / next without fighting shared-post hits. */}
+              <button
+                type="button"
+                className={cn(
+                  "absolute inset-y-0 left-0 z-10 cursor-pointer border-0 bg-transparent",
+                  sourcePostId ? "w-[12%]" : "w-[18%]",
+                )}
+                aria-label="Previous story"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (suppressClick.current) {
+                    suppressClick.current = false;
+                    return;
+                  }
+                  goPrev();
+                }}
+              />
+              <button
+                type="button"
+                className={cn(
+                  "absolute inset-y-0 right-0 z-10 cursor-pointer border-0 bg-transparent",
+                  sourcePostId ? "w-[12%]" : "w-[18%]",
+                )}
+                aria-label={isLast ? "Close story" : "Next story"}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (suppressClick.current) {
+                    suppressClick.current = false;
+                    return;
+                  }
+                  advance();
+                }}
+              />
+              {!sourcePostId ? (
+                <button
+                  type="button"
+                  className="absolute inset-y-0 left-[18%] right-[18%] z-[5] cursor-pointer border-0 bg-transparent"
+                  aria-label={isLast ? "Close story" : "Next story"}
+                  onClick={() => {
+                    if (suppressClick.current) {
+                      suppressClick.current = false;
+                      return;
+                    }
+                    advance();
+                  }}
+                />
+              ) : null}
+            </div>
 
             <div
-              className="relative z-20 shrink-0 px-4 pb-[max(1.1rem,env(safe-area-inset-bottom))] pt-2"
+              className="relative z-30 shrink-0 px-4 pb-[max(1.1rem,env(safe-area-inset-bottom))] pt-2"
               onClick={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
             >
@@ -594,7 +644,6 @@ export function StoryViewerDialog({
 
               {isOwnStory ? (
                 <div className="flex justify-center gap-2">
-                  {viewPostButton}
                   <button
                     type="button"
                     className="inline-flex items-center gap-1.5 rounded-full bg-black/35 px-3 py-1.5 text-[12px] font-semibold tracking-wide text-white/95 backdrop-blur-md transition-colors hover:bg-black/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
@@ -609,7 +658,6 @@ export function StoryViewerDialog({
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {viewPostButton ? <div className="flex justify-center">{viewPostButton}</div> : null}
                   {canInteract ? (
                     replyOpen ? (
                     <div

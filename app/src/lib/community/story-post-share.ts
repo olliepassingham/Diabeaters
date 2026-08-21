@@ -309,7 +309,7 @@ function eventParts(iso: string): { weekday: string; day: string; month: string;
 }
 
 function drawAtmosphere(ctx: CanvasRenderingContext2D, media: CanvasImageSource | null) {
-  ctx.fillStyle = "#07080d";
+  ctx.fillStyle = "#0c2f2c";
   ctx.fillRect(0, 0, W, H);
 
   if (media) {
@@ -317,26 +317,26 @@ function drawAtmosphere(ctx: CanvasRenderingContext2D, media: CanvasImageSource 
     ctx.filter = "blur(48px)";
     drawCover(ctx, media, -120, -120, W + 240, H + 240, 0);
     ctx.restore();
-    ctx.fillStyle = "rgba(6, 8, 14, 0.58)";
+    ctx.fillStyle = "rgba(12, 47, 44, 0.55)";
     ctx.fillRect(0, 0, W, H);
   } else {
-    const a = ctx.createRadialGradient(W * 0.22, H * 0.28, 40, W * 0.22, H * 0.28, 780);
-    a.addColorStop(0, "rgba(20, 184, 166, 0.28)");
-    a.addColorStop(1, "rgba(20, 184, 166, 0)");
+    const a = ctx.createRadialGradient(W * 0.28, H * 0.22, 40, W * 0.28, H * 0.22, 900);
+    a.addColorStop(0, "rgba(45, 212, 191, 0.34)");
+    a.addColorStop(1, "rgba(45, 212, 191, 0)");
     ctx.fillStyle = a;
     ctx.fillRect(0, 0, W, H);
-    const b = ctx.createRadialGradient(W * 0.86, H * 0.72, 20, W * 0.86, H * 0.72, 820);
-    b.addColorStop(0, "rgba(59, 130, 246, 0.22)");
-    b.addColorStop(1, "rgba(59, 130, 246, 0)");
+    const b = ctx.createRadialGradient(W * 0.82, H * 0.78, 20, W * 0.82, H * 0.78, 860);
+    b.addColorStop(0, "rgba(56, 189, 248, 0.2)");
+    b.addColorStop(1, "rgba(56, 189, 248, 0)");
     ctx.fillStyle = b;
     ctx.fillRect(0, 0, W, H);
   }
 
   const vignette = ctx.createLinearGradient(0, 0, 0, H);
-  vignette.addColorStop(0, "rgba(0,0,0,0.38)");
-  vignette.addColorStop(0.22, "rgba(0,0,0,0)");
-  vignette.addColorStop(0.78, "rgba(0,0,0,0)");
-  vignette.addColorStop(1, "rgba(0,0,0,0.55)");
+  vignette.addColorStop(0, "rgba(0,0,0,0.22)");
+  vignette.addColorStop(0.2, "rgba(0,0,0,0)");
+  vignette.addColorStop(0.82, "rgba(0,0,0,0)");
+  vignette.addColorStop(1, "rgba(0,0,0,0.28)");
   ctx.fillStyle = vignette;
   ctx.fillRect(0, 0, W, H);
 }
@@ -500,10 +500,10 @@ function drawSharedFeedCard(
   ctx.fillStyle = "rgba(215, 235, 228, 0.78)";
   ctx.fillRect(0, 0, W, H);
 
-  const cardX = 48;
-  const cardW = W - 96;
-  const radius = 40;
-  const pad = 36;
+  const cardX = 28;
+  const cardW = W - 56;
+  const radius = 44;
+  const pad = 32;
   const av = 88;
   const headerH = pad + av + 28;
 
@@ -515,16 +515,20 @@ function drawSharedFeedCard(
       : Math.round(Math.min(cardW * 1.12, cardW / Math.max(aspect, 0.72)));
 
   ctx.font = `500 30px ${FONT}`;
-  const capH = caption ? Math.max(40, wrappedHeight(ctx, caption, cardW - pad * 2, 40, 4) + 8) : 0;
-  const captionBlock = pad + (caption ? capH : 8) + pad;
+  const capH = caption ? Math.max(36, wrappedHeight(ctx, caption, cardW - pad * 2, 38, 3) + 4) : 0;
+  const captionBlock = pad + (caption ? capH : 4) + pad;
   let cardH = headerH + imageH + captionBlock;
-  const maxCardH = H - 96;
+  const maxCardH = H - 72;
   let drawImageH = imageH;
   if (cardH > maxCardH) {
-    drawImageH = Math.max(520, imageH - (cardH - maxCardH));
-    cardH = headerH + drawImageH + captionBlock;
+    // Prefer keeping the photo large; shrink caption space first, then image.
+    const overflow = cardH - maxCardH;
+    const reducedCap = Math.max(0, capH - overflow);
+    const stillOver = cardH - maxCardH - (capH - reducedCap);
+    drawImageH = Math.max(640, imageH - Math.max(0, stillOver));
+    cardH = headerH + drawImageH + pad + (caption ? Math.max(36, reducedCap) : 4) + pad;
   }
-  const cardY = Math.max(48, Math.round((H - cardH) / 2));
+  const cardY = Math.max(36, Math.round((H - cardH) / 2));
 
   drawLiftedCard(ctx, cardX, cardY, cardW, cardH, radius, CARD_WHITE);
 
@@ -558,15 +562,16 @@ function drawSharedFeedCard(
   drawCover(ctx, media, cardX, cardY + headerH, cardW, drawImageH, 0);
 
   if (caption) {
-    drawNameAndCaption(
+    ctx.fillStyle = INK;
+    ctx.font = `500 30px ${FONT}`;
+    drawWrapped(
       ctx,
-      name,
       caption,
       cardX + pad,
-      cardY + headerH + drawImageH + pad + 30,
+      cardY + headerH + drawImageH + pad + 28,
       cardW - pad * 2,
-      40,
-      4,
+      38,
+      3,
     );
   }
   ctx.restore();
@@ -598,40 +603,36 @@ function drawQuoteCard(
   handle: string | null,
   photo: CanvasImageSource | null,
 ) {
-  const pad = 56;
-  const innerW = W - SIDE * 2;
-  const textW = innerW - pad * 2;
+  // Full-bleed cream story — no floating card on a black void.
+  const wash = ctx.createLinearGradient(0, 0, W, H);
+  wash.addColorStop(0, "#d7ebe4");
+  wash.addColorStop(0.45, CREAM);
+  wash.addColorStop(1, "#e8f4f1");
+  ctx.fillStyle = wash;
+  ctx.fillRect(0, 0, W, H);
+
+  const padX = 72;
+  const textW = W - padX * 2;
   const metrics = quoteMetrics(body);
-  ctx.font = `500 ${metrics.size}px ${FONT_SERIF}`;
-  const textH = wrappedHeight(ctx, body, textW, metrics.lh, metrics.maxLines);
-  const authorH = 64;
-  const cardH = Math.min(H - TOP_SAFE - BOTTOM_SAFE, pad + 92 + textH + 40 + authorH + pad);
-  const cardY = TOP_SAFE + Math.max(0, (H - TOP_SAFE - BOTTOM_SAFE - cardH) / 2);
+  const topY = TOP_SAFE + 40;
+  const authorH = 72;
+  const authorY = H - BOTTOM_SAFE - authorH;
 
-  drawLiftedCard(ctx, SIDE, cardY, innerW, cardH, 40, CREAM);
-  ctx.save();
-  roundRect(ctx, SIDE, cardY, innerW, cardH, 40);
-  ctx.clip();
-  ctx.fillStyle = TEAL;
-  ctx.fillRect(SIDE, cardY, innerW, 8);
-  ctx.restore();
-
-  ctx.fillStyle = "rgba(15, 118, 110, 0.14)";
-  ctx.font = `700 168px ${FONT_SERIF}`;
-  ctx.fillText("“", SIDE + 28, cardY + 148);
+  ctx.fillStyle = "rgba(15, 118, 110, 0.16)";
+  ctx.font = `700 200px ${FONT_SERIF}`;
+  ctx.fillText("“", padX - 12, topY + 120);
 
   ctx.fillStyle = INK;
   ctx.font = `500 ${metrics.size}px ${FONT_SERIF}`;
-  drawWrapped(ctx, body, SIDE + pad, cardY + pad + 108, textW, metrics.lh, metrics.maxLines);
+  drawWrapped(ctx, body, padX, topY + 132, textW, metrics.lh, metrics.maxLines);
 
-  const authorY = cardY + cardH - pad - authorH + 6;
   ctx.strokeStyle = "rgba(18, 20, 26, 0.08)";
   ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.moveTo(SIDE + pad, authorY - 22);
-  ctx.lineTo(SIDE + innerW - pad, authorY - 22);
+  ctx.moveTo(padX, authorY - 28);
+  ctx.lineTo(W - padX, authorY - 28);
   ctx.stroke();
-  drawAuthorRow(ctx, SIDE + pad, authorY, name, handle, true, photo);
+  drawAuthorRow(ctx, padX, authorY, name, handle, true, photo);
 }
 
 function drawEventCard(
