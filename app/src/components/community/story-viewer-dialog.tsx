@@ -582,12 +582,12 @@ export function StoryViewerDialog({
                 </div>
               )}
 
-              {/* Edge taps: previous / next without fighting shared-post hits. */}
+              {/* Edge taps: previous / next — keep narrow on shared posts so card controls stay tappable. */}
               <button
                 type="button"
                 className={cn(
                   "absolute inset-y-0 left-0 z-10 cursor-pointer border-0 bg-transparent",
-                  sourcePostId ? "w-[12%]" : "w-[18%]",
+                  sourcePostId ? "w-10" : "w-[18%]",
                 )}
                 aria-label="Previous story"
                 onClick={(e) => {
@@ -603,7 +603,7 @@ export function StoryViewerDialog({
                 type="button"
                 className={cn(
                   "absolute inset-y-0 right-0 z-10 cursor-pointer border-0 bg-transparent",
-                  sourcePostId ? "w-[12%]" : "w-[18%]",
+                  sourcePostId ? "w-10" : "w-[18%]",
                 )}
                 aria-label={isLast ? "Close story" : "Next story"}
                 onClick={(e) => {

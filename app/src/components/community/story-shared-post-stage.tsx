@@ -1,11 +1,13 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type MouseEvent } from "react";
 import { formatDistanceToNow } from "date-fns";
+import { Volume2, VolumeX } from "lucide-react";
 import { Link } from "wouter";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { renderBodyWithMentions } from "@/components/community/render-body-with-mentions";
 import {
   fetchCommunityPostById,
   getPostImageSignedUrls,
+  getPostVideoSignedUrl,
   parseEventExtra,
   parsePollExtra,
   type CommunityPostRow,
@@ -19,6 +21,10 @@ type AuthorMeta = {
   handle: string | null;
   avatarUrl: string | null;
 };
+
+type SharedMedia =
+  | { kind: "image"; url: string }
+  | { kind: "video"; url: string };
 
 type Props = {
   postId: string;
@@ -75,14 +81,21 @@ function AuthorChip({
 
 /**
  * Full-bleed interactive stage for stories that reshare a feed post.
- * Image posts keep the photo clear; caption sits below in a fixed footer band.
+ * Photos and videos use the same card: media on top, caption + author below.
  */
 export function StorySharedPostStage({ postId, className, onOpenPost, onOpenAuthor }: Props) {
   const [post, setPost] = useState<CommunityPostRow | null>(null);
   const [author, setAuthor] = useState<AuthorMeta | null>(null);
-  const [thumbUrl, setThumbUrl] = useState<string | null>(null);
+  const [media, setMedia] = useState<SharedMedia | null>(null);
+  const [muted, setMuted] = useState(true);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
+
+  const toggleMute = useCallback((e: MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setMuted((m) => !m);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -90,7 +103,8 @@ export function StorySharedPostStage({ postId, className, onOpenPost, onOpenAuth
     setFailed(false);
     setPost(null);
     setAuthor(null);
-    setThumbUrl(null);
+    setMedia(null);
+    setMuted(true);
 
     void (async () => {
       const res = await fetchCommunityPostById(postId);
@@ -115,10 +129,16 @@ export function StorySharedPostStage({ postId, className, onOpenPost, onOpenAuth
         avatarUrl: p?.avatar_url ?? null,
       });
 
-      const path = row.image_urls?.[0] || null;
-      if (path) {
-        const urls = await getPostImageSignedUrls([path]);
-        if (!cancelled && urls[0]) setThumbUrl(urls[0]);
+      const videoPath = row.video_url?.trim() || null;
+      if (videoPath) {
+        const url = await getPostVideoSignedUrl(videoPath);
+        if (!cancelled && url) setMedia({ kind: "video", url });
+      } else {
+        const imagePath = row.image_urls?.[0] || null;
+        if (imagePath) {
+          const urls = await getPostImageSignedUrls([imagePath]);
+          if (!cancelled && urls[0]) setMedia({ kind: "image", url: urls[0] });
+        }
       }
       setLoading(false);
     })();
@@ -163,7 +183,8 @@ export function StorySharedPostStage({ postId, className, onOpenPost, onOpenAuth
     event?.title?.trim() ||
     "";
   const quoteText = poll?.question?.trim() || caption || "Shared from the feed";
-  const showPhotoCard = Boolean(thumbUrl) && !poll;
+  const showMediaCard = Boolean(media) && !poll;
+  const footerCaption = caption || event?.title?.trim() || "";
 
   return (
     <div
@@ -173,69 +194,127 @@ export function StorySharedPostStage({ postId, className, onOpenPost, onOpenAuth
       )}
       data-testid="story-shared-post-stage"
     >
-      {/* Soft blurred photo wash behind the card (image posts only). */}
-      {showPhotoCard && thumbUrl ? (
+      {/* Soft wash behind the card — same treatment for photo and video. */}
+      {showMediaCard && media ? (
         <>
-          <img
-            src={thumbUrl}
-            alt=""
-            className="absolute inset-0 h-full w-full scale-110 object-cover opacity-40 blur-2xl"
-            aria-hidden
-          />
+          {media.kind === "image" ? (
+            <img
+              src={media.url}
+              alt=""
+              className="absolute inset-0 h-full w-full scale-110 object-cover opacity-40 blur-2xl"
+              aria-hidden
+            />
+          ) : (
+            <video
+              src={media.url}
+              muted
+              playsInline
+              preload="metadata"
+              className="absolute inset-0 h-full w-full scale-110 object-cover opacity-40 blur-2xl"
+              aria-hidden
+            />
+          )}
           <div className="absolute inset-0 bg-gradient-to-br from-[#d7ebe4]/88 via-[#f6f1e8]/92 to-[#e8f4f1]/95" />
         </>
       ) : null}
 
-      <button
-        type="button"
-        className="absolute inset-0 z-[8] cursor-pointer border-0 bg-transparent"
-        aria-label="View original post"
-        data-testid="button-story-open-post"
-        onClick={(e) => {
-          e.stopPropagation();
-          onOpenPost();
-        }}
-      />
-
       <div className="pointer-events-none absolute inset-0 z-[9] flex flex-col px-3.5 pb-[max(6.75rem,env(safe-area-inset-bottom))] pt-[max(5.25rem,calc(env(safe-area-inset-top)+4rem))] sm:px-5">
-        {showPhotoCard && thumbUrl ? (
+        {showMediaCard && media ? (
           <div className="mx-auto flex min-h-0 w-full max-w-lg flex-1 flex-col overflow-hidden rounded-[1.5rem] bg-white shadow-[0_18px_50px_-20px_rgba(15,23,42,0.35)] ring-1 ring-slate-900/8">
-            {/* Image stays clear — never covered by caption. */}
+            {/* Media on top — caption never overlays it. */}
             <div className="relative min-h-0 flex-[1.35] overflow-hidden bg-slate-100">
-              <img src={thumbUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+              <button
+                type="button"
+                className="pointer-events-auto absolute inset-0 z-0 cursor-pointer border-0 bg-transparent"
+                aria-label="View original post"
+                data-testid="button-story-open-post"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenPost();
+                }}
+              />
+              {media.kind === "image" ? (
+                <img
+                  src={media.url}
+                  alt=""
+                  className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+                />
+              ) : (
+                <video
+                  src={media.url}
+                  muted={muted}
+                  loop
+                  playsInline
+                  autoPlay
+                  className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+                  data-testid="story-shared-post-video"
+                />
+              )}
+              {media.kind === "video" ? (
+                <button
+                  type="button"
+                  className="pointer-events-auto absolute bottom-3 left-1/2 z-20 flex h-10 w-10 -translate-x-1/2 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm"
+                  onClick={toggleMute}
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                  }}
+                  aria-label={muted ? "Unmute video" : "Mute video"}
+                  data-testid="story-shared-post-mute"
+                >
+                  {muted ? <VolumeX className="h-4 w-4" aria-hidden /> : <Volume2 className="h-4 w-4" aria-hidden />}
+                </button>
+              ) : null}
               {event ? (
-                <div className="absolute left-3 top-3 rounded-full bg-black/45 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white backdrop-blur-md">
+                <div className="pointer-events-none absolute left-3 top-3 rounded-full bg-black/45 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white backdrop-blur-md">
                   Event
                 </div>
               ) : null}
             </div>
 
             <div className="flex shrink-0 flex-col gap-2.5 px-3.5 pb-3 pt-3">
-              {caption || event?.title ? (
-                <p className="line-clamp-4 text-[0.95rem] font-medium leading-snug tracking-tight text-slate-900 sm:text-base">
-                  {event && event.title.trim() && caption !== event.title.trim() ? (
+              {footerCaption ? (
+                <button
+                  type="button"
+                  className="pointer-events-auto line-clamp-4 whitespace-pre-wrap text-left text-[0.95rem] font-medium leading-snug tracking-tight text-slate-900 sm:text-base"
+                  data-testid="story-shared-post-caption"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenPost();
+                  }}
+                >
+                  {event && event.title.trim() && caption && caption !== event.title.trim() ? (
                     <>
                       <span className="font-semibold">{event.title.trim()}</span>
-                      {caption ? (
-                        <>
-                          <span className="text-slate-400"> · </span>
-                          {renderBodyWithMentions(caption, {})}
-                        </>
-                      ) : null}
+                      <span className="text-slate-400"> · </span>
+                      {renderBodyWithMentions(caption, {})}
                     </>
                   ) : (
-                    renderBodyWithMentions(caption || event?.title || "", {})
+                    renderBodyWithMentions(footerCaption, {})
                   )}
-                </p>
+                </button>
               ) : null}
-              <div className="pointer-events-auto border-t border-slate-900/8 pt-2">
+              <div
+                className={cn(
+                  "pointer-events-auto",
+                  footerCaption ? "border-t border-slate-900/8 pt-2" : undefined,
+                )}
+              >
                 <AuthorChip author={author} post={post} onLight onOpenAuthor={onOpenAuthor} />
               </div>
             </div>
           </div>
         ) : (
           <div className="mx-auto flex min-h-0 w-full max-w-lg flex-1 flex-col justify-center px-1">
-            <div className="min-h-0 overflow-hidden">
+            <button
+              type="button"
+              className="pointer-events-auto min-h-0 overflow-hidden text-left"
+              aria-label="View original post"
+              data-testid="button-story-open-post"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenPost();
+              }}
+            >
               <p
                 className="mb-3 select-none font-serif text-[4.75rem] leading-none text-teal-700/20"
                 aria-hidden
@@ -257,7 +336,7 @@ export function StorySharedPostStage({ postId, className, onOpenPost, onOpenAuth
                   ))}
                 </ul>
               ) : null}
-            </div>
+            </button>
             <div className="pointer-events-auto mt-6 rounded-2xl bg-white/75 p-1 shadow-sm ring-1 ring-slate-900/5">
               <AuthorChip author={author} post={post} onLight onOpenAuthor={onOpenAuthor} />
             </div>

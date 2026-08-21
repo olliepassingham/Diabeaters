@@ -829,6 +829,8 @@ export async function renderPostAsStoryFile(
 
   const poll = post.post_kind === "poll" ? parsePollExtra(post.post_extra) : null;
   const event = post.post_kind === "event" ? parseEventExtra(post.post_extra) : null;
+  // Video posts: freeze one frame into the same shared card as photos (caption below).
+  // The story viewer then plays the live post video inside StorySharedPostStage.
   const mediaPath = event ? post.image_urls[0] || null : post.video_url || post.image_urls[0] || null;
   const media = await loadMedia(mediaPath);
   const caption = (() => {
