@@ -148,7 +148,7 @@ export function HomeCommandHero({
 
   return (
     <>
-      <header className="border-b border-border/35 pb-3 pt-1" data-testid="card-hero">
+      <header className="pb-4 pt-1" data-testid="card-hero">
         <div className="flex items-start justify-between gap-2 px-1">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">

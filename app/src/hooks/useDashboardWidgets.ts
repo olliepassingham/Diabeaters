@@ -85,6 +85,39 @@ function migrateHomeWidgetDefaultsV2(list: WidgetPlacement[]): WidgetPlacement[]
   return next;
 }
 
+/** Put practical daily tools before retrospective insights on the redesigned home. */
+function migrateHomeWidgetDefaultsV3(list: WidgetPlacement[]): WidgetPlacement[] {
+  if (typeof localStorage === "undefined") return list;
+  const FLAG = "diabeaters_dash_home_order_v3";
+  try {
+    if (localStorage.getItem(FLAG)) return list;
+  } catch {
+    return list;
+  }
+
+  const byId = new Map(list.map((placement) => [placement.id, placement]));
+  const next = DASHBOARD_WIDGET_REGISTRY.map((definition, index) => {
+    const previous = byId.get(definition.id);
+    return {
+      id: definition.id,
+      type: definition.id,
+      enabled: typeof previous?.enabled === "boolean" ? previous.enabled : definition.defaultEnabled,
+      order: index,
+      size:
+        previous?.size === "full" || previous?.size === "half"
+          ? previous.size
+          : definition.defaultSize,
+    };
+  });
+
+  try {
+    localStorage.setItem(FLAG, "1");
+  } catch {
+    /* ignore */
+  }
+  return next;
+}
+
 function mergeWithRegistry(saved: PersistedRow[] | null): WidgetPlacement[] {
   const defaults = buildDefaultPlacements();
   if (!saved?.length) return defaults;
@@ -112,7 +145,7 @@ function mergeWithRegistry(saved: PersistedRow[] | null): WidgetPlacement[] {
     };
   });
 
-  return normaliseOrders(migrateHomeWidgetDefaultsV2(merged));
+  return normaliseOrders(migrateHomeWidgetDefaultsV3(migrateHomeWidgetDefaultsV2(merged)));
 }
 
 function loadPlacements(): WidgetPlacement[] {
@@ -132,7 +165,7 @@ function loadPlacements(): WidgetPlacement[] {
     if (!Array.isArray(parsed)) return buildDefaultPlacements();
 
     const merged = mergeWithRegistry(parsed as PersistedRow[]);
-    // Persist one-time migrations (e.g. home order v2) so order sticks.
+    // Persist one-time home order migrations so the hierarchy sticks.
     persistPlacements(merged);
     return merged;
   } catch {

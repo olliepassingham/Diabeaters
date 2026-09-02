@@ -116,7 +116,7 @@ export function HomeCgmGraph() {
 
   return (
     <section
-      className="relative overflow-hidden border-b border-border/35 pb-5 pt-2"
+      className="relative overflow-hidden pb-6 pt-3"
       data-testid="home-cgm-graph"
       aria-labelledby="home-cgm-title"
     >

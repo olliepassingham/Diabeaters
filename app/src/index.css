@@ -287,18 +287,47 @@
     position: absolute;
     inset: -1rem -0.75rem auto;
     z-index: -1;
-    height: 32rem;
+    height: 100%;
     pointer-events: none;
     background:
       radial-gradient(circle at 12% 0%, rgb(var(--color-primary) / 0.1), transparent 42%),
-      radial-gradient(circle at 88% 10%, rgb(6 182 212 / 0.07), transparent 38%);
-    mask-image: linear-gradient(to bottom, black 0%, transparent 100%);
+      radial-gradient(circle at 88% 18%, rgb(6 182 212 / 0.08), transparent 34%),
+      radial-gradient(circle at 4% 58%, rgb(139 92 246 / 0.055), transparent 30%),
+      radial-gradient(circle at 94% 86%, rgb(16 185 129 / 0.06), transparent 34%);
+    mask-image: linear-gradient(to bottom, black 0%, black 88%, transparent 100%);
   }
 
   .dark .home-flow-canvas::before {
     background:
       radial-gradient(circle at 12% 0%, rgb(var(--color-primary) / 0.14), transparent 42%),
-      radial-gradient(circle at 88% 10%, rgb(6 182 212 / 0.08), transparent 38%);
+      radial-gradient(circle at 88% 18%, rgb(6 182 212 / 0.1), transparent 34%),
+      radial-gradient(circle at 4% 58%, rgb(139 92 246 / 0.08), transparent 30%),
+      radial-gradient(circle at 94% 86%, rgb(16 185 129 / 0.08), transparent 34%);
+  }
+
+  .home-widget-flow {
+    position: relative;
+    isolation: isolate;
+    margin-top: -0.25rem;
+    padding: 0 0 2rem;
+  }
+
+  .home-widget-flow::before {
+    content: "";
+    position: absolute;
+    inset: -2rem -0.75rem 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 95% 22% at 4% 8%, rgb(6 182 212 / 0.065), transparent 72%),
+      radial-gradient(ellipse 90% 24% at 96% 35%, rgb(var(--color-primary) / 0.07), transparent 74%),
+      radial-gradient(ellipse 90% 22% at 2% 65%, rgb(245 158 11 / 0.045), transparent 72%),
+      radial-gradient(ellipse 90% 22% at 94% 91%, rgb(139 92 246 / 0.05), transparent 72%);
+  }
+
+  .home-widget-section {
+    position: relative;
+    padding: 0.2rem 0.25rem 0.35rem;
   }
 
   @media (hover: hover) and (pointer: fine) {
@@ -383,21 +412,21 @@
     z-index: 1;
   }
 
-  /* Widget accent stripes (tier 3). */
+  /* Lower home sections use icon colour and whitespace, not card-edge stripes. */
   .widget-accent-insights {
-    border-left: 3px solid rgb(var(--color-primary) / 0.55);
+    border-left: 0;
   }
 
   .widget-accent-tracking {
-    border-left: 3px solid rgb(6 182 212 / 0.55);
+    border-left: 0;
   }
 
   .widget-accent-community {
-    border-left: 3px solid rgb(139 92 246 / 0.5);
+    border-left: 0;
   }
 
   .widget-accent-setup {
-    border-left: 3px solid rgb(245 158 11 / 0.55);
+    border-left: 0;
   }
 
   .widget-accent-urgent {

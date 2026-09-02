@@ -159,7 +159,7 @@ export function AppointmentsWidget(props: DashboardWidgetLayoutProps) {
       </CardHeader>
       <CardContent className={cn(widgetContentClass, "flex flex-col gap-2")}>
         {appointments.length === 0 ? (
-          <div className="flex items-center justify-between gap-3 border-y border-border/30 py-3">
+          <div className="flex items-center justify-between gap-3 py-3">
             <div className="min-w-0">
               <p className="text-sm font-medium text-foreground">No upcoming appointments</p>
               <p className="mt-0.5 text-xs text-muted-foreground">Your next clinic visit will appear here.</p>
@@ -178,7 +178,7 @@ export function AppointmentsWidget(props: DashboardWidgetLayoutProps) {
               return (
                 <div
                   key={appointment.id}
-                  className="pressable flex gap-3 border-b border-border/35 px-1 py-3 transition-colors last:border-b-0 hover:bg-blue-500/[0.04] dark:hover:bg-blue-950/15"
+                  className="pressable flex gap-3 px-1 py-3 transition-colors hover:bg-blue-500/[0.04] dark:hover:bg-blue-950/15"
                   data-testid={`widget-appointment-${appointment.id}`}
                 >
                   <div

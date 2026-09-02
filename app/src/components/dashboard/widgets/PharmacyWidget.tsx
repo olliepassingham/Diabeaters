@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Building2, ChevronRight } from "lucide-react";
 import { Link } from "wouter";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { storage, DIABEATER_SETTINGS_CHANGED_EVENT, type Pharmacy } from "@/lib/storage";
@@ -9,10 +8,9 @@ import { describePharmacyStatus, pharmacyHasAnyHours } from "@/lib/pharmacy";
 import { cn } from "@/lib/utils";
 import { WidgetCard } from "./WidgetCard";
 import type { DashboardWidgetLayoutProps } from "./types";
-import { isCompactLayout } from "./types";
+import { WidgetHeaderIcon, widgetContentClass, widgetHeaderClass } from "./widget-header";
 
-export function PharmacyWidget(props: DashboardWidgetLayoutProps) {
-  const compact = isCompactLayout(props);
+export function PharmacyWidget(_props: DashboardWidgetLayoutProps) {
   const [pharmacy, setPharmacy] = useState<Pharmacy | null>(() => storage.getPharmacy());
   const [now, setNow] = useState<Date>(() => new Date());
 
@@ -38,8 +36,8 @@ export function PharmacyWidget(props: DashboardWidgetLayoutProps) {
   }, [pharmacy, now]);
 
   return (
-    <WidgetCard variant="glass-muted" data-testid="widget-pharmacy">
-      <CardHeader className={cn("space-y-0 pb-2", compact ? "px-4 pt-4" : "px-4 pt-4")}>
+    <WidgetCard accent="tracking" data-testid="widget-pharmacy">
+      <CardHeader className={widgetHeaderClass}>
         <div className="flex items-center justify-between gap-2">
           <Link
             href="/settings/pharmacy"
@@ -48,10 +46,8 @@ export function PharmacyWidget(props: DashboardWidgetLayoutProps) {
             data-testid="link-pharmacy-widget-title"
           >
             <div className="flex min-w-0 items-center gap-2 transition-opacity hover:opacity-80">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <Building2 className="h-4 w-4" aria-hidden />
-              </span>
-              <CardTitle className="text-h3">Pharmacy</CardTitle>
+              <WidgetHeaderIcon icon={Building2} className="bg-cyan-500/10 ring-cyan-500/15 [&_svg]:text-cyan-600 dark:[&_svg]:text-cyan-300" />
+              <CardTitle className="text-base font-semibold leading-tight">Pharmacy</CardTitle>
             </div>
           </Link>
           <Link
@@ -63,19 +59,19 @@ export function PharmacyWidget(props: DashboardWidgetLayoutProps) {
           </Link>
         </div>
       </CardHeader>
-      <CardContent className="px-4 pb-4 pt-1">
+      <CardContent className={cn(widgetContentClass, "pt-0")}>
         {!pharmacy ? (
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center justify-between gap-3 py-3">
             <div className="min-w-0">
               <p className="text-sm font-medium text-foreground">Add your pharmacy</p>
               <p className="text-xs text-muted-foreground">Save opening hours for realistic collect‑by dates.</p>
             </div>
-            <Button asChild size="sm" variant="outline" className="shrink-0" data-testid="button-pharmacy-widget-add">
+            <Button asChild size="sm" variant="ghost" className="shrink-0 rounded-full" data-testid="button-pharmacy-widget-add">
               <Link href="/settings/pharmacy">Add</Link>
             </Button>
           </div>
         ) : (
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center justify-between gap-3 py-3">
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-foreground">{pharmacy.name}</p>
               {pharmacy.addressLine ? (
@@ -85,13 +81,12 @@ export function PharmacyWidget(props: DashboardWidgetLayoutProps) {
               )}
             </div>
             {status ? (
-              <Badge variant={status.open ? "default" : "secondary"} className="shrink-0 text-[11px]">
+              <span className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <span className={cn("h-2 w-2 rounded-full", status.open ? "bg-emerald-500" : "bg-muted-foreground/50")} />
                 {status.line}
-              </Badge>
+              </span>
             ) : (
-              <Badge variant="secondary" className="shrink-0 text-[11px]">
-                Add hours
-              </Badge>
+              <span className="shrink-0 text-xs text-muted-foreground">Add hours</span>
             )}
           </div>
         )}

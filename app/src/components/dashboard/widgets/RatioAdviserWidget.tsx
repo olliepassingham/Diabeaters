@@ -206,7 +206,7 @@ export function RatioAdviserWidget(_props: DashboardWidgetLayoutProps) {
                 >
                   <div
                     className={cn(
-                      "pressable flex min-h-11 items-center gap-2 border-b border-border/35 bg-transparent px-1.5 py-2 text-left transition-colors",
+                      "pressable flex min-h-11 items-center gap-2 bg-transparent px-1.5 py-2 text-left transition-colors",
                       "hover:bg-sky-500/[0.04] dark:hover:bg-sky-950/15",
                     )}
                   >

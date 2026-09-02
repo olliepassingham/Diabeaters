@@ -32,7 +32,7 @@ export function HomeSupplyGraph({ supplies }: { supplies: Supply[] }) {
 
   return (
     <section
-      className="border-b border-border/35 py-5"
+      className="py-6"
       data-testid="home-supply-graph"
       aria-labelledby="home-supply-title"
     >

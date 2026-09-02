@@ -12,7 +12,7 @@ export function WidgetHeaderIcon({
   return (
     <div
       className={cn(
-        "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/12",
+        "flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 shadow-[0_6px_18px_-8px_currentColor] ring-1 ring-primary/10",
         className,
       )}
       aria-hidden

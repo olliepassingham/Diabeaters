@@ -39,7 +39,7 @@ import { HomeCommandHero } from "@/components/home/HomeCommandHero";
 import { HomeTodayPulse } from "@/components/home/HomeTodayPulse";
 import { HomeCgmGraph } from "@/components/home/HomeCgmGraph";
 import { HomeSupplyGraph } from "@/components/home/HomeSupplyGraph";
-import { CommunityQuickPostWidget } from "@/components/dashboard/widgets/CommunityQuickPostWidget";
+import { HomeTravelContext } from "@/components/home/HomeTravelContext";
 import { getHealthStatus } from "@/lib/dashboard-health-status";
 import { useAskAnything } from "@/components/ai-coach/ask-anything-context";
 import { cn } from "@/lib/utils";
@@ -97,7 +97,7 @@ function SoftSettingsNudge({
 }) {
   return (
     <div
-      className="animate-fade-in-up border-b border-border/35 px-1 py-4"
+      className="animate-fade-in-up px-1 py-4"
       data-testid="banner-soft-setup-nudge"
       role="status"
       aria-live="polite"
@@ -328,10 +328,6 @@ export default function Dashboard() {
   // SetupPromptCard covers incomplete setup; never show the settings-completion widget in the grid (avoids empty slot when complete).
   const showCommunityQuickPostWidget =
     !isOffline && isCommunityEnabled && !cloudProfileLoading && cloudProfile?.is_public === true;
-  const showPromotedCommunityWidget =
-    !isCommunityDash &&
-    showCommunityQuickPostWidget &&
-    activeWidgets.some((widget) => widget.type === "community-quick-post");
   const communityDashWidgetAllow = new Set(["community-quick-post", "tip-of-day", "pharmacy"]);
   const widgetsToRender = activeWidgets
     .filter((w) => w.type !== "settings-completion")
@@ -410,16 +406,12 @@ export default function Dashboard() {
 
         {!isCommunityDash ? <HomeCgmGraph /> : null}
 
-        {showPromotedCommunityWidget ? (
-          <section className="border-b border-border/35 py-3" data-testid="home-community-section">
-            <CommunityQuickPostWidget layoutSize="full" widgetType="community-quick-post" />
-          </section>
-        ) : null}
+        {!isCommunityDash ? <HomeTravelContext /> : null}
 
         {!isCommunityDash ? <HomeSupplyGraph supplies={supplies} /> : null}
 
         {showWelcomeWidget ? (
-          <section className="border-b border-border/35 py-4" style={{ animationDelay: "50ms" }}>
+          <section className="py-4" style={{ animationDelay: "50ms" }}>
             <WelcomeWidget />
           </section>
         ) : null}
@@ -450,7 +442,11 @@ export default function Dashboard() {
       <DashboardWidgetSettings
         open={widgetsDialogOpen}
         onOpenChange={setWidgetsDialogOpen}
-        placements={placements}
+        placements={
+          isCommunityDash
+            ? placements
+            : placements.filter((placement) => placement.type !== "community-quick-post")
+        }
         toggleWidget={toggleWidget}
         setWidgetSize={setWidgetSize}
         reorderWidgets={reorderWidgets}
@@ -459,7 +455,7 @@ export default function Dashboard() {
         allowResize={!isMobile}
       />
 
-      <section className="pt-2" data-testid="dashboard-widgets">
+      <section className="home-widget-flow" data-testid="dashboard-widgets">
         <div className="animate-stagger grid grid-cols-1 items-start md:grid-cols-2">
           {widgetsToRender.map((w) => {
             const Comp = w.Component;
@@ -469,7 +465,7 @@ export default function Dashboard() {
                 key={w.id}
                 data-testid={`widget-container-${w.type}`}
                 className={cn(
-                  "w-full self-start empty:hidden border-b border-border/35 py-2 md:px-2",
+                  "home-widget-section w-full self-start empty:hidden md:px-2",
                   (isMobile || w.size === "full") && "md:col-span-2",
                 )}
               >

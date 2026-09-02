@@ -264,7 +264,7 @@ export function TodayActivityLink({ compact = false }: { compact?: boolean }) {
         "group outline-none ring-offset-background transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         compact
           ? "flex min-w-0 items-center gap-2 rounded-xl text-muted-foreground hover:text-foreground"
-          : "-mx-1 mb-2 flex items-center justify-between gap-2 rounded-lg border-b border-border/40 px-1 pb-2 hover:bg-muted/30 dark:hover:bg-muted/15",
+          : "-mx-1 mb-2 flex items-center justify-between gap-2 rounded-lg px-1 pb-2 hover:bg-muted/30 dark:hover:bg-muted/15",
       )}
       data-testid="link-today-activity-calendar"
       aria-label={
@@ -313,6 +313,7 @@ export function TodayAtAGlanceContent(props: {
   /** When hero already shows supply runway, hide duplicate glance copy. */
   suppressRunwayDuplicate?: boolean;
   hideActivityHeader?: boolean;
+  hideTravelContext?: boolean;
 }) {
   const supplyShortcutHidden = props.supplyShortcutHidden === true;
   const { healthStatus, suppressRunwayDuplicate } = props;
@@ -410,7 +411,7 @@ export function TodayAtAGlanceContent(props: {
 
   const status = useMemo(() => getTodayGlanceLine(supplies, scenarioState), [supplies, scenarioState]);
 
-  const showSupplyAttentionRows = suppliesNeedingAttention.length > 0;
+  const showSupplyAttentionRows = suppliesNeedingAttention.length > 0 && !suppressRunwayDuplicate;
   const omitDuplicateStockBanner =
     showSupplyAttentionRows &&
     (status.message === "Critical supplies need attention" || status.message === "Some supplies are running low");
@@ -531,12 +532,12 @@ export function TodayAtAGlanceContent(props: {
         ) : (
           <div
             className={cn(
-              "flex items-start gap-2 rounded-lg border px-2.5 py-1.5",
+              "flex items-start gap-2 px-1 py-2",
               status.type === "warning"
-                ? "border-red-500/20 bg-red-500/[0.05] dark:border-red-500/20 dark:bg-red-950/20"
+                ? "border-red-500/20"
                 : status.type === "info"
-                  ? "border-amber-500/20 bg-amber-500/[0.05] dark:border-amber-500/20 dark:bg-amber-950/20"
-                  : "border-emerald-500/20 bg-emerald-500/[0.05] dark:border-emerald-500/20 dark:bg-emerald-950/20",
+                  ? "border-amber-500/20"
+                  : "border-emerald-500/20",
             )}
           >
             {status.type === "warning" ? (
@@ -552,11 +553,11 @@ export function TodayAtAGlanceContent(props: {
           </div>
         )}
 
-        {showTravelCard ? (
+        {showTravelCard && !props.hideTravelContext ? (
           <div data-testid="dashboard-today-extras">
             <Link href="/scenarios/travel" className="block">
               <div
-                className="cursor-pointer rounded-xl border border-border/45 bg-muted/15 px-2.5 py-2 transition-colors hover:bg-muted/30 dark:border-border/35 dark:bg-muted/10 dark:hover:bg-muted/20"
+                className="cursor-pointer px-1 py-2 transition-colors hover:bg-muted/20"
                 data-testid="dashboard-today-trip-countdown"
               >
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Travel</p>
@@ -575,7 +576,7 @@ export function TodayAtAGlanceContent(props: {
         ) : null}
 
         {scenarioState.sickDayActive ? (
-          <div className="rounded-xl border border-orange-500/20 bg-orange-500/[0.05] px-2.5 py-2 text-sm leading-snug text-orange-950 dark:border-orange-500/25 dark:bg-orange-950/25 dark:text-orange-100">
+          <div className="px-1 py-2 text-sm leading-snug text-orange-950 dark:text-orange-100">
             Sick day — {scenarioState.sickDaySeverity || "moderate"} severity
           </div>
         ) : null}
@@ -594,14 +595,14 @@ export function TodayAtAGlanceContent(props: {
           <Link href="/scenarios/bedtime" className="block">
             <div
               className={cn(
-                "flex cursor-pointer items-center gap-2 rounded-xl border px-2.5 py-2 text-sm leading-snug transition-colors",
+                "flex cursor-pointer items-center gap-2 px-1 py-2 text-sm leading-snug transition-colors",
                 overnightTirBand == null
-                  ? "border-border/45 bg-muted/15 text-foreground hover:bg-muted/30 dark:border-border/35 dark:bg-muted/10 dark:hover:bg-muted/20"
+                  ? "border-border/35 text-foreground hover:bg-muted/20"
                   : overnightTirBand === "low"
-                    ? "border-red-500/20 bg-red-500/[0.05] text-red-950 hover:bg-red-500/[0.08] dark:border-red-500/25 dark:bg-red-950/25 dark:text-red-100"
+                    ? "border-red-500/20 text-red-950 hover:bg-red-500/[0.05] dark:border-red-500/25 dark:text-red-100"
                     : overnightTirBand === "ok"
-                      ? "border-amber-500/20 bg-amber-500/[0.05] text-amber-950 hover:bg-amber-500/[0.08] dark:border-amber-500/25 dark:bg-amber-950/25 dark:text-amber-100"
-                      : "border-emerald-500/20 bg-emerald-500/[0.05] text-emerald-950 hover:bg-emerald-500/[0.08] dark:border-emerald-500/25 dark:bg-emerald-950/25 dark:text-emerald-100",
+                      ? "border-amber-500/20 text-amber-950 hover:bg-amber-500/[0.05] dark:border-amber-500/25 dark:text-amber-100"
+                      : "border-emerald-500/20 text-emerald-950 hover:bg-emerald-500/[0.05] dark:border-emerald-500/25 dark:text-emerald-100",
               )}
               data-testid="card-morning-bedtime-score"
               aria-label={
@@ -624,7 +625,7 @@ export function TodayAtAGlanceContent(props: {
         {isEvening ? (
           <Link href="/scenarios/bedtime" className="block">
             <div
-              className="flex cursor-pointer items-center gap-2 rounded-xl border border-border/45 bg-muted/15 px-2.5 py-2 text-sm leading-snug text-foreground transition-colors hover:bg-muted/30 dark:border-border/35 dark:bg-muted/10 dark:hover:bg-muted/20"
+              className="flex cursor-pointer items-center gap-2 px-1 py-2 text-sm leading-snug text-foreground transition-colors hover:bg-muted/20"
               data-testid="card-evening-bedtime"
             >
               <Moon className="h-4 w-4 shrink-0 text-primary" aria-hidden />

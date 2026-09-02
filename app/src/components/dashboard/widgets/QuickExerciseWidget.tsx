@@ -368,7 +368,7 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
                 <div
                   key={exercise.id}
                   className={cn(
-                    "flex w-full items-center gap-0.5 border-b border-border/35 py-1 transition-colors last:border-b-0",
+                    "flex w-full items-center gap-0.5 py-1 transition-colors",
                     "hover:bg-emerald-500/[0.04] dark:hover:bg-emerald-950/15",
                     isActive && "opacity-50",
                   )}

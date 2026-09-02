@@ -25,7 +25,7 @@ export function WidgetCard({
     <Card
       variant={variant}
       className={cn(
-        "pressable flex flex-col overflow-hidden !rounded-none !border-y-0 !border-r-0 !bg-transparent !shadow-none !backdrop-blur-none",
+        "pressable flex flex-col overflow-hidden !rounded-none !border-0 !bg-none !bg-transparent !shadow-none !ring-0 !backdrop-blur-none",
         ACCENT_CLASS[accent],
         className,
       )}

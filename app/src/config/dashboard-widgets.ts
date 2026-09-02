@@ -62,8 +62,8 @@ export interface DashboardWidgetDefinition {
 
 /**
  * Default order is array order (also used as initial `order` index). Persisted `order` in localStorage overrides.
- * New users: Community → Patterns → Pharmacy → Quick exercise → Ratios → Appointments →
- * Routines (off) → Tip of the day; Settings progress on; Welcome stays off.
+ * New users: Community → Pharmacy → Quick exercise → Ratios → Appointments →
+ * Tip of the day → Patterns; Routines off. Settings progress on; Welcome stays off.
  * UK-English copy throughout.
  */
 export const DASHBOARD_WIDGET_REGISTRY: DashboardWidgetDefinition[] = [
@@ -74,14 +74,6 @@ export const DASHBOARD_WIDGET_REGISTRY: DashboardWidgetDefinition[] = [
     defaultEnabled: true,
     defaultSize: "half",
     component: CommunityQuickPostWidget,
-  },
-  {
-    id: "pattern-insights",
-    label: "Your patterns",
-    description: "Spots patterns in your logged hypos, exercise, and checks.",
-    defaultEnabled: true,
-    defaultSize: "full",
-    component: PatternInsightsWidget,
   },
   {
     id: "pharmacy",
@@ -130,6 +122,14 @@ export const DASHBOARD_WIDGET_REGISTRY: DashboardWidgetDefinition[] = [
     defaultEnabled: true,
     defaultSize: "full",
     component: TipOfDayWidget,
+  },
+  {
+    id: "pattern-insights",
+    label: "Your patterns",
+    description: "Spots patterns in your logged hypos, exercise, and checks.",
+    defaultEnabled: true,
+    defaultSize: "full",
+    component: PatternInsightsWidget,
   },
   {
     id: "settings-completion",

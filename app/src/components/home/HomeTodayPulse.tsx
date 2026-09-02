@@ -14,7 +14,7 @@ export function HomeTodayPulse({
 }) {
   return (
     <section
-      className="animate-fade-in-up border-b border-border/35 py-2"
+      className="animate-fade-in-up py-2"
       style={{ animationDelay: "80ms" }}
     >
       <div data-testid="dashboard-today-overview-card">
@@ -23,6 +23,7 @@ export function HomeTodayPulse({
           healthStatus={healthStatus}
           suppressRunwayDuplicate={suppressRunwayDuplicate}
           hideActivityHeader
+          hideTravelContext
         />
       </div>
     </section>
