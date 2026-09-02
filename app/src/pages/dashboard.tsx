@@ -408,16 +408,16 @@ export default function Dashboard() {
 
         {!isCommunityDash ? <HomeTravelContext /> : null}
 
+        {!isCommunityDash ? (
+          <HomeTodayPulse healthStatus={healthStatus} suppressRunwayDuplicate />
+        ) : null}
+
         {!isCommunityDash ? <HomeSupplyGraph supplies={supplies} /> : null}
 
         {showWelcomeWidget ? (
           <section className="py-4" style={{ animationDelay: "50ms" }}>
             <WelcomeWidget />
           </section>
-        ) : null}
-
-        {!isCommunityDash ? (
-          <HomeTodayPulse healthStatus={healthStatus} suppressRunwayDuplicate />
         ) : null}
 
         {showSoftSetupNudge && (

@@ -34,6 +34,7 @@ import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-out
 import { MealCarbAbsorptionPreview } from "@/components/meal-carb-absorption-preview";
 import { MealCompositionBuilder } from "@/components/meal-composition-builder";
 import { MealDoseResultCard } from "@/components/meal-dose-result-card";
+import { CarbEstimatorSheet } from "@/components/carb-estimator-sheet";
 import { ScenarioResultHero, ScenarioResultHeroSuffix } from "@/components/scenarios/scenario-result-hero";
 
 import { Link, useLocation, useSearch } from "wouter";
@@ -173,6 +174,7 @@ export default function Adviser() {
 
   const [mealCarbs, setMealCarbs] = useState("");
   const [carbUnit, setCarbUnit] = useState<"grams" | "cp">("grams");
+  const [carbEstimatorOpen, setCarbEstimatorOpen] = useState(false);
   const [mealTime, setMealTime] = useState<string>(getInitialMealTime);
   const [mealComposition, setMealComposition] = useState<MealComposition>(DEFAULT_MEAL_COMPOSITION);
   const mealImpact = useMemo(() => computeMealImpact(mealComposition), [mealComposition]);
@@ -704,6 +706,17 @@ export default function Adviser() {
                       {carbUnit === "cp" ? "CP" : "g"}
                     </span>
                   </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-9 w-full rounded-xl text-primary hover:bg-primary/10"
+                    onClick={() => setCarbEstimatorOpen(true)}
+                    data-testid="button-open-carb-estimator"
+                  >
+                    <Search className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                    Estimate from foods
+                  </Button>
                 </div>
               </section>
 
@@ -1056,6 +1069,19 @@ export default function Adviser() {
           <RatioAdviserTool settings={settings} bgUnit={bgUnits} onSettingsUpdate={(s) => setSettings(s)} onNavigateToMeal={() => setActiveTab("meal")} />
         </TabsContent>
       </Tabs>
+
+      <CarbEstimatorSheet
+        open={carbEstimatorOpen}
+        onOpenChange={setCarbEstimatorOpen}
+        onConfirm={(grams) => {
+          setMealCarbs(String(grams));
+          setCarbUnit("grams");
+          toast({
+            title: "Carb estimate added",
+            description: `${grams}g is ready to check before continuing.`,
+          });
+        }}
+      />
 
       {activeTab === "meal" ? (
         <>
