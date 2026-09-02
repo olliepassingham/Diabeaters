@@ -3,7 +3,6 @@ import type { WidgetSize, WidgetType } from "@/lib/storage";
 import {
   AppointmentsWidget,
   SettingsCompletionWidget,
-  SupplySummaryWidget,
   RatioAdviserWidget,
   QuickExerciseWidget,
   RoutinesWidget,
@@ -14,8 +13,42 @@ import {
   PatternInsightsWidget,
 } from "@/components/widgets";
 
-export type DashboardWidgetComponentProps = { layoutSize?: WidgetSize };
+export type DashboardWidgetComponentProps = { layoutSize?: WidgetSize; widgetType?: WidgetType };
 type WidgetComponent = ComponentType<DashboardWidgetComponentProps> | ComponentType<{ compact?: boolean }>;
+
+export type WidgetAccent = "insights" | "tracking" | "community" | "setup" | "default" | "urgent";
+
+const WIDGET_ACCENT: Record<WidgetType, WidgetAccent> = {
+  "pattern-insights": "insights",
+  "supply-summary": "tracking",
+  "quick-exercise": "tracking",
+  "ratio-adviser": "insights",
+  "community-quick-post": "community",
+  "pharmacy": "tracking",
+  "appointments": "tracking",
+  "routines": "tracking",
+  "tip-of-day": "community",
+  "settings-completion": "setup",
+  welcome: "setup",
+};
+
+const ACCENT_CLASS: Record<WidgetAccent, string> = {
+  insights: "widget-accent-insights",
+  tracking: "widget-accent-tracking",
+  community: "widget-accent-community",
+  setup: "widget-accent-setup",
+  urgent: "widget-accent-urgent",
+  default: "",
+};
+
+export function getWidgetAccent(type: WidgetType): WidgetAccent {
+  return WIDGET_ACCENT[type] ?? "default";
+}
+
+export function getWidgetAccentClass(type: WidgetType, urgent = false): string {
+  if (urgent) return ACCENT_CLASS.urgent;
+  return ACCENT_CLASS[getWidgetAccent(type)];
+}
 
 /** Single source of truth for dashboard widget metadata and React components. */
 export interface DashboardWidgetDefinition {
@@ -29,7 +62,7 @@ export interface DashboardWidgetDefinition {
 
 /**
  * Default order is array order (also used as initial `order` index). Persisted `order` in localStorage overrides.
- * New users: Community → Patterns → Supplies → Pharmacy → Quick exercise → Ratios → Appointments →
+ * New users: Community → Patterns → Pharmacy → Quick exercise → Ratios → Appointments →
  * Routines (off) → Tip of the day; Settings progress on; Welcome stays off.
  * UK-English copy throughout.
  */
@@ -49,14 +82,6 @@ export const DASHBOARD_WIDGET_REGISTRY: DashboardWidgetDefinition[] = [
     defaultEnabled: true,
     defaultSize: "full",
     component: PatternInsightsWidget,
-  },
-  {
-    id: "supply-summary",
-    label: "Supplies",
-    description: "Stock on hand and how long each item is expected to last (run-out bars).",
-    defaultEnabled: true,
-    defaultSize: "full",
-    component: SupplySummaryWidget,
   },
   {
     id: "pharmacy",

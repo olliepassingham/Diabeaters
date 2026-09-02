@@ -22,8 +22,8 @@ const STRUGGLE_CONFIGS: Record<string, StruggleConfig> = {
     message: "You said running out of supplies was your biggest challenge. Your Supply Tracker can predict when things will run low and remind you to reorder.",
     cta: "Open Supply Tracker",
     link: "/supplies",
-    iconColor: "text-blue-600 dark:text-blue-400",
-    iconBg: "bg-blue-500/10 dark:bg-blue-500/20",
+    iconColor: "text-primary",
+    iconBg: "bg-primary/10 ring-1 ring-primary/15",
   },
   meals: {
     icon: Utensils,
@@ -31,8 +31,8 @@ const STRUGGLE_CONFIGS: Record<string, StruggleConfig> = {
     message: "You said meal dosing was tricky. Meal & ratios can suggest insulin from the carb ratios you save — try it with your next meal.",
     cta: "Plan a meal",
     link: "/adviser?tab=meal",
-    iconColor: "text-orange-600 dark:text-orange-400",
-    iconBg: "bg-orange-500/10 dark:bg-orange-500/20",
+    iconColor: "text-amber-700 dark:text-amber-300",
+    iconBg: "bg-amber-500/10 ring-1 ring-amber-500/20",
   },
   exercise: {
     icon: Dumbbell,
@@ -40,8 +40,8 @@ const STRUGGLE_CONFIGS: Record<string, StruggleConfig> = {
     message: "Exercise throwing your levels off? The Exercise Planner can suggest carb and insulin adjustments for your workout.",
     cta: "Open exercise guide",
     link: "/scenarios/exercise",
-    iconColor: "text-green-600 dark:text-green-400",
-    iconBg: "bg-green-500/10 dark:bg-green-500/20",
+    iconColor: "text-emerald-700 dark:text-emerald-300",
+    iconBg: "bg-emerald-500/10 ring-1 ring-emerald-500/20",
   },
   overview: {
     icon: LayoutDashboard,
@@ -49,8 +49,8 @@ const STRUGGLE_CONFIGS: Record<string, StruggleConfig> = {
     message: "Everything in one place — supplies, meals, exercise, and more. Use Home and Tools along the bottom (or the menu on larger screens), and use the layout control on Home to show what matters most.",
     cta: "Browse tools",
     link: "/tools",
-    iconColor: "text-purple-600 dark:text-purple-400",
-    iconBg: "bg-purple-500/10 dark:bg-purple-500/20",
+    iconColor: "text-violet-700 dark:text-violet-300",
+    iconBg: "bg-violet-500/10 ring-1 ring-violet-500/20",
   },
 };
 
@@ -111,7 +111,7 @@ export function WelcomeWidget() {
   return (
     <Card
       variant="glass-muted"
-      className="dashboard-card-hover overflow-hidden rounded-2xl border border-border/50 shadow-none dark:border-border/40"
+      className="overflow-hidden !rounded-none !border-0 !bg-transparent !shadow-none !backdrop-blur-none"
       data-testid="widget-welcome"
     >
       <CardContent className="p-4 md:p-5 pt-5 pb-4">

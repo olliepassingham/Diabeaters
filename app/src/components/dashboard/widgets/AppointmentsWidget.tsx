@@ -15,9 +15,9 @@ import { WidgetCard } from "./WidgetCard";
 import type { DashboardWidgetLayoutProps } from "./types";
 import { isCompactLayout } from "./types";
 import { cn } from "@/lib/utils";
-import { HomeCardEmpty } from "@/components/home/home-ui";
 import { syncAppointments } from "@/lib/appointments-supabase";
 import { useAuth } from "@/lib/auth-context";
+import { WidgetHeaderIcon, widgetContentClass, widgetHeaderClass } from "./widget-header";
 
 function parseAppointmentDate(dateStr: string | undefined): Date | null {
   if (!dateStr) return null;
@@ -144,55 +144,46 @@ export function AppointmentsWidget(props: DashboardWidgetLayoutProps) {
   const list = compact ? appointments.slice(0, 2) : appointments;
 
   return (
-    <WidgetCard className="overflow-visible" data-testid="widget-appointments">
-      <CardHeader className="p-4 pb-2 md:p-6 md:pb-3 flex flex-col gap-1 space-y-0 sm:flex-row sm:items-start sm:justify-between">
+    <WidgetCard accent="tracking" className="overflow-visible" data-testid="widget-appointments">
+      <CardHeader className={widgetHeaderClass}>
         <div>
           <Link href="/appointments">
-            <div className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer">
-              <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0" />
-              <CardTitle className="text-h3 text-foreground">
+            <div className="flex items-center gap-2 transition-opacity hover:opacity-80">
+              <WidgetHeaderIcon icon={Calendar} className="bg-blue-500/10 ring-blue-500/15 [&_svg]:text-blue-600 dark:[&_svg]:text-blue-400" />
+              <CardTitle className="text-base font-semibold leading-tight text-foreground">
                 {compact ? "Appts" : "Appointments"}
               </CardTitle>
             </div>
           </Link>
-          <p className="text-small text-muted-foreground uppercase tracking-wide mt-1 pl-0 sm:pl-7">
-            {appointments.length > 0 ? "Upcoming visits" : null}
-          </p>
         </div>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3 p-4 pt-0 md:px-6 md:pb-6">
+      <CardContent className={cn(widgetContentClass, "flex flex-col gap-2")}>
         {appointments.length === 0 ? (
-          <HomeCardEmpty
-            compact
-            icon={Calendar}
-            title="No upcoming appointments"
-            description="Add clinic visits to see them on your calendar."
-          >
-            <Link href="/appointments" className="w-full">
-              <Button
-                variant="secondary"
-                size="sm"
-                className="w-full min-h-9 gap-1.5 text-xs font-medium shadow-sm border border-border/80"
-                data-testid="button-add-appointment-widget"
-              >
-                <Plus className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                Add appointment
-              </Button>
-            </Link>
-          </HomeCardEmpty>
+          <div className="flex items-center justify-between gap-3 border-y border-border/30 py-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">No upcoming appointments</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">Your next clinic visit will appear here.</p>
+            </div>
+            <Button asChild variant="ghost" size="sm" className="shrink-0 rounded-full text-blue-700 hover:bg-blue-500/10 dark:text-blue-300">
+              <Link href="/appointments" data-testid="button-add-appointment-widget">
+                <Plus className="mr-1 h-3.5 w-3.5" aria-hidden />
+                Add
+              </Link>
+            </Button>
+          </div>
         ) : (
-          <div className="space-y-3">
+          <div>
             {list.map((appointment) => {
               const d = parseAppointmentDate(appointment.date);
               return (
                 <div
                   key={appointment.id}
-                  className="pressable card-interactive flex gap-3 rounded-xl border border-border bg-card p-3 shadow-sm transition-colors hover:border-blue-500/30 hover:bg-blue-500/[0.04] dark:hover:border-blue-500/20 dark:hover:bg-blue-950/20"
+                  className="pressable flex gap-3 border-b border-border/35 px-1 py-3 transition-colors last:border-b-0 hover:bg-blue-500/[0.04] dark:hover:bg-blue-950/15"
                   data-testid={`widget-appointment-${appointment.id}`}
                 >
                   <div
                     className={cn(
-                      "flex flex-col items-center justify-center rounded-lg bg-card shadow-sm min-w-[3.25rem] px-2 py-2 border border-border",
+                      "flex min-w-[3.25rem] flex-col items-center justify-center rounded-xl bg-blue-500/[0.08] px-2 py-2",
                     )}
                   >
                     {d ? (

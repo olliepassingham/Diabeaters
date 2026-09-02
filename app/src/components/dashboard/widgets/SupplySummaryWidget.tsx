@@ -11,6 +11,7 @@ import type { DashboardWidgetLayoutProps } from "./types";
 import { cn } from "@/lib/utils";
 import { HomeCardEmpty } from "@/components/home/home-ui";
 import { SupplyRunwayFill } from "@/components/visualizations/supply-runway-fill";
+import { WidgetHeaderIcon, widgetContentClass, widgetHeaderClass } from "./widget-header";
 
 const typeIcons: Record<string, typeof Package> = {
   needle: Syringe,
@@ -77,10 +78,10 @@ export function SupplySummaryWidget(_props: DashboardWidgetLayoutProps) {
 
   if (error) {
     return (
-      <WidgetCard className="overflow-visible" data-testid="widget-supply-summary">
-        <CardHeader className="p-4 pb-2 md:p-6 md:pb-3">
+      <WidgetCard accent="tracking" className="overflow-visible" data-testid="widget-supply-summary">
+        <CardHeader className={widgetHeaderClass}>
           <div className="flex items-center gap-2">
-            <Package className="h-5 w-5 text-cyan-600 dark:text-cyan-400 shrink-0" />
+            <WidgetHeaderIcon icon={Package} />
             <CardTitle className="text-h3 text-foreground">Supplies</CardTitle>
           </div>
         </CardHeader>
@@ -114,14 +115,15 @@ export function SupplySummaryWidget(_props: DashboardWidgetLayoutProps) {
 
   return (
     <WidgetCard
-      className={cn("overflow-visible", hasAlerts && "ring-1 ring-amber-500/35 dark:ring-amber-400/25")}
+      accent={criticalSupplies.length > 0 ? "urgent" : "tracking"}
+      className={cn("overflow-visible", hasAlerts && !criticalSupplies.length && "ring-1 ring-amber-500/35 dark:ring-amber-400/25")}
       data-testid="widget-supply-summary"
     >
-      <CardHeader className="p-4 pb-2 md:p-6 md:pb-2">
+      <CardHeader className={widgetHeaderClass}>
         <div className="flex items-center justify-between gap-2">
           <Link href="/supplies">
             <div className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer min-w-0">
-              <Package className="h-5 w-5 text-cyan-600 dark:text-cyan-400 shrink-0" />
+              <WidgetHeaderIcon icon={Package} />
               <CardTitle className="text-h3 text-foreground">Supplies</CardTitle>
             </div>
           </Link>
@@ -132,7 +134,7 @@ export function SupplySummaryWidget(_props: DashboardWidgetLayoutProps) {
           )}
         </div>
       </CardHeader>
-      <CardContent className="flex flex-col gap-2.5 p-4 pt-0 md:px-6 md:pb-5">
+      <CardContent className={cn("flex flex-col gap-2.5", widgetContentClass)}>
         {supplies.length === 0 ? (
           <HomeCardEmpty
             compact

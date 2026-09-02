@@ -39,9 +39,10 @@ export function CommunityQuickPostWidget(_props: DashboardWidgetLayoutProps) {
   return (
     <WidgetCard
       data-testid="widget-community-quick-post"
-      className="border-border/50 bg-gradient-to-b from-card/95 to-muted/15 py-0 shadow-sm"
+      accent="community"
+      className="py-0"
     >
-      <CardContent className="px-3 py-3 sm:px-3.5">
+      <CardContent className="px-2 py-1 sm:px-3">
         <FeedComposerSheet
           open={composer.sheetOpen}
           onOpenChange={composer.setSheetOpen}

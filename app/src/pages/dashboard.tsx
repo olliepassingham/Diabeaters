@@ -1,16 +1,9 @@
-import { useState, useEffect, useRef, useMemo, type ReactElement } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLocation, useSearch } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Phone,
-  LayoutGrid,
-  AlertCircle,
-  ArrowRight,
-  CheckCircle2,
-  X,
-} from "lucide-react";
+import { AlertCircle, ArrowRight, X } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Link } from "wouter";
 import {
@@ -18,619 +11,76 @@ import {
   DIABEATER_SETTINGS_CHANGED_EVENT,
   DIABEATER_PROFILE_CHANGED_EVENT,
   DIABEATER_ACTIVE_USER_CHANGED_EVENT,
-  DIABEATER_OPEN_HYPO_DIALOG_EVENT,
-  notifyHypoCloudLogged,
   dismissSoftSetupNudge,
   isCommunityAccountProfile,
   isSoftSetupNudgeDismissed,
   isWithinOnboardingPostFinishGracePeriod,
   Supply as LocalSupply,
   ScenarioState,
-  UserProfile,
   SettingsCompletionItem,
+  UserProfile,
 } from "@/lib/storage";
 import { getActiveAppMode } from "@/lib/carer-session";
 import { seedPatientFirstRunDefaultsIfNeeded } from "@/lib/starter-patient-defaults";
-import { useToast } from "@/hooks/use-toast";
-import { ToastAction } from "@/components/ui/toast";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { WelcomeWidget, shouldOfferWelcomeWidget } from "@/components/widgets/welcome-widget";
-import { StagingChip } from "@/components/StagingChip";
 import { useDashboardWidgets } from "@/hooks/useDashboardWidgets";
 import { DashboardWidgetSettings } from "@/components/dashboard/DashboardWidgetSettings";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useAuth } from "@/lib/auth-context";
 import { useProfile } from "@/lib/profile";
 import { getSupabase } from "@/lib/supabase";
 import { repairSickDayCloudIfLocalInactive } from "@/lib/scenarios-supabase";
-import { insertHypoLog } from "@/lib/hypo-logs-supabase";
-import { invokeNotifyCarersOnHypo } from "@/lib/invoke-notify-carers-hypo";
-import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
 import { PageHeader, PageShell } from "@/components/layout";
 import { PendingHypoCheckInBanner } from "@/components/pending-hypo-check-in-banner";
-import { LogHypoTreatmentSheet } from "@/components/log-hypo-treatment-sheet";
-import { SupplyTrackerTodaySection } from "@/components/dashboard/SupplyTrackerTodaySection";
 import { isAiCoachEnabled, isCommunityEnabled } from "@/lib/flags";
 import { useOffline } from "@/hooks/use-offline";
-import { DashboardQuickActions } from "@/components/home/dashboard-quick-actions";
-import { HomeMetaBadge, HomePrimaryStatusPill, homeDashboardCardClass, homeSetupCardClass } from "@/components/home/home-ui";
+import { HomeMetaBadge, homeDataPanelClass, homeHeroPanelClass } from "@/components/home/home-ui";
+import { HomeCommandHero } from "@/components/home/HomeCommandHero";
+import { HomeTodayPulse } from "@/components/home/HomeTodayPulse";
+import { HomeCgmGraph } from "@/components/home/HomeCgmGraph";
+import { HomeSupplyGraph } from "@/components/home/HomeSupplyGraph";
+import { CommunityQuickPostWidget } from "@/components/dashboard/widgets/CommunityQuickPostWidget";
+import { getHealthStatus } from "@/lib/dashboard-health-status";
 import { useAskAnything } from "@/components/ai-coach/ask-anything-context";
-import {
-  getHealthStatus,
-  getTodayGlanceLine,
-  shouldShowHeroGlanceLine,
-  type HealthStatus,
-} from "@/lib/dashboard-health-status";
-import { listCarerLinksForPatient } from "@/lib/carers";
 import { cn } from "@/lib/utils";
 
 const VERIFIED_WELCOME_PENDING_KEY = "diabeater_verified_welcome_pending";
 const VERIFIED_WELCOME_DISMISSED_AT_KEY = "diabeater_verified_welcome_dismissed_at";
 const VERIFIED_WELCOME_DISMISS_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
-type ToastLike = ReturnType<typeof useToast>["toast"];
-
-async function runHypoTreatmentPipeline(
-  fields: { glucoseInput: string; treatment: string; notes: string },
-  ctx: {
-    userId: string | undefined;
-    toast: ToastLike;
-    onAfterLocalSave?: () => void;
-    /** Navigate to Family & supporters when suggesting a link. */
-    onOpenFamilySupporters?: () => void;
-  },
-): Promise<void> {
-  const glucoseLevel = fields.glucoseInput.trim() ? parseFloat(fields.glucoseInput) : undefined;
-  const treatment = fields.treatment.trim() || undefined;
-  const notes = fields.notes.trim() || undefined;
-
-  const created = storage.addHypoTreatment({
-    timestamp: new Date().toISOString(),
-    glucoseLevel,
-    treatment,
-    notes,
-    carerNotified: false,
-  });
-
-  ctx.onAfterLocalSave?.();
-
-  let description = "Saved to your hypo history.";
-  let toastAction: ReactElement | undefined;
-  let notifyInvokeFailed = false;
-  let notifyFailure: { detail?: string; error?: string } | null = null;
-
-  if (ctx.userId && getSupabase()) {
-    const cloud = await insertHypoLog({
-      blood_glucose: created.glucoseLevel ?? null,
-      treatment: created.treatment ?? null,
-      notes: created.notes ?? null,
-    });
-
-    if (cloud.data) {
-      storage.patchHypoTreatment(created.id, { supabaseHypoLogId: cloud.data.id });
-      notifyHypoCloudLogged({ hypoLogId: cloud.data.id });
-      const notify = await invokeNotifyCarersOnHypo({
-        hypoId: cloud.data.id,
-        userId: ctx.userId,
-      });
-
-      if (!notify.success) {
-        notifyInvokeFailed = true;
-        notifyFailure = notify;
-      } else {
-        const eligible = notify.eligible_carers ?? 0;
-        const delivered = (notify.delivered_push ?? 0) + (notify.delivered_inapp ?? 0);
-
-        if (eligible > 0 && delivered > 0) {
-          storage.updateHypoTreatmentCarerNotified(created.id, true);
-          description =
-            eligible === 1 ? "Your supporter has been notified." : "Your supporters have been notified.";
-        } else if (eligible > 0 && delivered === 0) {
-          description =
-            "Hypo logged. No alerts were delivered — ask your supporter to enable push in Diabeaters (Settings → Notifications) on their phone.";
-        } else if (eligible === 0) {
-          const links = await listCarerLinksForPatient();
-          const linkedCount = links.data?.length ?? 0;
-          if (linkedCount === 0) {
-            description =
-              "Saved to your history. Link a supporter if you want someone alerted next time.";
-            if (ctx.onOpenFamilySupporters) {
-              toastAction = (
-                <ToastAction altText="Link a supporter" onClick={ctx.onOpenFamilySupporters}>
-                  Link supporter
-                </ToastAction>
-              );
-            }
-          } else {
-            description =
-              "Saved to your record. Linked supporters did not get an alert — turn on Hypo logs sharing in Family & supporters.";
-            if (ctx.onOpenFamilySupporters) {
-              toastAction = (
-                <ToastAction altText="Open Family and supporters" onClick={ctx.onOpenFamilySupporters}>
-                  Check sharing
-                </ToastAction>
-              );
-            }
-          }
-        }
-      }
-    } else {
-      description =
-        "Saved on this device. Cloud log failed — sign in again and retry if supporters should be notified.";
-    }
-  }
-
-  ctx.toast({
-    title: "Hypo treatment logged",
-    description,
-    action: toastAction,
-  });
-  if (notifyInvokeFailed && notifyFailure) {
-    ctx.toast({
-      title: NOTIFY_EDGE_FAILURE_TITLE,
-      description: notifyEdgeFailureDescription(notifyFailure),
-      variant: "destructive",
-    });
-  }
-}
-
-function StatusPill({ status }: { status: HealthStatus }) {
-  const config = {
-    stable: {
-      text: "Stable",
-      textColor: "text-green-700 dark:text-green-400",
-      stroke: "#22c55e",
-      trackStroke: "hsl(142 71% 45% / 0.2)",
-      fill: "hsl(142 71% 45% / 0.08)",
-      arc: 1,
-    },
-    watch: {
-      text: "Watch",
-      textColor: "text-amber-700 dark:text-amber-400",
-      stroke: "#f59e0b",
-      trackStroke: "hsl(38 92% 50% / 0.2)",
-      fill: "hsl(38 92% 50% / 0.08)",
-      arc: 0.6,
-    },
-    action: {
-      text: "Action needed",
-      textColor: "text-red-700 dark:text-red-400",
-      stroke: "#ef4444",
-      trackStroke: "hsl(0 72% 52% / 0.2)",
-      fill: "hsl(0 72% 52% / 0.08)",
-      arc: 0.3,
-    },
-  };
-
-  const { text, textColor, stroke, trackStroke, fill, arc } = config[status];
-  const pillRef = useRef<HTMLDivElement>(null);
-  const [dims, setDims] = useState({ w: 0, h: 0 });
-
-  useEffect(() => {
-    if (pillRef.current) {
-      const { offsetWidth, offsetHeight } = pillRef.current;
-      setDims({ w: offsetWidth, h: offsetHeight });
-    }
-  }, [text]);
-
-  const sw = 2.5;
-  const rx = dims.h / 2;
-  const ry = dims.h / 2;
-  const innerW = dims.w - sw;
-  const innerH = dims.h - sw;
-  const innerRx = Math.max(0, rx - sw / 2);
-  const innerRy = Math.max(0, ry - sw / 2);
-
-  const getPerimeter = () => {
-    if (innerW <= 0 || innerH <= 0) return 0;
-    const straightH = innerW - 2 * innerRx;
-    const straightV = innerH - 2 * innerRy;
-    const curveApprox = Math.PI * (3 * (innerRx + innerRy) - Math.sqrt((3 * innerRx + innerRy) * (innerRx + 3 * innerRy))) / 2;
-    return 2 * straightH + 2 * straightV + 2 * curveApprox;
-  };
-
-  const perimeter = getPerimeter();
-  const dashOffset = perimeter * (1 - arc);
-  const pulseClass = status === "action" ? "animate-pulse" : "";
-
-  return (
-    <div className={`relative inline-flex ${pulseClass}`} data-testid="status-indicator">
-      <div
-        ref={pillRef}
-        className="relative inline-flex min-w-[5.5rem] items-center justify-center whitespace-nowrap px-4 py-1.5 sm:min-w-[6rem] sm:px-4"
-        style={{ background: fill, borderRadius: `${rx}px` }}
-      >
-        <span className={`text-xs font-semibold ${textColor}`} data-testid="text-status">
-          {text}
-        </span>
-        {dims.w > 0 && (
-          <svg
-            className="absolute inset-0 pointer-events-none"
-            width={dims.w}
-            height={dims.h}
-            viewBox={`0 0 ${dims.w} ${dims.h}`}
-          >
-            <rect
-              x={sw / 2}
-              y={sw / 2}
-              width={innerW}
-              height={innerH}
-              rx={innerRx}
-              ry={innerRy}
-              fill="none"
-              stroke={trackStroke}
-              strokeWidth={sw}
-            />
-            <rect
-              x={sw / 2}
-              y={sw / 2}
-              width={innerW}
-              height={innerH}
-              rx={innerRx}
-              ry={innerRy}
-              fill="none"
-              stroke={stroke}
-              strokeWidth={sw}
-              strokeLinecap="round"
-              strokeDasharray={perimeter}
-              strokeDashoffset={dashOffset}
-              style={{ transition: "stroke-dashoffset 0.6s ease" }}
-            />
-          </svg>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function DashboardInfoDialog() {
-  return (
-    <PageInfoDialog
-      title="About Your Dashboard"
-      description="Your personal diabetes command centre"
-    >
-      <InfoSection title="Customise your view">
-        <p>Tap the layout button to edit widgets. You can show or hide cards and drag them into the order you prefer. Your layout is saved on this device.</p>
-      </InfoSection>
-      <InfoSection title="Reordering">
-        <p>In the widget editor, drag the handle beside each row to change order. On tablets and larger screens, you can also switch some widgets between full and half width.</p>
-      </InfoSection>
-      <InfoSection title="Status Indicator">
-        <p>The status shows your overall diabetes situation. Green means stable, amber means watch, and red means action is needed.</p>
-      </InfoSection>
-      <InfoSection title="Quick Navigation">
-        <p>Click the Diabeaters logo in the navigation bar to return to the dashboard from any page.</p>
-      </InfoSection>
-      <InfoSection title="Help Now Button">
-        <p>The red Help Now button gives you instant access to emergency resources, contacts, and guidance for urgent situations.</p>
-      </InfoSection>
-    </PageInfoDialog>
-  );
-}
-
-function HeroCard({
-  status,
-  profile,
-  cloudFullName,
-  supplies,
-  scenarioState,
-  onEditWidgets,
-}: {
-  status: HealthStatus;
-  profile: UserProfile | null;
-  cloudFullName: string | null;
-  supplies: LocalSupply[];
-  scenarioState: ScenarioState;
-  onEditWidgets: () => void;
-}) {
-  const { user } = useAuth();
-  const [, setLocation] = useLocation();
-  const isUrgent = status === "action";
-  const { toast } = useToast();
-  const [hypoDialogOpen, setHypoDialogOpen] = useState(false);
-  const [quickHypoConfirmOpen, setQuickHypoConfirmOpen] = useState(false);
-  const [hasLinkedSupporters, setHasLinkedSupporters] = useState<boolean | null>(null);
-
-  const handleHypoDialogOpenChange = (open: boolean) => {
-    setHypoDialogOpen(open);
-  };
-
-  const openFamilySupporters = () => setLocation("/family-carers");
-
-  const refreshLinkedSupporters = () => {
-    if (!user?.id || !getSupabase()) {
-      setHasLinkedSupporters(null);
-      return;
-    }
-    void listCarerLinksForPatient().then((res) => {
-      if (res.error) {
-        setHasLinkedSupporters(null);
-        return;
-      }
-      setHasLinkedSupporters((res.data?.length ?? 0) > 0);
-    });
-  };
-
-  useEffect(() => {
-    refreshLinkedSupporters();
-  }, [user?.id]);
-
-  useEffect(() => {
-    const openHypo = () => setHypoDialogOpen(true);
-    window.addEventListener(DIABEATER_OPEN_HYPO_DIALOG_EVENT, openHypo);
-    return () => window.removeEventListener(DIABEATER_OPEN_HYPO_DIALOG_EVENT, openHypo);
-  }, []);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("hypo_log") !== "1") return;
-    setHypoDialogOpen(true);
-    params.delete("hypo_log");
-    const query = params.toString();
-    const next = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
-    window.history.replaceState({}, "", next);
-  }, []);
-
-  const handleLogHypo = (fields: { glucoseInput: string; treatment: string; notes: string }) => {
-    void runHypoTreatmentPipeline(fields, {
-      userId: user?.id,
-      toast,
-      onOpenFamilySupporters: openFamilySupporters,
-      onAfterLocalSave: () => {
-        handleHypoDialogOpenChange(false);
-      },
-    }).then(() => refreshLinkedSupporters());
-  };
-
-  const handleTreatedHypoClick = () => {
-    if (storage.getNotificationSettings().hypoDashboardQuickNotify === true) {
-      refreshLinkedSupporters();
-      setQuickHypoConfirmOpen(true);
-      return;
-    }
-    setHypoDialogOpen(true);
-  };
-
-  const confirmQuickHypo = () => {
-    setQuickHypoConfirmOpen(false);
-    void runHypoTreatmentPipeline(
-      { glucoseInput: "", treatment: "", notes: "" },
-      { userId: user?.id, toast, onOpenFamilySupporters: openFamilySupporters },
-    ).then(() => refreshLinkedSupporters());
-  };
-
-  const quickConfirmHasSupporters = hasLinkedSupporters !== false;
-
-  const greeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 18) return "Good afternoon";
-    return "Good evening";
-  };
-
-  const displayName = cloudFullName?.trim() || profile?.name?.trim() || "";
-  const firstName = displayName.split(" ")[0] || "";
-  const glance = getTodayGlanceLine(supplies, scenarioState);
-  const showHeroGlanceLine = shouldShowHeroGlanceLine(glance, supplies, scenarioState, status);
-  const activeExercise = storage.getActiveExercise();
-  const pumpFailureActive = storage.getScenarioState().pumpFailureActive === true;
-
-  return (
-    <>
-      <Card
-        variant="glass"
-        className={cn(homeDashboardCardClass, "hover:shadow-md")}
-        data-testid="card-hero"
-      >
-        <CardContent className="space-y-4 p-4 md:p-5">
-          <div className="space-y-3">
-            <div className="flex items-start gap-2 sm:gap-3">
-              <div className="flex min-w-0 flex-1 flex-col gap-2">
-                <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                  <span
-                    className="font-display text-2xl font-semibold tracking-tight text-foreground text-balance sm:text-3xl"
-                    data-testid="text-greeting"
-                  >
-                    {greeting()}
-                    {firstName ? `, ${firstName}` : ""}
-                  </span>
-                  <StagingChip />
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="shrink-0" data-testid="wrap-dashboard-status-pill">
-                    <StatusPill status={status} />
-                  </div>
-                  {showHeroGlanceLine ? (
-                    <HomePrimaryStatusPill
-                      type={glance.type}
-                      message={glance.message}
-                      testId="text-dashboard-glance"
-                    />
-                  ) : null}
-                </div>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <DashboardInfoDialog />
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={onEditWidgets}
-                  className="h-11 w-11 rounded-xl focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-neutral-200"
-                  data-testid="button-customize"
-                  aria-label="Customise dashboard widgets"
-                >
-                  <LayoutGrid className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          {(scenarioState.sickDayActive ||
-            scenarioState.travelModeActive ||
-            Boolean(activeExercise) ||
-            pumpFailureActive) && (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                Active
-              </span>
-              {scenarioState.sickDayActive ? (
-                <Button asChild variant="outline" size="sm" className="h-8 rounded-full px-3 text-xs">
-                  <Link href="/scenarios/sick-day" data-testid="chip-active-sickday">
-                    <AlertCircle className="h-3.5 w-3.5 mr-1.5 text-amber-600 dark:text-amber-400" />
-                    Sick day
-                  </Link>
-                </Button>
-              ) : null}
-              {scenarioState.travelModeActive ? (
-                <Button asChild variant="outline" size="sm" className="h-8 rounded-full px-3 text-xs">
-                  <Link href="/scenarios/travel" data-testid="chip-active-travel">
-                    <ArrowRight className="h-3.5 w-3.5 mr-1.5 text-blue-600 dark:text-blue-400" />
-                    Travel
-                  </Link>
-                </Button>
-              ) : null}
-              {activeExercise ? (
-                <Button asChild variant="outline" size="sm" className="h-8 rounded-full px-3 text-xs">
-                  <Link href="/scenarios/exercise" data-testid="chip-active-exercise">
-                    <CheckCircle2 className="h-3.5 w-3.5 mr-1.5 text-emerald-600 dark:text-emerald-400" />
-                    Exercise
-                  </Link>
-                </Button>
-              ) : null}
-              {pumpFailureActive ? (
-                <Button asChild variant="outline" size="sm" className="h-8 rounded-full px-3 text-xs">
-                  <Link href="/scenarios/pump-failure" data-testid="chip-active-pumpfailure">
-                    <AlertCircle className="h-3.5 w-3.5 mr-1.5 text-red-600 dark:text-red-400" />
-                    Pump failure
-                  </Link>
-                </Button>
-              ) : null}
-            </div>
-          )}
-
-          <div className="flex min-w-0 flex-nowrap items-stretch gap-2">
-            <Link href="/help-now" className="min-w-0 flex-1">
-              <Button
-                variant="destructive"
-                className={cn(
-                  "h-12 w-full min-w-0 rounded-2xl px-3 text-sm",
-                  "bg-gradient-to-r from-red-500 to-red-600 dark:from-red-700 dark:to-red-600",
-                  "shadow-sm shadow-red-600/10 ring-1 ring-red-500/20 hover:shadow-md",
-                  isUrgent && "glow-pulse-critical",
-                )}
-                data-testid="button-help-now"
-              >
-                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/15">
-                  <Phone className="h-4 w-4 shrink-0" />
-                </span>
-                <span className="ml-2 font-semibold tracking-tight">Help Now</span>
-              </Button>
-            </Link>
-            <Button
-              className={cn(
-                "h-12 min-w-0 flex-1 rounded-2xl px-3 text-sm text-white",
-                "bg-gradient-to-r from-emerald-500 to-green-600 dark:from-emerald-700 dark:to-green-700",
-                "shadow-sm shadow-emerald-600/10 ring-1 ring-emerald-500/20 hover:shadow-md",
-              )}
-              onClick={handleTreatedHypoClick}
-              data-testid="button-dashboard-treated-hypo"
-            >
-              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/15">
-                <CheckCircle2 className="h-4 w-4 shrink-0" />
-              </span>
-              <span className="ml-2 font-semibold tracking-tight">Treated a Hypo</span>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <LogHypoTreatmentSheet
-        open={hypoDialogOpen}
-        onOpenChange={handleHypoDialogOpenChange}
-        profile={profile}
-        onSubmit={handleLogHypo}
-      />
-
-      <AlertDialog open={quickHypoConfirmOpen} onOpenChange={setQuickHypoConfirmOpen}>
-        <AlertDialogContent data-testid="dialog-quick-hypo-confirm">
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {quickConfirmHasSupporters ? "Log treated hypo and tell supporters?" : "Log treated hypo?"}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {quickConfirmHasSupporters
-                ? "This logs a hypo treatment now and notifies any linked supporters. You can turn off quick-notify in Settings → Notifications if you would rather add details first."
-                : "This logs a hypo treatment to your history now. Link a supporter later if you want someone alerted next time. You can turn off quick-notify in Settings → Notifications if you would rather add details first."}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-quick-hypo-cancel">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-800"
-              onClick={confirmQuickHypo}
-              data-testid="button-quick-hypo-confirm"
-            >
-              {quickConfirmHasSupporters ? "Log + tell supporters" : "Log hypo"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
-  );
-}
 
 function DashboardSkeleton() {
   return (
     <PageShell variant="wide" density="compact" className="animate-fade-in">
-      <Card className="border-border/70 shadow-sm">
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="space-y-2">
-              <Skeleton className="h-5 w-56 skeleton-shimmer" />
-              <Skeleton className="h-3 w-40 skeleton-shimmer" />
-            </div>
-            <Skeleton className="h-7 w-20 rounded-full skeleton-shimmer" />
-          </div>
-        </CardContent>
-      </Card>
-      <div className="flex items-center gap-2">
-        <Skeleton className="h-8 flex-1 rounded-full skeleton-shimmer" />
-        <Skeleton className="h-8 w-[7.5rem] rounded-full skeleton-shimmer" />
-        <Skeleton className="h-8 w-8 rounded-full skeleton-shimmer" />
-        <Skeleton className="h-8 w-8 rounded-md skeleton-shimmer" />
+      <div className={cn(homeHeroPanelClass, "p-4 space-y-4")}>
+        <Skeleton className="h-3 w-36 skeleton-shimmer" />
+        <div className="flex items-center justify-between gap-4">
+          <Skeleton className="h-12 w-32 rounded-full skeleton-shimmer" />
+          <Skeleton className="h-16 w-24 rounded-xl skeleton-shimmer" />
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <Skeleton className="h-11 rounded-2xl skeleton-shimmer" />
+          <Skeleton className="h-11 rounded-2xl skeleton-shimmer" />
+          <Skeleton className="h-11 rounded-2xl skeleton-shimmer" />
+          <Skeleton className="h-11 rounded-2xl skeleton-shimmer" />
+        </div>
       </div>
-      <div className="space-y-2">
-        <Skeleton className="h-3 w-24 skeleton-shimmer" />
+      <div className={cn(homeDataPanelClass, "p-3")}>
+        <Skeleton className="h-12 w-full rounded-lg skeleton-shimmer" />
+      </div>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <Card className="border-border/70 shadow-sm">
-          <CardContent className="space-y-2 p-3">
-            <Skeleton className="h-14 w-full rounded-md skeleton-shimmer" />
+          <CardContent className="space-y-2 p-4">
+            <Skeleton className="h-4 w-28 skeleton-shimmer" />
+            <Skeleton className="h-24 w-full rounded-md skeleton-shimmer" />
           </CardContent>
         </Card>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
-          <Card className="border-border/70 shadow-sm">
-            <CardContent className="space-y-2 p-3">
-              <Skeleton className="h-4 w-28 skeleton-shimmer" />
-              <Skeleton className="h-12 w-full rounded-md skeleton-shimmer" />
-            </CardContent>
-          </Card>
-          <Card className="border-border/70 shadow-sm">
-            <CardContent className="space-y-2 p-3">
-              <Skeleton className="h-4 w-28 skeleton-shimmer" />
-              <Skeleton className="h-12 w-full rounded-md skeleton-shimmer" />
-            </CardContent>
-          </Card>
-        </div>
+        <Card className="border-border/70 shadow-sm">
+          <CardContent className="space-y-2 p-4">
+            <Skeleton className="h-4 w-28 skeleton-shimmer" />
+            <Skeleton className="h-24 w-full rounded-md skeleton-shimmer" />
+          </CardContent>
+        </Card>
       </div>
     </PageShell>
   );
@@ -647,7 +97,7 @@ function SoftSettingsNudge({
 }) {
   return (
     <div
-      className="animate-fade-in-up rounded-2xl border border-border/50 bg-muted/20 px-3 py-2.5 sm:px-4 dark:border-border/40 dark:bg-muted/15"
+      className="animate-fade-in-up border-b border-border/35 px-1 py-4"
       data-testid="banner-soft-setup-nudge"
       role="status"
       aria-live="polite"
@@ -686,7 +136,10 @@ function SetupPromptCard({
   completion: { percentage: number; completed: number; total: number; missing: SettingsCompletionItem[] };
 }) {
   return (
-    <Card className={cn(homeSetupCardClass, "hover:shadow-md")} data-testid="card-setup-prompt">
+    <Card
+      className="!rounded-none !border-y-0 !border-r-0 !border-l-[3px] !border-l-amber-500/55 !bg-transparent !shadow-none"
+      data-testid="card-setup-prompt"
+    >
       <CardContent className="space-y-3 p-4">
         <div className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
@@ -875,10 +328,15 @@ export default function Dashboard() {
   // SetupPromptCard covers incomplete setup; never show the settings-completion widget in the grid (avoids empty slot when complete).
   const showCommunityQuickPostWidget =
     !isOffline && isCommunityEnabled && !cloudProfileLoading && cloudProfile?.is_public === true;
+  const showPromotedCommunityWidget =
+    !isCommunityDash &&
+    showCommunityQuickPostWidget &&
+    activeWidgets.some((widget) => widget.type === "community-quick-post");
   const communityDashWidgetAllow = new Set(["community-quick-post", "tip-of-day", "pharmacy"]);
   const widgetsToRender = activeWidgets
     .filter((w) => w.type !== "settings-completion")
     .filter((w) => w.type !== "community-quick-post" || showCommunityQuickPostWidget)
+    .filter((w) => isCommunityDash || w.type !== "community-quick-post")
     .filter((w) => !isCommunityDash || communityDashWidgetAllow.has(w.type));
 
   if (isLoading) {
@@ -892,12 +350,15 @@ export default function Dashboard() {
         title={<span data-testid="dashboard-title">Dashboard</span>}
         description={
           <span data-testid="dashboard-subtitle">
-            {isCommunityDash ? "Explore education and the community" : "Your daily overview"}
+            {isCommunityDash ? "Explore education and the community" : "Today and activity calendar"}
           </span>
         }
       />
-      {/* Today: high-signal cluster (reads as one section) */}
-      <section className="dashboard-home-canvas space-y-2.5 sm:space-y-3.5" data-testid="dashboard-today">
+      {/* One continuous patient-home canvas: status, graphs, actions, today. */}
+      <section
+        className="home-flow-canvas animate-fade-in"
+        data-testid="dashboard-today"
+      >
         {showVerifiedWelcome && (
           <Alert
             className="animate-fade-in-up border-emerald-500/40 bg-emerald-500/5 dark:bg-emerald-950/20 dark:border-emerald-500/30"
@@ -934,35 +395,38 @@ export default function Dashboard() {
         ) : null}
 
         {!isCommunityDash ? (
-          <div className="animate-fade-in" style={{ animationDelay: "30ms" }}>
-            <HeroCard
+          <div style={{ animationDelay: "30ms" }}>
+            <HomeCommandHero
               status={healthStatus}
               profile={profile}
-              cloudFullName={cloudProfile?.full_name ?? null}
-              supplies={supplies}
               scenarioState={scenarioState}
               onEditWidgets={() => setWidgetsDialogOpen(true)}
+              showCoach={isAiCoachEnabled && !isOffline}
+              showGuides={showScenariosQuickLink}
+              guidesHref={scenariosQuickHref}
             />
           </div>
         ) : null}
 
-        {!isCommunityDash ? (
-          <div className="animate-fade-in-up" style={{ animationDelay: "45ms" }}>
-            <DashboardQuickActions
-              showScenariosLink={showScenariosQuickLink}
-              scenariosHref={scenariosQuickHref}
-              showCoachLink={isAiCoachEnabled && !isOffline}
-            />
-          </div>
+        {!isCommunityDash ? <HomeCgmGraph /> : null}
+
+        {showPromotedCommunityWidget ? (
+          <section className="border-b border-border/35 py-3" data-testid="home-community-section">
+            <CommunityQuickPostWidget layoutSize="full" widgetType="community-quick-post" />
+          </section>
         ) : null}
+
+        {!isCommunityDash ? <HomeSupplyGraph supplies={supplies} /> : null}
 
         {showWelcomeWidget ? (
-          <section className="animate-fade-in-up" style={{ animationDelay: "50ms" }}>
+          <section className="border-b border-border/35 py-4" style={{ animationDelay: "50ms" }}>
             <WelcomeWidget />
           </section>
         ) : null}
 
-        {!isCommunityDash ? <SupplyTrackerTodaySection healthStatus={healthStatus} /> : null}
+        {!isCommunityDash ? (
+          <HomeTodayPulse healthStatus={healthStatus} suppressRunwayDuplicate />
+        ) : null}
 
         {showSoftSetupNudge && (
           <section className="animate-fade-in-up" style={{ animationDelay: "70ms" }}>
@@ -995,8 +459,8 @@ export default function Dashboard() {
         allowResize={!isMobile}
       />
 
-      <section className="animate-stagger space-y-2.5 sm:space-y-4 pt-1 sm:pt-2" data-testid="dashboard-widgets">
-        <div className="grid grid-cols-1 items-start gap-3 sm:gap-5 md:grid-cols-2">
+      <section className="pt-2" data-testid="dashboard-widgets">
+        <div className="animate-stagger grid grid-cols-1 items-start md:grid-cols-2">
           {widgetsToRender.map((w) => {
             const Comp = w.Component;
             if (!Comp) return null;
@@ -1005,12 +469,11 @@ export default function Dashboard() {
                 key={w.id}
                 data-testid={`widget-container-${w.type}`}
                 className={cn(
-                  // empty:hidden collapses the slot when a widget renders nothing (e.g. no insights).
-                  "w-full self-start empty:hidden",
+                  "w-full self-start empty:hidden border-b border-border/35 py-2 md:px-2",
                   (isMobile || w.size === "full") && "md:col-span-2",
                 )}
               >
-                <Comp layoutSize={isMobile ? "full" : w.size} />
+                <Comp layoutSize={isMobile ? "full" : w.size} widgetType={w.type} />
               </div>
             );
           })}

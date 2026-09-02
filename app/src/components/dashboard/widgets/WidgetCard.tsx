@@ -2,20 +2,31 @@ import * as React from "react";
 import { Card, type CardVariant } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { hapticLight } from "@/lib/haptics";
+import type { WidgetAccent } from "@/config/dashboard-widgets";
 
-/** Dashboard widget surface — glass family to match the home hero. */
+const ACCENT_CLASS: Record<WidgetAccent, string> = {
+  insights: "widget-accent-insights",
+  tracking: "widget-accent-tracking",
+  community: "widget-accent-community",
+  setup: "widget-accent-setup",
+  urgent: "widget-accent-urgent",
+  default: "",
+};
+
+/** Dashboard widget section — intentionally borderless on the continuous home canvas. */
 export function WidgetCard({
   className,
   variant = "glass-strong",
+  accent = "default",
   onPointerDown,
   ...props
-}: React.ComponentProps<typeof Card> & { variant?: CardVariant }) {
+}: React.ComponentProps<typeof Card> & { variant?: CardVariant; accent?: WidgetAccent }) {
   return (
     <Card
       variant={variant}
       className={cn(
-        // Single hairline edge — the glass surface provides the fill; no ring/shadow stacking.
-        "pressable card-interactive dashboard-card-hover flex flex-col overflow-hidden rounded-[1.35rem] border border-border/50 shadow-none dark:border-border/40",
+        "pressable flex flex-col overflow-hidden !rounded-none !border-y-0 !border-r-0 !bg-transparent !shadow-none !backdrop-blur-none",
+        ACCENT_CLASS[accent],
         className,
       )}
       {...props}
@@ -23,7 +34,6 @@ export function WidgetCard({
         onPointerDown?.(e);
         if (e.button !== 0) return;
         const target = e.target as HTMLElement | null;
-        // Nested controls handle their own feedback — only haptic on the card chrome.
         if (target?.closest("button, a[href], input, textarea, select, [role='switch'], [role='checkbox'], [role='radio']")) {
           return;
         }

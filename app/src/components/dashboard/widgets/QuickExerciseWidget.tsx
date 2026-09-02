@@ -26,6 +26,7 @@ import { cgmTrendForExercise } from "@/lib/cgm/apply-cgm-trend";
 import { isStarterExerciseRoutine, seedStarterExerciseRoutineIfNeeded } from "@/lib/starter-exercise-routine";
 import { EXERCISE_GUIDE_HREF } from "@/lib/exercise-mode-deep-link";
 import { Badge } from "@/components/ui/badge";
+import { WidgetHeaderIcon, widgetContentClass, widgetHeaderClass } from "./widget-header";
 
 const EXERCISE_ICONS: Record<ExerciseType, typeof Dumbbell> = {
   cardio: Flame,
@@ -254,10 +255,10 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
 
   if (error) {
     return (
-      <WidgetCard className="overflow-visible" data-testid="widget-quick-exercise">
-        <CardHeader className="space-y-0 p-3 pb-1.5 sm:p-4 sm:pb-2">
+      <WidgetCard accent="tracking" className="overflow-visible" data-testid="widget-quick-exercise">
+        <CardHeader className={widgetHeaderClass}>
           <div className="flex items-center gap-2">
-            <Dumbbell className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <WidgetHeaderIcon icon={Dumbbell} />
             <CardTitle className="text-base font-semibold leading-tight text-foreground">Quick exercise</CardTitle>
           </div>
         </CardHeader>
@@ -270,7 +271,7 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
 
   if (exercises === null) {
     return (
-      <WidgetCard className="overflow-visible" data-testid="widget-quick-exercise">
+      <WidgetCard accent="tracking" className="overflow-visible" data-testid="widget-quick-exercise">
         <CardContent className="p-3 sm:p-4">
           <p className="text-sm text-muted-foreground">Loading…</p>
         </CardContent>
@@ -297,16 +298,16 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
       : "Add exercises";
 
   return (
-    <WidgetCard className="overflow-visible" data-testid="widget-quick-exercise">
-      <CardHeader className="space-y-0 p-3 pb-1.5 sm:p-4 sm:pb-2">
+    <WidgetCard accent="tracking" className="overflow-visible" data-testid="widget-quick-exercise">
+      <CardHeader className={widgetHeaderClass}>
         <Link href="/scenarios/exercise">
-          <div className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer">
-            <Dumbbell className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          <div className="flex items-center gap-2 transition-opacity hover:opacity-80">
+            <WidgetHeaderIcon icon={Dumbbell} className="bg-emerald-500/10 ring-emerald-500/15 [&_svg]:text-emerald-600 dark:[&_svg]:text-emerald-400" />
             <CardTitle className="text-base font-semibold leading-tight text-foreground">Quick exercise</CardTitle>
           </div>
         </Link>
       </CardHeader>
-      <CardContent className="flex flex-col gap-2 p-3 pt-0 sm:gap-2.5 sm:p-4 sm:pt-0">
+      <CardContent className={cn(widgetContentClass, "flex flex-col gap-2")}>
         {travelActiveTripHint ? (
           <p className="text-[11px] text-muted-foreground" data-testid="text-exercise-travel-active-hint">
             On an active trip — logging sessions helps you spot patterns.
@@ -367,22 +368,22 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
                 <div
                   key={exercise.id}
                   className={cn(
-                    "flex w-full items-center gap-0.5 rounded-xl border border-border/70 bg-card/80 p-0.5 transition-colors",
-                    "hover:border-emerald-500/35 hover:bg-emerald-500/[0.06] dark:hover:border-emerald-500/25 dark:hover:bg-emerald-950/25",
-                    isActive && "border-emerald-500/60 dark:border-emerald-500/50 opacity-50",
+                    "flex w-full items-center gap-0.5 border-b border-border/35 py-1 transition-colors last:border-b-0",
+                    "hover:bg-emerald-500/[0.04] dark:hover:bg-emerald-950/15",
+                    isActive && "opacity-50",
                   )}
                 >
                   <button
                     type="button"
                     onClick={() => handleQuickStart(exercise)}
                     className={cn(
-                      "pressable flex min-h-10 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 py-1.5 text-left",
+                      "pressable flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-xl px-1.5 py-1.5 text-left",
                       isActive && "pointer-events-none",
                     )}
                     disabled={isActive}
                     data-testid={`button-quick-exercise-${exercise.id}`}
                   >
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 dark:bg-emerald-500/15">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 dark:bg-emerald-500/15">
                       <Icon className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                     </span>
                     <span className="min-w-0 flex-1 text-left">
@@ -448,9 +449,9 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
         {(exercises.length > 0 || activeSession) && (
           <Link href={plannerCtaHref}>
             <Button
-              variant="secondary"
+              variant="ghost"
               size="sm"
-              className="w-full h-9 gap-1.5 text-xs font-medium shadow-sm border border-border/80"
+              className="h-9 w-full gap-1.5 rounded-full text-xs font-medium text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-300"
               data-testid="button-exercise-action"
             >
               {plannerCtaLabel}

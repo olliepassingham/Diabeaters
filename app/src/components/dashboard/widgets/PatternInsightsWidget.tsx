@@ -5,6 +5,7 @@ import { Link } from "wouter";
 import { WidgetCard } from "./WidgetCard";
 import type { DashboardWidgetLayoutProps } from "./types";
 import { isCompactLayout } from "./types";
+import { WidgetHeaderIcon, widgetContentClass, widgetHeaderClass } from "./widget-header";
 import { storage } from "@/lib/storage";
 import { computePatternInsights } from "@/lib/insights/pattern-insights";
 import { computeHourlyHypoComparison } from "@/lib/insights/pattern-charts";
@@ -22,6 +23,7 @@ import {
 } from "@/lib/cgm/glucose-day-filters";
 import { resolveUserTargetBgRange } from "@/lib/target-bg-range";
 import { normalizeBgUnits } from "@/lib/alcohol-night-tool";
+import { cn } from "@/lib/utils";
 
 const MIN_HYPOS_FOR_CHART = 3;
 const MIN_DAYS_FOR_OVERLAY = 1;
@@ -113,19 +115,15 @@ export function PatternInsightsWidget(props: DashboardWidgetLayoutProps) {
   const showBuildingTeaser = cgmConnected && !hasGlucoseChart && !hasHypoChart && !topInsight;
 
   return (
-    <WidgetCard data-testid="widget-pattern-insights">
-      <CardHeader className="p-4 pb-2 md:p-6 md:pb-3">
+    <WidgetCard accent="insights" data-testid="widget-pattern-insights">
+      <CardHeader className={widgetHeaderClass}>
         <div className="flex items-center justify-between gap-2 min-w-0">
           <Link
             href="/tools/patterns"
             className="flex min-w-0 items-center gap-2 hover:opacity-80 transition-opacity"
             data-testid="link-view-all-patterns"
           >
-            {hasGlucoseChart ? (
-              <LineChart className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden />
-            ) : (
-              <Sparkles className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden />
-            )}
+            <WidgetHeaderIcon icon={hasGlucoseChart ? LineChart : Sparkles} />
             <CardTitle className="text-h3 text-foreground">Your patterns</CardTitle>
             <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
           </Link>
@@ -142,7 +140,7 @@ export function PatternInsightsWidget(props: DashboardWidgetLayoutProps) {
           ) : null}
         </div>
       </CardHeader>
-      <CardContent className="p-4 pt-0 md:px-6 md:pb-6 space-y-3">
+      <CardContent className={cn(widgetContentClass, "space-y-3")}>
         {hasGlucoseChart ? (
           <GlucoseDayOverlayChart
             series={glucoseSeries}

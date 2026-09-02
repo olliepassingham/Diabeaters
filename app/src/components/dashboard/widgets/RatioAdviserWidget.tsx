@@ -25,6 +25,7 @@ import { WidgetCard } from "./WidgetCard";
 import type { DashboardWidgetLayoutProps } from "./types";
 import { cn } from "@/lib/utils";
 import { HomeCardEmpty } from "@/components/home/home-ui";
+import { WidgetHeaderIcon, widgetContentClass, widgetHeaderClass } from "./widget-header";
 
 function getScenarioFactor(scenarioState: ScenarioState): { factor: number; label: string; icon: typeof Pill } | null {
   if (scenarioState.sickDayActive) {
@@ -126,10 +127,10 @@ export function RatioAdviserWidget(_props: DashboardWidgetLayoutProps) {
 
   if (error) {
     return (
-      <WidgetCard className="overflow-visible" data-testid="widget-ratio-adviser">
-        <CardHeader className="space-y-0 p-3 pb-1.5 sm:p-4 sm:pb-2">
+      <WidgetCard accent="insights" className="overflow-visible" data-testid="widget-ratio-adviser">
+        <CardHeader className={widgetHeaderClass}>
           <div className="flex items-center gap-2">
-            <Syringe className="h-4 w-4 text-sky-600 dark:text-sky-400 shrink-0" />
+            <WidgetHeaderIcon icon={Syringe} />
             <CardTitle className="text-base font-semibold leading-tight text-foreground">Your ratios</CardTitle>
           </div>
         </CardHeader>
@@ -164,11 +165,11 @@ export function RatioAdviserWidget(_props: DashboardWidgetLayoutProps) {
   const lastRatioSpansFullRow = ratios.length % 2 === 1;
 
   return (
-    <WidgetCard className="overflow-visible" data-testid="widget-ratio-adviser">
-      <CardHeader className="space-y-0 p-3 pb-1.5 sm:p-4 sm:pb-2">
+    <WidgetCard accent="insights" className="overflow-visible" data-testid="widget-ratio-adviser">
+      <CardHeader className={widgetHeaderClass}>
         <Link href="/settings/ratios">
           <div className="flex flex-wrap items-center gap-1.5 hover:opacity-80 transition-opacity cursor-pointer">
-            <Syringe className="h-4 w-4 text-sky-600 dark:text-sky-400 shrink-0" />
+            <WidgetHeaderIcon icon={Syringe} className="bg-sky-500/10 ring-sky-500/15 [&_svg]:text-sky-600 dark:[&_svg]:text-sky-400" />
             <CardTitle className="text-base font-semibold leading-tight text-foreground">Your ratios</CardTitle>
             {scenario && (
               <span
@@ -186,7 +187,7 @@ export function RatioAdviserWidget(_props: DashboardWidgetLayoutProps) {
           </div>
         </Link>
       </CardHeader>
-      <CardContent className="flex flex-col gap-2 p-3 pt-0 sm:p-4 sm:pt-0">
+      <CardContent className={cn(widgetContentClass, "flex flex-col gap-2")}>
         {hasRatios ? (
           <div className="grid grid-cols-2 gap-1.5">
             {ratios.map((r, idx) => {
@@ -205,11 +206,11 @@ export function RatioAdviserWidget(_props: DashboardWidgetLayoutProps) {
                 >
                   <div
                     className={cn(
-                      "pressable flex min-h-9 items-center gap-1.5 rounded-lg border border-border/70 bg-card/80 px-2 py-1.5 text-left transition-colors",
-                      "hover:border-sky-500/35 hover:bg-sky-500/[0.06] dark:hover:border-sky-500/25 dark:hover:bg-sky-950/25",
+                      "pressable flex min-h-11 items-center gap-2 border-b border-border/35 bg-transparent px-1.5 py-2 text-left transition-colors",
+                      "hover:bg-sky-500/[0.04] dark:hover:bg-sky-950/15",
                     )}
                   >
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-sky-500/10 dark:bg-sky-500/15">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-sky-500/10 dark:bg-sky-500/15">
                       <RowIcon className="h-3 w-3 text-sky-600 dark:text-sky-400" aria-hidden />
                     </span>
                     <span className="min-w-0 flex-1 truncate text-[11px] font-medium leading-none text-muted-foreground">

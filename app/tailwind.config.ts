@@ -112,11 +112,32 @@ export default {
           from: { opacity: "0", transform: "translateY(6px)" },
           to: { opacity: "1", transform: "translateY(0)" },
         },
+        "fade-in": {
+          from: { opacity: "0" },
+          to: { opacity: "1" },
+        },
+        "fade-in-up": {
+          from: { opacity: "0", transform: "translateY(10px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        "glow-pulse-critical": {
+          "0%, 100%": {
+            boxShadow:
+              "0 0 0 1px rgb(239 68 68 / 0.25), 0 0 12px 2px rgb(239 68 68 / 0.2)",
+          },
+          "50%": {
+            boxShadow:
+              "0 0 0 1px rgb(239 68 68 / 0.45), 0 0 20px 6px rgb(239 68 68 / 0.35)",
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "soft-in": "soft-in 185ms cubic-bezier(0.22, 1, 0.36, 1) both",
+        "fade-in": "fade-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both",
+        "fade-in-up": "fade-in-up 280ms cubic-bezier(0.22, 1, 0.36, 1) both",
+        "glow-pulse-critical": "glow-pulse-critical 2.2s ease-in-out infinite",
       },
     },
   },

@@ -213,9 +213,109 @@ export function SupplyTrackerEntryCard() {
   );
 }
 
-function TodayAtAGlanceContent(props: { supplyShortcutHidden?: boolean; healthStatus: HealthStatus }) {
+export function TodayActivityLink({ compact = false }: { compact?: boolean }) {
+  const [activityTick, setActivityTick] = useState(0);
+
+  useEffect(() => {
+    const refresh = () => setActivityTick((tick) => tick + 1);
+    const onVis = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", refresh);
+    window.addEventListener(DIABEATER_ACTIVE_USER_CHANGED_EVENT, refresh);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener(DIABEATER_ACTIVE_USER_CHANGED_EVENT, refresh);
+    };
+  }, []);
+
+  const activityWeek = useMemo(
+    () => getActivityWeekSummary(collectAllActivityEvents()),
+    [activityTick],
+  );
+  const habitStreaks = useMemo(() => {
+    const events = collectAllActivityEvents();
+    return {
+      bedtime: computeStreakStats(events, "bedtime_check"),
+      exercise: computeStreakStats(events, "exercise_session"),
+      showingUp: computeStreakStats(events, "app_check_in"),
+    };
+  }, [activityTick]);
+  const activityLabel =
+    habitStreaks.bedtime.current > 0 || habitStreaks.exercise.current > 0
+      ? `Bedtime ${habitStreaks.bedtime.current}d · Exercise ${habitStreaks.exercise.current}d`
+      : habitStreaks.showingUp.current >= 2
+        ? `Showing up · ${habitStreaks.showingUp.current} days`
+        : activityWeek.countLast7Days === 0
+          ? "Activity calendar"
+          : `${activityWeek.countLast7Days} ${activityWeek.countLast7Days === 1 ? "entry" : "entries"} this week`;
+  const dateLabel = new Date().toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+
+  return (
+    <Link
+      href="/tools/activity"
+      className={cn(
+        "group outline-none ring-offset-background transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        compact
+          ? "flex min-w-0 items-center gap-2 rounded-xl text-muted-foreground hover:text-foreground"
+          : "-mx-1 mb-2 flex items-center justify-between gap-2 rounded-lg border-b border-border/40 px-1 pb-2 hover:bg-muted/30 dark:hover:bg-muted/15",
+      )}
+      data-testid="link-today-activity-calendar"
+      aria-label={
+        activityWeek.countLast7Days === 0
+          ? "Open activity calendar"
+          : `Open activity calendar, ${activityWeek.countLast7Days} entries this week`
+      }
+      onPointerEnter={() => prefetchToolsDestinationHref("/tools/activity")}
+      onFocus={() => prefetchToolsDestinationHref("/tools/activity")}
+    >
+      <div className={cn("flex min-w-0 items-center", compact ? "gap-2" : "gap-2")}>
+        <div
+          className={cn(
+            "flex shrink-0 items-center justify-center bg-primary/12 text-primary transition-colors group-hover:bg-primary/20",
+            compact ? "h-8 w-8 rounded-xl" : "h-7 w-7 rounded-md",
+          )}
+        >
+          <Calendar className={compact ? "h-4 w-4" : "h-3.5 w-3.5"} aria-hidden />
+        </div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-0.5">
+            <span className={cn("font-semibold tracking-tight text-foreground", compact ? "font-display text-2xl" : "text-sm")}>
+              Today
+            </span>
+            <ChevronRight
+              className={cn(
+                "shrink-0 text-primary opacity-90 transition-transform group-hover:translate-x-0.5",
+                compact ? "h-4 w-4" : "h-3.5 w-3.5",
+              )}
+              aria-hidden
+            />
+          </div>
+          {compact ? null : <p className="text-[11px] leading-tight text-muted-foreground">{activityLabel}</p>}
+        </div>
+      </div>
+      <span className={cn("shrink-0 tabular-nums text-muted-foreground", compact ? "text-sm" : "max-w-[46%] truncate text-xs font-medium")}>
+        {compact ? `· ${dateLabel}` : dateLabel}
+      </span>
+    </Link>
+  );
+}
+
+export function TodayAtAGlanceContent(props: {
+  supplyShortcutHidden?: boolean;
+  healthStatus: HealthStatus;
+  /** When hero already shows supply runway, hide duplicate glance copy. */
+  suppressRunwayDuplicate?: boolean;
+  hideActivityHeader?: boolean;
+}) {
   const supplyShortcutHidden = props.supplyShortcutHidden === true;
-  const { healthStatus } = props;
+  const { healthStatus, suppressRunwayDuplicate } = props;
   const [supplies, setSupplies] = useState<Supply[]>(() => storage.getSupplies());
   const [scenarioState, setScenarioState] = useState<ScenarioState>(() => storage.getScenarioState());
   const [bedtimeLogs, setBedtimeLogs] = useState<BedtimeLog[]>(() => storage.getBedtimeLogs());
@@ -310,20 +410,6 @@ function TodayAtAGlanceContent(props: { supplyShortcutHidden?: boolean; healthSt
 
   const status = useMemo(() => getTodayGlanceLine(supplies, scenarioState), [supplies, scenarioState]);
 
-  const activityWeek = useMemo(
-    () => getActivityWeekSummary(collectAllActivityEvents()),
-    [activityTick],
-  );
-
-  const habitStreaks = useMemo(() => {
-    const events = collectAllActivityEvents();
-    return {
-      bedtime: computeStreakStats(events, "bedtime_check"),
-      exercise: computeStreakStats(events, "exercise_session"),
-      showingUp: computeStreakStats(events, "app_check_in"),
-    };
-  }, [activityTick]);
-
   const showSupplyAttentionRows = suppliesNeedingAttention.length > 0;
   const omitDuplicateStockBanner =
     showSupplyAttentionRows &&
@@ -383,7 +469,8 @@ function TodayAtAGlanceContent(props: { supplyShortcutHidden?: boolean; healthSt
   );
 
   const hideVisibleGlanceBanner =
-    omitDuplicateStockBanner || omitTravelStatusBanner || omitHeroAlignedGlanceBanner;
+    omitDuplicateStockBanner || omitTravelStatusBanner || omitHeroAlignedGlanceBanner ||
+    (suppressRunwayDuplicate && /shortest runway/i.test(status.message));
 
   const supplyAttentionVisible = suppliesNeedingAttention.slice(0, 2);
   const supplyAttentionExtra = Math.max(0, suppliesNeedingAttention.length - supplyAttentionVisible.length);
@@ -434,49 +521,7 @@ function TodayAtAGlanceContent(props: { supplyShortcutHidden?: boolean; healthSt
 
   return (
     <div className="space-y-0 px-4 py-3.5" data-testid="dashboard-today-inline">
-      <Link
-        href="/tools/activity"
-        className="group -mx-1 mb-2 flex items-center justify-between gap-2 rounded-lg border-b border-border/40 px-1 pb-2 outline-none ring-offset-background transition-colors hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 dark:hover:bg-muted/15"
-        data-testid="link-today-activity-calendar"
-        aria-label={
-          activityWeek.countLast7Days === 0
-            ? "Open activity calendar"
-            : `Open activity calendar, ${activityWeek.countLast7Days} entries this week`
-        }
-        onPointerEnter={() => prefetchToolsDestinationHref("/tools/activity")}
-        onFocus={() => prefetchToolsDestinationHref("/tools/activity")}
-      >
-        <div className="flex min-w-0 items-center gap-2">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/12 text-primary transition-colors group-hover:bg-primary/20">
-            <Calendar className="h-3.5 w-3.5" aria-hidden />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-0.5">
-              <span className="text-sm font-semibold tracking-tight text-foreground">Today</span>
-              <ChevronRight
-                className="h-3.5 w-3.5 shrink-0 text-primary opacity-90 transition-transform group-hover:translate-x-0.5"
-                aria-hidden
-              />
-            </div>
-            <p className="text-[11px] leading-tight text-muted-foreground transition-colors group-hover:text-foreground/75">
-              {habitStreaks.bedtime.current > 0 || habitStreaks.exercise.current > 0 ? (
-                <>
-                  Bedtime {habitStreaks.bedtime.current}d · Exercise {habitStreaks.exercise.current}d
-                </>
-              ) : habitStreaks.showingUp.current >= 2 ? (
-                <>Showing up · {habitStreaks.showingUp.current} days</>
-              ) : activityWeek.countLast7Days === 0 ? (
-                "Activity calendar"
-              ) : (
-                `${activityWeek.countLast7Days} ${activityWeek.countLast7Days === 1 ? "entry" : "entries"} this week`
-              )}
-            </p>
-          </div>
-        </div>
-        <span className="max-w-[46%] shrink-0 truncate text-xs font-medium tabular-nums text-muted-foreground">
-          {new Date().toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
-        </span>
-      </Link>
+      {props.hideActivityHeader ? null : <TodayActivityLink />}
 
       <div className="flex flex-col gap-1.5">
         {hideVisibleGlanceBanner ? (
