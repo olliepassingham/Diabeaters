@@ -21,7 +21,7 @@ export type CommunityPostRow = {
   image_alt_texts: string[];
   /** Optional storage path for one attached video (standard posts only). */
   video_url: string | null;
-  /** Self-labeled sensitive-topic hint for readers (optional, legacy). */
+  /** Self-labeled sensitive-topic / experience-sharing hint for readers. */
   content_note: CommunityContentNoteId | null;
   post_kind: CommunityPostKind;
   post_extra: CommunityPollExtra | CommunityEventExtra | null;

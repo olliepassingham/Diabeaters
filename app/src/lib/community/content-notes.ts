@@ -1,10 +1,9 @@
-/** Self-labeled sensitivity / tone flags (stored on `community_posts.content_note`). */
-
 export const COMMUNITY_CONTENT_NOTE_IDS = [
   "hypos-lows",
   "mental-health",
   "eating-body",
   "general-sensitive",
+  "experience-sharing",
 ] as const;
 
 export type CommunityContentNoteId = (typeof COMMUNITY_CONTENT_NOTE_IDS)[number];
@@ -38,6 +37,11 @@ export const COMMUNITY_CONTENT_NOTES: {
     label: "Sensitive topic — read with care",
     shortLabel: "Sensitive",
   },
+  {
+    id: "experience-sharing",
+    label: "Peer experience only — not medical advice or dosing guidance",
+    shortLabel: "Experience only",
+  },
 ];
 
 export function communityContentNoteLabel(id: CommunityContentNoteId): string {
@@ -48,3 +52,7 @@ export function communityContentNoteLabel(id: CommunityContentNoteId): string {
 export function communityContentNoteHint(id: CommunityContentNoteId): string {
   return COMMUNITY_CONTENT_NOTES.find((n) => n.id === id)?.label ?? id;
 }
+
+/** Default note applied when someone shares a short learning video. */
+export const VIDEO_POST_DEFAULT_CONTENT_NOTE: CommunityContentNoteId = "experience-sharing";
+

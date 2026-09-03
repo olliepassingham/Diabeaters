@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Bookmark, Search as SearchIcon } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { FeedFollowSuggestionsStrip } from "@/components/community/feed-follow-suggestions-strip";
+import { FeedWatchLearnStrip } from "@/components/community/feed-watch-learn-strip";
 import {
   FeedStoriesComposerHeader,
   FeedStoriesComposerHeaderForm,
@@ -28,11 +29,13 @@ import {
   fetchCommunityPostsFromFollowingPage,
   fetchCommunityPostsPage,
   fetchFollowSuggestions,
+  fetchRecentCommunityVideoPosts,
   readFeedComposerDraft,
   followUser,
   listFolloweeIdsForCurrentUser,
   type CommunityTopicId,
   type FeedCursor,
+  type CommunityPostRow,
   type CommunityStoryRow,
   type FollowSuggestion,
   fetchStoryById,
@@ -141,6 +144,8 @@ export default function CommunityHomePage() {
   const [scrollByTab, setScrollByTab] = useState<Record<FeedTab, number>>({ everyone: 0, following: 0 });
   const [showProfileReminder, setShowProfileReminder] = useState(false);
   const [suggestionsDismissed, setSuggestionsDismissed] = useState(false);
+  const [watchLearnPosts, setWatchLearnPosts] = useState<CommunityPostRow[]>([]);
+  const [watchLearnLoading, setWatchLearnLoading] = useState(false);
   const [storyFolloweeIds, setStoryFolloweeIds] = useState<string[]>([]);
   const [storyPeople, setStoryPeople] = useState<
     { id: string; name: string; avatar_url: string | null }[]
@@ -264,6 +269,28 @@ export default function CommunityHomePage() {
         : fetchCommunityPostsFromFollowingPage(limit, cursor, topicFilter),
     [feedTab, topicFilter],
   );
+
+  useEffect(() => {
+    if (!user?.id || savedOnly || feedSearch.trim()) {
+      setWatchLearnPosts([]);
+      setWatchLearnLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setWatchLearnLoading(true);
+    void fetchRecentCommunityVideoPosts(10).then((res) => {
+      if (cancelled) return;
+      setWatchLearnLoading(false);
+      if (res.error || !res.data) {
+        setWatchLearnPosts([]);
+        return;
+      }
+      setWatchLearnPosts(res.data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, savedOnly, feedSearch, feedListRevision]);
 
   useEffect(() => {
     if (!user?.id || feedTab !== "following") {
@@ -995,6 +1022,10 @@ export default function CommunityHomePage() {
           </div>
         ) : null}
       </div>
+
+      {user && !savedOnly && !feedSearch.trim() ? (
+        <FeedWatchLearnStrip posts={watchLearnPosts} loading={watchLearnLoading} />
+      ) : null}
 
       {user && !savedOnly && !feedSearch.trim() && !suggestionsDismissed && (suggestedLoading || suggested.length > 0) ? (
         <FeedFollowSuggestionsStrip

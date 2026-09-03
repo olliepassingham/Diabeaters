@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2, Volume2, VolumeX } from "lucide-react";
+import { Loader2, Play, Volume2, VolumeX } from "lucide-react";
 import { FeedMediaLightbox } from "@/components/community/feed-media-lightbox";
 import { APP_SCROLL_MAIN_ID } from "@/lib/app-scroll";
 import { claimActiveFeedVideo, releaseActiveFeedVideo } from "@/lib/feed-video-playback";
@@ -11,11 +11,13 @@ type Props = {
   className?: string;
   /** Start buffering immediately (first visible feed posts). */
   priority?: boolean;
+  /** Optional topic chip shown on the video surface. */
+  topicLabel?: string | null;
 };
 
 const PLAY_THRESHOLD = 0.6;
 
-export function FeedPostVideo({ path, className, priority = false }: Props) {
+export function FeedPostVideo({ path, className, priority = false, topicLabel = null }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const expandedVideoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -154,7 +156,7 @@ export function FeedPostVideo({ path, className, priority = false }: Props) {
           type="button"
           className="relative block w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
           onClick={() => setExpanded(true)}
-          aria-label="Open video fullscreen"
+          aria-label="Watch video fullscreen"
         >
           <video
             ref={videoRef}
@@ -169,11 +171,25 @@ export function FeedPostVideo({ path, className, priority = false }: Props) {
           />
           <div
             className={cn(
-              "pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/45 to-transparent transition-opacity duration-300",
-              playing ? "opacity-100" : "opacity-0",
+              "pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/55 to-transparent transition-opacity duration-300",
+              playing ? "opacity-100" : "opacity-90",
             )}
             aria-hidden
           />
+          {topicLabel ? (
+            <span className="pointer-events-none absolute left-3 top-3 max-w-[70%] truncate rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
+              {topicLabel}
+            </span>
+          ) : null}
+          <span
+            className={cn(
+              "pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-full bg-black/55 px-4 py-2 text-sm font-semibold text-white backdrop-blur-sm transition-opacity duration-200",
+              playing ? "opacity-0" : "opacity-100",
+            )}
+          >
+            <Play className="h-4 w-4 fill-current" aria-hidden />
+            Watch
+          </span>
         </button>
         <button
           type="button"

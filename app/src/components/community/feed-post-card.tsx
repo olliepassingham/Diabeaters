@@ -66,6 +66,8 @@ import { BEATIE_FEED_AVATAR_FALLBACK_SRC } from "@/lib/ai-feed-reply/config";
 import { AI_ASSISTANT_NAME } from "@/lib/ai-coach/persona";
 import { type FeedAuthorMeta } from "@/lib/community/feed-author-meta";
 import {
+  communityContentNoteHint,
+  communityContentNoteLabel,
   communityTopicLabel,
   fetchDmThreadsForCurrentUser,
   getFirstWhitelistedFeedLink,
@@ -564,6 +566,8 @@ export function FeedPostCard({
   }
 
   const topicLabel = communityTopicLabel(post.topic);
+  const contentNoteLabel = post.content_note ? communityContentNoteLabel(post.content_note) : null;
+  const contentNoteHint = post.content_note ? communityContentNoteHint(post.content_note) : null;
   const bodyText = (() => {
     const b = post.body.trim();
     if (b.length === 0) return null;
@@ -752,6 +756,18 @@ export function FeedPostCard({
                 >
                   {topicLabel}
                 </span>
+                {contentNoteLabel ? (
+                  <>
+                    <span aria-hidden>·</span>
+                    <span
+                      data-testid="feed-post-content-note"
+                      title={contentNoteHint ?? contentNoteLabel}
+                      className="inline-flex max-w-[9rem] truncate rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-medium text-amber-900 dark:text-amber-100"
+                    >
+                      {contentNoteLabel}
+                    </span>
+                  </>
+                ) : null}
                 <span aria-hidden>·</span>
                 <time title={post.created_at}>
                   {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
@@ -801,7 +817,30 @@ export function FeedPostCard({
       </div>
 
       {hasFeedVideo && post.video_url ? (
-        <FeedPostVideo path={post.video_url} priority={mediaPriority} />
+        <FeedPostVideo path={post.video_url} priority={mediaPriority} topicLabel={topicLabel} />
+      ) : null}
+      {hasFeedVideo ? (
+        <div
+          className="flex items-center gap-2 border-b border-border/30 px-3.5 py-2 text-[11px] text-muted-foreground sm:px-4"
+          data-testid="feed-post-video-safety"
+        >
+          <span className="min-w-0 flex-1 leading-snug">
+            Peer experience — not medical advice or dosing guidance.
+          </span>
+          {canReportPost ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 shrink-0 gap-1 rounded-full px-2 text-[11px] text-muted-foreground"
+              onClick={onReportPost}
+              data-testid="button-report-video-post"
+            >
+              <Flag className="h-3 w-3" aria-hidden />
+              Report
+            </Button>
+          ) : null}
+        </div>
       ) : null}
 
       {hasFeedImages ? (

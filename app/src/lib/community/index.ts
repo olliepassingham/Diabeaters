@@ -19,11 +19,18 @@ export {
 export {
   COMMUNITY_CONTENT_NOTE_IDS,
   COMMUNITY_CONTENT_NOTES,
+  VIDEO_POST_DEFAULT_CONTENT_NOTE,
   communityContentNoteHint,
   communityContentNoteLabel,
   isCommunityContentNoteId,
   type CommunityContentNoteId,
 } from "./content-notes";
+export {
+  GUIDED_POST_VIDEO_MAX_SECONDS,
+  MAX_POST_VIDEO_SECONDS,
+  formatVideoDurationSeconds,
+  readVideoFileDurationSeconds,
+} from "./feed-video-limits";
 export { getFirstWhitelistedFeedLink } from "./link-whitelist";
 export {
   COMMUNITY_POST_KINDS,

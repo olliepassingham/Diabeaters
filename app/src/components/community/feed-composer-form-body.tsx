@@ -13,7 +13,7 @@ import {
 import { MentionTextarea } from "@/components/community/mention-textarea";
 import { Textarea } from "@/components/ui/textarea";
 import { InlineInfoHint } from "@/components/ui/field-label-with-info";
-import { MAX_POST_IMAGES, MAX_POST_VIDEO_BYTES } from "@/lib/community";
+import { MAX_POST_IMAGES, MAX_POST_VIDEO_BYTES, MAX_POST_VIDEO_SECONDS } from "@/lib/community";
 import type { CommunityTopicId } from "@/lib/community";
 import type { CommunityTopicRow } from "@/lib/community/topics";
 import { eventQuickStartPresets } from "@/lib/community/event-display";
@@ -50,6 +50,7 @@ export type FeedComposerFormBodyProps = {
   composerFiles: File[];
   composerVideoPreview: string | null;
   composerVideoFile: File | null;
+  composerVideoDurationSeconds: number | null;
   removeComposerImage: (index: number) => void;
   removeComposerVideo: () => void;
   composerImageAlts: string[];
@@ -62,6 +63,8 @@ export type FeedComposerFormBodyProps = {
   onPollModeClick: () => void;
   onEventModeClick: () => void;
   composerCanSubmit: boolean;
+  guidedVideoMaxSeconds: number;
+  formatVideoDurationSeconds: (totalSeconds: number) => string;
 };
 
 export function FeedComposerFormBody({
@@ -90,6 +93,7 @@ export function FeedComposerFormBody({
   composerFiles,
   composerVideoPreview,
   composerVideoFile,
+  composerVideoDurationSeconds,
   removeComposerImage,
   removeComposerVideo,
   composerImageAlts,
@@ -102,10 +106,17 @@ export function FeedComposerFormBody({
   onPollModeClick,
   onEventModeClick,
   composerCanSubmit,
+  guidedVideoMaxSeconds,
+  formatVideoDurationSeconds,
 }: FeedComposerFormBodyProps) {
   const audienceInfo =
     "Posts are shared to the Diabeaters community feed. Avoid personal identifiers. Be kind — report anything unsafe.";
   const videoMaxMb = Math.round(MAX_POST_VIDEO_BYTES / (1024 * 1024));
+  const standardPlaceholder = composerVideoFile
+    ? "Share a 30–60s tip from your day…"
+    : "Share something…";
+  const videoDurationOverGuide =
+    composerVideoDurationSeconds != null && composerVideoDurationSeconds > guidedVideoMaxSeconds;
 
   return (
     <>
@@ -350,7 +361,7 @@ export function FeedComposerFormBody({
           onChange={setComposer}
           currentUserId={user?.id}
           hideHint={false}
-          placeholder="Share something…"
+          placeholder={standardPlaceholder}
           rows={3}
           maxLength={8000}
           disabled={submitting || !user || !canComposeToFeed}
@@ -377,6 +388,15 @@ export function FeedComposerFormBody({
           <div className="overflow-hidden rounded-lg border border-border/70 bg-black">
             <video src={composerVideoPreview} controls playsInline preload="metadata" className="max-h-64 w-full" />
           </div>
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            Aim for about {guidedVideoMaxSeconds}s. Marked as experience only — not medical advice.
+            {composerVideoDurationSeconds != null
+              ? ` This clip is ${formatVideoDurationSeconds(composerVideoDurationSeconds)}.`
+              : null}
+            {videoDurationOverGuide
+              ? ` Shorter is easier to watch (max ${MAX_POST_VIDEO_SECONDS}s).`
+              : null}
+          </p>
           {composerVideoFile?.name ? (
             <p className="truncate text-[11px] text-muted-foreground" title={composerVideoFile.name}>
               {composerVideoFile.name}
@@ -536,7 +556,7 @@ export function FeedComposerFormBody({
         </Button>
         <InlineInfoHint
           ariaLabel="Media limits for posts"
-          content={`Up to ${MAX_POST_IMAGES} photos (5MB each) or one video (${videoMaxMb}MB, MP4/MOV/WebM).`}
+          content={`Up to ${MAX_POST_IMAGES} photos (5MB each) or one short video (~${guidedVideoMaxSeconds}s, max ${MAX_POST_VIDEO_SECONDS}s / ${videoMaxMb}MB, MP4/MOV/WebM). Video tips are labeled as peer experience only.`}
         />
       </div>
       <Button

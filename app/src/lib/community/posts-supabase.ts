@@ -9,8 +9,14 @@ import { canEngageWithCommunityFeed, COMMUNITY_FEED_ENGAGE_REQUIRED_MESSAGE, get
 import { listFolloweeIdsForCurrentUser } from "./follows-supabase";
 import {
   isCommunityContentNoteId,
+  VIDEO_POST_DEFAULT_CONTENT_NOTE,
   type CommunityContentNoteId,
 } from "./content-notes";
+import {
+  GUIDED_POST_VIDEO_MAX_SECONDS,
+  MAX_POST_VIDEO_SECONDS,
+  readVideoFileDurationSeconds,
+} from "./feed-video-limits";
 import {
   isCommunityPostKind,
   parseMentionMap,
@@ -578,6 +584,18 @@ function validateVideoFile(file: File | null | undefined): Error | null {
   return null;
 }
 
+export async function validateFeedVideoFile(file: File): Promise<Error | null> {
+  const basic = validateVideoFile(file);
+  if (basic) return basic;
+  const duration = await readVideoFileDurationSeconds(file);
+  if (duration != null && duration > MAX_POST_VIDEO_SECONDS) {
+    return new Error(
+      `Keep clips to about ${GUIDED_POST_VIDEO_MAX_SECONDS}s (max ${MAX_POST_VIDEO_SECONDS}s) so they stay easy to watch on a phone.`,
+    );
+  }
+  return null;
+}
+
 /** Signed URL for a private bucket video (cached; batch-friendly). */
 export async function getPostVideoSignedUrl(path: string): Promise<string | null> {
   return getPostMediaSignedUrl(path);
@@ -615,6 +633,30 @@ export async function fetchCommunityPostsPage(
 
   const dataOut = await finalizePostRowsForFeed(posts);
   return { data: dataOut, error: null };
+}
+
+/** Recent standard posts that include a video — used by the Feed “Watch & learn” strip. */
+export async function fetchRecentCommunityVideoPosts(limit = 12): Promise<{
+  data: CommunityPostRow[] | null;
+  error: Error | null;
+}> {
+  const supabase = getSupabase();
+  if (!supabase) return { data: null, error: new Error("Supabase not configured") };
+
+  const lim = Math.min(Math.max(limit, 1), 24);
+  const { data, error } = await supabase
+    .from("community_posts")
+    .select("*")
+    .eq("post_kind", "standard")
+    .not("video_url", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(lim);
+
+  if (error) return { data: null, error: wrapFeedRpcError(error) };
+  const posts = ((data ?? []) as Record<string, unknown>[])
+    .map((row) => mapPost(row))
+    .filter((post) => Boolean(post.video_url));
+  return { data: await finalizePostRowsForFeed(posts), error: null };
 }
 
 /** Posts from people you follow plus your own (RLS still applies for blocks). */
@@ -777,6 +819,7 @@ export type InsertFeedPostInput =
       imageFiles?: File[];
       videoFile?: File;
       imageAlts?: string[];
+      contentNote?: CommunityContentNoteId | null;
       mentions: FeedPostMentions;
     }
   | {
@@ -846,6 +889,7 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
   imageFiles: File[];
   videoFile?: File | null;
   imageAlts?: string[];
+  contentNote?: CommunityContentNoteId | null;
 }): Promise<{ data: CommunityPostRow | null; error: Error | null }> {
   const { supabase, uid, mentioned_user_ids } = params;
   const files = params.imageFiles.filter(Boolean);
@@ -853,10 +897,13 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
   if (videoFile && files.length > 0) {
     return { data: null, error: new Error("Choose photos or a video, not both.") };
   }
-  const vErr = validateVideoFile(videoFile);
+  const vErr = videoFile ? await validateFeedVideoFile(videoFile) : null;
   if (vErr) return { data: null, error: vErr };
   const iErr = validateImageFiles(files);
   if (iErr) return { data: null, error: iErr };
+
+  const contentNote =
+    params.contentNote ?? (videoFile ? VIDEO_POST_DEFAULT_CONTENT_NOTE : null);
 
   const imageAltsForInsert = normalizeAltsForCount(params.imageAlts, files.length);
 
@@ -882,6 +929,7 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
       mention_map: params.mention_map,
       mentioned_user_ids,
     };
+    if (contentNote) insertRow.content_note = contentNote;
     const { data, error } = await supabase.from("community_posts").insert(insertRow).select("*").single();
 
     if (error) return { data: null, error: new Error(error.message) };
@@ -944,6 +992,7 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
     if (imageAltsForInsert.some((s) => s.trim().length > 0)) {
       insertPayload.image_alt_texts = imageAltsForInsert;
     }
+    if (contentNote) insertPayload.content_note = contentNote;
 
     const { data, error } = await supabase.from("community_posts").insert(insertPayload).select("*").single();
 
@@ -1094,6 +1143,7 @@ export async function insertFeedPost(
     imageFiles: files,
     videoFile,
     imageAlts: input.imageAlts,
+    contentNote: input.contentNote,
   });
 }
 

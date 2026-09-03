@@ -7,10 +7,15 @@ import { useAuth } from "@/lib/auth-context";
 import {
   DEFAULT_COMMUNITY_TOPIC,
   FEED_COMPOSER_DRAFT_KEY,
+  GUIDED_POST_VIDEO_MAX_SECONDS,
   MAX_POST_IMAGES,
+  VIDEO_POST_DEFAULT_CONTENT_NOTE,
   buildMentionsForPost,
+  formatVideoDurationSeconds,
   insertFeedPost,
   readFeedComposerDraft,
+  readVideoFileDurationSeconds,
+  validateFeedVideoFile,
   type CommunityPostRow,
   type CommunityTopicId,
 } from "@/lib/community";
@@ -52,6 +57,7 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
   const [composer, setComposer] = useState(() => readFeedComposerDraft()?.body ?? "");
   const [composerFiles, setComposerFiles] = useState<File[]>([]);
   const [composerVideoFile, setComposerVideoFile] = useState<File | null>(null);
+  const [composerVideoDurationSeconds, setComposerVideoDurationSeconds] = useState<number | null>(null);
   const [composerImageAlts, setComposerImageAlts] = useState<string[]>([]);
   const [composerPreviews, setComposerPreviews] = useState<string[]>([]);
   const [composerVideoPreview, setComposerVideoPreview] = useState<string | null>(null);
@@ -71,7 +77,11 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
   const canComposeToFeed =
     Boolean(user?.id) && !profileLoading && canEngageWithCommunityFeed(profile);
 
-  const pillPreview = composer.trim() ? composer.trim() : "Share something with the community…";
+  const pillPreview = composer.trim()
+    ? composer.trim()
+    : composerVideoFile
+      ? "Share a 30–60s tip from your day…"
+      : "Share something with the community…";
   const avatarDisplayName = (profile?.full_name ?? user?.email ?? "You").trim() || "You";
   const avatarPath = profile?.avatar_url ?? null;
   const profileHref = user?.id ? `/community/profile/${encodeURIComponent(user.id)}` : undefined;
@@ -85,11 +95,19 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
   useEffect(() => {
     if (!composerVideoFile) {
       setComposerVideoPreview(null);
+      setComposerVideoDurationSeconds(null);
       return;
     }
     const url = URL.createObjectURL(composerVideoFile);
     setComposerVideoPreview(url);
-    return () => URL.revokeObjectURL(url);
+    let cancelled = false;
+    void readVideoFileDurationSeconds(composerVideoFile).then((duration) => {
+      if (!cancelled) setComposerVideoDurationSeconds(duration);
+    });
+    return () => {
+      cancelled = true;
+      URL.revokeObjectURL(url);
+    };
   }, [composerVideoFile]);
 
   useEffect(() => {
@@ -136,22 +154,37 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
-  function onPickVideo(files: FileList | null) {
+  async function onPickVideo(files: FileList | null) {
     const f = files?.[0];
     if (!f) return;
     if (!f.type.startsWith("video/")) {
       toast({ title: "Unsupported file", description: "Choose an MP4, MOV, or WebM video.", variant: "destructive" });
+      if (videoInputRef.current) videoInputRef.current.value = "";
+      return;
+    }
+    const validationError = await validateFeedVideoFile(f);
+    if (validationError) {
+      toast({
+        title: "Choose a shorter clip",
+        description: validationError.message,
+        variant: "destructive",
+      });
+      if (videoInputRef.current) videoInputRef.current.value = "";
       return;
     }
     setComposerFiles([]);
     setComposerImageAlts([]);
     if (fileInputRef.current) fileInputRef.current.value = "";
     setComposerVideoFile(f);
+    if (composerTopic === DEFAULT_COMMUNITY_TOPIC) {
+      setComposerTopic("tips-what-worked");
+    }
     if (videoInputRef.current) videoInputRef.current.value = "";
   }
 
   function removeComposerVideo() {
     setComposerVideoFile(null);
+    setComposerVideoDurationSeconds(null);
     if (videoInputRef.current) videoInputRef.current.value = "";
   }
 
@@ -179,6 +212,7 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
     setComposer("");
     setComposerFiles([]);
     setComposerVideoFile(null);
+    setComposerVideoDurationSeconds(null);
     setComposerImageAlts([]);
     setComposerPostKind("standard");
     setPollQuestion("");
@@ -267,6 +301,7 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
         imageFiles: composerFiles.length ? composerFiles : undefined,
         videoFile: composerVideoFile ?? undefined,
         imageAlts: composerImageAlts,
+        contentNote: composerVideoFile ? VIDEO_POST_DEFAULT_CONTENT_NOTE : null,
         mentions,
       });
     } else if (composerPostKind === "poll") {
@@ -355,6 +390,7 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
     composerFiles,
     composerVideoPreview,
     composerVideoFile,
+    composerVideoDurationSeconds,
     removeComposerImage,
     removeComposerVideo,
     composerImageAlts,
@@ -367,6 +403,8 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
     onPollModeClick,
     onEventModeClick,
     composerCanSubmit,
+    guidedVideoMaxSeconds: GUIDED_POST_VIDEO_MAX_SECONDS,
+    formatVideoDurationSeconds,
   };
 
   return {
