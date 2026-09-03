@@ -105,6 +105,7 @@ export default function Adviser() {
   );
   const didPrefillFromExerciseLink = useRef(false);
   const didPrefillFromAlcoholLink = useRef(false);
+  const didPrefillFromHomeLink = useRef(false);
   const splitCalculatorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -215,9 +216,48 @@ export default function Adviser() {
   }, []);
 
   useEffect(() => {
+    // Home's contextual meal prompt can prefill carbs and composition, but the
+    // existing adviser remains the confirmation and calculation boundary.
+    if (didPrefillFromHomeLink.current) return;
+    try {
+      const params = new URLSearchParams(
+        typeof window !== "undefined" ? window.location.search.replace(/^\?/, "") : "",
+      );
+      if (params.get("from") !== "home") return;
+
+      const carbs = Number(params.get("carbs"));
+      if (Number.isFinite(carbs) && carbs > 0 && carbs <= 1000) {
+        setMealCarbs(String(Math.round(carbs)));
+        setCarbUnit("grams");
+      }
+
+      const carbType = params.get("carbType");
+      const validCarbTypes = ["liquid_sugars", "quick_refined", "fruit", "starchy", "balanced", "unsure"];
+      if (carbType && validCarbTypes.includes(carbType)) {
+        setMealComposition({
+          carbType: carbType as MealComposition["carbType"],
+          hasFat: params.get("fat") === "1",
+          hasProtein: params.get("protein") === "1",
+          hasFibre: params.get("fibre") === "1",
+        });
+      }
+
+      setActiveTab("meal");
+      setPlanningAroundExercise(false);
+      didPrefillFromHomeLink.current = true;
+    } catch {
+      // Ignore malformed deep links and leave the adviser editable.
+    }
+  }, []);
+
+  useEffect(() => {
     // If a workout just finished, default the meal planner to post-exercise.
     // Skip when an explicit deep-link prefill was applied.
-    if (didPrefillFromExerciseLink.current || didPrefillFromAlcoholLink.current) return;
+    if (
+      didPrefillFromExerciseLink.current ||
+      didPrefillFromAlcoholLink.current ||
+      didPrefillFromHomeLink.current
+    ) return;
     try {
       const last = storage.getLastExerciseSummary();
       if (!last) return;
@@ -1073,12 +1113,15 @@ export default function Adviser() {
       <CarbEstimatorSheet
         open={carbEstimatorOpen}
         onOpenChange={setCarbEstimatorOpen}
-        onConfirm={(grams) => {
+        onConfirm={({ grams, compositionHint }) => {
           setMealCarbs(String(grams));
           setCarbUnit("grams");
+          if (compositionHint) {
+            setMealComposition(compositionHint);
+          }
           toast({
             title: "Carb estimate added",
-            description: `${grams}g is ready to check before continuing.`,
+            description: `${grams}g and likely meal composition are ready to check.`,
           });
         }}
       />

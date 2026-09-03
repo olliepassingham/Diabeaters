@@ -45,6 +45,12 @@ describe("carb estimator", () => {
     expect(result.lowGrams).toBe(33);
     expect(result.highGrams).toBe(47);
     expect(result.items).toHaveLength(2);
+    expect(result.compositionHint).toEqual({
+      carbType: "quick_refined",
+      hasFat: false,
+      hasProtein: true,
+      hasFibre: false,
+    });
   });
 
   it("ignores invalid food, portion and quantity selections", () => {
@@ -63,6 +69,19 @@ describe("carb estimator", () => {
       suggestedGrams: 0,
       lowGrams: 0,
       highGrams: 0,
+      compositionHint: null,
+    });
+  });
+
+  it("suggests likely composition for a complete meal", () => {
+    const result = estimateCarbMeal([
+      { id: "meal", foodId: "curry-rice", portionId: "regular", quantity: 1 },
+    ]);
+    expect(result.compositionHint).toEqual({
+      carbType: "balanced",
+      hasFat: true,
+      hasProtein: true,
+      hasFibre: true,
     });
   });
 });

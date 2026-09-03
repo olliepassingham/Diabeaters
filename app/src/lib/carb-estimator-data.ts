@@ -26,6 +26,13 @@ export type CarbFood = {
   portions: CarbPortion[];
 };
 
+export type CarbCompositionHint = {
+  carbType: "liquid_sugars" | "quick_refined" | "fruit" | "starchy" | "balanced" | "unsure";
+  hasFat: boolean;
+  hasProtein: boolean;
+  hasFibre: boolean;
+};
+
 const p = (
   id: string,
   label: string,
@@ -283,6 +290,139 @@ export const CARB_FOODS: CarbFood[] = [
     category: "meals",
     portions: [p("small", "Small burrito", 55, 30), p("regular", "Regular burrito", 80, 30), p("large", "Large burrito", 110, 30)],
   },
+  {
+    id: "full-english",
+    name: "Full English breakfast",
+    aliases: ["fry up", "cooked breakfast", "english breakfast"],
+    category: "meals",
+    portions: [p("small", "Small, 1 toast", 35, 30), p("regular", "Regular, 2 toast", 55, 30), p("large", "Large with hash browns", 80, 35)],
+  },
+  {
+    id: "pancakes",
+    name: "Pancakes with syrup",
+    aliases: ["american pancakes", "pancake stack"],
+    category: "meals",
+    portions: [p("small", "2 pancakes", 40, 30), p("regular", "3 pancakes", 60, 30), p("large", "Large stack", 90, 35)],
+  },
+  {
+    id: "eggs-toast",
+    name: "Eggs on toast",
+    aliases: ["scrambled eggs on toast", "poached eggs on toast"],
+    category: "meals",
+    portions: [p("one-slice", "Eggs with 1 slice", 17, 25), p("regular", "Eggs with 2 slices", 32, 25), p("large", "Eggs with 3 thick slices", 55, 30)],
+  },
+  {
+    id: "soup-bread",
+    name: "Soup with bread",
+    aliases: ["soup and roll", "soup and toast"],
+    category: "meals",
+    portions: [p("small", "Cup with 1 slice", 25, 30), p("regular", "Bowl with bread roll", 45, 30), p("large", "Large bowl with 2 rolls", 70, 35)],
+  },
+  {
+    id: "jacket-beans",
+    name: "Jacket potato with beans",
+    aliases: ["baked potato and beans", "jacket spud beans"],
+    category: "meals",
+    portions: [p("small", "Small potato, light beans", 45, 25), p("regular", "Medium potato with beans", 65, 25), p("large", "Large potato with beans", 90, 30)],
+  },
+  {
+    id: "spaghetti-bolognese",
+    name: "Spaghetti bolognese",
+    aliases: ["spag bol", "pasta bolognese"],
+    category: "meals",
+    portions: [p("small", "Small bowl", 45, 25), p("regular", "Regular bowl", 65, 25), p("large", "Large bowl", 90, 30)],
+  },
+  {
+    id: "lasagne",
+    name: "Lasagne",
+    aliases: ["lasagna"],
+    category: "meals",
+    portions: [p("small", "Small slice", 35, 30), p("regular", "Regular slice", 50, 30), p("large", "Large slice with garlic bread", 80, 35)],
+  },
+  {
+    id: "macaroni-cheese",
+    name: "Macaroni cheese",
+    aliases: ["mac and cheese", "mac n cheese"],
+    category: "meals",
+    portions: [p("small", "Small bowl", 40, 30), p("regular", "Regular bowl", 60, 30), p("large", "Large bowl", 85, 35)],
+  },
+  {
+    id: "stir-fry-noodles",
+    name: "Stir-fry with noodles",
+    aliases: ["noodle stir fry", "chow mein"],
+    category: "meals",
+    portions: [p("small", "Small plate", 45, 30), p("regular", "Regular plate", 65, 30), p("large", "Large plate/takeaway", 90, 35)],
+  },
+  {
+    id: "stir-fry-rice",
+    name: "Stir-fry with rice",
+    aliases: ["rice stir fry", "chicken and rice"],
+    category: "meals",
+    portions: [p("small", "Small plate", 45, 30), p("regular", "Regular plate", 65, 30), p("large", "Large plate/takeaway", 95, 35)],
+  },
+  {
+    id: "fried-rice",
+    name: "Fried rice",
+    aliases: ["egg fried rice", "special fried rice"],
+    category: "meals",
+    portions: [p("small", "Small side portion", 38, 25), p("regular", "Regular carton/plate", 65, 30), p("large", "Large carton", 90, 30)],
+  },
+  {
+    id: "burger-fries",
+    name: "Burger and fries",
+    aliases: ["burger and chips", "cheeseburger meal"],
+    category: "meals",
+    portions: [p("small", "Small burger meal", 60, 30), p("regular", "Regular burger meal", 85, 30), p("large", "Large burger meal", 115, 35)],
+  },
+  {
+    id: "kebab-wrap",
+    name: "Kebab wrap",
+    aliases: ["doner kebab", "chicken kebab wrap"],
+    category: "meals",
+    portions: [p("small", "Small wrap", 45, 30), p("regular", "Regular wrap", 65, 30), p("large", "Large wrap with chips", 105, 35)],
+  },
+  {
+    id: "pie-mash",
+    name: "Pie and mash",
+    aliases: ["meat pie with mash", "chicken pie and mash"],
+    category: "meals",
+    portions: [p("small", "Small pie and mash", 55, 30), p("regular", "Regular plate", 75, 30), p("large", "Large plate", 100, 35)],
+  },
+  {
+    id: "roast-dinner",
+    name: "Roast dinner",
+    aliases: ["sunday roast", "roast chicken dinner", "roast beef dinner"],
+    category: "meals",
+    portions: [p("small", "Small plate", 45, 35), p("regular", "Regular plate", 65, 35), p("large", "Large plate", 90, 40)],
+  },
+  {
+    id: "ramen",
+    name: "Ramen noodle bowl",
+    aliases: ["ramen", "noodle soup"],
+    category: "meals",
+    portions: [p("small", "Small bowl", 45, 30), p("regular", "Regular bowl", 65, 30), p("large", "Large restaurant bowl", 90, 35)],
+  },
+  {
+    id: "chilli-rice",
+    name: "Chilli with rice",
+    aliases: ["chilli con carne", "bean chilli and rice"],
+    category: "meals",
+    portions: [p("small", "Small bowl", 50, 30), p("regular", "Regular bowl", 70, 30), p("large", "Large bowl", 95, 35)],
+  },
+  {
+    id: "shepherds-pie",
+    name: "Shepherd's pie",
+    aliases: ["cottage pie"],
+    category: "meals",
+    portions: [p("small", "Small serving", 30, 30), p("regular", "Regular serving", 45, 30), p("large", "Large serving", 65, 35)],
+  },
+  {
+    id: "salad-grains",
+    name: "Salad with grains",
+    aliases: ["chicken grain salad", "quinoa salad", "couscous salad"],
+    category: "meals",
+    portions: [p("small", "Side salad", 20, 35), p("regular", "Main-meal bowl", 40, 35), p("large", "Large bowl with bread", 65, 40)],
+  },
 ];
 
 export const CARB_CATEGORY_LABELS: Record<CarbFoodCategory, string> = {
@@ -294,4 +434,69 @@ export const CARB_CATEGORY_LABELS: Record<CarbFoodCategory, string> = {
   snacks: "Snacks",
   drinks: "Drinks",
   meals: "Meals & takeaway",
+};
+
+const hint = (
+  carbType: CarbCompositionHint["carbType"],
+  hasFat = false,
+  hasProtein = false,
+  hasFibre = false,
+): CarbCompositionHint => ({ carbType, hasFat, hasProtein, hasFibre });
+
+/** Composition hints drive Meal Adviser toggles; they never change the carb estimate. */
+export const CARB_COMPOSITION_HINTS: Record<string, CarbCompositionHint> = {
+  porridge: hint("starchy", false, false, true),
+  "breakfast-cereal": hint("quick_refined"),
+  granola: hint("quick_refined", true, false, true),
+  toast: hint("quick_refined"),
+  bagel: hint("quick_refined"),
+  wrap: hint("quick_refined"),
+  croissant: hint("quick_refined", true),
+  rice: hint("starchy"),
+  pasta: hint("starchy"),
+  noodles: hint("starchy"),
+  potato: hint("starchy", false, false, true),
+  chips: hint("starchy", true),
+  apple: hint("fruit", false, false, true),
+  banana: hint("fruit", false, false, true),
+  orange: hint("fruit", false, false, true),
+  grapes: hint("fruit"),
+  berries: hint("fruit", false, false, true),
+  milk: hint("unsure", false, true),
+  yogurt: hint("unsure", false, true),
+  "ice-cream": hint("quick_refined", true, true),
+  biscuit: hint("quick_refined", true),
+  chocolate: hint("quick_refined", true),
+  crisps: hint("starchy", true),
+  "cereal-bar": hint("quick_refined", true),
+  cake: hint("quick_refined", true),
+  "fruit-juice": hint("liquid_sugars"),
+  "fizzy-drink": hint("liquid_sugars"),
+  latte: hint("liquid_sugars", false, true),
+  sandwich: hint("balanced", true, true),
+  pizza: hint("starchy", true, true),
+  "curry-rice": hint("balanced", true, true, true),
+  "fish-chips": hint("starchy", true, true),
+  "beans-toast": hint("balanced", false, true, true),
+  sushi: hint("balanced", false, true),
+  burrito: hint("balanced", true, true, true),
+  "full-english": hint("balanced", true, true),
+  pancakes: hint("quick_refined", true, true),
+  "eggs-toast": hint("balanced", true, true),
+  "soup-bread": hint("balanced", false, false, true),
+  "jacket-beans": hint("balanced", false, true, true),
+  "spaghetti-bolognese": hint("balanced", true, true),
+  lasagne: hint("starchy", true, true),
+  "macaroni-cheese": hint("starchy", true, true),
+  "stir-fry-noodles": hint("balanced", true, true, true),
+  "stir-fry-rice": hint("balanced", true, true, true),
+  "fried-rice": hint("starchy", true, true),
+  "burger-fries": hint("starchy", true, true),
+  "kebab-wrap": hint("balanced", true, true, true),
+  "pie-mash": hint("starchy", true, true),
+  "roast-dinner": hint("balanced", true, true, true),
+  ramen: hint("balanced", true, true),
+  "chilli-rice": hint("balanced", true, true, true),
+  "shepherds-pie": hint("balanced", true, true, true),
+  "salad-grains": hint("balanced", true, true, true),
 };

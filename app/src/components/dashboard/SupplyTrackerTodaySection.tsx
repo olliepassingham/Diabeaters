@@ -475,6 +475,14 @@ export function TodayAtAGlanceContent(props: {
 
   const supplyAttentionVisible = suppliesNeedingAttention.slice(0, 2);
   const supplyAttentionExtra = Math.max(0, suppliesNeedingAttention.length - supplyAttentionVisible.length);
+  const hasVisibleContent =
+    !props.hideActivityHeader ||
+    !hideVisibleGlanceBanner ||
+    (showTravelCard && !props.hideTravelContext) ||
+    scenarioState.sickDayActive ||
+    showSupplyAttentionRows ||
+    Boolean(morningBedtimeLog) ||
+    isEvening;
 
   const supplyBlock = (
     <div
@@ -521,7 +529,10 @@ export function TodayAtAGlanceContent(props: {
   );
 
   return (
-    <div className="space-y-0 px-4 py-3.5" data-testid="dashboard-today-inline">
+    <div
+      className={cn(hasVisibleContent ? "space-y-0 px-4 py-3.5" : "contents")}
+      data-testid="dashboard-today-inline"
+    >
       {props.hideActivityHeader ? null : <TodayActivityLink />}
 
       <div className="flex flex-col gap-1.5">

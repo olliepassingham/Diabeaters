@@ -14,7 +14,7 @@ export function HomeTodayPulse({
 }) {
   return (
     <section
-      className="animate-fade-in-up py-2"
+      className="animate-fade-in-up"
       style={{ animationDelay: "80ms" }}
     >
       <div data-testid="dashboard-today-overview-card">

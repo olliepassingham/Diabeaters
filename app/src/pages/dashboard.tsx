@@ -38,6 +38,7 @@ import { HomeMetaBadge, homeDataPanelClass, homeHeroPanelClass } from "@/compone
 import { HomeCommandHero } from "@/components/home/HomeCommandHero";
 import { HomeTodayPulse } from "@/components/home/HomeTodayPulse";
 import { HomeCgmGraph } from "@/components/home/HomeCgmGraph";
+import { HomeMealMoment } from "@/components/home/HomeMealMoment";
 import { HomeSupplyGraph } from "@/components/home/HomeSupplyGraph";
 import { HomeTravelContext } from "@/components/home/HomeTravelContext";
 import { getHealthStatus } from "@/lib/dashboard-health-status";
@@ -405,6 +406,8 @@ export default function Dashboard() {
         ) : null}
 
         {!isCommunityDash ? <HomeCgmGraph /> : null}
+
+        {!isCommunityDash ? <HomeMealMoment healthStatus={healthStatus} /> : null}
 
         {!isCommunityDash ? <HomeTravelContext /> : null}
 

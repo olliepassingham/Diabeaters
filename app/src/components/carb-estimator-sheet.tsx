@@ -10,15 +10,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
 import {
   CARB_CATEGORY_LABELS,
+  type CarbCompositionHint,
   type CarbFood,
   type CarbFoodCategory,
 } from "@/lib/carb-estimator-data";
@@ -33,10 +28,19 @@ import { cn } from "@/lib/utils";
 type CarbEstimatorSheetProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (grams: number) => void;
+  onConfirm: (result: { grams: number; compositionHint: CarbCompositionHint | null }) => void;
 };
 
-const CATEGORIES = Object.keys(CARB_CATEGORY_LABELS) as CarbFoodCategory[];
+const CATEGORIES: CarbFoodCategory[] = [
+  "meals",
+  "breakfast",
+  "bread",
+  "staples",
+  "fruit",
+  "dairy",
+  "snacks",
+  "drinks",
+];
 
 function selectionId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
@@ -49,7 +53,7 @@ export function CarbEstimatorSheet({
   onConfirm,
 }: CarbEstimatorSheetProps) {
   const [query, setQuery] = useState("");
-  const [category, setCategory] = useState<CarbFoodCategory | "all">("all");
+  const [category, setCategory] = useState<CarbFoodCategory | "all">("meals");
   const [selections, setSelections] = useState<CarbEstimateSelection[]>([]);
   const estimate = useMemo(() => estimateCarbMeal(selections), [selections]);
   const [confirmedGrams, setConfirmedGrams] = useState("");
@@ -59,7 +63,11 @@ export function CarbEstimatorSheet({
   }, [estimate.suggestedGrams]);
 
   const results = useMemo(
-    () => searchCarbFoods(query, { category, limit: query.trim() ? 10 : 8 }),
+    () =>
+      searchCarbFoods(query, {
+        category: query.trim() ? "all" : category,
+        limit: query.trim() ? 12 : 10,
+      }),
     [category, query],
   );
 
@@ -86,7 +94,7 @@ export function CarbEstimatorSheet({
   const useEstimate = () => {
     const grams = Math.round(Number(confirmedGrams));
     if (!Number.isFinite(grams) || grams <= 0 || grams > 1000) return;
-    onConfirm(grams);
+    onConfirm({ grams, compositionHint: estimate.compositionHint });
     onOpenChange(false);
   };
 
@@ -94,24 +102,21 @@ export function CarbEstimatorSheet({
   const finalGramsValid = Number.isFinite(finalGrams) && finalGrams > 0 && finalGrams <= 1000;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="bottom"
-        className="flex max-h-[92dvh] flex-col gap-0 rounded-t-[1.75rem] border-t border-border/50 p-0"
-        data-testid="carb-estimator-sheet"
-      >
-        <SheetHeader className="shrink-0 px-5 pb-3 pt-5 text-left sm:px-6">
-          <div className="flex items-center gap-2">
+    <BottomSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      className="max-h-[94dvh] rounded-t-[1.75rem]"
+      title={
+        <span className="flex items-center gap-2">
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
               <Calculator className="h-4 w-4" aria-hidden />
             </span>
-            <div>
-              <SheetTitle>Estimate meal carbs</SheetTitle>
-              <SheetDescription>Build your meal from typical portions, then check the result.</SheetDescription>
-            </div>
-          </div>
-        </SheetHeader>
-
+            <span>Estimate meal carbs</span>
+        </span>
+      }
+      description="Build your meal from typical portions, then check the result. Drag down to close."
+    >
+      <div className="flex min-h-0 flex-1 flex-col" data-testid="carb-estimator-sheet">
         <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 sm:px-6">
           <div className="relative">
             <Search
@@ -355,7 +360,7 @@ export function CarbEstimatorSheet({
             </p>
           )}
         </div>
-      </SheetContent>
-    </Sheet>
+      </div>
+    </BottomSheet>
   );
 }

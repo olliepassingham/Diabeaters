@@ -14,6 +14,7 @@ describe("CarbEstimatorSheet", () => {
       />,
     );
 
+    expect(screen.getByLabelText("Drag down to close")).not.toBeNull();
     fireEvent.change(screen.getByTestId("input-carb-food-search"), {
       target: { value: "banana" },
     });
@@ -26,7 +27,15 @@ describe("CarbEstimatorSheet", () => {
     fireEvent.change(confirmedInput, { target: { value: "30" } });
     fireEvent.click(screen.getByTestId("button-use-carb-estimate"));
 
-    expect(onConfirm).toHaveBeenCalledWith(30);
+    expect(onConfirm).toHaveBeenCalledWith({
+      grams: 30,
+      compositionHint: {
+        carbType: "fruit",
+        hasFat: false,
+        hasProtein: false,
+        hasFibre: true,
+      },
+    });
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 

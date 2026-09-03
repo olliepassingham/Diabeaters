@@ -1,6 +1,8 @@
 import {
   CARB_CATEGORY_LABELS,
+  CARB_COMPOSITION_HINTS,
   CARB_FOODS,
+  type CarbCompositionHint,
   type CarbFood,
   type CarbFoodCategory,
   type CarbPortion,
@@ -29,6 +31,7 @@ export type CarbMealEstimate = {
   suggestedGrams: number;
   lowGrams: number;
   highGrams: number;
+  compositionHint: CarbCompositionHint | null;
 };
 
 export function normalizeCarbSearch(value: string): string {
@@ -96,6 +99,27 @@ function roundOne(value: number): number {
   return Math.round(value * 10) / 10;
 }
 
+function combineCompositionHints(items: CarbEstimatedItem[]): CarbCompositionHint | null {
+  const hints = items
+    .map((item) => CARB_COMPOSITION_HINTS[item.food.id])
+    .filter((item): item is CarbCompositionHint => Boolean(item));
+  if (!hints.length) return null;
+
+  const meaningfulTypes = [...new Set(hints.map((item) => item.carbType).filter((type) => type !== "unsure"))];
+  const carbType =
+    meaningfulTypes.length === 0
+      ? "unsure"
+      : meaningfulTypes.length === 1
+        ? meaningfulTypes[0]!
+        : "balanced";
+  return {
+    carbType,
+    hasFat: hints.some((item) => item.hasFat),
+    hasProtein: hints.some((item) => item.hasProtein),
+    hasFibre: hints.some((item) => item.hasFibre),
+  };
+}
+
 export function estimateCarbMeal(selections: CarbEstimateSelection[]): CarbMealEstimate {
   const items = selections
     .map(estimateCarbSelection)
@@ -109,5 +133,6 @@ export function estimateCarbMeal(selections: CarbEstimateSelection[]): CarbMealE
     suggestedGrams: Math.round(estimatedGrams),
     lowGrams: Math.floor(lowGrams),
     highGrams: Math.ceil(highGrams),
+    compositionHint: combineCompositionHints(items),
   };
 }

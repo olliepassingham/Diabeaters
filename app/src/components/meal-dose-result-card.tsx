@@ -122,13 +122,25 @@ function MealDoseHero({
 }
 
 function PumpMealActions({ loopNote }: { loopNote: string | null }) {
+  const steps = ["Check IOB", "Enter bolus", "Follow pump"];
+
   return (
-    <ol className="space-y-1.5 rounded-xl border border-indigo-200/70 bg-indigo-50/40 px-3 py-2.5 text-sm dark:border-indigo-900/50 dark:bg-indigo-950/20" data-testid="list-pump-meal-actions">
-      <li className="text-foreground/90">1. Check IOB on your pump</li>
-      <li className="text-foreground/90">2. Program this bolus on the device</li>
-      <li className="text-foreground/90">3. Use extended or combo bolus if your team recommends it for this meal</li>
-      {loopNote ? <li className="text-xs text-muted-foreground">{loopNote}</li> : null}
-    </ol>
+    <div className="space-y-2">
+      <ol
+        className="grid grid-cols-3 rounded-2xl bg-indigo-500/[0.08] p-1 dark:bg-indigo-400/[0.08]"
+        data-testid="list-pump-meal-actions"
+      >
+        {steps.map((step, index) => (
+          <li key={step} className="flex min-w-0 flex-col items-center gap-1 rounded-xl px-1.5 py-2 text-center">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-indigo-500/15 text-[10px] font-bold text-indigo-700 dark:text-indigo-300">
+              {index + 1}
+            </span>
+            <span className="text-[11px] font-medium leading-tight text-foreground/80">{step}</span>
+          </li>
+        ))}
+      </ol>
+      {loopNote ? <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">{loopNote}</p> : null}
+    </div>
   );
 }
 
@@ -162,7 +174,10 @@ export function MealDoseResultCard({
   return (
     <Card
       data-testid="card-meal-result"
-      className={cn("relative border-border/60 shadow-none", isPage && "rounded-2xl")}
+      className={cn(
+        "relative border-border/60 shadow-none",
+        isPage && "!border-0 !bg-transparent !bg-none !shadow-none",
+      )}
     >
       <Button
         variant="ghost"
@@ -174,7 +189,7 @@ export function MealDoseResultCard({
       >
         <X className="h-4 w-4" />
       </Button>
-      <CardContent className={cn("space-y-3", isPage ? "p-4 sm:p-5" : "p-4")}>
+      <CardContent className={cn("space-y-3", isPage ? "p-0 pt-10" : "p-4")}>
 
         {mealResult.error === "no_ratios" ? (
           <div className="space-y-3" data-testid="meal-result-no-ratios">
@@ -202,37 +217,48 @@ export function MealDoseResultCard({
             {mealImpact ? <MealImpactCard impact={mealImpact} /> : null}
             {splitPreview ? (
               <div
-                className="space-y-2 rounded-xl border border-border/60 bg-background/60 p-3"
+                className="overflow-hidden rounded-[1.35rem] bg-gradient-to-br from-cyan-500/[0.09] via-background/70 to-primary/[0.08] p-4 ring-1 ring-primary/10"
                 data-testid="meal-result-split-preview"
               >
-                <p className="flex items-center gap-1.5 text-sm font-medium">
-                  <Split className="h-4 w-4 text-primary" aria-hidden />
-                  {isPumpUser ? "Consider an extended / combo bolus" : "Consider splitting this dose"}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {isPumpUser
-                    ? "Fat or protein can cause a delayed rise — an extended bolus may match better than a single hit."
-                    : "Fat/protein in this meal can cause a delayed rise — spreading the dose may help it match."}
-                </p>
-                <div className="flex items-center justify-between gap-2 rounded-lg bg-muted/30 px-3 py-2 text-sm">
-                  <span>
-                    {isPumpUser ? "Now" : "Now"}: <strong className="tabular-nums">{formatInsulinUnits(splitPreview.firstDose, roundIncrement)}u</strong>
+                <div className="flex items-center gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/12 text-primary">
+                    <Split className="h-4 w-4" aria-hidden />
                   </span>
-                  <span>
-                    {isPumpUser ? `Extended over ${splitPreview.secondDoseDelay}h` : `In ${splitPreview.secondDoseDelay}h`}:{" "}
-                    <strong className="tabular-nums">{formatInsulinUnits(splitPreview.secondDose, roundIncrement)}u</strong>
-                  </span>
+                  <div>
+                    <p className="text-sm font-semibold">
+                      {isPumpUser ? "A split bolus may fit better" : "A split dose may fit better"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Optional pattern-based suggestion</p>
+                  </div>
+                </div>
+                <div className="relative mt-4 grid grid-cols-2 gap-5 before:absolute before:left-1/2 before:top-2 before:h-px before:w-[40%] before:-translate-x-1/2 before:bg-primary/25">
+                  <div>
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Now</span>
+                    <p className="mt-0.5 font-display text-2xl font-bold tabular-nums">
+                      {formatInsulinUnits(splitPreview.firstDose, roundIncrement)}
+                      <span className="ml-0.5 text-sm font-semibold text-muted-foreground">u</span>
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      {isPumpUser ? `Over ${splitPreview.secondDoseDelay}h` : `In ${splitPreview.secondDoseDelay}h`}
+                    </span>
+                    <p className="mt-0.5 font-display text-2xl font-bold tabular-nums">
+                      {formatInsulinUnits(splitPreview.secondDose, roundIncrement)}
+                      <span className="ml-0.5 text-sm font-semibold text-muted-foreground">u</span>
+                    </p>
+                  </div>
                 </div>
                 {onOpenSplitCalculator ? (
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
-                    className="w-full"
+                    className="mt-3 w-full rounded-full bg-background/70"
                     onClick={onOpenSplitCalculator}
                     data-testid="button-open-split-from-result"
                   >
-                    Open full split calculator
+                    Review in split calculator
                   </Button>
                 ) : null}
               </div>
@@ -251,13 +277,12 @@ export function MealDoseResultCard({
               <CollapsibleTrigger asChild>
                 <button
                   type="button"
-                  className="w-full flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-left"
+                  className="flex w-full items-center justify-between gap-3 rounded-2xl bg-muted/25 px-3.5 py-3 text-left transition-colors hover:bg-muted/40"
                   data-testid="button-toggle-meal-result-details"
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <BookOpen className="h-4 w-4 text-primary flex-shrink-0" />
-                    <span className="text-sm font-medium">More detail</span>
-                    <span className="text-xs text-muted-foreground truncate">Tips, rounding, safety notes</span>
+                    <span className="text-sm font-medium">Safety & calculation details</span>
                   </div>
                   {showDetails ? (
                     <ChevronUp className="h-4 w-4 text-muted-foreground" />
