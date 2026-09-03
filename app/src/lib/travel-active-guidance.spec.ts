@@ -132,7 +132,7 @@ describe("buildActiveTravelTodayFocus", () => {
         tripStyle: "city",
       },
     });
-    expect(focus.toLowerCase()).toMatch(/time zone|basal|extra checks/);
+    expect(focus.toLowerCase()).toMatch(/long-acting|local time|pump/);
   });
 
   it("guides pre-departure briefly", () => {

@@ -120,9 +120,9 @@ export function buildActiveTravelTodayFocus(input: ActiveTravelProgressInput): s
 
   if (plan.timezoneChange !== "none" && plan.timezoneHours > 0) {
     const phase = timezonePhase(dayNumber);
-    if (phase === 1) return isPumpUser ? "Extra checks while time zones settle." : "Extra checks; basal may stay on home time.";
-    if (phase === 2) return "Shift meals and timing in small steps.";
-    return "Aim for your local routine.";
+    if (phase === 1) return isPumpUser ? "Pump: home time today, then local." : "Take long-acting at the local time below.";
+    if (phase === 2) return "Move meals and long-acting 1–2h toward local.";
+    return "Aim for your local injection time.";
   }
 
   if (plan.accessRisk === "limited" || plan.accessRisk === "unsure") {

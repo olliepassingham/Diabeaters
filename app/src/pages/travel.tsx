@@ -98,10 +98,13 @@ import {
 } from "@/lib/travel-active-guidance";
 import { buildExerciseScenarioPlannerHref } from "@/lib/exercise-planner-href";
 import { getWorkoutElapsedMs } from "@/lib/exercise-session-timing";
+import { TravelInsulinClockCard } from "@/components/travel-insulin-clock-card";
 import {
-  ExerciseWorkoutProgressBar,
-  formatExerciseElapsedShort,
-} from "@/components/exercise-active-session-extras";
+  buildBasalAdjustmentSchedule,
+  pickBasalRowForDay,
+  timezoneChangeFromHours,
+  type BasalAdjustmentRow,
+} from "@/lib/travel-insulin-clock";
 
 interface TravelPlan {
   duration: number;
@@ -186,16 +189,6 @@ interface RiskWarning {
   description: string;
   severity: "low" | "medium" | "high";
 }
-
-type BasalAdjustmentRow = {
-  day: number;
-  label: string;
-  homeTime: string;
-  localTime: string;
-  note: string;
-};
-
-type TravelPlanBasalSlice = Pick<TravelPlan, "timezoneHours" | "timezoneDirection" | "timezoneChange">;
 
 const TRAVEL_DURATION_PRESETS = [
   { label: "Weekend", days: 3 },
@@ -328,90 +321,6 @@ function climateTimezoneGuidance(plan: TravelPlan): ClimateGuidanceSection & { p
     phases,
     callout: "Trips under 3 days: some people keep home basal times. Flexible insulins (e.g. degludec) may need less shifting — follow your own plan.",
   };
-}
-
-/** Gradual MDI long-acting clock shift for a single home-clock anchor time. */
-function buildBasalAdjustmentSchedule(
-  basalInjectionTime: string,
-  plan: TravelPlanBasalSlice,
-): BasalAdjustmentRow[] {
-  const anchor = basalInjectionTime.trim();
-  if (plan.timezoneChange === "none" || !anchor) return [];
-
-  const [hours, minutes] = anchor.split(":").map(Number);
-  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return [];
-
-  const homeTimeMinutes = hours * 60 + minutes;
-  const tzDiff = plan.timezoneHours;
-  const direction = plan.timezoneDirection;
-
-  const maxShiftPerDay = 2;
-  const daysToAdjust = Math.ceil(tzDiff / maxShiftPerDay);
-
-  const schedule: BasalAdjustmentRow[] = [];
-
-  const formatTime = (totalMinutes: number) => {
-    let mins = totalMinutes % (24 * 60);
-    if (mins < 0) mins += 24 * 60;
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
-    return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
-  };
-
-  schedule.push({
-    day: 0,
-    label: "Travel Day",
-    homeTime: anchor,
-    localTime: formatTime(homeTimeMinutes + (direction === "east" ? tzDiff * 60 : -tzDiff * 60)),
-    note: "Take at your usual time (shown in both home and local time)",
-  });
-
-  for (let i = 1; i <= daysToAdjust; i++) {
-    const shiftSoFar = Math.min(i * maxShiftPerDay, tzDiff);
-    const shiftMinutes = shiftSoFar * 60;
-
-    let adjustedHomeMinutes: number;
-    let adjustedLocalMinutes: number;
-
-    if (direction === "east") {
-      adjustedHomeMinutes = homeTimeMinutes - shiftMinutes;
-      adjustedLocalMinutes = homeTimeMinutes + tzDiff * 60 - shiftMinutes;
-    } else {
-      adjustedHomeMinutes = homeTimeMinutes + shiftMinutes;
-      adjustedLocalMinutes = homeTimeMinutes - tzDiff * 60 + shiftMinutes;
-    }
-
-    const isFullyAdjusted = shiftSoFar >= tzDiff;
-
-    schedule.push({
-      day: i,
-      label: `Day ${i}`,
-      homeTime: formatTime(adjustedHomeMinutes),
-      localTime: formatTime(adjustedLocalMinutes),
-      note: isFullyAdjusted ? "Fully adjusted to local time" : `Shifted ${shiftSoFar}h of ${tzDiff}h total`,
-    });
-  }
-
-  if (daysToAdjust > 0) {
-    schedule.push({
-      day: daysToAdjust + 1,
-      label: "Onwards",
-      homeTime: direction === "east" ? formatTime(homeTimeMinutes - tzDiff * 60) : formatTime(homeTimeMinutes + tzDiff * 60),
-      localTime: anchor,
-      note: "Continue taking at your usual local time",
-    });
-  }
-
-  return schedule;
-}
-
-function pickBasalRowForDay(rows: BasalAdjustmentRow[], dayInTrip: number): BasalAdjustmentRow | null {
-  if (!rows.length) return null;
-  const entry = rows.find((s) => s.day === dayInTrip);
-  if (entry) return entry;
-  const lastEntry = rows[rows.length - 1];
-  if (dayInTrip >= (lastEntry?.day ?? 0)) return lastEntry;
-  return null;
 }
 
 function TravelDisclaimerCard({ compact = false }: { compact?: boolean }) {
@@ -1076,7 +985,7 @@ export default function Travel() {
   const { user } = useAuth();
   const [step, setStep] = useState<"entry" | "inputs" | "results">("entry");
   const TRAVEL_INPUT_STEPS = 3;
-  const INPUT_STEP_TITLES = ["Trip details", "Timezone & style", "Conditions"] as const;
+  const INPUT_STEP_TITLES = ["Trip details", "Time difference", "Conditions"] as const;
   const [travelWizardStep, setTravelWizardStep] = useState(0);
   const [customDurationOpen, setCustomDurationOpen] = useState(false);
   const [isTravelModeActive, setIsTravelModeActive] = useState(false);
@@ -1556,10 +1465,8 @@ export default function Travel() {
       },
     });
     toast({
-      title: "Travel Mode Activated",
-      description: `You'll see travel reminders until ${
-        formatTripDate(activePlan.endDate, profile, { day: "numeric", month: "short", year: "numeric" }) || "your return date"
-      }`,
+      title: "Travel mode on",
+      description: "Turned on for this trip. Check Insulin times for today’s local injection clock.",
     });
     void (async () => {
       const res = await invokeNotifyScenarioStarted({
@@ -1653,6 +1560,9 @@ export default function Travel() {
     const warnings = calculateRiskWarnings(plan, isPumpUser);
     setPackingList(list);
     setRiskWarnings(warnings);
+    setResultsTab(
+      plan.timezoneChange !== "none" && plan.timezoneHours > 0 ? "climate" : "packing",
+    );
     setStep("results");
     storage.saveTravelPlan(plan);
 
@@ -1705,7 +1615,7 @@ export default function Travel() {
     });
   };
 
-  if (step === "entry" && isTravelModeActive && packingList.length > 0) {
+  if (step === "entry" && isTravelModeActive) {
     const startDate = parseISODateOrNull(plan.startDate) ?? new Date(getDefaultISOTripDates().start);
     const endDate = parseISODateOrNull(plan.endDate) ?? new Date(getDefaultISOTripDates().end);
     const today = new Date();
@@ -1739,7 +1649,6 @@ export default function Travel() {
         .filter((x): x is BasalAdjustmentRow & { doseLabel: string } => x != null);
     })();
 
-    const selectedPhrases = emergencyPhrases[selectedLanguage];
     const dayNumber = hasStarted ? daysElapsed + 1 : 0;
     const activeProgressInput = {
       plan,
@@ -1851,6 +1760,17 @@ export default function Travel() {
           </div>
         </div>
 
+        {plan.timezoneChange !== "none" && plan.timezoneHours > 0 ? (
+          <TravelInsulinClockCard
+            hours={plan.timezoneHours}
+            direction={plan.timezoneDirection}
+            isPumpUser={isPumpUser}
+            todayEntries={todayScheduleEntries}
+            schedules={basalSchedules}
+            hasStarted={hasStarted && !hasEnded}
+          />
+        ) : null}
+
         {plan.tripStyle === "active" && hasStarted && !hasEnded ? (
           <Card
             className="overflow-hidden rounded-[1.35rem] border-border/50 shadow-none"
@@ -1932,10 +1852,9 @@ export default function Travel() {
         ) : null}
 
         <Tabs value={activeTravelTab} onValueChange={(v) => setActiveTravelTab(v as any)} className="w-full" data-testid="travel-active-tabs">
-          <TabsList className="grid h-11 w-full grid-cols-3 gap-1 rounded-xl bg-muted/45 p-1">
-            <TabsTrigger value="overview" className="rounded-lg text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm" data-testid="tab-travel-overview">Overview</TabsTrigger>
-            <TabsTrigger value="plan" className="rounded-lg text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm" data-testid="tab-travel-plan">Plan</TabsTrigger>
-            <TabsTrigger value="checklist" className="rounded-lg text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm" data-testid="tab-travel-checklist">Checklist</TabsTrigger>
+          <TabsList className="grid h-11 w-full grid-cols-2 gap-1 rounded-xl bg-muted/45 p-1">
+            <TabsTrigger value="overview" className="rounded-lg text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm" data-testid="tab-travel-overview">Trip</TabsTrigger>
+            <TabsTrigger value="checklist" className="rounded-lg text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm" data-testid="tab-travel-checklist">Packing</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="mt-4 space-y-3 animate-fade-in-up" data-testid="tabcontent-travel-overview">
@@ -1988,22 +1907,11 @@ export default function Travel() {
                     variant="outline"
                     size="sm"
                     className="h-10 min-h-9 rounded-xl"
-                    onClick={() => setActiveTravelTab("plan")}
-                    data-testid="button-overview-open-plan"
-                  >
-                    <Clock className="h-3.5 w-3.5 mr-1.5" aria-hidden />
-                    Plan
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-10 min-h-9 rounded-xl"
                     onClick={() => setActiveTravelTab("checklist")}
                     data-testid="button-overview-open-checklist"
                   >
                     <Package className="h-3.5 w-3.5 mr-1.5" aria-hidden />
-                    Checklist
+                    Packing
                   </Button>
                   <Button asChild variant="outline" size="sm" className="h-10 min-h-9 rounded-xl" data-testid="button-overview-emergency">
                     <Link href="/emergency-card">
@@ -2038,139 +1946,6 @@ export default function Travel() {
                 </CardContent>
               </Card>
             )}
-          </TabsContent>
-
-          <TabsContent value="plan" className="mt-4 space-y-3 animate-fade-in-up" data-testid="tabcontent-travel-plan">
-            {todayScheduleEntries.length > 0 && !isPumpUser && hasStarted && !hasEnded && (
-              <Card className="overflow-hidden rounded-[1.35rem] border-border/50 shadow-none">
-                <CardHeader className="px-4 pb-2 pt-4">
-                  <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                    <Clock className="h-4 w-4 text-primary" aria-hidden />
-                    Today&apos;s insulin timing
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 px-4 pb-4 pt-0">
-                  {todayScheduleEntries.map((row, idx) => (
-                    <div
-                      key={`${row.doseLabel}-${idx}`}
-                      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/50 bg-muted/15 px-3 py-3"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-sm text-muted-foreground">{row.doseLabel}</p>
-                        <p
-                          className="text-xl font-bold tabular-nums text-foreground"
-                          data-testid={idx === 0 ? "text-today-injection-time" : `text-today-injection-time-${idx + 1}`}
-                        >
-                          {row.localTime}
-                          <span className="ml-1 text-sm font-normal text-muted-foreground">local</span>
-                        </p>
-                        <p className="text-sm text-muted-foreground">{row.homeTime} home</p>
-                      </div>
-                      <Badge variant="outline" className="rounded-full">{row.label}</Badge>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )}
-
-            {isPumpUser && plan.timezoneChange !== "none" && hasStarted && !hasEnded && (
-              <Card className="overflow-hidden rounded-[1.35rem] border-border/50 shadow-none">
-                <CardHeader className="px-4 pb-2 pt-4">
-                  <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                    <Clock className="h-4 w-4 text-primary" aria-hidden />
-                    Timezone
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-1 px-4 pb-4 pt-0 text-sm">
-                  <p className="font-semibold tabular-nums">
-                    {plan.timezoneHours}h {plan.timezoneDirection === "east" ? "ahead" : "behind"}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {daysElapsed < 2
-                      ? "Keep pump on home time for day one, then switch to local."
-                      : "Pump should be on local time — check basal rates suit."}
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-
-            <Card className="overflow-hidden rounded-[1.35rem] border-border/50 shadow-none">
-              <CardHeader className="px-4 pb-2 pt-4">
-                <CardTitle className="text-base font-semibold">Emergency</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 pt-0">
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <Link href="/emergency-card">
-                    <Button variant="secondary" className="min-h-10 w-full rounded-xl" data-testid="button-active-emergency-card">
-                      <Globe className="h-4 w-4 mr-2" />
-                      Emergency card
-                    </Button>
-                  </Link>
-                  <Link href="/help-now">
-                    <Button variant="outline" className="min-h-10 w-full rounded-xl" data-testid="button-help-now-link">
-                      <AlertTriangle className="h-4 w-4 mr-2" />
-                      Help now
-                    </Button>
-                  </Link>
-                </div>
-
-                <Collapsible defaultOpen={false} className="group rounded-xl border border-border/60 bg-muted/10">
-                  <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5">
-                    <CollapsibleTrigger className="flex min-h-10 flex-1 items-center gap-2 text-left text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg">
-                      <Languages className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                      Key phrases
-                      <ChevronDown className="ml-auto h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" aria-hidden />
-                    </CollapsibleTrigger>
-                    <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
-                      <SelectTrigger className="h-10 w-full min-w-[8.5rem] max-w-[10rem] sm:w-40" data-testid="select-phrase-language">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.keys(emergencyPhrases).map((lang) => (
-                          <SelectItem key={lang} value={lang}>
-                            {lang}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <CollapsibleContent className="space-y-2 border-t border-border/60 px-3 pb-3 pt-2">
-                    {selectedPhrases ? (
-                      <div className="grid grid-cols-1 gap-2">
-                        <div className="rounded-lg border border-border/50 bg-background/60 px-3 py-2">
-                          <p className="text-[11px] text-muted-foreground">I am diabetic</p>
-                          <p className="text-base font-medium" data-testid="text-phrase-diabetic">
-                            {selectedPhrases.iAmDiabetic}
-                          </p>
-                        </div>
-                        <div className="rounded-lg border border-border/50 bg-background/60 px-3 py-2">
-                          <p className="text-[11px] text-muted-foreground">I need sugar</p>
-                          <p className="text-base font-medium" data-testid="text-phrase-sugar">
-                            {selectedPhrases.needSugar}
-                          </p>
-                        </div>
-                        <div className="rounded-lg border border-border/50 bg-background/60 px-3 py-2">
-                          <p className="text-[11px] text-muted-foreground">I need medical help</p>
-                          <p className="text-base font-medium" data-testid="text-phrase-help">
-                            {selectedPhrases.needHelp}
-                          </p>
-                        </div>
-                        <div className="flex items-center justify-between gap-2 rounded-lg border border-border/50 bg-background/60 px-3 py-2">
-                          <div>
-                            <p className="text-[11px] text-muted-foreground">Emergency ({selectedLanguage})</p>
-                            <p className="text-lg font-bold tabular-nums" data-testid="text-emergency-number">
-                              {selectedPhrases.emergencyNumber}
-                            </p>
-                          </div>
-                          <Phone className="h-4 w-4 text-muted-foreground" aria-hidden />
-                        </div>
-                      </div>
-                    ) : null}
-                  </CollapsibleContent>
-                </Collapsible>
-              </CardContent>
-            </Card>
           </TabsContent>
 
           <TabsContent value="checklist" className="mt-4 space-y-3 animate-fade-in-up" data-testid="tabcontent-travel-checklist">
@@ -2235,6 +2010,15 @@ export default function Travel() {
           }
         />
 
+        <Alert className="rounded-2xl border-sky-500/25 bg-sky-500/[0.06]" data-testid="alert-when-to-start-travel">
+          <Clock className="h-4 w-4" />
+          <AlertTitle className="text-sm">When to start Travel</AlertTitle>
+          <AlertDescription className="text-sm leading-snug">
+            Build your plan anytime. Turn Travel <span className="font-medium text-foreground">on</span> when you leave
+            or board — that unlocks today’s insulin clock in local destination time. Packing is optional.
+          </AlertDescription>
+        </Alert>
+
         {!holidayPrep && !showPrepForm ? (
           <section className="space-y-2.5">
             <button
@@ -2250,9 +2034,9 @@ export default function Travel() {
                 <MapPin className="h-5 w-5" aria-hidden />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-[15px] font-semibold text-foreground">Travel plan</span>
+                <span className="block text-[15px] font-semibold text-foreground">Plan this trip</span>
                 <span className="mt-0.5 block text-xs text-muted-foreground">
-                  Packing, timezone & climate
+                  Time zones, insulin clock, packing
                 </span>
               </span>
               <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/70" aria-hidden />
@@ -2577,7 +2361,7 @@ export default function Travel() {
                       className="h-11 w-full rounded-xl"
                       variant={isDepartureNear || hasDeparted ? "default" : "outline"}
                       onClick={() => {
-                        if ((isDepartureNear || hasDeparted) && packingPlanReady) {
+                        if (isDepartureNear || hasDeparted) {
                           const next = seedPlanFromHolidayPrep();
                           setPlan(next);
                           handleActivateTravelMode(next);
@@ -2592,9 +2376,7 @@ export default function Travel() {
                       }
                     >
                       {isDepartureNear || hasDeparted
-                        ? packingPlanReady
-                          ? "Start travel"
-                          : "Make packing list"
+                        ? "Start travel"
                         : packingPlanReady
                           ? "Open packing list"
                           : "Make packing list"}
@@ -2900,6 +2682,78 @@ export default function Travel() {
             {travelWizardStep === 1 ? (
               <>
             <div className="space-y-2">
+              <Label className="text-xs font-medium text-muted-foreground">Time difference</Label>
+              <p className="text-sm leading-snug text-muted-foreground">
+                How many hours ahead or behind is your destination? Example: UK to Thailand is about 7h east.
+              </p>
+              <div className="space-y-3 rounded-xl border border-border/50 bg-background/50 p-3">
+                <div className="flex items-center justify-center gap-3" data-testid="select-timezone-hours">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-12 w-12 rounded-xl"
+                    onClick={() =>
+                      setPlan((prev) => {
+                        const hours = Math.max(0, prev.timezoneHours - 1);
+                        return {
+                          ...prev,
+                          timezoneHours: hours,
+                          timezoneChange: timezoneChangeFromHours(hours),
+                          timezoneDirection:
+                            hours === 0 ? "none" : prev.timezoneDirection === "none" ? "east" : prev.timezoneDirection,
+                        };
+                      })
+                    }
+                    aria-label="Decrease hours"
+                  >
+                    -
+                  </Button>
+                  <span className="min-w-[3.5rem] text-center font-display text-2xl font-bold tabular-nums">
+                    {plan.timezoneHours}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-12 w-12 rounded-xl"
+                    onClick={() =>
+                      setPlan((prev) => {
+                        const hours = Math.min(12, prev.timezoneHours + 1);
+                        return {
+                          ...prev,
+                          timezoneHours: hours,
+                          timezoneChange: timezoneChangeFromHours(hours),
+                          timezoneDirection:
+                            hours === 0 ? "none" : prev.timezoneDirection === "none" ? "east" : prev.timezoneDirection,
+                        };
+                      })
+                    }
+                    aria-label="Increase hours"
+                  >
+                    +
+                  </Button>
+                  <span className="text-sm text-muted-foreground">h</span>
+                </div>
+                {plan.timezoneHours > 0 ? (
+                  <TravelSegmentGroup
+                    labelledBy="timezone-direction-label"
+                    value={plan.timezoneDirection === "none" ? "east" : plan.timezoneDirection}
+                    onChange={(value) => setPlan((prev) => ({ ...prev, timezoneDirection: value }))}
+                    options={[
+                      { value: "east", label: "East (ahead)" },
+                      { value: "west", label: "West (behind)" },
+                    ]}
+                    testId="select-timezone-direction"
+                    columns={2}
+                  />
+                ) : (
+                  <p className="text-center text-sm text-muted-foreground">0h = same time zone</p>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2">
               <Label id="trip-style-label" className="text-xs font-medium text-muted-foreground">Trip style</Label>
               <TravelSegmentGroup
                 labelledBy="trip-style-label"
@@ -2920,77 +2774,6 @@ export default function Travel() {
                 variant="tiles"
               />
             </div>
-
-            <div className="space-y-2">
-              <Label id="timezone-label" className="text-xs font-medium text-muted-foreground">Timezone</Label>
-              <TravelSegmentGroup
-                labelledBy="timezone-label"
-                value={plan.timezoneChange}
-                onChange={(value) => {
-                  setPlan((prev) => ({
-                    ...prev,
-                    timezoneChange: value,
-                    timezoneDirection: value === "none" ? "none" : prev.timezoneDirection === "none" ? "east" : prev.timezoneDirection,
-                    timezoneHours: value === "none" ? 0 : value === "minor" ? 2 : 6,
-                  }));
-                }}
-                options={[
-                  { value: "none", label: "None" },
-                  { value: "minor", label: "Minor" },
-                  { value: "major", label: "Major" },
-                ]}
-                testId="select-timezone"
-                columns={3}
-              />
-            </div>
-            
-            {plan.timezoneChange !== "none" && (
-              <div className="space-y-3 rounded-xl border border-border/50 bg-background/50 p-3">
-                <div className="space-y-2">
-                  <Label className="text-xs font-medium text-muted-foreground">Hours</Label>
-                  <div className="flex items-center justify-center gap-3" data-testid="select-timezone-hours">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="h-12 w-12 rounded-xl"
-                      onClick={() => setPlan((prev) => ({ ...prev, timezoneHours: Math.max(1, prev.timezoneHours - 1) }))}
-                      aria-label="Decrease hours"
-                    >
-                      -
-                    </Button>
-                    <span className="min-w-[3.5rem] text-center font-display text-2xl font-bold tabular-nums">
-                      {plan.timezoneHours}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="h-12 w-12 rounded-xl"
-                      onClick={() => setPlan((prev) => ({ ...prev, timezoneHours: Math.min(12, prev.timezoneHours + 1) }))}
-                      aria-label="Increase hours"
-                    >
-                      +
-                    </Button>
-                    <span className="text-sm text-muted-foreground">h</span>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label id="timezone-direction-label" className="text-xs font-medium text-muted-foreground">Direction</Label>
-                  <TravelSegmentGroup
-                    labelledBy="timezone-direction-label"
-                    value={plan.timezoneDirection === "none" ? "east" : plan.timezoneDirection}
-                    onChange={(value) => setPlan((prev) => ({ ...prev, timezoneDirection: value }))}
-                    options={[
-                      { value: "east", label: "East" },
-                      { value: "west", label: "West" },
-                    ]}
-                    testId="select-timezone-direction"
-                    columns={2}
-                  />
-                </div>
-              </div>
-            )}
               </>
             ) : null}
 
@@ -3131,16 +2914,24 @@ export default function Travel() {
       >
         {isTravelModeActive ? (
           <>
-            <p className="text-sm font-semibold">Travel mode on</p>
-            <Button size="sm" variant="outline" className="h-10 rounded-xl" onClick={handleDeactivateTravelMode} data-testid="button-deactivate-travel">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">Travel mode on</p>
+              <p className="text-xs text-muted-foreground">Insulin times use destination local time.</p>
+            </div>
+            <Button size="sm" variant="outline" className="h-10 shrink-0 rounded-xl" onClick={handleDeactivateTravelMode} data-testid="button-deactivate-travel">
               End
             </Button>
           </>
         ) : (
           <>
-            <p className="text-sm font-semibold">Start this trip</p>
-            <Button size="sm" className="h-10 rounded-xl" onClick={handleActivateTravelMode} data-testid="button-activate-travel">
-              Start travel
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">Start when you leave</p>
+              <p className="text-xs leading-snug text-muted-foreground">
+                Turn on at the airport or when you board — not weeks before. Then open Insulin for today’s local injection time.
+              </p>
+            </div>
+            <Button size="sm" className="h-10 shrink-0 rounded-xl" onClick={handleActivateTravelMode} data-testid="button-activate-travel">
+              Start
             </Button>
           </>
         )}
@@ -3161,7 +2952,7 @@ export default function Travel() {
           </TabsTrigger>
           {showClimateTab && (
             <TabsTrigger value="climate" className="rounded-lg text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm" data-testid="tab-results-climate">
-              Climate
+              Insulin
             </TabsTrigger>
           )}
         </TabsList>
@@ -3312,6 +3103,21 @@ export default function Travel() {
 
         {showClimateTab && (
         <TabsContent value="climate" className="mt-4 space-y-3" data-testid="panel-travel-climate">
+          {plan.timezoneChange !== "none" && plan.timezoneHours > 0 ? (
+            <TravelInsulinClockCard
+              hours={plan.timezoneHours}
+              direction={plan.timezoneDirection}
+              isPumpUser={isPumpUser}
+              todayEntries={basalSchedules
+                .map(({ doseLabel, rows }) => {
+                  const entry = pickBasalRowForDay(rows, 0);
+                  return entry ? { doseLabel, ...entry } : null;
+                })
+                .filter((x): x is BasalAdjustmentRow & { doseLabel: string } => x != null)}
+              schedules={basalSchedules}
+              hasStarted={false}
+            />
+          ) : null}
           {/* Most-needed info first: when to take long-acting insulin, no scrolling required. */}
           {!isPumpUser && plan.timezoneChange !== "none" && (() => {
             const tz = climateTimezoneGuidance(plan);
