@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { BookOpen, ChevronDown, ChevronUp, Plane, Split, Thermometer, X } from "lucide-react";
+import { BookOpen, Check, ChevronDown, ChevronUp, Plane, Split, Thermometer, Utensils, X } from "lucide-react";
 
 import { MealImpactCard } from "@/components/meal-impact-card";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
@@ -11,6 +11,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { calculateSplitDose, formatInsulinUnits, insulinRoundIncrement, type MealDoseResult, type SplitFatTier } from "@/lib/meal-dose";
 import { closedLoopSafetyNote, usesClosedLoop } from "@/lib/closed-loop";
 import type { MealImpactProfile } from "@/lib/meal-impact";
+import type { MealTimelineEventStatus } from "@/lib/meal-timeline-events";
 import type { RatioFormat, ScenarioState, UserSettings } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 
@@ -18,6 +19,8 @@ export type MealDoseResultCardProps = {
   mealResult: MealDoseResult;
   mealImpact: MealImpactProfile | null;
   isPumpUser: boolean;
+  mealTimelineStatus?: MealTimelineEventStatus;
+  onConfirmMeal?: () => void;
   showDetails: boolean;
   onShowDetailsChange: (open: boolean) => void;
   scenarioState: ScenarioState;
@@ -148,6 +151,8 @@ export function MealDoseResultCard({
   mealResult,
   mealImpact,
   isPumpUser,
+  mealTimelineStatus,
+  onConfirmMeal,
   showDetails,
   onShowDetailsChange,
   scenarioState,
@@ -214,6 +219,41 @@ export function MealDoseResultCard({
         ) : (
           <>
             <MealDoseHero mealResult={mealResult} isPumpUser={isPumpUser} isPage={isPage} usesLoop={usesLoop} />
+            {mealTimelineStatus ? (
+              <div
+                className="flex items-center gap-3 rounded-2xl bg-primary/[0.07] px-3 py-2.5"
+                data-testid="meal-timeline-confirmation"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  {mealTimelineStatus === "confirmed" ? (
+                    <Check className="h-4 w-4" aria-hidden />
+                  ) : (
+                    <Utensils className="h-4 w-4" aria-hidden />
+                  )}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">
+                    {mealTimelineStatus === "confirmed" ? "Meal added to your glucose timeline" : "Meal plan saved"}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {mealTimelineStatus === "confirmed"
+                      ? "It will appear on your CGM graph."
+                      : "Confirm when you eat so your graph stays accurate."}
+                  </p>
+                </div>
+                {mealTimelineStatus === "planned" && onConfirmMeal ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-9 shrink-0 rounded-full px-3 text-xs"
+                    onClick={onConfirmMeal}
+                    data-testid="button-confirm-meal-eaten"
+                  >
+                    I ate this
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
             {mealImpact ? <MealImpactCard impact={mealImpact} /> : null}
             {splitPreview ? (
               <div

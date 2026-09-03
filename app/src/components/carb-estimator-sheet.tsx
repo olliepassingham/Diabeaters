@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Calculator, Minus, Plus, Search, Trash2 } from "lucide-react";
+import { ArrowLeft, Calculator, ChevronRight, Minus, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -55,6 +55,7 @@ export function CarbEstimatorSheet({
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<CarbFoodCategory | "all">("meals");
   const [selections, setSelections] = useState<CarbEstimateSelection[]>([]);
+  const [view, setView] = useState<"browse" | "meal">("browse");
   const estimate = useMemo(() => estimateCarbMeal(selections), [selections]);
   const [confirmedGrams, setConfirmedGrams] = useState("");
 
@@ -83,6 +84,7 @@ export function CarbEstimatorSheet({
         quantity: 1,
       },
     ]);
+    setView("meal");
   };
 
   const updateSelection = (id: string, updates: Partial<CarbEstimateSelection>) => {
@@ -117,8 +119,10 @@ export function CarbEstimatorSheet({
       description="Build your meal from typical portions, then check the result. Drag down to close."
     >
       <div className="flex min-h-0 flex-1 flex-col" data-testid="carb-estimator-sheet">
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 sm:px-6">
-          <div className="relative">
+        <div className="min-h-0 flex-1 overscroll-contain overflow-y-auto px-5 pb-5 touch-pan-y sm:px-6">
+          {view === "browse" ? (
+            <>
+              <div className="relative">
             <Search
               className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
               aria-hidden
@@ -130,9 +134,9 @@ export function CarbEstimatorSheet({
               className="h-11 rounded-full pl-9"
               data-testid="input-carb-food-search"
             />
-          </div>
+              </div>
 
-          <div className="-mx-1 mt-2 flex gap-1.5 overflow-x-auto px-1 pb-1" aria-label="Food categories">
+              <div className="-mx-1 mt-2 flex gap-1.5 overflow-x-auto px-1 pb-1" aria-label="Food categories">
             <Button
               type="button"
               variant={category === "all" ? "default" : "ghost"}
@@ -154,9 +158,9 @@ export function CarbEstimatorSheet({
                 {CARB_CATEGORY_LABELS[item]}
               </Button>
             ))}
-          </div>
+              </div>
 
-          <section className="mt-3" aria-labelledby="carb-search-results-title">
+              <section className="mt-3" aria-labelledby="carb-search-results-title">
             <h3
               id="carb-search-results-title"
               className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
@@ -190,9 +194,23 @@ export function CarbEstimatorSheet({
                 No curated match. Try a simpler food name.
               </p>
             )}
-          </section>
+              </section>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="mb-3 flex min-h-10 items-center gap-2 rounded-full pr-3 text-sm font-medium text-primary"
+                onClick={() => setView("browse")}
+                data-testid="button-carb-estimator-add-more"
+              >
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
+                  <ArrowLeft className="h-4 w-4" aria-hidden />
+                </span>
+                Add another food
+              </button>
 
-          <section className="mt-5" aria-labelledby="selected-foods-title">
+          <section aria-labelledby="selected-foods-title">
             <div className="flex items-center justify-between gap-2">
               <h3
                 id="selected-foods-title"
@@ -206,7 +224,10 @@ export function CarbEstimatorSheet({
                   variant="ghost"
                   size="sm"
                   className="h-7 rounded-full px-2 text-xs text-muted-foreground"
-                  onClick={() => setSelections([])}
+                  onClick={() => {
+                    setSelections([]);
+                    setView("browse");
+                  }}
                 >
                   Clear
                 </Button>
@@ -307,10 +328,35 @@ export function CarbEstimatorSheet({
               </div>
             )}
           </section>
+            </>
+          )}
         </div>
 
         <div className="shrink-0 border-t border-border/40 bg-background/95 px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur-xl sm:px-6">
-          {estimate.items.length ? (
+          {view === "browse" && estimate.items.length ? (
+            <button
+              type="button"
+              className="flex min-h-12 w-full items-center gap-3 rounded-2xl bg-primary/10 px-3 py-2 text-left"
+              onClick={() => setView("meal")}
+              data-testid="button-view-carb-estimator-meal"
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
+                {selections.length}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold">
+                  Your meal · {estimate.suggestedGrams}g
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                  {selections.length} {selections.length === 1 ? "item" : "items"} selected
+                </span>
+              </span>
+              <span className="flex items-center gap-1 text-xs font-semibold text-primary">
+                Review
+                <ChevronRight className="h-4 w-4" aria-hidden />
+              </span>
+            </button>
+          ) : view === "meal" && estimate.items.length ? (
             <>
               <div className="flex items-end justify-between gap-3">
                 <div>
@@ -354,11 +400,11 @@ export function CarbEstimatorSheet({
                 Use this estimate
               </Button>
             </>
-          ) : (
+          ) : view === "browse" ? (
             <p className="py-2 text-center text-xs text-muted-foreground">
               Add a food to calculate a typical range.
             </p>
-          )}
+          ) : null}
         </div>
       </div>
     </BottomSheet>

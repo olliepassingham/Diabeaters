@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Activity, ChevronRight, Loader2, RefreshCw } from "lucide-react";
 import { Link } from "wouter";
 import { CgmGlucoseChart } from "@/components/cgm-glucose-chart";
@@ -11,6 +11,11 @@ import { formatTargetBgInput } from "@/lib/hypo-context";
 import { resolveUserTargetBgRange } from "@/lib/target-bg-range";
 import { storage } from "@/lib/storage";
 import { useCgmHistory } from "@/hooks/use-cgm-history";
+import {
+  getMealTimelineEvents,
+  MEAL_TIMELINE_CHANGED_EVENT,
+  type MealTimelineEvent,
+} from "@/lib/meal-timeline-events";
 
 function localPoints(units: BgUnits): CgmChartPoint[] {
   return getCgmLocalHistory(0.5).map((point) => ({
@@ -107,12 +112,38 @@ function EmptyCgmChart({
 
 export function HomeCgmGraph() {
   const history = useCgmHistory("12h");
+  const [mealEvents, setMealEvents] = useState<MealTimelineEvent[]>(() =>
+    getMealTimelineEvents(Date.now() - 12 * 60 * 60 * 1000),
+  );
   const { units, connected, sourceLabel, loading, refresh } = history;
   const savedPoints = useMemo(() => localPoints(units), [units]);
   const points = history.points.length ? history.points : savedPoints;
   const target = useMemo(() => resolveUserTargetBgRange(storage.getSettings(), units), [units]);
 
   const latest = points[points.length - 1];
+  const timelineEvents = useMemo(
+    () =>
+      mealEvents.map((event) => ({
+        id: event.id,
+        timeMs: new Date(event.occurredAt).getTime(),
+        label: event.status === "confirmed" ? "Meal" : "Meal planned",
+        detail: `${event.mealType.charAt(0).toUpperCase()}${event.mealType.slice(1)} · ${event.carbsGrams}g`,
+        status: event.status,
+      })),
+    [mealEvents],
+  );
+
+  useEffect(() => {
+    const refreshMealEvents = () => {
+      setMealEvents(getMealTimelineEvents(Date.now() - 12 * 60 * 60 * 1000));
+    };
+    window.addEventListener(MEAL_TIMELINE_CHANGED_EVENT, refreshMealEvents);
+    window.addEventListener("focus", refreshMealEvents);
+    return () => {
+      window.removeEventListener(MEAL_TIMELINE_CHANGED_EVENT, refreshMealEvents);
+      window.removeEventListener("focus", refreshMealEvents);
+    };
+  }, []);
 
   return (
     <section
@@ -175,6 +206,7 @@ export function HomeCgmGraph() {
           units={units}
           targetLow={target.low}
           targetHigh={target.high}
+          timelineEvents={timelineEvents}
           className="-mx-1 w-[calc(100%+0.5rem)] [&_svg]:min-h-[220px] [&>p]:hidden"
         />
       ) : (

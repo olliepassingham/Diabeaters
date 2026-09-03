@@ -57,6 +57,11 @@ import {
   type MealImpactProfile,
 } from "@/lib/meal-impact";
 import {
+  confirmMealTimelineEvent,
+  savePlannedMealEvent,
+  type MealTimelineEvent,
+} from "@/lib/meal-timeline-events";
+import {
   getSplitFatAbsorptionVisual,
   splitFatLevelShortLabel,
 } from "@/lib/meal-planner-food-categories";
@@ -144,6 +149,7 @@ export default function Adviser() {
   }, []);
 
   const [mealResult, setMealResult] = useState<MealDoseResult | null>(null);
+  const [mealTimelineEvent, setMealTimelineEvent] = useState<MealTimelineEvent | null>(null);
   const [showMealResultDetails, setShowMealResultDetails] = useState(false);
   // Plain local state rather than a URL query flag — keeps this view resilient to any
   // transient re-renders of the search string (wouter's history-driven `useSearch()` can
@@ -167,6 +173,7 @@ export default function Adviser() {
     if (clearResult) {
       setMealResult(null);
       setMealResultImpact(null);
+      setMealTimelineEvent(null);
     }
     window.requestAnimationFrame(() => {
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -445,6 +452,23 @@ export default function Adviser() {
       });
     } catch {}
 
+    if (!result.error) {
+      try {
+        setMealTimelineEvent(
+          savePlannedMealEvent(
+            {
+              mealType,
+              carbsGrams: carbValue,
+              compositionLabel: mealCompositionSummaryLabel(mealComposition),
+            },
+            mealTimelineEvent?.id,
+          ),
+        );
+      } catch {
+        // Timeline markers are an enhancement and must not block the dose result.
+      }
+    }
+
     openMealResultPage(result, mealImpact);
   };
 
@@ -676,6 +700,15 @@ export default function Adviser() {
                 mealResult={mealResult}
                 mealImpact={mealResultImpact}
                 isPumpUser={isPumpUser}
+                mealTimelineStatus={mealTimelineEvent?.status}
+                onConfirmMeal={
+                  mealTimelineEvent?.status === "planned"
+                    ? () => {
+                        const confirmed = confirmMealTimelineEvent(mealTimelineEvent.id);
+                        if (confirmed) setMealTimelineEvent(confirmed);
+                      }
+                    : undefined
+                }
                 showDetails={showMealResultDetails}
                 onShowDetailsChange={setShowMealResultDetails}
                 scenarioState={scenarioState}

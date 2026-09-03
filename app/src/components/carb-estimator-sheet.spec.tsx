@@ -20,6 +20,7 @@ describe("CarbEstimatorSheet", () => {
     });
     fireEvent.click(screen.getByTestId("button-add-carb-food-banana"));
 
+    expect(screen.getByTestId("button-carb-estimator-add-more")).not.toBeNull();
     expect(screen.getByText("Likely range 22–32g")).not.toBeNull();
     const confirmedInput = screen.getByTestId("input-confirmed-carb-estimate");
     expect((confirmedInput as HTMLInputElement).value).toBe("27");
@@ -50,5 +51,29 @@ describe("CarbEstimatorSheet", () => {
 
     expect(screen.queryByTestId("button-use-carb-estimate")).toBeNull();
     expect(screen.getByText("Add a food to calculate a typical range.")).not.toBeNull();
+  });
+
+  it("moves between the meal editor and food browser without losing selections", () => {
+    render(
+      <CarbEstimatorSheet
+        open
+        onOpenChange={() => {}}
+        onConfirm={() => {}}
+      />,
+    );
+
+    fireEvent.change(screen.getByTestId("input-carb-food-search"), {
+      target: { value: "pizza" },
+    });
+    fireEvent.click(screen.getByTestId("button-add-carb-food-pizza"));
+    expect(screen.getByText("Your meal · 1 item")).not.toBeNull();
+
+    fireEvent.click(screen.getByTestId("button-carb-estimator-add-more"));
+    expect(screen.getByTestId("button-view-carb-estimator-meal")).not.toBeNull();
+    expect(screen.getByText("1 item selected")).not.toBeNull();
+
+    fireEvent.click(screen.getByTestId("button-view-carb-estimator-meal"));
+    expect(screen.getByText("Your meal · 1 item")).not.toBeNull();
+    expect(screen.getByTestId("button-use-carb-estimate")).not.toBeNull();
   });
 });

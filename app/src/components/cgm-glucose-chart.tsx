@@ -1,4 +1,4 @@
-import { useId, useMemo } from "react";
+import { useId, useMemo, useState } from "react";
 import {
   buildCgmHistoryAxisTicks,
   chartYDomain,
@@ -25,7 +25,16 @@ type CgmGlucoseChartProps = {
   overlays?: CgmChartOverlay[];
   /** Optional educational near-future estimate, rendered as a subtle dashed extension of the trend line. */
   projection?: NearFutureProjectionResult | null;
+  timelineEvents?: CgmTimelineEvent[];
   className?: string;
+};
+
+export type CgmTimelineEvent = {
+  id: string;
+  timeMs: number;
+  label: string;
+  detail: string;
+  status: "planned" | "confirmed";
 };
 
 const WIDTH = 320;
@@ -55,8 +64,10 @@ export function CgmGlucoseChart({
   targetHigh,
   overlays = [],
   projection,
+  timelineEvents = [],
   className,
 }: CgmGlucoseChartProps) {
+  const [selectedTimelineEventId, setSelectedTimelineEventId] = useState<string | null>(null);
   const gradientId = useId().replace(/:/g, "");
   const futureGradientId = useId().replace(/:/g, "");
   const innerWidth = WIDTH - PAD.left - PAD.right;
@@ -75,6 +86,15 @@ export function CgmGlucoseChart({
 
   const chartStartMs = points[0]?.timeMs ?? 0;
   const chartEndMs = points[points.length - 1]?.timeMs ?? chartStartMs;
+  const visibleTimelineEvents = useMemo(
+    () =>
+      timelineEvents.filter(
+        (event) => Number.isFinite(event.timeMs) && event.timeMs >= chartStartMs && event.timeMs <= chartEndMs,
+      ),
+    [timelineEvents, chartStartMs, chartEndMs],
+  );
+  const selectedTimelineEvent =
+    visibleTimelineEvents.find((event) => event.id === selectedTimelineEventId) ?? null;
 
   const historyCoords = useMemo(() => {
     return points.map((p) => ({
@@ -401,6 +421,59 @@ export function CgmGlucoseChart({
           );
         })}
 
+        {visibleTimelineEvents.map((event) => {
+          const x = scaleXByTime(event.timeMs, chartStartMs, chartEndMs, historyWidth);
+          const confirmed = event.status === "confirmed";
+          return (
+            <g
+              key={event.id}
+              role="button"
+              tabIndex={0}
+              aria-label={`${event.label}, ${event.detail}`}
+              className="cursor-pointer outline-none"
+              onClick={() => setSelectedTimelineEventId((current) => (current === event.id ? null : event.id))}
+              onKeyDown={(keyboardEvent) => {
+                if (keyboardEvent.key === "Enter" || keyboardEvent.key === " ") {
+                  keyboardEvent.preventDefault();
+                  setSelectedTimelineEventId((current) => (current === event.id ? null : event.id));
+                }
+              }}
+              data-testid={`cgm-timeline-event-${event.id}`}
+            >
+              <title>{`${event.label}: ${event.detail}`}</title>
+              <rect x={x - 10} y={PAD.top} width={20} height={innerHeight} fill="transparent" />
+              <line
+                x1={x}
+                y1={PAD.top + 13}
+                x2={x}
+                y2={PAD.top + innerHeight}
+                stroke="hsl(var(--primary))"
+                strokeOpacity={confirmed ? 0.35 : 0.2}
+                strokeDasharray={confirmed ? "3 3" : "2 4"}
+              />
+              <circle
+                cx={x}
+                cy={PAD.top + 11}
+                r={8}
+                fill={confirmed ? "hsl(var(--primary))" : "hsl(var(--background))"}
+                stroke="hsl(var(--primary))"
+                strokeWidth={1.25}
+                strokeOpacity={confirmed ? 0.9 : 0.6}
+              />
+              <text
+                x={x}
+                y={PAD.top + 13.5}
+                textAnchor="middle"
+                fontSize="7"
+                fontWeight={700}
+                fill={confirmed ? "hsl(var(--primary-foreground))" : "hsl(var(--primary))"}
+              >
+                M
+              </text>
+            </g>
+          );
+        })}
+
         {axisTicks.map((ms) => {
           const x = scaleXByTime(ms, chartStartMs, chartEndMs, historyWidth);
           const historyRight = PAD.left + historyWidth;
@@ -455,6 +528,19 @@ export function CgmGlucoseChart({
           </>
         ) : null}
       </svg>
+
+      {selectedTimelineEvent ? (
+        <div
+          className="mx-3 -mt-1 flex items-center justify-between gap-3 rounded-xl bg-primary/[0.07] px-3 py-2 text-xs"
+          data-testid="cgm-timeline-event-detail"
+        >
+          <span className="min-w-0">
+            <span className="font-semibold text-foreground">{selectedTimelineEvent.label}</span>
+            <span className="ml-1.5 text-muted-foreground">{selectedTimelineEvent.detail}</span>
+          </span>
+          <span className="shrink-0 capitalize text-primary">{selectedTimelineEvent.status}</span>
+        </div>
+      ) : null}
 
       {points.length > 0 ? (
         <p className="mt-1 text-center text-[11px] text-muted-foreground">
