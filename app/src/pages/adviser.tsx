@@ -12,39 +12,33 @@ import {
   AlertCircle,
   Calculator,
   ChevronDown,
-  ChevronUp,
   ArrowRight,
   ArrowLeft,
   Search,
   Thermometer,
   Plane,
-  BookOpen,
+  Split,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RatioAdviserTool } from "@/components/ratio-adviser-tool";
 import { Switch } from "@/components/ui/switch";
 import { storage, UserSettings, UserProfile, ScenarioState, RatioFormat, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
-import { parseRatioToGramsPerUnit, calculateDoseFromCarbs, formatRatioForDisplay } from "@/lib/ratio-utils";
-import { calculateMealDose, calculateSplitDose, insulinRoundIncrement, type MealDoseResult, type SplitFatTier } from "@/lib/meal-dose";
-import { getEffectiveTdd } from "@/lib/tdd";
+import { parseRatioToGramsPerUnit, formatRatioForDisplay } from "@/lib/ratio-utils";
+import { calculateMealDose, insulinRoundIncrement, type MealDoseResult, type SplitFatTier } from "@/lib/meal-dose";
 import { Badge } from "@/components/ui/badge";
 import { FaceLogoWatermark } from "@/components/face-logo";
-import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
-import { MealCarbAbsorptionPreview } from "@/components/meal-carb-absorption-preview";
 import { MealCompositionBuilder } from "@/components/meal-composition-builder";
 import { MealDoseResultCard } from "@/components/meal-dose-result-card";
 import { CarbEstimatorSheet } from "@/components/carb-estimator-sheet";
-import { ScenarioResultHero, ScenarioResultHeroSuffix } from "@/components/scenarios/scenario-result-hero";
+import { SplitDosePlanCard } from "@/components/split-dose-plan-card";
 
 import { Link, useLocation, useSearch } from "wouter";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { useToast } from "@/hooks/use-toast";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
 import { hypoTreatmentsInRollingHours } from "@/lib/hypo-context";
-import { ageInWholeYearsUtc } from "@/lib/user-age";
 import {
   getPostExerciseEducationalCopy,
   inferPostExerciseLoadTier,
@@ -63,9 +57,11 @@ import {
   type MealTimelineEvent,
 } from "@/lib/meal-timeline-events";
 import {
-  getSplitFatAbsorptionVisual,
-  splitFatLevelShortLabel,
-} from "@/lib/meal-planner-food-categories";
+  computeMealSplitPlanFromCarbs,
+  computeMealSplitPlanFromDose,
+  SPLIT_FAT_OPTIONS,
+  type MealSplitPlan,
+} from "@/lib/meal-split-plan";
 
 
 function getInitialTab(): string {
@@ -188,13 +184,13 @@ export default function Adviser() {
     const split = params.get("split");
     if (split === "1" || split === "true") {
       setActiveTab("meal");
-      setShowSplitCalculator(true);
+      window.requestAnimationFrame(() => {
+        splitCalculatorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
     } else if (tab === "meal" || tab === "ratios") {
       setActiveTab(tab);
-      if (tab === "ratios") setShowSplitCalculator(false);
     } else if (tab === "ratio-adviser") {
       setActiveTab("ratios");
-      setShowSplitCalculator(false);
     }
     setCameFromRatios(params.get("from") === "ratios");
 
@@ -223,11 +219,13 @@ export default function Adviser() {
   // update out of step with local `setState` batches) and avoids a stale/removed dose
   // result flashing back to the entry form right after it was computed.
   const [showMealResultPage, setShowMealResultPage] = useState(false);
+  const [showSplitResultPage, setShowSplitResultPage] = useState(false);
 
   const openMealResultPage = (result: MealDoseResult, impact: MealImpactProfile) => {
     setMealResult(result);
     setMealResultImpact(impact);
     setShowMealResultDetails(false);
+    setShowSplitResultPage(false);
     setActiveTab("meal");
     setShowMealResultPage(true);
     window.requestAnimationFrame(() => {
@@ -371,22 +369,12 @@ export default function Adviser() {
     }
   }, []);
 
-  // Split Bolus Calculator state
+  // Split dose planner state
   const [splitCarbs, setSplitCarbs] = useState("");
-  const [splitFatLevel, setSplitFatLevel] = useState<"low" | "medium" | "high">("high");
-  const [splitMealTime, setSplitMealTime] = useState<"breakfast" | "lunch" | "dinner" | "snack">("dinner");
-  const [showSplitCalculator, setShowSplitCalculator] = useState(false);
-  const [showSplitResultDetails, setShowSplitResultDetails] = useState(false);
-  const [splitResult, setSplitResult] = useState<{
-    totalUnits: number;
-    firstDose: number;
-    secondDose: number;
-    secondDoseDelay: number;
-    splitRatio: string;
-    ratioUsed: string;
-  } | null>(null);
-
-  const splitAbsorptionVisual = useMemo(() => getSplitFatAbsorptionVisual(splitFatLevel), [splitFatLevel]);
+  const [splitFatLevel, setSplitFatLevel] = useState<SplitFatTier>("high");
+  const [splitMealTime, setSplitMealTime] = useState<"breakfast" | "lunch" | "dinner" | "snack">(getInitialMealTime);
+  const [splitSourceExactDose, setSplitSourceExactDose] = useState<number | null>(null);
+  const [splitResult, setSplitResult] = useState<MealSplitPlan | null>(null);
 
   const bgUnits = profile.bgUnits || "mmol/L";
   const isPumpUser = isPumpDeliveryMethod(profile?.insulinDeliveryMethod);
@@ -419,71 +407,95 @@ export default function Adviser() {
     return () => window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
   }, []);
 
-  // Split Bolus Calculator function
-  const calculateSplitBolus = () => {
-    if (!splitCarbs) return;
-    
-    const carbValue = parseInt(splitCarbs);
-    if (isNaN(carbValue) || carbValue <= 0) return;
-    
-    // Get ratio based on selected meal time
-    const ratioMap: Record<string, string | undefined> = {
-      breakfast: settings.breakfastRatio,
-      lunch: settings.lunchRatio,
-      dinner: settings.dinnerRatio,
-      snack: settings.snackRatio || settings.lunchRatio, // Fallback snack to lunch
-    };
-    const selectedRatio = ratioMap[splitMealTime];
-    
-    let totalUnits = 0;
-    let ratioUsed = "";
-    const ratioFmt: RatioFormat = profile.ratioFormat || "per10g";
-    const cpSize = profile?.carbPortionSize;
-    
-    if (selectedRatio) {
-      const gpu = parseRatioToGramsPerUnit(selectedRatio);
-      if (gpu && gpu > 0) {
-        totalUnits = Math.round((carbValue / gpu) * 10) / 10;
-        ratioUsed = `Using your ${splitMealTime} ratio (${formatRatioForDisplay(gpu, ratioFmt, cpSize)})`;
-      }
-    } else {
-      const effectiveTdd = getEffectiveTdd(settings);
-      if (!effectiveTdd) {
-        setSplitResult(null);
-        return;
-      }
-      const ageYears = ageInWholeYearsUtc(profile.dateOfBirth ?? storage.getProfile()?.dateOfBirth);
-      if (ageYears !== null && ageYears < 18) {
+  const openSplitPlanPage = (plan: MealSplitPlan, sourceExactDose: number | null = null) => {
+    setSplitResult(plan);
+    setSplitSourceExactDose(sourceExactDose);
+    setShowMealResultPage(false);
+    setShowSplitResultPage(true);
+    setActiveTab("meal");
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  };
+
+  const closeSplitResultPage = () => {
+    setShowSplitResultPage(false);
+    if (mealResult && !mealResult.error) {
+      setShowMealResultPage(true);
+    }
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  };
+
+  const submitSplitPlan = (fatTier: SplitFatTier = splitFatLevel) => {
+    const carbValue = parseInt(splitCarbs || (carbUnit === "grams" ? mealCarbs : ""), 10);
+    if (!Number.isFinite(carbValue) || carbValue <= 0) {
+      toast({
+        title: "Enter carbs first",
+        description: "Add the meal carbs before opening the split plan.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const computed = computeMealSplitPlanFromCarbs({
+      carbsGrams: carbValue,
+      mealTime: splitMealTime,
+      fatTier,
+      settings: storage.getSettings(),
+      ratioFormat: profile.ratioFormat || "per10g",
+      carbPortionSize: profile?.carbPortionSize,
+      roundIncrement,
+      dateOfBirth: profile.dateOfBirth ?? storage.getProfile()?.dateOfBirth,
+    });
+
+    if ("error" in computed) {
+      if (computed.error === "under18_no_tdd") {
         toast({
           title: "Meal ratio needed",
           description:
             "For under-18 users we do not estimate doses from TDD alone. Add the meal ratio from your diabetes team in Settings, then try again.",
           variant: "destructive",
         });
-        setSplitResult(null);
-        return;
+      } else if (computed.error === "no_ratio") {
+        toast({
+          title: "Add a meal ratio first",
+          description: "The split planner needs your insulin-to-carb ratio or TDD to work out the total dose.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Enter carbs first",
+          description: "Add the meal carbs before opening the split plan.",
+          variant: "destructive",
+        });
       }
-      const estimatedRatio = Math.round(500 / effectiveTdd);
-      totalUnits = Math.round((carbValue / estimatedRatio) * 10) / 10;
-      ratioUsed = `Estimated from TDD (${formatRatioForDisplay(estimatedRatio, ratioFmt, cpSize)})`;
-    }
-    
-    if (totalUnits <= 0) {
-      setSplitResult(null);
       return;
     }
 
-    const split = calculateSplitDose(totalUnits, splitFatLevel, roundIncrement);
+    setSplitCarbs(String(carbValue));
+    setSplitFatLevel(fatTier);
+    openSplitPlanPage(computed.plan, null);
+  };
 
-    setSplitResult({
-      totalUnits: split.totalUnits,
-      firstDose: split.firstDose,
-      secondDose: split.secondDose,
-      secondDoseDelay: split.secondDoseDelay,
-      splitRatio: split.splitRatio,
-      ratioUsed,
-    });
-    setShowSplitResultDetails(false);
+  const applySplitFatTier = (tier: SplitFatTier) => {
+    setSplitFatLevel(tier);
+    if (splitSourceExactDose != null && splitResult) {
+      const next = computeMealSplitPlanFromDose({
+        exactDose: splitSourceExactDose,
+        carbsGrams: splitResult.carbsGrams,
+        mealTime: splitResult.mealTime,
+        fatTier: tier,
+        roundIncrement,
+        ratioUsed: splitResult.ratioUsed,
+      });
+      if (!("error" in next)) setSplitResult(next);
+      return;
+    }
+    if (splitResult || splitCarbs || mealCarbs) {
+      submitSplitPlan(tier);
+    }
   };
 
   const handleQuickMealPlan = (
@@ -556,26 +568,30 @@ export default function Adviser() {
     handleQuickMealPlan();
   };
 
-  /** Opens the standalone split calculator prefilled from the just-calculated result. */
+  /** Opens the redesigned split plan immediately from the meal dose suggestion. */
   const openSplitCalculatorFromResult = () => {
-    if (!mealResult) return;
-    setSplitCarbs(String(mealResult.carbs));
-    if (
+    if (!mealResult || mealResult.error || mealResult.exactDose <= 0) return;
+    const tier: SplitFatTier =
+      mealResultImpact?.composition.hasFat && mealResultImpact?.composition.hasProtein ? "high" : "medium";
+    const mealType =
       mealResult.mealType === "breakfast" ||
       mealResult.mealType === "lunch" ||
       mealResult.mealType === "dinner" ||
       mealResult.mealType === "snack"
-    ) {
-      setSplitMealTime(mealResult.mealType);
-    }
-    const tier: SplitFatTier =
-      mealResultImpact?.composition.hasFat && mealResultImpact?.composition.hasProtein ? "high" : "medium";
-    setSplitFatLevel(tier);
-    closeMealResultPage(false);
-    setShowSplitCalculator(true);
-    window.requestAnimationFrame(() => {
-      splitCalculatorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        ? mealResult.mealType
+        : splitMealTime;
+    const plan = computeMealSplitPlanFromDose({
+      exactDose: mealResult.exactDose,
+      carbsGrams: mealResult.carbs,
+      mealTime: mealType,
+      fatTier: tier,
+      roundIncrement,
     });
+    if ("error" in plan) return;
+    setSplitCarbs(String(mealResult.carbs));
+    setSplitMealTime(mealType);
+    setSplitFatLevel(tier);
+    openSplitPlanPage(plan, mealResult.exactDose);
   };
 
   const getRatioForMeal = (meal: string): string => {
@@ -598,7 +614,13 @@ export default function Adviser() {
       <FaceLogoWatermark />
       <PageHeader
         leading={<PageBackButton />}
-        title={showMealResultPage ? "Your dose suggestion" : "Meal & ratios"}
+        title={
+          showSplitResultPage
+            ? "Your split plan"
+            : showMealResultPage
+              ? "Your dose suggestion"
+              : "Meal & ratios"
+        }
         actions={
           <PageInfoDialog title="About Meal & ratios" description="Meal planning and ratio tools">
             <InfoSection title="Meal planner">
@@ -761,7 +783,15 @@ export default function Adviser() {
         </TabsList>
 
         <TabsContent value="meal" className="space-y-4 mt-4 animate-fade-in-up">
-          {showMealResultPage && mealResult ? (
+          {showSplitResultPage && splitResult ? (
+            <SplitDosePlanCard
+              plan={splitResult}
+              isPumpUser={isPumpUser}
+              onFatTierChange={applySplitFatTier}
+              onBack={closeSplitResultPage}
+              backLabel={mealResult && !mealResult.error ? "Back to dose suggestion" : "Back to meal planner"}
+            />
+          ) : showMealResultPage && mealResult ? (
             <div className="space-y-4 animate-fade-in-up">
               <Button
                 type="button"
@@ -989,220 +1019,109 @@ export default function Adviser() {
           </Card>
 
           <div ref={splitCalculatorRef}>
-          <Card
-            className={cn(
-              "overflow-hidden rounded-2xl border-border/60 bg-card shadow-none",
-              showSplitCalculator ? "ring-2 ring-primary/20" : "",
-            )}
-            data-testid="card-split-dose-calculator"
-          >
-            <div className="border-b border-border/50 px-4 py-4 sm:px-5">
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="font-display text-base font-semibold tracking-tight text-foreground sm:text-lg">
-                  Split dose calculator
-                </h3>
-                <Badge variant="secondary" className="rounded-full px-2.5 py-0 text-[10px] font-semibold uppercase tracking-wide">
-                  High-fat meals
-                </Badge>
+            <section
+              className="relative overflow-hidden rounded-[1.5rem] bg-gradient-to-br from-primary/[0.10] via-background/70 to-cyan-500/[0.08] p-4 ring-1 ring-primary/10"
+              data-testid="card-split-dose-calculator"
+            >
+              <div className="flex items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
+                  <Split className="h-4 w-4" aria-hidden />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-primary">
+                    Slower meals
+                  </p>
+                  <h3 className="font-display text-lg font-semibold tracking-tight">Split a high-fat meal</h3>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Pizza, curry, fish &amp; chips — spread insulin to match digestion.
+                  </p>
+                </div>
               </div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Split bolus for slower-absorbing meals — pizza, curry, fish &amp; chips.
-              </p>
-            </div>
 
-            <Collapsible open={showSplitCalculator} onOpenChange={setShowSplitCalculator}>
-              <div className="px-4 py-3 sm:px-5">
-                <CollapsibleTrigger asChild>
-                  <Button
-                    variant={showSplitCalculator ? "secondary" : "default"}
-                    className="h-11 w-full gap-2 rounded-xl text-sm font-semibold shadow-sm"
-                    data-testid="button-split-calculator-toggle"
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="split-carbs" className="text-xs text-muted-foreground">
+                    Total carbs (g)
+                  </Label>
+                  <Input
+                    id="split-carbs"
+                    type="number"
+                    inputMode="decimal"
+                    placeholder={carbUnit === "grams" && mealCarbs ? mealCarbs : "e.g. 80"}
+                    value={splitCarbs}
+                    onChange={(e) => setSplitCarbs(e.target.value)}
+                    className="h-11 rounded-xl"
+                    data-testid="input-split-carbs"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="split-meal" className="text-xs text-muted-foreground">
+                    Meal
+                  </Label>
+                  <Select
+                    value={splitMealTime}
+                    onValueChange={(v: "breakfast" | "lunch" | "dinner" | "snack") => setSplitMealTime(v)}
                   >
-                    {showSplitCalculator ? (
-                      <>
-                        <ChevronUp className="h-4 w-4" />
-                        Hide calculator
-                      </>
-                    ) : (
-                      <>
-                        <Calculator className="h-4 w-4" />
-                        Calculate split doses
-                      </>
-                    )}
-                  </Button>
-                </CollapsibleTrigger>
+                    <SelectTrigger id="split-meal" className="h-11 rounded-xl" data-testid="select-split-meal">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="breakfast">Breakfast</SelectItem>
+                      <SelectItem value="lunch">Lunch</SelectItem>
+                      <SelectItem value="dinner">Dinner</SelectItem>
+                      <SelectItem value="snack">Snack</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <CollapsibleContent>
-                <CardContent className="space-y-4 border-t border-border/50 pt-4">
-                  <div className="grid gap-4 md:grid-cols-3">
-                    <div className="space-y-2">
-                      <Label htmlFor="split-carbs">Total carbs (g)</Label>
-                      <Input
-                        id="split-carbs"
-                        type="number"
-                        placeholder="e.g., 80"
-                        value={splitCarbs}
-                        onChange={(e) => setSplitCarbs(e.target.value)}
-                        data-testid="input-split-carbs"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="split-meal">Which meal?</Label>
-                      <Select value={splitMealTime} onValueChange={(v: "breakfast" | "lunch" | "dinner" | "snack") => setSplitMealTime(v)}>
-                        <SelectTrigger id="split-meal" data-testid="select-split-meal">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="breakfast">Breakfast</SelectItem>
-                          <SelectItem value="lunch">Lunch</SelectItem>
-                          <SelectItem value="dinner">Dinner</SelectItem>
-                          <SelectItem value="snack">Snack</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="split-fat">Fat content</Label>
-                      <Select value={splitFatLevel} onValueChange={(v: "low" | "medium" | "high") => setSplitFatLevel(v)}>
-                        <SelectTrigger id="split-fat" data-testid="select-split-fat">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="low">Low fat (pasta, rice)</SelectItem>
-                          <SelectItem value="medium">Medium fat (burgers, curries)</SelectItem>
-                          <SelectItem value="high">High fat (pizza, fish & chips)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
 
-                  <Button onClick={calculateSplitBolus} disabled={!splitCarbs} className="w-full rounded-xl" data-testid="button-calculate-split">
-                    <Calculator className="h-4 w-4 mr-2" />
-                    Calculate split doses
-                  </Button>
-
-                  {splitResult && (
-                    <div className="space-y-3">
-                      <ScenarioResultHero
-                        label="Split plan"
-                        value={
-                          <>
-                            {splitResult.firstDose + splitResult.secondDose}
-                            <ScenarioResultHeroSuffix>u</ScenarioResultHeroSuffix>
-                          </>
-                        }
+              <div className="mt-3">
+                <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  How fatty is it?
+                </p>
+                <div className="grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Fat content">
+                  {SPLIT_FAT_OPTIONS.map((option) => {
+                    const selected = splitFatLevel === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        onClick={() => setSplitFatLevel(option.value)}
+                        className={cn(
+                          "rounded-2xl px-2 py-2.5 text-center transition-colors",
+                          selected
+                            ? "bg-primary text-primary-foreground shadow-sm"
+                            : "bg-background/70 text-foreground ring-1 ring-border/40",
+                        )}
+                        data-testid={`button-split-entry-fat-${option.value}`}
                       >
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          {splitResult.firstDose}u now · {splitResult.secondDose}u in {splitResult.secondDoseDelay}h
-                        </p>
-                        <Badge variant="secondary" className="mt-2 font-mono text-xs tabular-nums">
-                          {splitResult.splitRatio}
-                        </Badge>
-                      </ScenarioResultHero>
+                        <span className="block text-xs font-semibold">{option.label}</span>
+                        <span
+                          className={cn(
+                            "mt-0.5 block text-[10px]",
+                            selected ? "text-primary-foreground/80" : "text-muted-foreground",
+                          )}
+                        >
+                          {option.ratio}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
-                      <div className="grid gap-3 md:grid-cols-2">
-                        <div className="rounded-xl border border-border/60 bg-muted/15 p-3 text-center">
-                          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                            {isPumpUser ? "First part — now" : "First dose — now"}
-                          </p>
-                          <p className="mt-1 text-2xl font-bold tabular-nums text-foreground">{splitResult.firstDose}u</p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {isPumpUser ? "Program or deliver at meal start" : "Take when you start eating"}
-                          </p>
-                        </div>
-                        <div className="rounded-xl border border-border/60 bg-muted/15 p-3 text-center">
-                          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                            {isPumpUser ? "Second part — later" : "Second dose — later"}
-                          </p>
-                          <p className="mt-1 text-2xl font-bold tabular-nums text-foreground">{splitResult.secondDose}u</p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {isPumpUser
-                              ? `Program remainder in ${splitResult.secondDoseDelay} h (or use extended bolus)`
-                              : `Take in ${splitResult.secondDoseDelay} hours`}
-                          </p>
-                        </div>
-                      </div>
-
-                      <MealCarbAbsorptionPreview
-                        carbsGrams={parseInt(splitCarbs, 10)}
-                        visual={splitAbsorptionVisual}
-                        foodChoiceLabel={splitFatLevelShortLabel(splitFatLevel)}
-                        previewTestId="split-carb-absorption-preview"
-                      />
-
-                      <Collapsible open={showSplitResultDetails} onOpenChange={setShowSplitResultDetails}>
-                        <CollapsibleTrigger asChild>
-                          <button
-                            type="button"
-                            className="w-full flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-left"
-                            data-testid="button-toggle-split-result-details"
-                          >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <BookOpen className="h-4 w-4 text-primary flex-shrink-0" />
-                              <span className="text-sm font-medium">More detail</span>
-                              <span className="text-xs text-muted-foreground truncate">Why split, ratio, tips</span>
-                            </div>
-                            {showSplitResultDetails ? (
-                              <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                            ) : (
-                              <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                            )}
-                          </button>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent>
-                          <div className="pt-2 space-y-3">
-                            <MedicalNumericOutputDisclaimer compact />
-                            <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
-                              <p className="text-sm text-blue-800 dark:text-blue-200">
-                                High-fat meals slow carb absorption.{" "}
-                                {isPumpUser
-                                  ? "Delivering the full bolus at once can cause an early low then a late rise. Splitting matches digestion — on a pump, extended or dual-wave bolus often does this for you."
-                                  : "Taking all insulin upfront can cause an initial hypo, then a late spike. Split your dose to match the slower digestion."}
-                              </p>
-                            </div>
-                            <div className="text-sm text-muted-foreground space-y-1">
-                              <p>
-                                <strong>Total:</strong> {splitResult.totalUnits} units for {splitCarbs}g carbs
-                              </p>
-                              <p className="text-xs">{splitResult.ratioUsed}</p>
-                              <p>
-                                <strong>Why split?</strong> Fat slows carb absorption by {splitResult.secondDoseDelay - 1} to{" "}
-                                {splitResult.secondDoseDelay + 1} hours.
-                              </p>
-                            </div>
-                            <div className="p-2 bg-muted rounded text-xs text-muted-foreground space-y-1">
-                              <p>
-                                <strong>Rounding guide:</strong> This app rounds suggested doses to whole units (pen-friendly). If you use
-                                a device that can deliver finer increments, follow your care team&apos;s guidance.
-                              </p>
-                              <p>
-                                <strong>Tip:</strong>{" "}
-                                {isPumpUser
-                                  ? "Set a timer for the second part; check BG and IOB before delivering."
-                                  : "Set a timer for your second dose! Check BG before taking it."}
-                              </p>
-                            </div>
-                            {isPumpUser && (
-                              <div className="p-3 bg-indigo-50 dark:bg-indigo-950/30 rounded-lg border border-indigo-200 dark:border-indigo-800" data-testid="pump-tip-split-bolus">
-                                <p className="text-xs font-medium text-indigo-600 dark:text-indigo-400 mb-1">Pump Users</p>
-                                <p className="text-sm text-indigo-800 dark:text-indigo-200">
-                                  Your pump may have an extended/square wave bolus feature that handles this automatically. Check your
-                                  pump&apos;s manual for how to set up a dual-wave or combo bolus instead of manually splitting doses.
-                                </p>
-                              </div>
-                            )}
-                            <p className="text-xs text-muted-foreground">
-                              [Not medical advice. Everyone&apos;s response to fat varies. Start conservatively and adjust based on your
-                              experience.]
-                            </p>
-                          </div>
-                        </CollapsibleContent>
-                      </Collapsible>
-                    </div>
-                  )}
-                </CardContent>
-              </CollapsibleContent>
-            </Collapsible>
-          </Card>
+              <Button
+                type="button"
+                className="mt-4 h-11 w-full rounded-full"
+                onClick={() => submitSplitPlan()}
+                disabled={!splitCarbs && !(carbUnit === "grams" && mealCarbs)}
+                data-testid="button-calculate-split"
+              >
+                See split plan
+              </Button>
+            </section>
           </div>
             </>
           )}

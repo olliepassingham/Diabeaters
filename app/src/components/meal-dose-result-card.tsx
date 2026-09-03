@@ -298,7 +298,7 @@ export function MealDoseResultCard({
                     onClick={onOpenSplitCalculator}
                     data-testid="button-open-split-from-result"
                   >
-                    Review in split calculator
+                    See the split plan
                   </Button>
                 ) : null}
               </div>
