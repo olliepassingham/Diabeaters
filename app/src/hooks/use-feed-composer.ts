@@ -13,6 +13,7 @@ import {
   buildMentionsForPost,
   formatVideoDurationSeconds,
   insertFeedPost,
+  isLikelyVideoFile,
   readFeedComposerDraft,
   readVideoFileDurationSeconds,
   validateFeedVideoFile,
@@ -157,7 +158,7 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
   async function onPickVideo(files: FileList | null) {
     const f = files?.[0];
     if (!f) return;
-    if (!f.type.startsWith("video/")) {
+    if (!isLikelyVideoFile(f)) {
       toast({ title: "Unsupported file", description: "Choose an MP4, MOV, or WebM video.", variant: "destructive" });
       if (videoInputRef.current) videoInputRef.current.value = "";
       return;

@@ -29,6 +29,7 @@ export {
   GUIDED_POST_VIDEO_MAX_SECONDS,
   MAX_POST_VIDEO_SECONDS,
   formatVideoDurationSeconds,
+  isLikelyVideoFile,
   readVideoFileDurationSeconds,
 } from "./feed-video-limits";
 export { getFirstWhitelistedFeedLink } from "./link-whitelist";

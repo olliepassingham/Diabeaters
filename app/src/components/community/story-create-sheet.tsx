@@ -167,7 +167,7 @@ export function StoryCreateSheet({
       <input
         ref={videoInputRef}
         type="file"
-        accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm"
+        accept="video/*"
         className={FILE_INPUT_HIDDEN_CLASS}
         onChange={(e) => onPick(e.target.files)}
       />

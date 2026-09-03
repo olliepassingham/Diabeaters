@@ -50,9 +50,11 @@
 		<true/>
 	</dict>
     <key>NSCameraUsageDescription</key>
-    <string>Allow Diabeaters to use your camera to take photos for community posts, direct messages, and your profile.</string>
+    <string>Allow Diabeaters to use your camera to take photos and short videos for community posts, stories, direct messages, and your profile.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Allow Diabeaters to use your microphone when you record a video for a community post or story.</string>
     <key>NSPhotoLibraryUsageDescription</key>
-    <string>Allow Diabeaters to access your photo library so you can attach images to community posts and direct messages, and update your profile photo.</string>
+    <string>Allow Diabeaters to access your photo library so you can attach photos and videos to community posts and stories, and update your profile photo.</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
     <string>Allow Diabeaters to save images to your photo library when you export or download them from the app.</string>
     <key>NSHealthShareUsageDescription</key>

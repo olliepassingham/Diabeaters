@@ -15,6 +15,7 @@ import {
 import {
   GUIDED_POST_VIDEO_MAX_SECONDS,
   MAX_POST_VIDEO_SECONDS,
+  isLikelyVideoFile,
   readVideoFileDurationSeconds,
 } from "./feed-video-limits";
 import {
@@ -570,15 +571,7 @@ function validateVideoFile(file: File | null | undefined): Error | null {
   if (file.size > MAX_POST_VIDEO_BYTES) {
     return new Error("Video must be 50MB or smaller.");
   }
-  const t = file.type.toLowerCase();
-  const allowed =
-    t === "video/mp4" ||
-    t === "video/quicktime" ||
-    t === "video/webm" ||
-    file.name.toLowerCase().endsWith(".mp4") ||
-    file.name.toLowerCase().endsWith(".mov") ||
-    file.name.toLowerCase().endsWith(".webm");
-  if (!allowed) {
+  if (!isLikelyVideoFile(file)) {
     return new Error("Only MP4, MOV, or WebM videos are allowed.");
   }
   return null;

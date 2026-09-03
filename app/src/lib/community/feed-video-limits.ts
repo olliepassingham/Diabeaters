@@ -13,6 +13,20 @@ export function formatVideoDurationSeconds(totalSeconds: number): string {
   return `${mins}:${String(secs).padStart(2, "0")}`;
 }
 
+const VIDEO_NAME_RE = /\.(mp4|mov|m4v|webm|qt)$/i;
+
+/**
+ * iOS camera recordings often omit MIME or use `application/octet-stream`.
+ * Reject only when the type is clearly not video.
+ */
+export function isLikelyVideoFile(file: File): boolean {
+  const t = (file.type || "").toLowerCase().trim();
+  if (t.startsWith("video/")) return true;
+  if (t && t !== "application/octet-stream") return false;
+  if (!file.name || !file.name.includes(".")) return true;
+  return VIDEO_NAME_RE.test(file.name);
+}
+
 /** Reads duration from a local video File via HTMLVideoElement metadata. */
 export function readVideoFileDurationSeconds(file: File): Promise<number | null> {
   if (typeof document === "undefined") return Promise.resolve(null);

@@ -485,7 +485,7 @@ export function FeedComposerFormBody({
         <input
           ref={videoInputRef}
           type="file"
-          accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm"
+          accept="video/*"
           className={FILE_INPUT_HIDDEN_CLASS}
           id="feed-composer-video"
           disabled={submitting || !user || !canComposeToFeed || composerPostKind !== "standard" || Boolean(composerVideoFile) || composerFiles.length > 0}
