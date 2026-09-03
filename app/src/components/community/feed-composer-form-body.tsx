@@ -389,7 +389,8 @@ export function FeedComposerFormBody({
             <video src={composerVideoPreview} controls playsInline preload="metadata" className="max-h-64 w-full" />
           </div>
           <p className="text-[11px] leading-snug text-muted-foreground">
-            Aim for about {guidedVideoMaxSeconds}s. Marked as experience only — not medical advice.
+            This clip shows in Watch and on the Feed. Aim for about {guidedVideoMaxSeconds}s. Marked as
+            experience only — not medical advice.
             {composerVideoDurationSeconds != null
               ? ` This clip is ${formatVideoDurationSeconds(composerVideoDurationSeconds)}.`
               : null}
@@ -556,7 +557,7 @@ export function FeedComposerFormBody({
         </Button>
         <InlineInfoHint
           ariaLabel="Media limits for posts"
-          content={`Up to ${MAX_POST_IMAGES} photos (5MB each) or one short video (~${guidedVideoMaxSeconds}s, max ${MAX_POST_VIDEO_SECONDS}s / ${videoMaxMb}MB, MP4/MOV/WebM). Video tips are labeled as peer experience only.`}
+          content={`Up to ${MAX_POST_IMAGES} photos (5MB each) or one short video (~${guidedVideoMaxSeconds}s, max ${MAX_POST_VIDEO_SECONDS}s / ${videoMaxMb}MB, MP4/MOV/WebM). Videos appear in Watch and on the Feed, and are labeled as peer experience only.`}
         />
       </div>
       <Button
