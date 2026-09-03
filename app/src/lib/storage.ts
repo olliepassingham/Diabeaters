@@ -285,6 +285,9 @@ export const DIABEATER_SETTINGS_CHANGED_EVENT = "diabeater-settings-changed";
 /** Dispatched when `saveProfile` updates local profile JSON (same-tab). */
 export const DIABEATER_PROFILE_CHANGED_EVENT = "diabeater-profile-changed";
 
+/** Same-tab: local supply rows changed (add, edit, reconcile). */
+export const DIABEATER_SUPPLIES_CHANGED_EVENT = "diabeater-supplies-changed";
+
 /** Same-tab: quick exercise session JSON was written or cleared (`diabeater_active_exercise`). */
 export const DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT = "diabeater-active-exercise-changed";
 
@@ -616,6 +619,22 @@ export interface Supply {
 }
 
 export type SupplyType = Supply["type"];
+
+/** Newest local timestamp used for last-write-wins (stock edits may only bump pickup date). */
+export function getSupplySyncTimestamp(local: Pick<Supply, "updated_at" | "lastPickupDate">): string {
+  const candidates = [local.updated_at, local.lastPickupDate].filter(
+    (iso): iso is string => typeof iso === "string" && iso.length > 0,
+  );
+  if (candidates.length === 0) return new Date(0).toISOString();
+  return candidates.reduce((best, iso) =>
+    new Date(iso).getTime() > new Date(best).getTime() ? iso : best,
+  );
+}
+
+function emitSuppliesChanged(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(DIABEATER_SUPPLIES_CHANGED_EVENT));
+}
 
 export interface HolidayPrep {
   id: string;
@@ -2012,9 +2031,11 @@ export const storage = {
       const existingSupply = supplies[existingIndex];
       const currentAdjustedQuantity = this.getAdjustedQuantity(existingSupply);
       const newTotalQuantity = Math.max(0, currentAdjustedQuantity) + supply.currentQuantity;
+      const now = new Date().toISOString();
       supplies[existingIndex].currentQuantity = newTotalQuantity;
       supplies[existingIndex].quantityAtPickup = newTotalQuantity;
-      supplies[existingIndex].lastPickupDate = supply.lastPickupDate || new Date().toISOString();
+      supplies[existingIndex].lastPickupDate = supply.lastPickupDate || now;
+      supplies[existingIndex].updated_at = now;
       if (supply.dailyUsage) {
         supplies[existingIndex].dailyUsage = supply.dailyUsage;
       }
@@ -2022,20 +2043,24 @@ export const storage = {
         supplies[existingIndex].notes = supply.notes;
       }
       localStorage.setItem(STORAGE_KEYS.SUPPLIES, JSON.stringify(supplies));
+      emitSuppliesChanged();
       if (supply.dailyUsage > 0) {
         this.syncSupplyUsageToSettings(supply.type, supply.dailyUsage);
       }
       return { supply: supplies[existingIndex], merged: true };
     }
     
+    const now = new Date().toISOString();
     const newSupply: Supply = { 
       ...supply, 
       id: generateId(),
       quantityAtPickup: supply.currentQuantity,
-      lastPickupDate: supply.lastPickupDate || new Date().toISOString()
+      lastPickupDate: supply.lastPickupDate || now,
+      updated_at: supply.updated_at || now,
     };
     supplies.push(newSupply);
     localStorage.setItem(STORAGE_KEYS.SUPPLIES, JSON.stringify(supplies));
+    emitSuppliesChanged();
     if (supply.dailyUsage > 0) {
       this.syncSupplyUsageToSettings(supply.type, supply.dailyUsage);
     }
@@ -2056,8 +2081,16 @@ export const storage = {
       updates.quantityAtPickup = Math.max(0, current.quantityAtPickup + delta);
     }
     
-    supplies[index] = { ...current, ...updates };
+    const next: Supply = { ...current, ...updates };
+    if (updates.updated_at === undefined) {
+      const changedKeys = Object.keys(updates).filter((key) => key !== "cloud_id");
+      if (changedKeys.length > 0) {
+        next.updated_at = new Date().toISOString();
+      }
+    }
+    supplies[index] = next;
     localStorage.setItem(STORAGE_KEYS.SUPPLIES, JSON.stringify(supplies));
+    emitSuppliesChanged();
     if (updates.dailyUsage !== undefined && updates.dailyUsage > 0) {
       const supplyType = updates.type || current.type;
       this.syncSupplyUsageToSettings(supplyType, updates.dailyUsage);
@@ -2148,6 +2181,7 @@ export const storage = {
     const filtered = supplies.filter(s => s.id !== id);
     if (filtered.length === supplies.length) return false;
     localStorage.setItem(STORAGE_KEYS.SUPPLIES, JSON.stringify(filtered));
+    emitSuppliesChanged();
     return true;
   },
 
@@ -2196,12 +2230,13 @@ export const storage = {
     this.saveUsualPrescription(items);
   },
 
-  addUsualPrescriptionSupplies(): { added: number; merged: number } {
+  addUsualPrescriptionSupplies(): { added: number; merged: number; supplies: Supply[] } {
     const usual = this.getUsualPrescription();
-    if (!usual || usual.items.length === 0) return { added: 0, merged: 0 };
+    if (!usual || usual.items.length === 0) return { added: 0, merged: 0, supplies: [] };
     
     let addedCount = 0;
     let mergedCount = 0;
+    const affected = new Map<string, Supply>();
     for (const item of usual.items) {
       const result = this.addSupply({
         name: item.name,
@@ -2210,13 +2245,15 @@ export const storage = {
         dailyUsage: item.dailyUsage,
         notes: item.notes,
       });
+      affected.set(result.supply.id, result.supply);
+      this.addPickupRecord(result.supply.id, result.supply.name, item.quantity);
       if (result.merged) {
         mergedCount++;
       } else {
         addedCount++;
       }
     }
-    return { added: addedCount, merged: mergedCount };
+    return { added: addedCount, merged: mergedCount, supplies: [...affected.values()] };
   },
 
   getPickupHistory(supplyId?: string): PickupRecord[] {
@@ -5183,17 +5220,24 @@ export const storage = {
       if (existing.cloud_id && existing.cloud_id !== row.id) {
         return existing;
       }
-      supplies[existingIndex] = {
-        ...existing,
-        name: row.name,
-        type,
-        currentQuantity: qty,
-        quantityAtPickup: qty,
-        notes: row.notes ?? existing.notes,
-        cloud_id: row.id,
-        updated_at: row.updated_at,
-      };
+      const localTs = new Date(getSupplySyncTimestamp(existing)).getTime();
+      const cloudTs = new Date(row.updated_at).getTime();
+      const localIsNewer =
+        Number.isFinite(localTs) && Number.isFinite(cloudTs) && localTs >= cloudTs;
+      supplies[existingIndex] = localIsNewer
+        ? { ...existing, cloud_id: row.id }
+        : {
+            ...existing,
+            name: row.name,
+            type,
+            currentQuantity: qty,
+            quantityAtPickup: qty,
+            notes: row.notes ?? existing.notes,
+            cloud_id: row.id,
+            updated_at: row.updated_at,
+          };
       localStorage.setItem(STORAGE_KEYS.SUPPLIES, JSON.stringify(supplies));
+      emitSuppliesChanged();
       return supplies[existingIndex];
     }
 
@@ -5211,12 +5255,13 @@ export const storage = {
     };
     supplies.push(newSupply);
     localStorage.setItem(STORAGE_KEYS.SUPPLIES, JSON.stringify(supplies));
+    emitSuppliesChanged();
     return newSupply;
   },
 
   /**
    * Collapse local rows that share the same name + type (keeps one).
-   * Prefers a row with cloud_id, then higher stock. Returns removed ids.
+   * Prefers higher stock, then a linked cloud row, then a newer timestamp.
    */
   dedupeSuppliesByNameAndType(): string[] {
     const supplies = this.getSupplies();
@@ -5225,7 +5270,8 @@ export const storage = {
 
     const score = (s: Supply): number => {
       const stock = Math.max(0, Math.round(Number(s.currentQuantity) || 0));
-      return (s.cloud_id ? 1_000_000 : 0) + stock;
+      const ts = new Date(getSupplySyncTimestamp(s)).getTime() || 0;
+      return stock * 1e13 + ts + (s.cloud_id ? 1 : 0);
     };
 
     for (const s of supplies) {
@@ -5247,6 +5293,7 @@ export const storage = {
     const keepIds = new Set([...keepByKey.values()].map((s) => s.id));
     const next = supplies.filter((s) => keepIds.has(s.id));
     localStorage.setItem(STORAGE_KEYS.SUPPLIES, JSON.stringify(next));
+    emitSuppliesChanged();
     return removed;
   },
 

@@ -95,13 +95,20 @@ export function normalizeExamplePumpSupplies(opts: PumpSupplySeedOptions = {}): 
       s.type === "insulin_vial" &&
       (s.notes === STARTER_SUPPLY_NOTE || /^pump insulin/i.test(s.name.trim()));
     if (!isStarterPumpInsulin) continue;
-    if (s.currentQuantity === healthyQty && s.dailyUsage === tdd) continue;
+
+    const qtyPatch =
+      s.currentQuantity < 100
+        ? {
+            currentQuantity: healthyQty,
+            quantityAtPickup: healthyQty,
+            lastPickupDate: todayNoonIso(),
+          }
+        : {};
+    if (s.dailyUsage === tdd && Object.keys(qtyPatch).length === 0) continue;
 
     const updated = storage.updateSupply(s.id, {
-      currentQuantity: healthyQty,
-      quantityAtPickup: healthyQty,
       dailyUsage: tdd,
-      lastPickupDate: todayNoonIso(),
+      ...qtyPatch,
     });
     if (updated) queueCloudSync(updated.id);
   }

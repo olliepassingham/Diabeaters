@@ -2,12 +2,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import * as offline from "../src/lib/offline";
 import * as supabaseMod from "../src/lib/supabase";
 import { storage } from "../src/lib/storage";
-import {
-  compareUpdatedAtForSync,
-  flushSuppliesOfflineQueue,
-  reconcilePairWinnerForTest,
-  syncToCloud,
-} from "../src/lib/supplies";
+import { compareUpdatedAtForSync, flushSuppliesOfflineQueue, reconcilePairWinnerForTest, syncToCloud } from "../src/lib/supplies";
 
 vi.mock("../src/lib/supabase", () => ({
   getSupabase: vi.fn(),
@@ -41,6 +36,18 @@ describe("supplies sync", () => {
       reconcilePairWinnerForTest(
         { updated_at: "2026-01-01T00:00:00.000Z" },
         { updated_at: "2026-01-01T00:00:00.000Z" },
+      ),
+    ).toBe("local");
+  });
+
+  it("reconcilePairWinnerForTest prefers a newer pickup over a stale updated_at", () => {
+    expect(
+      reconcilePairWinnerForTest(
+        {
+          updated_at: "2026-01-01T00:00:00.000Z",
+          lastPickupDate: "2026-06-01T12:00:00.000Z",
+        },
+        { updated_at: "2026-03-01T00:00:00.000Z" },
       ),
     ).toBe("local");
   });
@@ -186,7 +193,7 @@ describe("supplies sync", () => {
     expect(updateSpy).toHaveBeenCalled();
   });
 
-  it("importSupplyFromCloudReconcile merges onto same name+type instead of cloning", () => {
+  it("importSupplyFromCloudReconcile keeps newer local stock instead of cloning", () => {
     storage.addSupply({
       name: "Infusion Sets",
       type: "infusion_set",
@@ -199,13 +206,36 @@ describe("supplies sync", () => {
       id: "cloud-sets-1",
       name: "Infusion Sets",
       quantity: 8,
-      updated_at: "2026-08-21T00:00:00.000Z",
+      updated_at: "2020-01-01T00:00:00.000Z",
       category: "infusion_set",
     });
 
     const list = storage.getSupplies();
     expect(list).toHaveLength(1);
     expect(list[0].cloud_id).toBe("cloud-sets-1");
+    expect(list[0].currentQuantity).toBe(10);
+  });
+
+  it("importSupplyFromCloudReconcile applies newer cloud quantity", () => {
+    storage.addSupply({
+      name: "Infusion Sets",
+      type: "infusion_set",
+      currentQuantity: 10,
+      dailyUsage: 0,
+    });
+    const id = storage.getSupplies()[0]!.id;
+    storage.updateSupply(id, { updated_at: "2020-01-01T00:00:00.000Z", lastPickupDate: "2020-01-01T00:00:00.000Z" });
+
+    storage.importSupplyFromCloudReconcile({
+      id: "cloud-sets-2",
+      name: "Infusion Sets",
+      quantity: 8,
+      updated_at: "2026-08-21T00:00:00.000Z",
+      category: "infusion_set",
+    });
+
+    const list = storage.getSupplies();
+    expect(list).toHaveLength(1);
     expect(list[0].currentQuantity).toBe(8);
   });
 
@@ -243,5 +273,32 @@ describe("supplies sync", () => {
     const list = storage.getSupplies();
     expect(list).toHaveLength(2);
     expect(list.find((s) => s.type === "infusion_set")?.id).toBe("a");
+  });
+
+  it("dedupeSuppliesByNameAndType keeps the higher stock row", () => {
+    localStorage.setItem(
+      "diabeater_supplies",
+      JSON.stringify([
+        {
+          id: "cloud-low",
+          name: "Needles",
+          type: "needle",
+          currentQuantity: 10,
+          dailyUsage: 4,
+          cloud_id: "cloud-a",
+        },
+        {
+          id: "local-high",
+          name: "Needles",
+          type: "needle",
+          currentQuantity: 110,
+          dailyUsage: 4,
+        },
+      ]),
+    );
+
+    const removed = storage.dedupeSuppliesByNameAndType();
+    expect(removed).toEqual(["cloud-low"]);
+    expect(storage.getSupplies()[0]?.id).toBe("local-high");
   });
 });

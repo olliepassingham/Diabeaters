@@ -109,6 +109,26 @@ describe("seedPumpSuppliesIfNeeded", () => {
       expect.objectContaining({ currentQuantity: 1000, quantityAtPickup: 1000 }),
     );
   });
+
+  it("does not reset pump insulin after a real stock add", () => {
+    storageMock.getSupplies.mockReturnValue([
+      {
+        id: "vial",
+        type: "insulin_vial",
+        name: "Pump Insulin (vial/cartridge)",
+        currentQuantity: 2500,
+        dailyUsage: 40,
+        notes: "Starter example — typical one pharmacy collection. Edit to match your stock.",
+      },
+      { id: "1", type: "infusion_set", name: "Sets" },
+      { id: "2", type: "reservoir", name: "Reservoirs" },
+    ]);
+    seedPumpSuppliesIfNeeded({ tdd: 40 });
+    expect(storageMock.updateSupply).not.toHaveBeenCalledWith(
+      "vial",
+      expect.objectContaining({ currentQuantity: 1000 }),
+    );
+  });
 });
 
 describe("pumpSetupCompletion", () => {

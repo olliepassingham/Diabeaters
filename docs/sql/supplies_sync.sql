@@ -20,12 +20,23 @@ create table if not exists public.supplies (
 create index if not exists supplies_user_id_idx on public.supplies (user_id);
 create index if not exists supplies_user_updated_at_idx on public.supplies (user_id, updated_at desc);
 
--- 2) updated_at trigger (keeps server timestamps consistent)
-create or replace function public.set_updated_at()
+-- 2) updated_at trigger — stock fields only (forecast cache must not steal LWW)
+create or replace function public.set_supplies_stock_updated_at()
 returns trigger
 language plpgsql
 as $$
 begin
+  if (
+    new.quantity is not distinct from old.quantity
+    and new.name is not distinct from old.name
+    and new.unit is not distinct from old.unit
+    and new.category is not distinct from old.category
+    and new.notes is not distinct from old.notes
+    and new.user_id is not distinct from old.user_id
+  ) then
+    new.updated_at = old.updated_at;
+    return new;
+  end if;
   new.updated_at = now();
   return new;
 end;
@@ -35,7 +46,7 @@ drop trigger if exists set_supplies_updated_at on public.supplies;
 create trigger set_supplies_updated_at
 before update on public.supplies
 for each row
-execute function public.set_updated_at();
+execute function public.set_supplies_stock_updated_at();
 
 -- 3) RLS
 alter table public.supplies enable row level security;

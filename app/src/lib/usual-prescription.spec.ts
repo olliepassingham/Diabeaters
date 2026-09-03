@@ -1,8 +1,11 @@
-import { describe, expect, it } from "vitest";
-import { getRepeatPrescriptionQuantity, supplyToUsualPrescriptionItem } from "@/lib/storage";
+import { beforeEach, describe, expect, it } from "vitest";
+import { getRepeatPrescriptionQuantity, storage, supplyToUsualPrescriptionItem } from "@/lib/storage";
 import { formatUsualItemQuantity } from "@/lib/usual-prescription";
 
 describe("usual prescription helpers", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
   it("prefers typical refill quantity over stock levels", () => {
     const qty = getRepeatPrescriptionQuantity({
       id: "1",
@@ -54,5 +57,24 @@ describe("usual prescription helpers", () => {
     });
     expect(formatted.primary).toContain("pen");
     expect(formatted.secondary).toBe("1500 units");
+  });
+
+  it("addUsualPrescriptionSupplies adds onto leftover and stamps updated_at", () => {
+    storage.addSupply({
+      name: "Needles",
+      type: "needle",
+      currentQuantity: 20,
+      dailyUsage: 4,
+    });
+    storage.saveUsualPrescription([
+      { name: "Needles", type: "needle", quantity: 100, dailyUsage: 4 },
+    ]);
+
+    const result = storage.addUsualPrescriptionSupplies();
+    expect(result.merged).toBe(1);
+    expect(result.supplies).toHaveLength(1);
+    expect(result.supplies[0]?.currentQuantity).toBe(120);
+    expect(result.supplies[0]?.updated_at).toBeTruthy();
+    expect(storage.getAdjustedQuantity(result.supplies[0]!)).toBe(120);
   });
 });

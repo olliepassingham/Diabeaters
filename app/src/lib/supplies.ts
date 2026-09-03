@@ -1,5 +1,5 @@
 import type { AuthError, PostgrestError } from "@supabase/supabase-js";
-import { getSupplyIncrement, storage, type Supply as LocalSupply } from "./storage";
+import { getSupplyIncrement, getSupplySyncTimestamp, storage, type Supply as LocalSupply } from "./storage";
 import { getSupabase } from "./supabase";
 import {
   enqueue,
@@ -205,7 +205,7 @@ export function localSupplyToSyncPayload(local: LocalSupply, cloudId: string | n
     unit: unitLabel,
     category: local.type,
     notes: local.notes ?? null,
-    updated_at: local.updated_at || new Date().toISOString(),
+    updated_at: getSupplySyncTimestamp(local),
   };
 }
 
@@ -387,8 +387,7 @@ export function reconcilePairWinnerForTest(
   local: { updated_at?: string; lastPickupDate?: string },
   cloud: { updated_at: string },
 ): "local" | "cloud" {
-  const lt = local.updated_at || local.lastPickupDate || new Date(0).toISOString();
-  const d = compareUpdatedAtForSync(lt, cloud.updated_at);
+  const d = compareUpdatedAtForSync(getSupplySyncTimestamp(local), cloud.updated_at);
   return d === "cloud" ? "cloud" : "local";
 }
 
@@ -459,8 +458,7 @@ export async function reconcileSupplies(): Promise<void> {
       continue;
     }
     matchedCloudIds.add(c.id);
-    const localTs = local.updated_at || local.lastPickupDate || new Date(0).toISOString();
-    const decision = compareUpdatedAtForSync(localTs, c.updated_at);
+    const decision = compareUpdatedAtForSync(getSupplySyncTimestamp(local), c.updated_at);
     if (decision === "local" || decision === "tie") {
       await syncToCloud({ ...local, cloud_id: c.id });
     } else {
@@ -483,8 +481,7 @@ export async function reconcileSupplies(): Promise<void> {
     unmatchedCloud.splice(idx, 1);
     matchedCloudIds.add(c.id);
 
-    const localTs = local.updated_at || local.lastPickupDate || new Date(0).toISOString();
-    const decision = compareUpdatedAtForSync(localTs, c.updated_at);
+    const decision = compareUpdatedAtForSync(getSupplySyncTimestamp(local), c.updated_at);
     if (decision === "local" || decision === "tie") {
       storage.updateSupply(local.id, { cloud_id: c.id });
       await syncToCloud({ ...local, cloud_id: c.id });

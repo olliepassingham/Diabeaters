@@ -12,8 +12,8 @@ On login and session restore (debounced), **`reconcileSupplies()`**:
 
 1. Loads all cloud rows for the current user.
 2. Matches local rows by **`cloud_id`**, then once by **`(name, category)`** (category is the local supply `type`).
-3. For each matched pair, compares **`updated_at`** (ISO strings). The newer side wins: either the cloud row is updated from local data or the local row is updated from the cloud.
-4. Cloud rows with no local match are **imported** as new local supplies (with `cloud_id` set).
+3. For each matched pair, compares the newer of local **`updated_at`** and **`lastPickupDate`** with cloud **`updated_at`**. The newer side wins: either the cloud row is updated from local data or the local row is updated from the cloud.
+4. Cloud rows with no local match are **imported** as new local supplies (with `cloud_id` set). Forecast-only cloud updates (`days_remaining_cached`) do **not** bump `updated_at`, so they cannot overwrite a later local stock edit.
 
 Ties favour **pushing local** to the cloud to avoid unnecessary churn.
 

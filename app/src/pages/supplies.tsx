@@ -12,7 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Plus, Pencil, Trash2, Package, Syringe, Activity, Settings, Calendar, RotateCcw, AlertTriangle, ClipboardList, Undo2, Plug, Cylinder, Plane, Thermometer, ArrowRight, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
 import { UsualPrescriptionDialog } from "@/components/usual-prescription-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { storage, Supply, LastPrescription, UsualPrescription, UsualPrescriptionItem, PrescriptionCycle, ScenarioState, getSupplyIncrement, getUnitsPerPen, getInsulinContainerLabel, DIABEATER_SCENARIO_STATE_CHANGED_EVENT, DIABEATER_PROFILE_CHANGED_EVENT, type UserProfile } from "@/lib/storage";
+import { storage, Supply, LastPrescription, UsualPrescription, UsualPrescriptionItem, PrescriptionCycle, ScenarioState, getSupplyIncrement, getUnitsPerPen, getInsulinContainerLabel, DIABEATER_SCENARIO_STATE_CHANGED_EVENT, DIABEATER_PROFILE_CHANGED_EVENT, DIABEATER_SUPPLIES_CHANGED_EVENT, type UserProfile } from "@/lib/storage";
 import { INSULIN_STOCK_QUANTITY_HINT } from "@/lib/insulin-pen-units";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { seedPatientFirstRunDefaultsIfNeeded } from "@/lib/starter-patient-defaults";
@@ -1686,17 +1686,32 @@ export default function Supplies() {
     return () => window.removeEventListener(DIABEATER_SCENARIO_STATE_CHANGED_EVENT, onScenario);
   }, []);
 
+  const refreshSupplies = () => {
+    storage.autoAdvanceActiveItemDates();
+    setSupplies(storage.getSupplies());
+    setUsualPrescription(storage.getUsualPrescription());
+  };
+
   useEffect(() => {
     const onProfile = () => setLocalProfile(storage.getProfile());
     window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
     return () => window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
   }, []);
 
-  const refreshSupplies = () => {
-    storage.autoAdvanceActiveItemDates();
-    setSupplies(storage.getSupplies());
-    setUsualPrescription(storage.getUsualPrescription());
-  };
+  useEffect(() => {
+    const onSupplies = () => refreshSupplies();
+    window.addEventListener(DIABEATER_SUPPLIES_CHANGED_EVENT, onSupplies);
+    window.addEventListener("focus", onSupplies);
+    const onVis = () => {
+      if (document.visibilityState === "visible") onSupplies();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.removeEventListener(DIABEATER_SUPPLIES_CHANGED_EVENT, onSupplies);
+      window.removeEventListener("focus", onSupplies);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, []);
 
   const maybeNotifyLowSupplies = async () => {
     const { edgeFailure } = await runSupplyLowInAppNotifyScan();
@@ -1725,6 +1740,12 @@ export default function Supplies() {
         description: `${parts.join(", ")} item${(result.added + result.merged) > 1 ? "s" : ""} from your usual prescription.` 
       });
       refreshSupplies();
+      void maybeNotifyLowSupplies();
+      void import("@/lib/supplies").then((m) => {
+        for (const supply of result.supplies) {
+          void m.syncToCloud(supply);
+        }
+      });
     } else {
       setPreviousSupplies(null);
       toast({ 
@@ -1841,10 +1862,21 @@ export default function Supplies() {
 
   const handleUndo = () => {
     if (previousSupplies) {
+      const current = storage.getSupplies();
+      const restoredIds = new Set(previousSupplies.map((s) => s.id));
+      const removed = current.filter((s) => !restoredIds.has(s.id));
       localStorage.setItem("diabeater_supplies", JSON.stringify(previousSupplies));
       toast({ title: "Undo successful", description: "Changes have been reverted." });
       setPreviousSupplies(null);
       refreshSupplies();
+      void import("@/lib/supplies").then((m) => {
+        for (const supply of storage.getSupplies()) {
+          void m.syncToCloud(supply);
+        }
+        for (const supply of removed) {
+          void m.deleteFromCloud(supply);
+        }
+      });
     }
   };
 
