@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Bookmark, Search as SearchIcon } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { FeedFollowSuggestionsStrip } from "@/components/community/feed-follow-suggestions-strip";
-import { FeedWatchLearnStrip } from "@/components/community/feed-watch-learn-strip";
+import { FeedWatchLearnPlayer } from "@/components/community/feed-watch-learn-player";
 import {
   FeedStoriesComposerHeader,
   FeedStoriesComposerHeaderForm,
@@ -146,6 +146,8 @@ export default function CommunityHomePage() {
   const [suggestionsDismissed, setSuggestionsDismissed] = useState(false);
   const [watchLearnPosts, setWatchLearnPosts] = useState<CommunityPostRow[]>([]);
   const [watchLearnLoading, setWatchLearnLoading] = useState(false);
+  const [watchLearnOpen, setWatchLearnOpen] = useState(false);
+  const [watchLearnStartId, setWatchLearnStartId] = useState<string | null>(null);
   const [storyFolloweeIds, setStoryFolloweeIds] = useState<string[]>([]);
   const [storyPeople, setStoryPeople] = useState<
     { id: string; name: string; avatar_url: string | null }[]
@@ -271,14 +273,14 @@ export default function CommunityHomePage() {
   );
 
   useEffect(() => {
-    if (!user?.id || savedOnly || feedSearch.trim()) {
+    if (!user?.id) {
       setWatchLearnPosts([]);
       setWatchLearnLoading(false);
       return;
     }
     let cancelled = false;
     setWatchLearnLoading(true);
-    void fetchRecentCommunityVideoPosts(10).then((res) => {
+    void fetchRecentCommunityVideoPosts(20).then((res) => {
       if (cancelled) return;
       setWatchLearnLoading(false);
       if (res.error || !res.data) {
@@ -290,7 +292,7 @@ export default function CommunityHomePage() {
     return () => {
       cancelled = true;
     };
-  }, [user?.id, savedOnly, feedSearch, feedListRevision]);
+  }, [user?.id, feedListRevision]);
 
   useEffect(() => {
     if (!user?.id || feedTab !== "following") {
@@ -732,26 +734,39 @@ export default function CommunityHomePage() {
 
       <div className="space-y-2.5">
         <Tabs
-          value={feedTab}
+          value={watchLearnOpen ? "watch" : feedTab}
           onValueChange={(v) => {
+            if (v === "watch") {
+              setWatchLearnStartId(watchLearnPosts[0]?.id ?? null);
+              setWatchLearnOpen(true);
+              return;
+            }
+            setWatchLearnOpen(false);
             // Sync scroll from app main container (not window — mobile shell scrolls #app-scroll-main).
             setScrollByTab((prev) => ({ ...prev, [feedTab]: getAppScrollTop() }));
             setFeedTab(v as FeedTab);
           }}
           className="w-full"
         >
-          <TabsList className="grid h-12 w-full grid-cols-2 rounded-full bg-muted/45 p-1 dark:bg-muted/30">
+          <TabsList className="grid h-12 w-full grid-cols-3 rounded-full bg-muted/45 p-1 dark:bg-muted/30">
             <TabsTrigger
               value="following"
-              className="rounded-full text-sm font-semibold data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+              className="rounded-full px-2 text-[13px] font-semibold sm:text-sm data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
             >
               Following
             </TabsTrigger>
             <TabsTrigger
               value="everyone"
-              className="rounded-full text-sm font-semibold data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+              className="rounded-full px-2 text-[13px] font-semibold sm:text-sm data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
             >
               Everyone
+            </TabsTrigger>
+            <TabsTrigger
+              value="watch"
+              className="rounded-full px-2 text-[13px] font-semibold sm:text-sm data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+              aria-label="Watch and learn"
+            >
+              Watch
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -1023,10 +1038,6 @@ export default function CommunityHomePage() {
         ) : null}
       </div>
 
-      {user && !savedOnly && !feedSearch.trim() ? (
-        <FeedWatchLearnStrip posts={watchLearnPosts} loading={watchLearnLoading} />
-      ) : null}
-
       {user && !savedOnly && !feedSearch.trim() && !suggestionsDismissed && (suggestedLoading || suggested.length > 0) ? (
         <FeedFollowSuggestionsStrip
           suggestions={suggested}
@@ -1087,6 +1098,18 @@ export default function CommunityHomePage() {
         onStoryPosted={() => refreshStories()}
       />
       </div>
+      <FeedWatchLearnPlayer
+        open={watchLearnOpen}
+        onOpenChange={setWatchLearnOpen}
+        posts={watchLearnPosts}
+        loading={watchLearnLoading}
+        initialIndex={Math.max(
+          0,
+          watchLearnPosts.findIndex((post) => post.id === watchLearnStartId),
+        )}
+        viewerId={user?.id}
+        canEngage={canEngageWithFeed}
+      />
       <CommunityPushPromptDialog
         open={communityPushPromptOpen}
         onOpenChange={setCommunityPushPromptOpen}
