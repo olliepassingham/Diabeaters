@@ -53,6 +53,7 @@ import {
   computeMealImpact,
   DEFAULT_MEAL_COMPOSITION,
   mealCompositionSummaryLabel,
+  type MealCarbType,
   type MealComposition,
   type MealImpactProfile,
 } from "@/lib/meal-impact";
@@ -86,6 +87,71 @@ function getInitialMealTime(): string {
   return "lunch";
 }
 
+const VALID_MEAL_CARB_TYPES: MealCarbType[] = [
+  "liquid_sugars",
+  "quick_refined",
+  "fruit",
+  "starchy",
+  "balanced",
+  "unsure",
+];
+
+function compositionFromSearchParams(params: URLSearchParams): MealComposition | null {
+  const carbType = params.get("carbType");
+  if (!carbType || !VALID_MEAL_CARB_TYPES.includes(carbType as MealCarbType)) return null;
+  return {
+    carbType: carbType as MealCarbType,
+    hasFat: params.get("fat") === "1",
+    hasProtein: params.get("protein") === "1",
+    hasFibre: params.get("fibre") === "1",
+  };
+}
+
+function computeStoredMealDoseSuggestion(args: {
+  carbValue: number;
+  mealTime: string;
+  composition: MealComposition;
+  planningAroundExercise: boolean;
+  exerciseTiming: "before" | "after" | "during";
+  exerciseWithin: string;
+}): { result: MealDoseResult; impact: MealImpactProfile } {
+  const freshSettings = storage.getSettings();
+  const storedProfile = storage.getProfile();
+  const bgUnits = storedProfile?.bgUnits || "mmol/L";
+  const isPumpUser = isPumpDeliveryMethod(storedProfile?.insulinDeliveryMethod);
+  const roundIncrement = insulinRoundIncrement(isPumpUser);
+  const exerciseContext = args.planningAroundExercise ? args.exerciseTiming : undefined;
+  const hoursAway = args.planningAroundExercise ? parseInt(args.exerciseWithin, 10) : undefined;
+  const lastEx = storage.getLastExerciseSummary();
+  const exerciseMeta =
+    exerciseContext && lastEx && storage.didExerciseRecently(24)
+      ? { exerciseType: lastEx.exerciseType, intensity: lastEx.intensity, durationMinutes: lastEx.durationMinutes }
+      : undefined;
+
+  const result = calculateMealDose(
+    args.carbValue,
+    args.mealTime,
+    freshSettings,
+    bgUnits,
+    exerciseContext,
+    hoursAway,
+    exerciseMeta,
+    roundIncrement,
+  );
+
+  try {
+    storage.addActivityLog({
+      activityType: "meal_planning",
+      activityDetails: `${args.carbValue}g carbs for ${args.mealTime} (${mealCompositionSummaryLabel(args.composition)})`,
+      recommendation: `${result.dose} units`,
+    });
+  } catch {
+    // Activity logging is best-effort and must not block a dose suggestion.
+  }
+
+  return { result, impact: computeMealImpact(args.composition) };
+}
+
 function adviserSearchParams(search: string): URLSearchParams {
   // wouter's useLocation() only returns the pathname (no query string), so callers
   // must pass the search string from useSearch() here, not the location itself.
@@ -111,6 +177,7 @@ export default function Adviser() {
   const didPrefillFromExerciseLink = useRef(false);
   const didPrefillFromAlcoholLink = useRef(false);
   const didPrefillFromHomeLink = useRef(false);
+  const didAutoDoseFromHomeLink = useRef(false);
   const splitCalculatorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -238,20 +305,17 @@ export default function Adviser() {
         setCarbUnit("grams");
       }
 
-      const carbType = params.get("carbType");
-      const validCarbTypes = ["liquid_sugars", "quick_refined", "fruit", "starchy", "balanced", "unsure"];
-      if (carbType && validCarbTypes.includes(carbType)) {
-        setMealComposition({
-          carbType: carbType as MealComposition["carbType"],
-          hasFat: params.get("fat") === "1",
-          hasProtein: params.get("protein") === "1",
-          hasFibre: params.get("fibre") === "1",
-        });
+      const composition = compositionFromSearchParams(params);
+      if (composition) {
+        setMealComposition(composition);
       }
 
       setActiveTab("meal");
       setPlanningAroundExercise(false);
       didPrefillFromHomeLink.current = true;
+      if (params.get("autoDose") === "1" && Number.isFinite(carbs) && carbs > 0 && carbs <= 1000) {
+        didAutoDoseFromHomeLink.current = true;
+      }
     } catch {
       // Ignore malformed deep links and leave the adviser editable.
     }
@@ -422,9 +486,14 @@ export default function Adviser() {
     setShowSplitResultDetails(false);
   };
 
-  const handleQuickMealPlan = () => {
-    const carbValue = carbUnit === "cp" ? parseInt(mealCarbs) * 10 : parseInt(mealCarbs);
-    if (!mealCarbs || !Number.isFinite(carbValue) || carbValue <= 0) {
+  const handleQuickMealPlan = (
+    carbOverride?: number,
+    compositionOverride?: MealComposition,
+    mealTimeOverride?: string,
+  ) => {
+    const carbValue =
+      carbOverride ?? (carbUnit === "cp" ? parseInt(mealCarbs) * 10 : parseInt(mealCarbs));
+    if (!Number.isFinite(carbValue) || carbValue <= 0) {
       toast({
         title: "Enter carbs first",
         description: "Add how many carbs you're about to eat before getting a dose suggestion.",
@@ -432,25 +501,16 @@ export default function Adviser() {
       });
       return;
     }
-    const freshSettings = storage.getSettings();
-    const exerciseContext = planningAroundExercise ? exerciseTiming : undefined;
-    const hoursAway = planningAroundExercise ? parseInt(exerciseWithin) : undefined;
-
-    const lastEx = storage.getLastExerciseSummary();
-    const exerciseMeta =
-      exerciseContext && lastEx && storage.didExerciseRecently(24)
-        ? { exerciseType: lastEx.exerciseType, intensity: lastEx.intensity, durationMinutes: lastEx.durationMinutes }
-        : undefined;
-
-    const result = calculateMealDose(carbValue, mealTime, freshSettings, bgUnits, exerciseContext, hoursAway, exerciseMeta, roundIncrement);
-
-    try {
-      storage.addActivityLog({
-        activityType: "meal_planning",
-        activityDetails: `${carbValue}g carbs for ${mealTime} (${mealCompositionSummaryLabel(mealComposition)})`,
-        recommendation: `${result.dose} units`,
-      });
-    } catch {}
+    const composition = compositionOverride ?? mealComposition;
+    const mealType = mealTimeOverride ?? mealTime;
+    const { result, impact } = computeStoredMealDoseSuggestion({
+      carbValue,
+      mealTime: mealType,
+      composition,
+      planningAroundExercise,
+      exerciseTiming,
+      exerciseWithin,
+    });
 
     if (!result.error) {
       try {
@@ -459,7 +519,7 @@ export default function Adviser() {
             {
               mealType,
               carbsGrams: carbValue,
-              compositionLabel: mealCompositionSummaryLabel(mealComposition),
+              compositionLabel: mealCompositionSummaryLabel(composition),
             },
             mealTimelineEvent?.id,
           ),
@@ -469,8 +529,26 @@ export default function Adviser() {
       }
     }
 
-    openMealResultPage(result, mealImpact);
+    openMealResultPage(result, impact);
   };
+
+  useEffect(() => {
+    if (!didAutoDoseFromHomeLink.current) return;
+    didAutoDoseFromHomeLink.current = false;
+    try {
+      const params = new URLSearchParams(
+        typeof window !== "undefined" ? window.location.search.replace(/^\?/, "") : "",
+      );
+      const carbs = Number(params.get("carbs"));
+      if (!Number.isFinite(carbs) || carbs <= 0 || carbs > 1000) return;
+      const composition = compositionFromSearchParams(params) ?? DEFAULT_MEAL_COMPOSITION;
+      const mt = params.get("mealTime");
+      const mealOk = mt === "breakfast" || mt === "lunch" || mt === "dinner" || mt === "snack";
+      handleQuickMealPlan(Math.round(carbs), composition, mealOk ? mt : undefined);
+    } catch {
+      // Ignore malformed auto-dose links and leave the adviser editable.
+    }
+  }, []);
 
   /** Re-runs the calculation once ratios are saved from the inline "no ratios" setup panel. */
   const handleMealRatiosSaved = (updated: UserSettings) => {
@@ -788,7 +866,7 @@ export default function Adviser() {
                     data-testid="button-open-carb-estimator"
                   >
                     <Search className="mr-1.5 h-3.5 w-3.5" aria-hidden />
-                    Estimate from foods
+                    Estimate the carbs
                   </Button>
                 </div>
               </section>
@@ -1149,13 +1227,11 @@ export default function Adviser() {
         onConfirm={({ grams, compositionHint }) => {
           setMealCarbs(String(grams));
           setCarbUnit("grams");
+          const composition = compositionHint ?? mealComposition;
           if (compositionHint) {
             setMealComposition(compositionHint);
           }
-          toast({
-            title: "Carb estimate added",
-            description: `${grams}g and likely meal composition are ready to check.`,
-          });
+          handleQuickMealPlan(grams, composition);
         }}
       />
 

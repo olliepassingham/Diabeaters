@@ -80,7 +80,11 @@ export function BottomSheet({
                   <DrawerPrimitive.Description className="text-sm text-muted-foreground">
                     {description}
                   </DrawerPrimitive.Description>
-                ) : null}
+                ) : (
+                  <DrawerPrimitive.Description className="sr-only">
+                    Swipe down to close
+                  </DrawerPrimitive.Description>
+                )}
               </div>
             </div>
           </div>

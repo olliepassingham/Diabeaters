@@ -26,6 +26,9 @@ describe("CarbEstimatorSheet", () => {
     expect((confirmedInput as HTMLInputElement).value).toBe("27");
 
     fireEvent.change(confirmedInput, { target: { value: "30" } });
+    expect(screen.getByLabelText("How this carb estimate works")).not.toBeNull();
+    expect(screen.queryByText(/Portions and recipes vary/)).toBeNull();
+    expect(screen.queryByText(/Build your meal from typical portions/)).toBeNull();
     fireEvent.click(screen.getByTestId("button-use-carb-estimate"));
 
     expect(onConfirm).toHaveBeenCalledWith({

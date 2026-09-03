@@ -23,6 +23,7 @@ function adviserHref(
   slot: HomeMealSlot,
   grams?: number,
   composition?: CarbCompositionHint | null,
+  autoDose = false,
 ): string {
   const params = new URLSearchParams({ tab: "meal", mealTime: slot, from: "home" });
   if (grams != null) params.set("carbs", String(Math.round(grams)));
@@ -32,6 +33,7 @@ function adviserHref(
     if (composition.hasProtein) params.set("protein", "1");
     if (composition.hasFibre) params.set("fibre", "1");
   }
+  if (autoDose && grams != null) params.set("autoDose", "1");
   return `/adviser?${params.toString()}`;
 }
 
@@ -120,9 +122,9 @@ export function HomeMealMoment({ healthStatus }: { healthStatus: HealthStatus })
   return (
     <>
       <section className="animate-fade-in-up px-1 py-3" data-testid="home-meal-moment">
-        <div className="relative overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-primary/[0.13] via-background/75 to-cyan-500/[0.10] px-4 pb-4 pt-3.5 ring-1 ring-primary/10">
+        <div className="relative overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-primary/[0.13] via-background/75 to-cyan-500/[0.10] px-4 pb-3.5 pt-3 ring-1 ring-primary/10">
           <div className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full bg-primary/10 blur-3xl" />
-          <div className="relative flex items-start gap-3">
+          <div className="relative flex items-center gap-3">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm">
               <Utensils className="h-5 w-5" aria-hidden />
             </span>
@@ -132,15 +134,12 @@ export function HomeMealMoment({ healthStatus }: { healthStatus: HealthStatus })
                 {moment.timeLabel} · Right now
               </p>
               <h2 className="mt-0.5 font-display text-xl font-semibold tracking-tight">{moment.title}</h2>
-              <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                Estimate the carbs, then review your suggestion before you act.
-              </p>
             </div>
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              className="-mr-2 -mt-2 h-9 w-9 shrink-0 rounded-full text-muted-foreground"
+              className="-mr-2 h-9 w-9 shrink-0 rounded-full text-muted-foreground"
               onClick={dismiss}
               aria-label={`Dismiss ${moment.slot} suggestion`}
               data-testid="button-dismiss-home-meal-moment"
@@ -179,7 +178,7 @@ export function HomeMealMoment({ healthStatus }: { healthStatus: HealthStatus })
               data-testid="button-home-estimate-meal"
             >
               <Sparkles className="mr-2 h-4 w-4" aria-hidden />
-              Estimate from foods
+              Estimate the carbs
             </Button>
             <Button asChild variant="secondary" size="icon" className="h-11 w-11 rounded-full" title="Enter carbs manually">
               <Link href={adviserHref(moment.slot)} data-testid="link-home-enter-meal-carbs">
@@ -197,7 +196,7 @@ export function HomeMealMoment({ healthStatus }: { healthStatus: HealthStatus })
             open
             onOpenChange={setEstimatorOpen}
             onConfirm={({ grams, compositionHint }) => {
-              setLocation(adviserHref(moment.slot, grams, compositionHint));
+              setLocation(adviserHref(moment.slot, grams, compositionHint, true));
             }}
           />
         </Suspense>

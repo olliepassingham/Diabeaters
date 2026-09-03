@@ -3,6 +3,7 @@ import { ArrowLeft, Calculator, ChevronRight, Minus, Plus, Search, Trash2 } from
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { InlineInfoHint } from "@/components/ui/field-label-with-info";
 import {
   Select,
   SelectContent,
@@ -23,6 +24,7 @@ import {
   searchCarbFoods,
   type CarbEstimateSelection,
 } from "@/lib/carb-estimator";
+import { mealCompositionSummaryLabel } from "@/lib/meal-impact";
 import { cn } from "@/lib/utils";
 
 type CarbEstimatorSheetProps = {
@@ -116,7 +118,6 @@ export function CarbEstimatorSheet({
             <span>Estimate meal carbs</span>
         </span>
       }
-      description="Build your meal from typical portions, then check the result. Drag down to close."
     >
       <div className="flex min-h-0 flex-1 flex-col" data-testid="carb-estimator-sheet">
         <div className="min-h-0 flex-1 overscroll-contain overflow-y-auto px-5 pb-5 touch-pan-y sm:px-6">
@@ -169,25 +170,30 @@ export function CarbEstimatorSheet({
             </h3>
             {results.length ? (
               <div className="mt-1 grid grid-cols-1 gap-x-3 sm:grid-cols-2">
-                {results.map((food) => (
-                  <button
-                    key={food.id}
-                    type="button"
-                    className="group flex min-h-11 items-center justify-between gap-2 border-b border-border/30 py-2 text-left"
-                    onClick={() => addFood(food)}
-                    data-testid={`button-add-carb-food-${food.id}`}
-                  >
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-medium text-foreground">{food.name}</span>
-                      <span className="block truncate text-[11px] text-muted-foreground">
-                        {food.portions[Math.min(1, food.portions.length - 1)]?.label}
+                {results.map((food) => {
+                  const typicalPortion = food.portions[Math.min(1, food.portions.length - 1)] ?? food.portions[0];
+                  return (
+                    <button
+                      key={food.id}
+                      type="button"
+                      className="group flex min-h-11 items-center justify-between gap-2 border-b border-border/30 py-2 text-left"
+                      onClick={() => addFood(food)}
+                      data-testid={`button-add-carb-food-${food.id}`}
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium text-foreground">{food.name}</span>
+                        <span className="block truncate text-[11px] text-muted-foreground">
+                          {typicalPortion
+                            ? `${typicalPortion.label} · ${typicalPortion.carbsGrams}g`
+                            : null}
+                        </span>
                       </span>
-                    </span>
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors group-hover:bg-primary/20">
-                      <Plus className="h-3.5 w-3.5" aria-hidden />
-                    </span>
-                  </button>
-                ))}
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors group-hover:bg-primary/20">
+                        <Plus className="h-3.5 w-3.5" aria-hidden />
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             ) : (
               <p className="py-5 text-center text-sm text-muted-foreground">
@@ -239,6 +245,7 @@ export function CarbEstimatorSheet({
                 {selections.map((selection) => {
                   const food = getCarbFood(selection.foodId);
                   if (!food) return null;
+                  const itemEstimate = estimate.items.find((item) => item.selectionId === selection.id);
                   return (
                     <div
                       key={selection.id}
@@ -246,7 +253,14 @@ export function CarbEstimatorSheet({
                       data-testid={`carb-estimator-item-${selection.id}`}
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <p className="truncate text-sm font-semibold text-foreground">{food.name}</p>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-foreground">{food.name}</p>
+                          {itemEstimate ? (
+                            <p className="text-[11px] font-semibold tabular-nums text-primary">
+                              {Math.round(itemEstimate.estimatedGrams)}g
+                            </p>
+                          ) : null}
+                        </div>
                         <Button
                           type="button"
                           variant="ghost"
@@ -360,15 +374,27 @@ export function CarbEstimatorSheet({
             <>
               <div className="flex items-end justify-between gap-3">
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                    Typical estimate
-                  </p>
+                  <div className="flex items-center gap-0.5">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                      Typical estimate
+                    </p>
+                    <InlineInfoHint
+                      ariaLabel="How this carb estimate works"
+                      className="h-8 w-8"
+                      content="Portions and recipes vary. Check packaging or weigh food when accuracy matters, especially before dosing."
+                    />
+                  </div>
                   <p className="font-display text-3xl font-semibold tracking-tight text-foreground">
                     {estimate.suggestedGrams}g
                   </p>
                   <p className="text-xs text-muted-foreground">
                     Likely range {estimate.lowGrams}–{estimate.highGrams}g
                   </p>
+                  {estimate.compositionHint ? (
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      {mealCompositionSummaryLabel(estimate.compositionHint)}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="w-28">
                   <Label htmlFor="confirmed-carb-estimate" className="text-[10px] text-muted-foreground">
@@ -387,9 +413,6 @@ export function CarbEstimatorSheet({
                   />
                 </div>
               </div>
-              <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
-                Portions and recipes vary. Check packaging or weigh food when accuracy matters, especially before dosing.
-              </p>
               <Button
                 type="button"
                 className="mt-3 h-11 w-full rounded-xl"
@@ -397,7 +420,7 @@ export function CarbEstimatorSheet({
                 disabled={!finalGramsValid}
                 data-testid="button-use-carb-estimate"
               >
-                Use this estimate
+                Get dose suggestion
               </Button>
             </>
           ) : view === "browse" ? (
