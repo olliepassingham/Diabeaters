@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import { LayoutGrid, AlertCircle, ArrowRight, CheckCircle2 } from "lucide-react";
+import { LayoutGrid, AlertCircle, Dumbbell } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import {
@@ -60,16 +60,12 @@ export function HomeCommandHero({
   scenarioState,
   onEditWidgets,
   showCoach,
-  showGuides,
-  guidesHref,
 }: {
   status: HealthStatus;
   profile: UserProfile | null;
   scenarioState: ScenarioState;
   onEditWidgets: () => void;
   showCoach: boolean;
-  showGuides: boolean;
-  guidesHref: string;
 }) {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
@@ -178,37 +174,33 @@ export function HomeCommandHero({
         </div>
 
         {(scenarioState.sickDayActive ||
-          scenarioState.travelModeActive ||
           Boolean(activeExercise) ||
           pumpFailureActive) && (
-          <div className="mt-3 flex flex-wrap items-center gap-2 px-1">
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Active</span>
+          <div
+            className="mt-3 flex flex-wrap items-center gap-2 px-1"
+            data-testid="home-active-scenario-chips"
+          >
+            <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              Active
+            </span>
             {scenarioState.sickDayActive ? (
-              <Button asChild variant="outline" size="sm" className="h-8 rounded-full px-3 text-xs">
+              <Button asChild variant="secondary" size="sm" className="h-8 rounded-full px-3 text-xs font-semibold shadow-none">
                 <Link href="/scenarios/sick-day" data-testid="chip-active-sickday">
                   <AlertCircle className="mr-1.5 h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
                   Sick day
                 </Link>
               </Button>
             ) : null}
-            {scenarioState.travelModeActive ? (
-              <Button asChild variant="outline" size="sm" className="h-8 rounded-full px-3 text-xs">
-                <Link href="/scenarios/travel" data-testid="chip-active-travel">
-                  <ArrowRight className="mr-1.5 h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-                  Travel
-                </Link>
-              </Button>
-            ) : null}
             {activeExercise ? (
-              <Button asChild variant="outline" size="sm" className="h-8 rounded-full px-3 text-xs">
+              <Button asChild variant="secondary" size="sm" className="h-8 rounded-full px-3 text-xs font-semibold shadow-none">
                 <Link href="/scenarios/exercise" data-testid="chip-active-exercise">
-                  <CheckCircle2 className="mr-1.5 h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <Dumbbell className="mr-1.5 h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                   Exercise
                 </Link>
               </Button>
             ) : null}
             {pumpFailureActive ? (
-              <Button asChild variant="outline" size="sm" className="h-8 rounded-full px-3 text-xs">
+              <Button asChild variant="secondary" size="sm" className="h-8 rounded-full px-3 text-xs font-semibold shadow-none">
                 <Link href="/scenarios/pump-failure" data-testid="chip-active-pumpfailure">
                   <AlertCircle className="mr-1.5 h-3.5 w-3.5 text-red-600 dark:text-red-400" />
                   Pump failure
@@ -222,8 +214,6 @@ export function HomeCommandHero({
           <HomeActionDock
             isUrgent={isUrgent}
             showCoach={showCoach}
-            showGuides={showGuides}
-            guidesHref={guidesHref}
             onTreatedHypo={handleTreatedHypoClick}
           />
         </div>

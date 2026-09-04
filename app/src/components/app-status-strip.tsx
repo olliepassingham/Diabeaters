@@ -542,24 +542,52 @@ export function AppStatusStrip() {
       ) : null}
 
       {sc.travelModeActive && !ex && (!inPostExerciseWindow || postExerciseDismissed) ? (
-        <div className={rowClass}>
-          <Badge className="chip border border-blue-500/25 bg-blue-500/15 text-blue-900 dark:text-blue-200" variant="secondary">
-            <Plane className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            Travel{sc.travelDestination ? ` · ${sc.travelDestination}` : ""}
-            {travelStyleBadge ? ` · ${travelStyleBadge}` : ""}
-            {travelDays != null && travelDays >= 0 ? ` · ${travelDays}d` : ""}
-          </Badge>
-          <div className="flex items-center gap-2">
-            <Link href="/scenarios/travel">
-              <Button size="sm" variant="outline" className={btnClass} data-testid="status-travel-view">
-                View <ChevronRight className="h-3.5 w-3.5 ml-1" aria-hidden />
+        <div className={cn(rowClass, "py-1.5")} data-testid="status-travel-compact">
+          <Link
+            href="/scenarios/travel"
+            className="flex min-w-0 flex-1 items-center gap-2 rounded-lg outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
+            data-testid="status-travel-view"
+          >
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sky-500/20 text-sky-800 dark:text-sky-200">
+              <Plane className="h-3.5 w-3.5" aria-hidden />
+            </span>
+            <span className="min-w-0 truncate text-sm font-semibold text-foreground">
+              Travel
+              {sc.travelDestination ? ` · ${sc.travelDestination}` : ""}
+              {travelDays != null && travelDays >= 0 ? ` · ${travelDays}d` : ""}
+            </span>
+            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+          </Link>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className={cn(btnClass, "w-9 shrink-0 px-0")}
+                aria-label="Travel options"
+                data-testid="status-travel-more"
+              >
+                <MoreHorizontal className="h-4 w-4" aria-hidden />
               </Button>
-            </Link>
-            <Button size="sm" variant="outline" className={btnClass} onClick={handleEndTravel} data-testid="status-travel-end">
-              <Power className="h-3.5 w-3.5 mr-1" aria-hidden />
-              End
-            </Button>
-          </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[min(16rem,calc(100vw-2rem))]">
+              <DropdownMenuItem asChild className="cursor-pointer">
+                <Link href="/scenarios/travel">
+                  <Plane className="mr-2 h-3.5 w-3.5 opacity-70" aria-hidden />
+                  Open travel
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={handleEndTravel}
+                className="cursor-pointer"
+                data-testid="status-travel-end"
+              >
+                <Power className="mr-2 h-3.5 w-3.5 opacity-70" aria-hidden />
+                End travel mode
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       ) : null}
 

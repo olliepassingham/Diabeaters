@@ -68,7 +68,7 @@ export function HomeActionTile({
   );
 
   const tileClass = cn(
-    "group pressable flex min-h-[5.25rem] min-w-[6rem] flex-1 flex-col items-center justify-center gap-1.5 rounded-[1.35rem] px-2 py-2.5 ring-1 animate-soft-in transition-colors",
+    "group pressable flex min-h-[5.25rem] min-w-0 w-full flex-1 flex-col items-center justify-center gap-1.5 rounded-[1.35rem] px-1.5 py-2.5 ring-1 animate-soft-in transition-colors",
     tileVariantClasses[variant],
     className,
   );
@@ -96,7 +96,7 @@ export function HomeActionTile({
 
   if (glow) {
     return (
-      <div className="flex min-w-[6rem] flex-1" data-testid={testId ? `${testId}-glow` : undefined}>
+      <div className="min-w-0 w-full flex-1" data-testid={testId ? `${testId}-glow` : undefined}>
         {body}
       </div>
     );

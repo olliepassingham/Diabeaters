@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useSearch } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -303,14 +303,6 @@ export default function Dashboard() {
 
   const healthStatus = getHealthStatus(supplies, scenarioState);
 
-  const scenariosQuickHref = useMemo(() => {
-    if (scenarioState.sickDayActive) return "/scenarios/sick-day";
-    if (scenarioState.travelModeActive) return "/scenarios/travel";
-    return "/scenarios";
-  }, [scenarioState.sickDayActive, scenarioState.travelModeActive]);
-
-  const showScenariosQuickLink = scenarioState.sickDayActive || scenarioState.travelModeActive;
-
   const mode = getActiveAppMode();
   const isCommunityDash =
     isCommunityAccountProfile(profile) && mode !== "patient" && mode !== "carer";
@@ -399,8 +391,6 @@ export default function Dashboard() {
               scenarioState={scenarioState}
               onEditWidgets={() => setWidgetsDialogOpen(true)}
               showCoach={isAiCoachEnabled && !isOffline}
-              showGuides={showScenariosQuickLink}
-              guidesHref={scenariosQuickHref}
             />
           </div>
         ) : null}
