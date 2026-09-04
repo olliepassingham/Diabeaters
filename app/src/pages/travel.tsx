@@ -1999,6 +1999,15 @@ export default function Travel() {
     const tripDays = holidayPrep ? getPrepTripDays() : 0;
     const coverage = holidayPrep ? storage.getHolidaySupplyCoverage() : [];
     const supplySummary = formatTravelLandingSupplySummary(coverage);
+    const takeAwayList =
+      packingList.length > 0
+        ? packingList
+        : holidayPrep
+          ? calculatePackingList(seedPlanFromHolidayPrep(), supplies, settings, isPumpUser)
+          : [];
+    const takeAwayPreview = takeAwayList
+      .filter((item) => item.category === "insulin" || item.category === "delivery" || item.category === "monitoring")
+      .slice(0, 8);
     const isDepartureNear = daysUntil !== null && daysUntil <= 3 && daysUntil >= 0;
     const hasDeparted = daysUntil !== null && daysUntil < 0;
     const primaryTripAction = !holidayPrep
@@ -2203,39 +2212,120 @@ export default function Travel() {
                 <p className="text-center text-sm text-muted-foreground">Departure date has passed — start travel for local insulin times.</p>
               ) : null}
 
-              {supplySummary ? (
-                <Link
-                  href="/supplies"
-                  className={cn(
-                    "flex items-center gap-3 rounded-2xl border px-3.5 py-3 transition-colors",
-                    supplySummary.hasShortfall
-                      ? "border-red-500/25 bg-red-500/[0.06] hover:bg-red-500/[0.09]"
-                      : "border-border/50 bg-background/60 hover:bg-background",
-                  )}
-                  data-testid="link-travel-supply-summary"
-                >
-                  <Package
-                    className={cn(
-                      "mt-0.5 h-4 w-4 shrink-0",
-                      supplySummary.hasShortfall ? "text-red-600 dark:text-red-400" : "text-muted-foreground",
-                    )}
-                    aria-hidden
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-medium text-foreground">{supplySummary.title}</span>
-                    <span
-                      className={cn(
-                        "mt-0.5 block text-xs leading-snug",
-                        supplySummary.hasShortfall
-                          ? "text-red-700/90 dark:text-red-300/90"
-                          : "text-muted-foreground",
-                      )}
-                    >
-                      {supplySummary.detail}
-                    </span>
-                  </span>
-                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                </Link>
+              {supplySummary || takeAwayPreview.length > 0 ? (
+                <div className="space-y-3" data-testid="travel-entry-supplies-panel">
+                  {supplySummary ? (
+                    <div className="space-y-2">
+                      <div className="flex items-start justify-between gap-2 px-0.5">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-foreground" data-testid="text-travel-supply-need">
+                            {supplySummary.title}
+                          </p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {supplySummary.calendarTripDays}-day trip + travel buffer · check each item below
+                          </p>
+                        </div>
+                        <InlineInfoHint
+                          ariaLabel="How supply cover is calculated"
+                          content={
+                            <p className="text-sm">
+                              We compare your current stock days to about {supplySummary.daysNeeded} days for this trip
+                              (calendar days plus a travel buffer). Red items need ordering before you go.
+                            </p>
+                          }
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5" data-testid="travel-entry-supply-grid">
+                        {coverage.map(({ supply, daysRemaining, shortfall, coveragePercent, orderByDate }) => (
+                          <div
+                            key={supply.id}
+                            className={cn(
+                              "rounded-xl border px-2.5 py-2",
+                              shortfall > 0 ? "border-red-500/30 bg-red-500/[0.06]" : "border-border/70 bg-background/70",
+                            )}
+                            data-testid={`prep-supply-${supply.id}`}
+                          >
+                            <p className="truncate text-[11px] font-medium text-muted-foreground">{supply.name}</p>
+                            <p
+                              className={cn(
+                                "mt-0.5 text-sm font-bold tabular-nums",
+                                shortfall > 0 ? "text-red-600 dark:text-red-400" : "text-foreground",
+                              )}
+                            >
+                              {daysRemaining >= 999
+                                ? "—"
+                                : shortfall > 0
+                                  ? `${shortfall}d short`
+                                  : `${daysRemaining}d left`}
+                            </p>
+                            {orderByDate && shortfall > 0 ? (
+                              <p
+                                className="mt-0.5 text-[10px] font-medium text-red-700 dark:text-red-300"
+                                data-testid={`prep-supply-order-by-${supply.id}`}
+                              >
+                                Order by{" "}
+                                {formatTripDate(orderByDate, profile, { day: "numeric", month: "short" }) ||
+                                  orderByDate}
+                              </p>
+                            ) : null}
+                            {daysRemaining < 999 ? (
+                              <Progress
+                                value={coveragePercent}
+                                className={`mt-1.5 h-1.5 ${shortfall > 0 ? "[&>div]:bg-red-500" : "[&>div]:bg-emerald-500"}`}
+                              />
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                      <Link
+                        href="/supplies"
+                        className="inline-flex items-center gap-1 text-xs font-medium text-primary"
+                        data-testid="link-travel-supply-summary"
+                      >
+                        Open Supply Tracker
+                        <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+                      </Link>
+                    </div>
+                  ) : null}
+
+                  {takeAwayPreview.length > 0 ? (
+                    <div className="space-y-2 rounded-2xl border border-border/50 bg-background/60 p-3" data-testid="travel-entry-takeaway">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-semibold text-foreground">Take with you</p>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 px-2 text-xs"
+                          onClick={handleStartPlan}
+                          data-testid="button-open-takeaway-list"
+                        >
+                          Full list
+                          <ChevronRight className="ml-0.5 h-3.5 w-3.5" aria-hidden />
+                        </Button>
+                      </div>
+                      <ul className="space-y-1.5">
+                        {takeAwayPreview.map((item) => (
+                          <li
+                            key={`${item.category}-${item.name}`}
+                            className="flex items-center justify-between gap-3 text-sm"
+                            data-testid={`takeaway-item-${item.name}`}
+                          >
+                            <span className="min-w-0 truncate text-foreground/90">{item.name}</span>
+                            <span className="shrink-0 font-semibold tabular-nums text-foreground">
+                              {item.estimatedAmount} {item.unit}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                      {takeAwayList.length > takeAwayPreview.length ? (
+                        <p className="text-[11px] text-muted-foreground">
+                          +{takeAwayList.length - takeAwayPreview.length} more on the full packing list
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
               ) : null}
 
               {primaryTripAction && !isTravelModeActive ? (

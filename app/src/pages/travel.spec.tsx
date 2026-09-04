@@ -94,10 +94,10 @@ describe("Travel page", () => {
     });
 
     render(<Travel />);
-    const summary = screen.queryByTestId("link-travel-supply-summary");
-    expect(summary).not.toBeNull();
-    expect(summary?.textContent).toMatch(/Need \d+ days of supplies/);
-    expect(summary?.textContent).toMatch(/18-day trip \+ buffer/);
+    expect(screen.queryByTestId("text-travel-supply-need")?.textContent).toMatch(/Need \d+ days of supplies/);
+    expect(screen.queryByTestId("travel-entry-supply-grid")).not.toBeNull();
+    expect(screen.queryByText(/d left|d short/)).not.toBeNull();
+    expect(screen.queryByTestId("travel-entry-takeaway")).not.toBeNull();
     expect(screen.queryByText("Supplies look covered for this trip")).toBeNull();
   });
 
