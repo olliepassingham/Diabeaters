@@ -503,8 +503,12 @@ export default function Adviser() {
     compositionOverride?: MealComposition,
     mealTimeOverride?: string,
   ) => {
+    // Ignore non-numeric first args (e.g. a click SyntheticEvent if wired as onClick={handleQuickMealPlan}).
+    const resolvedCarbOverride =
+      typeof carbOverride === "number" && Number.isFinite(carbOverride) ? carbOverride : undefined;
     const carbValue =
-      carbOverride ?? (carbUnit === "cp" ? parseInt(mealCarbs) * 10 : parseInt(mealCarbs));
+      resolvedCarbOverride ??
+      (carbUnit === "cp" ? parseInt(mealCarbs, 10) * 10 : parseInt(mealCarbs, 10));
     if (!Number.isFinite(carbValue) || carbValue <= 0) {
       toast({
         title: "Enter carbs first",
@@ -1008,7 +1012,7 @@ export default function Adviser() {
               </div>
 
               <Button
-                onClick={handleQuickMealPlan}
+                onClick={() => handleQuickMealPlan()}
                 disabled={!mealCarbs}
                 className="h-12 w-full rounded-xl text-sm font-semibold"
                 data-testid="button-get-meal-advice"
