@@ -40,7 +40,7 @@ import { HomeTodayPulse } from "@/components/home/HomeTodayPulse";
 import { HomeCgmGraph } from "@/components/home/HomeCgmGraph";
 import { HomeMealMoment } from "@/components/home/HomeMealMoment";
 import { HomeSupplyGraph } from "@/components/home/HomeSupplyGraph";
-import { HomeTravelContext } from "@/components/home/HomeTravelContext";
+import { HomeNextUp } from "@/components/home/HomeNextUp";
 import { getHealthStatus } from "@/lib/dashboard-health-status";
 import { useAskAnything } from "@/components/ai-coach/ask-anything-context";
 import { cn } from "@/lib/utils";
@@ -409,7 +409,7 @@ export default function Dashboard() {
 
         {!isCommunityDash ? <HomeMealMoment healthStatus={healthStatus} /> : null}
 
-        {!isCommunityDash ? <HomeTravelContext /> : null}
+        {!isCommunityDash ? <HomeNextUp /> : null}
 
         {!isCommunityDash ? (
           <HomeTodayPulse healthStatus={healthStatus} suppressRunwayDuplicate />

@@ -314,6 +314,8 @@ export function TodayAtAGlanceContent(props: {
   suppressRunwayDuplicate?: boolean;
   hideActivityHeader?: boolean;
   hideTravelContext?: boolean;
+  /** When Home Next-up already shows bedtime, hide the orphan row here. */
+  hideBedtime?: boolean;
 }) {
   const supplyShortcutHidden = props.supplyShortcutHidden === true;
   const { healthStatus, suppressRunwayDuplicate } = props;
@@ -481,8 +483,8 @@ export function TodayAtAGlanceContent(props: {
     (showTravelCard && !props.hideTravelContext) ||
     scenarioState.sickDayActive ||
     showSupplyAttentionRows ||
-    Boolean(morningBedtimeLog) ||
-    isEvening;
+    (!props.hideBedtime && Boolean(morningBedtimeLog)) ||
+    (!props.hideBedtime && isEvening);
 
   const supplyBlock = (
     <div
@@ -602,7 +604,7 @@ export function TodayAtAGlanceContent(props: {
           )
         ) : null}
 
-        {morningBedtimeLog ? (
+        {!props.hideBedtime && morningBedtimeLog ? (
           <Link href="/scenarios/bedtime" className="block">
             <div
               className={cn(
@@ -633,7 +635,7 @@ export function TodayAtAGlanceContent(props: {
           </Link>
         ) : null}
 
-        {isEvening ? (
+        {!props.hideBedtime && isEvening ? (
           <Link href="/scenarios/bedtime" className="block">
             <div
               className="flex cursor-pointer items-center gap-2 px-1 py-2 text-sm leading-snug text-foreground transition-colors hover:bg-muted/20"

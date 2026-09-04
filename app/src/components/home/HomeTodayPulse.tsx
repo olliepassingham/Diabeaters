@@ -24,6 +24,7 @@ export function HomeTodayPulse({
           suppressRunwayDuplicate={suppressRunwayDuplicate}
           hideActivityHeader
           hideTravelContext
+          hideBedtime
         />
       </div>
     </section>
