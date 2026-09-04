@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type TouchEvent, type WheelEvent } from "react";
 import { createPortal } from "react-dom";
 import { Heart, Loader2, Volume2, VolumeX, X } from "lucide-react";
 import { Link } from "wouter";
@@ -26,6 +26,10 @@ type Props = {
 };
 
 const PLAY_THRESHOLD = 0.65;
+/** Ignore tiny finger wobble when deciding tap vs scroll. */
+const TAP_MOVE_PX = 12;
+/** Pull past the first clip this far (px) to dismiss Watch. */
+const DISMISS_PULL_PX = 72;
 
 function WatchLearnSlide({
   post,
@@ -108,13 +112,25 @@ export function FeedWatchLearnPlayer({
   loading = false,
 }: Props) {
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const touchStartRef = useRef<{ x: number; y: number; scrollTop: number } | null>(null);
+  const dismissPullRef = useRef(0);
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const [muted, setMuted] = useState(false);
   const [paused, setPaused] = useState(false);
+  const [dismissPull, setDismissPull] = useState(0);
   const [likeState, setLikeState] = useState<Record<string, { liked: boolean; count: number }>>({});
 
   const clips = posts.filter((post) => Boolean(post.video_url));
   const clipKey = clips.map((post) => post.id).join("|");
+
+  const scrollToIndex = useCallback((index: number, behavior: ScrollBehavior = "smooth") => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    const child = scroller.children[index] as HTMLElement | undefined;
+    if (typeof child?.scrollIntoView === "function") {
+      child.scrollIntoView({ behavior, block: "start" });
+    }
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -144,15 +160,19 @@ export function FeedWatchLearnPlayer({
     document.body.style.overflow = "hidden";
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onOpenChange(false);
-      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-        const scroller = scrollerRef.current;
-        if (!scroller) return;
-        const delta = event.key === "ArrowDown" ? 1 : -1;
-        const next = Math.min(clips.length - 1, Math.max(0, activeIndex + delta));
-        const child = scroller.children[next] as HTMLElement | undefined;
-        if (typeof child?.scrollIntoView === "function") {
-          child.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        const next = Math.min(clips.length - 1, activeIndex + 1);
+        if (next !== activeIndex) scrollToIndex(next);
+        return;
+      }
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        if (activeIndex <= 0) {
+          onOpenChange(false);
+          return;
         }
+        scrollToIndex(activeIndex - 1);
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -160,7 +180,7 @@ export function FeedWatchLearnPlayer({
       document.body.style.overflow = prevOverflow;
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [open, onOpenChange, activeIndex, clipKey]);
+  }, [open, onOpenChange, activeIndex, clipKey, clips.length, scrollToIndex]);
 
   useEffect(() => {
     if (!open) return;
@@ -215,6 +235,69 @@ export function FeedWatchLearnPlayer({
     },
     [canEngage, likeState, viewerId],
   );
+
+  const onScrollerTouchStart = (event: TouchEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("a, button, input, textarea, [role='button']")) {
+      touchStartRef.current = null;
+      return;
+    }
+    const touch = event.touches[0];
+    if (!touch) return;
+    touchStartRef.current = {
+      x: touch.clientX,
+      y: touch.clientY,
+      scrollTop: scrollerRef.current?.scrollTop ?? 0,
+    };
+    dismissPullRef.current = 0;
+    setDismissPull(0);
+  };
+
+  const onScrollerTouchMove = (event: TouchEvent<HTMLDivElement>) => {
+    const start = touchStartRef.current;
+    const touch = event.touches[0];
+    if (!start || !touch) return;
+    const dy = touch.clientY - start.y;
+    // On the first clip, pulling down (finger moves down → content wants to go up) dismisses.
+    const atTop = activeIndex <= 0 && start.scrollTop <= 2;
+    if (atTop && dy > 0) {
+      const pull = Math.min(140, dy);
+      dismissPullRef.current = pull;
+      setDismissPull(pull);
+    } else if (dismissPullRef.current > 0) {
+      dismissPullRef.current = 0;
+      setDismissPull(0);
+    }
+  };
+
+  const finishTouchGesture = (event: TouchEvent<HTMLDivElement>) => {
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+    const pull = dismissPullRef.current;
+    dismissPullRef.current = 0;
+    setDismissPull(0);
+
+    if (pull >= DISMISS_PULL_PX) {
+      onOpenChange(false);
+      return;
+    }
+
+    const touch = event.changedTouches[0];
+    if (!start || !touch) return;
+    const dx = Math.abs(touch.clientX - start.x);
+    const dy = Math.abs(touch.clientY - start.y);
+    if (dx < TAP_MOVE_PX && dy < TAP_MOVE_PX) {
+      setPaused((value) => !value);
+    }
+  };
+
+  const onScrollerWheel = (event: WheelEvent<HTMLDivElement>) => {
+    // Desktop: wheel up on the first clip closes Watch (parity with mobile pull-down).
+    if (activeIndex <= 0 && event.deltaY < -24 && (scrollerRef.current?.scrollTop ?? 0) <= 2) {
+      event.preventDefault();
+      onOpenChange(false);
+    }
+  };
 
   if (!open || typeof document === "undefined") return null;
 
@@ -281,7 +364,18 @@ export function FeedWatchLearnPlayer({
     >
       <div
         ref={scrollerRef}
-        className="h-[100dvh] snap-y snap-mandatory overflow-y-auto overscroll-y-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="h-[100dvh] snap-y snap-mandatory overflow-y-auto overscroll-y-contain touch-pan-y [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        style={
+          dismissPull > 0
+            ? { transform: `translateY(${dismissPull * 0.35}px)`, transition: "none" }
+            : undefined
+        }
+        onTouchStart={onScrollerTouchStart}
+        onTouchMove={onScrollerTouchMove}
+        onTouchEnd={finishTouchGesture}
+        onTouchCancel={finishTouchGesture}
+        onWheel={onScrollerWheel}
+        data-testid="watch-learn-scroller"
       >
         {clips.map((post, index) => {
           const author =
@@ -299,12 +393,6 @@ export function FeedWatchLearnPlayer({
                 active={index === activeIndex && !paused}
                 muted={muted}
                 priority={Math.abs(index - activeIndex) <= 1}
-              />
-              <button
-                type="button"
-                className="absolute inset-0 z-10"
-                aria-label={paused ? "Play video" : "Pause video"}
-                onClick={() => setPaused((value) => !value)}
               />
               <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/80 via-black/30 to-transparent px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-24">
                 <div className="pointer-events-auto flex items-end gap-3">
@@ -357,6 +445,15 @@ export function FeedWatchLearnPlayer({
           );
         })}
       </div>
+
+      {dismissPull > 24 ? (
+        <p
+          className="pointer-events-none absolute left-1/2 top-[max(4.5rem,calc(env(safe-area-inset-top)+3.25rem))] z-30 -translate-x-1/2 rounded-full bg-black/55 px-3 py-1.5 text-xs font-semibold text-white/90 backdrop-blur-sm"
+          data-testid="watch-learn-dismiss-hint"
+        >
+          {dismissPull >= DISMISS_PULL_PX ? "Release to close" : "Pull to close"}
+        </p>
+      ) : null}
 
       <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start justify-between px-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <span className="pointer-events-none rounded-full bg-black/45 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-white/90 backdrop-blur-sm">
