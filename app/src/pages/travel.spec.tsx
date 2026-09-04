@@ -162,5 +162,10 @@ describe("Travel page", () => {
 
     render(<Travel />);
     expect(screen.queryByTestId("travel-active-header")).not.toBeNull();
+    expect(screen.queryByTestId("travel-active-day-hero")).not.toBeNull();
+    expect(screen.queryByTestId("tab-travel-overview")?.textContent).toMatch(/Today/);
+    expect(screen.queryByTestId("text-overview-packing-progress")?.textContent).toBe("0/1");
+    expect(screen.queryByText("Fast-acting insulin")).not.toBeNull();
+    expect(screen.queryByText("2 pens")).not.toBeNull();
   });
 });
