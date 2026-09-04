@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import Travel from "./travel";
 import { storage } from "@/lib/storage";
 
@@ -14,6 +14,20 @@ vi.mock("@/lib/appointments-supabase", () => ({
 describe("Travel page", () => {
   beforeEach(() => {
     localStorage.clear();
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      configurable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
   });
 
   it("renders an empty travel landing with one clear plan action", () => {
@@ -85,6 +99,34 @@ describe("Travel page", () => {
     expect(summary?.textContent).toMatch(/Need \d+ days of supplies/);
     expect(summary?.textContent).toMatch(/18-day trip \+ buffer/);
     expect(screen.queryByText("Supplies look covered for this trip")).toBeNull();
+  });
+
+  it("lets you edit upcoming trip destination and dates", () => {
+    storage.saveHolidayPrep({
+      id: "prep-edit",
+      destination: "wyoming",
+      departureDate: "2030-09-05",
+      returnDate: "2030-09-23",
+      checklist: [],
+      createdAt: new Date().toISOString(),
+    });
+
+    render(<Travel />);
+    fireEvent.click(screen.getByTestId("button-edit-holiday-prep"));
+    expect(screen.getByTestId("dialog-edit-trip-details")).not.toBeNull();
+
+    fireEvent.change(screen.getByTestId("input-edit-trip-destination"), {
+      target: { value: "Wyoming, USA" },
+    });
+    fireEvent.change(screen.getByTestId("input-edit-trip-return"), {
+      target: { value: "2030-09-20" },
+    });
+    fireEvent.click(screen.getByTestId("button-save-edit-trip"));
+
+    expect(screen.queryByText("Wyoming, USA")).not.toBeNull();
+    expect(screen.getByTestId("card-travel-entry-hub").textContent).toMatch(/15d/);
+    expect(storage.getHolidayPrep()?.destination).toBe("Wyoming, USA");
+    expect(storage.getHolidayPrep()?.returnDate).toBe("2030-09-20");
   });
 
   it("renders active travel dashboard without crashing", () => {

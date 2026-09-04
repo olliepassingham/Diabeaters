@@ -31,10 +31,19 @@ import {
   Snowflake,
   Calendar,
   Trash2,
+  Pencil,
   Dumbbell,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   storage,
   Supply,
@@ -993,6 +1002,10 @@ export default function Travel() {
   const [activeTravelTab, setActiveTravelTab] = useState<"overview" | "plan" | "checklist">("overview");
 
   const [holidayPrep, setHolidayPrep] = useState<HolidayPrep | null>(null);
+  const [editTripOpen, setEditTripOpen] = useState(false);
+  const [editDestination, setEditDestination] = useState("");
+  const [editDeparture, setEditDeparture] = useState("");
+  const [editReturn, setEditReturn] = useState("");
   const [resultsTab, setResultsTab] = useState<"packing" | "emergency" | "climate">("packing");
 
   const isPumpUser = isPumpDeliveryMethod(profile?.insulinDeliveryMethod);
@@ -1309,7 +1322,94 @@ export default function Travel() {
   const handleDeleteHolidayPrep = () => {
     storage.deleteHolidayPrep();
     setHolidayPrep(null);
+    setEditTripOpen(false);
     toast({ title: "Trip cleared", description: "Removed from your travel guide" });
+  };
+
+  const openEditTripDetails = () => {
+    if (!holidayPrep) return;
+    setEditDestination(holidayPrep.destination);
+    setEditDeparture(holidayPrep.departureDate);
+    setEditReturn(holidayPrep.returnDate);
+    setEditTripOpen(true);
+  };
+
+  const handleSaveTripDetails = () => {
+    if (!holidayPrep) return;
+    const destination = editDestination.trim();
+    if (!destination) {
+      toast({
+        title: "Add a destination",
+        description: "Enter where you're going so this trip stays clear.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!editDeparture || !editReturn) {
+      toast({
+        title: "Add trip dates",
+        description: "Choose departure and return dates.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const departure = parseISODateOrNull(editDeparture);
+    const returnDate = parseISODateOrNull(editReturn);
+    if (!departure || !returnDate) {
+      toast({
+        title: "Invalid dates",
+        description: "Check the departure and return dates.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (returnDate.getTime() < departure.getTime()) {
+      toast({
+        title: "Invalid dates",
+        description: "Return date must be on or after departure.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const updated: HolidayPrep = {
+      ...holidayPrep,
+      destination,
+      departureDate: editDeparture,
+      returnDate: editReturn,
+    };
+    storage.saveHolidayPrep(updated);
+    setHolidayPrep(updated);
+
+    const duration = tripCalendarDaysBetween(editDeparture, editReturn);
+    setPlan((prev) => {
+      const next = {
+        ...prev,
+        destination,
+        startDate: editDeparture,
+        endDate: editReturn,
+        duration,
+      };
+      storage.saveTravelPlan(next);
+      return next;
+    });
+
+    const draft = storage.getTravelWizardDraft();
+    if (draft?.plan) {
+      storage.saveTravelWizardDraft({
+        ...draft,
+        plan: {
+          ...draft.plan,
+          destination,
+          startDate: editDeparture,
+          endDate: editReturn,
+          duration,
+        },
+      });
+    }
+
+    setEditTripOpen(false);
+    toast({ title: "Trip updated", description: "Destination and dates saved." });
   };
 
   const getPrepDaysUntilDeparture = (): number | null => {
@@ -1986,17 +2086,97 @@ export default function Travel() {
                     {tripDays > 0 ? ` · ${tripDays}d` : ""}
                   </p>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-10 w-10 shrink-0 rounded-full text-muted-foreground"
-                  onClick={handleDeleteHolidayPrep}
-                  aria-label="Delete trip"
-                  data-testid="button-delete-holiday-prep"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                <div className="flex shrink-0 items-center gap-0.5">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-10 w-10 rounded-full text-muted-foreground"
+                    onClick={openEditTripDetails}
+                    aria-label="Edit trip details"
+                    data-testid="button-edit-holiday-prep"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-10 w-10 rounded-full text-muted-foreground"
+                    onClick={handleDeleteHolidayPrep}
+                    aria-label="Delete trip"
+                    data-testid="button-delete-holiday-prep"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
+
+              <Dialog open={editTripOpen} onOpenChange={setEditTripOpen}>
+                <DialogContent className="max-w-md rounded-2xl" data-testid="dialog-edit-trip-details">
+                  <DialogHeader>
+                    <DialogTitle>Edit trip</DialogTitle>
+                    <DialogDescription>
+                      Update where you&apos;re going and when. Supply days update from the new dates.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-3 py-1">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="edit-trip-destination">Destination</Label>
+                      <Input
+                        id="edit-trip-destination"
+                        value={editDestination}
+                        onChange={(e) => setEditDestination(e.target.value)}
+                        placeholder="e.g. Wyoming"
+                        className="h-11 rounded-xl"
+                        data-testid="input-edit-trip-destination"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="edit-trip-departure">Departure</Label>
+                        <Input
+                          id="edit-trip-departure"
+                          type="date"
+                          value={editDeparture}
+                          onChange={(e) => setEditDeparture(e.target.value)}
+                          className="h-11 rounded-xl"
+                          data-testid="input-edit-trip-departure"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="edit-trip-return">Return</Label>
+                        <Input
+                          id="edit-trip-return"
+                          type="date"
+                          value={editReturn}
+                          min={editDeparture || undefined}
+                          onChange={(e) => setEditReturn(e.target.value)}
+                          className="h-11 rounded-xl"
+                          data-testid="input-edit-trip-return"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <DialogFooter className="gap-2 sm:gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="rounded-xl"
+                      onClick={() => setEditTripOpen(false)}
+                      data-testid="button-cancel-edit-trip"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      className="rounded-xl"
+                      onClick={handleSaveTripDetails}
+                      data-testid="button-save-edit-trip"
+                    >
+                      Save trip
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
 
               {daysUntil !== null && daysUntil >= 0 ? (
                 <div
