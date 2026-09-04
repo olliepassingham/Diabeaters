@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Loader2, Minus, RefreshCw, TrendingDown, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,8 @@ type CgmLiveBgChipProps = {
   waitingLabel?: string;
   /** Optional range status for colouring (supporter live snapshot). */
   rangeStatus?: GlucoseRangeStatus | null;
+  /** Extra controls on the same bar (e.g. compact Travel) so chrome stays one row. */
+  trailing?: ReactNode;
   className?: string;
 };
 
@@ -56,6 +59,7 @@ export function CgmLiveBgChip({
   showWaiting = false,
   waitingLabel = "Waiting for live BG",
   rangeStatus = null,
+  trailing = null,
   className,
 }: CgmLiveBgChipProps) {
   if (loading && !prefill?.fromCgm) {
@@ -70,6 +74,7 @@ export function CgmLiveBgChip({
           <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" aria-hidden />
           Checking BG…
         </div>
+        {trailing}
       </div>
     );
   }
@@ -109,6 +114,7 @@ export function CgmLiveBgChip({
             <RefreshCw className="h-3.5 w-3.5" aria-hidden />
           </Button>
         ) : null}
+        {trailing}
       </div>
     );
   }
@@ -184,6 +190,7 @@ export function CgmLiveBgChip({
           <RefreshCw className="h-3.5 w-3.5" aria-hidden />
         </Button>
       ) : null}
+      {trailing}
     </div>
   );
 }

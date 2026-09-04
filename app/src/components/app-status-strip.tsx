@@ -459,6 +459,63 @@ export function AppStatusStrip() {
 
   if (!show) return null;
 
+  const showTravelCompact =
+    sc.travelModeActive && !ex && (!inPostExerciseWindow || postExerciseDismissed);
+
+  const travelTrailing = showTravelCompact ? (
+    <div
+      className="flex shrink-0 items-center gap-0.5 border-l border-border/45 pl-2"
+      data-testid="status-travel-compact"
+    >
+      <Link
+        href="/scenarios/travel"
+        className="flex max-w-[9.5rem] items-center gap-1 rounded-md px-1 py-0.5 outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring sm:max-w-[12rem]"
+        data-testid="status-travel-view"
+        aria-label={
+          sc.travelDestination
+            ? `Open travel for ${sc.travelDestination}`
+            : "Open travel"
+        }
+      >
+        <Plane className="h-3.5 w-3.5 shrink-0 text-sky-700 dark:text-sky-300" aria-hidden />
+        <span className="truncate text-xs font-semibold text-foreground">
+          {sc.travelDestination?.trim() || "Travel"}
+          {travelDays != null && travelDays >= 0 ? ` · ${travelDays}d` : ""}
+        </span>
+      </Link>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-8 w-8 shrink-0 px-0"
+            aria-label="Travel options"
+            data-testid="status-travel-more"
+          >
+            <MoreHorizontal className="h-4 w-4" aria-hidden />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-[min(16rem,calc(100vw-2rem))]">
+          <DropdownMenuItem asChild className="cursor-pointer">
+            <Link href="/scenarios/travel">
+              <Plane className="mr-2 h-3.5 w-3.5 opacity-70" aria-hidden />
+              Open travel
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={handleEndTravel}
+            className="cursor-pointer"
+            data-testid="status-travel-end"
+          >
+            <Power className="mr-2 h-3.5 w-3.5 opacity-70" aria-hidden />
+            End travel mode
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  ) : null;
+
   const cgmChip = showCgmLiveChip ? (
     <CgmLiveBgChip
       prefill={
@@ -475,6 +532,7 @@ export function AppStatusStrip() {
       onOpen={showSupporterCgmLiveChip ? () => setLocation("/carer-view/glucose") : () => setLocation("/tools/cgm-live")}
       openLabel={showSupporterCgmLiveChip ? "Open live glucose" : "Open glucose trends"}
       rangeStatus={showSupporterCgmLiveChip ? supporterBgRow?.range_status ?? null : null}
+      trailing={!inSupporterSession ? travelTrailing : null}
     />
   ) : null;
 
@@ -541,7 +599,7 @@ export function AppStatusStrip() {
         </div>
       ) : null}
 
-      {sc.travelModeActive && !ex && (!inPostExerciseWindow || postExerciseDismissed) ? (
+      {showTravelCompact && !cgmChip ? (
         <div className={cn(rowClass, "py-1.5")} data-testid="status-travel-compact">
           <Link
             href="/scenarios/travel"
