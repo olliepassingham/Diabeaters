@@ -61,6 +61,32 @@ describe("Travel page", () => {
     expect(screen.queryByText("Spain")).not.toBeNull();
   });
 
+  it("shows concrete supply days needed on the trip card", () => {
+    storage.saveHolidayPrep({
+      id: "prep-1",
+      destination: "Wyoming",
+      departureDate: "2030-09-05",
+      returnDate: "2030-09-23",
+      checklist: [],
+      createdAt: new Date().toISOString(),
+    });
+    storage.addSupply({
+      name: "Insulin pens",
+      type: "insulin",
+      currentQuantity: 200,
+      dailyUsage: 4,
+      lastPickupDate: new Date().toISOString(),
+      notes: undefined,
+    });
+
+    render(<Travel />);
+    const summary = screen.queryByTestId("link-travel-supply-summary");
+    expect(summary).not.toBeNull();
+    expect(summary?.textContent).toMatch(/Need \d+ days of supplies/);
+    expect(summary?.textContent).toMatch(/18-day trip \+ buffer/);
+    expect(screen.queryByText("Supplies look covered for this trip")).toBeNull();
+  });
+
   it("renders active travel dashboard without crashing", () => {
     const today = new Date();
     const start = today.toISOString().split("T")[0];

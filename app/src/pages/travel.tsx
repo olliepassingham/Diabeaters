@@ -62,6 +62,7 @@ import {
   travelWeatherHypoTreatmentsMultiplier,
   travelWeatherPumpPowerMultiplier,
   travelWeatherTestStripMultiplier,
+  formatTravelLandingSupplySummary,
   tripCalendarDaysBetween,
 } from "@/lib/travel-supply-policy";
 import { cn } from "@/lib/utils";
@@ -1897,7 +1898,7 @@ export default function Travel() {
     const daysUntil = holidayPrep ? getPrepDaysUntilDeparture() : null;
     const tripDays = holidayPrep ? getPrepTripDays() : 0;
     const coverage = holidayPrep ? storage.getHolidaySupplyCoverage() : [];
-    const shortfallCount = coverage.filter((c) => c.shortfall > 0).length;
+    const supplySummary = formatTravelLandingSupplySummary(coverage);
     const isDepartureNear = daysUntil !== null && daysUntil <= 3 && daysUntil >= 0;
     const hasDeparted = daysUntil !== null && daysUntil < 0;
     const primaryTripAction = !holidayPrep
@@ -2022,12 +2023,12 @@ export default function Travel() {
                 <p className="text-center text-sm text-muted-foreground">Departure date has passed — start travel for local insulin times.</p>
               ) : null}
 
-              {coverage.length > 0 ? (
+              {supplySummary ? (
                 <Link
                   href="/supplies"
                   className={cn(
                     "flex items-center gap-3 rounded-2xl border px-3.5 py-3 transition-colors",
-                    shortfallCount > 0
+                    supplySummary.hasShortfall
                       ? "border-red-500/25 bg-red-500/[0.06] hover:bg-red-500/[0.09]"
                       : "border-border/50 bg-background/60 hover:bg-background",
                   )}
@@ -2035,15 +2036,23 @@ export default function Travel() {
                 >
                   <Package
                     className={cn(
-                      "h-4 w-4 shrink-0",
-                      shortfallCount > 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground",
+                      "mt-0.5 h-4 w-4 shrink-0",
+                      supplySummary.hasShortfall ? "text-red-600 dark:text-red-400" : "text-muted-foreground",
                     )}
                     aria-hidden
                   />
-                  <span className="min-w-0 flex-1 text-sm font-medium text-foreground">
-                    {shortfallCount > 0
-                      ? `${shortfallCount} supply item${shortfallCount === 1 ? "" : "s"} short for this trip`
-                      : "Supplies look covered for this trip"}
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium text-foreground">{supplySummary.title}</span>
+                    <span
+                      className={cn(
+                        "mt-0.5 block text-xs leading-snug",
+                        supplySummary.hasShortfall
+                          ? "text-red-700/90 dark:text-red-300/90"
+                          : "text-muted-foreground",
+                      )}
+                    >
+                      {supplySummary.detail}
+                    </span>
                   </span>
                   <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                 </Link>

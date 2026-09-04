@@ -43,6 +43,75 @@ export function tripSupplyDaysNeeded(params: {
   return Math.max(1, Math.ceil(days * buffer));
 }
 
+export type TravelLandingSupplyRow = {
+  supply: { name: string };
+  daysRemaining: number;
+  calendarTripDays: number;
+  daysNeeded: number;
+  shortfall: number;
+};
+
+export type TravelLandingSupplySummary = {
+  daysNeeded: number;
+  calendarTripDays: number;
+  shortfallCount: number;
+  hasShortfall: boolean;
+  /** Primary line: how many days of cover to pack for. */
+  title: string;
+  /** Secondary line: trip length + stock status or worst shortfall. */
+  detail: string;
+};
+
+/**
+ * Concrete Travel landing copy for supply coverage (avoids vague "looks covered").
+ * `daysNeeded` already includes the travel buffer used by Supply Tracker.
+ */
+export function formatTravelLandingSupplySummary(
+  coverage: TravelLandingSupplyRow[],
+): TravelLandingSupplySummary | null {
+  if (coverage.length === 0) return null;
+
+  const daysNeeded = coverage[0].daysNeeded;
+  const calendarTripDays = coverage[0].calendarTripDays;
+  const shortfalls = coverage
+    .filter((row) => row.shortfall > 0)
+    .sort((a, b) => b.shortfall - a.shortfall || a.supply.name.localeCompare(b.supply.name));
+  const shortfallCount = shortfalls.length;
+  const title = `Need ${daysNeeded} days of supplies`;
+
+  if (shortfallCount === 0) {
+    const finiteRemaining = coverage
+      .map((row) => row.daysRemaining)
+      .filter((days) => Number.isFinite(days) && days < 999);
+    const lowestStock = finiteRemaining.length > 0 ? Math.min(...finiteRemaining) : null;
+    return {
+      daysNeeded,
+      calendarTripDays,
+      shortfallCount: 0,
+      hasShortfall: false,
+      title,
+      detail:
+        lowestStock != null
+          ? `${calendarTripDays}-day trip + buffer · lowest stock ${lowestStock}d`
+          : `${calendarTripDays}-day trip + buffer · stock covers the target`,
+    };
+  }
+
+  const worst = shortfalls[0];
+  const others = shortfallCount - 1;
+  return {
+    daysNeeded,
+    calendarTripDays,
+    shortfallCount,
+    hasShortfall: true,
+    title,
+    detail:
+      others > 0
+        ? `${worst.supply.name}: ${worst.shortfall}d short · +${others} more`
+        : `${worst.supply.name}: ${worst.shortfall}d short`,
+  };
+}
+
 /** YYYY-MM-DD local calendar date from a Date. */
 export function formatLocalYmd(d: Date): string {
   const y = d.getFullYear();

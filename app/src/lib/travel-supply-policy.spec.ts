@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildTravelWeatherRiskWarnings,
+  formatTravelLandingSupplySummary,
   holidaySupplyDaysNeeded,
   travelAccessBufferMultiplier,
   travelPackingBufferMultiplier,
@@ -32,6 +33,68 @@ describe("holidaySupplyDaysNeeded", () => {
   it("doubles trip length at minimum 1", () => {
     expect(holidaySupplyDaysNeeded(7)).toBe(14);
     expect(holidaySupplyDaysNeeded(1)).toBe(2);
+  });
+});
+
+describe("formatTravelLandingSupplySummary", () => {
+  it("states days needed and lowest stock when covered", () => {
+    expect(
+      formatTravelLandingSupplySummary([
+        {
+          supply: { name: "Insulin" },
+          daysRemaining: 40,
+          calendarTripDays: 18,
+          daysNeeded: 27,
+          shortfall: 0,
+        },
+        {
+          supply: { name: "CGM" },
+          daysRemaining: 35,
+          calendarTripDays: 18,
+          daysNeeded: 27,
+          shortfall: 0,
+        },
+      ]),
+    ).toEqual({
+      daysNeeded: 27,
+      calendarTripDays: 18,
+      shortfallCount: 0,
+      hasShortfall: false,
+      title: "Need 27 days of supplies",
+      detail: "18-day trip + buffer · lowest stock 35d",
+    });
+  });
+
+  it("names the worst shortfall when stock is short", () => {
+    expect(
+      formatTravelLandingSupplySummary([
+        {
+          supply: { name: "CGM sensors" },
+          daysRemaining: 20,
+          calendarTripDays: 18,
+          daysNeeded: 27,
+          shortfall: 7,
+        },
+        {
+          supply: { name: "Insulin pens" },
+          daysRemaining: 10,
+          calendarTripDays: 18,
+          daysNeeded: 27,
+          shortfall: 17,
+        },
+      ]),
+    ).toEqual({
+      daysNeeded: 27,
+      calendarTripDays: 18,
+      shortfallCount: 2,
+      hasShortfall: true,
+      title: "Need 27 days of supplies",
+      detail: "Insulin pens: 17d short · +1 more",
+    });
+  });
+
+  it("returns null for empty coverage", () => {
+    expect(formatTravelLandingSupplySummary([])).toBeNull();
   });
 });
 
