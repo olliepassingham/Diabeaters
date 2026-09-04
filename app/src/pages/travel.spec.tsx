@@ -16,9 +16,12 @@ describe("Travel page", () => {
     localStorage.clear();
   });
 
-  it("renders entry step without crashing", () => {
+  it("renders an empty travel landing with one clear plan action", () => {
     render(<Travel />);
+    expect(screen.queryByTestId("travel-empty-hero")).not.toBeNull();
     expect(screen.queryByTestId("button-start-travel-plan")).not.toBeNull();
+    expect(screen.queryByTestId("alert-when-to-start-travel")).toBeNull();
+    expect(screen.queryByTestId("button-start-holiday-prep")).toBeNull();
   });
 
   it("opens on Your trip when a plan draft has destination dates", () => {

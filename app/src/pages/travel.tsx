@@ -10,28 +10,19 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { InlineInfoHint } from "@/components/ui/field-label-with-info";
 import { 
   Plane, 
-  MapPin, 
   Clock, 
   ShieldAlert, 
   Package, 
   Syringe, 
   Activity,
   AlertTriangle,
-  CheckCircle2,
   ChevronRight,
   ChevronLeft,
   ChevronDown,
-  ChevronUp,
   Pill,
   Info,
   Globe,
@@ -39,9 +30,6 @@ import {
   Sun,
   Snowflake,
   Calendar,
-  Languages,
-  Phone,
-  Luggage,
   Trash2,
   Dumbbell,
 } from "lucide-react";
@@ -86,8 +74,6 @@ import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/n
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
 import {
   getDisplayLocale,
-  getRegionDefaultsForProfile,
-  travelEnglishEmergencyNumber,
 } from "@/lib/region";
 import { PharmacyCard } from "@/components/pharmacy-card";
 import {
@@ -962,25 +948,6 @@ function TravelPackingItemRow({
   );
 }
 
-const EMERGENCY_PHRASES: Record<string, { lang: string; iAmDiabetic: string; needSugar: string; needHelp: string; emergencyNumber: string }> = {
-  "English": { lang: "en", iAmDiabetic: "I am diabetic", needSugar: "I need sugar", needHelp: "I need medical help", emergencyNumber: "999 / 112" },
-  "Spanish": { lang: "es", iAmDiabetic: "Soy diabético/a", needSugar: "Necesito azúcar", needHelp: "Necesito ayuda médica", emergencyNumber: "112" },
-  "French": { lang: "fr", iAmDiabetic: "Je suis diabétique", needSugar: "J'ai besoin de sucre", needHelp: "J'ai besoin d'aide médicale", emergencyNumber: "15 / 112" },
-  "German": { lang: "de", iAmDiabetic: "Ich bin Diabetiker/in", needSugar: "Ich brauche Zucker", needHelp: "Ich brauche medizinische Hilfe", emergencyNumber: "112" },
-  "Italian": { lang: "it", iAmDiabetic: "Sono diabetico/a", needSugar: "Ho bisogno di zucchero", needHelp: "Ho bisogno di aiuto medico", emergencyNumber: "118 / 112" },
-  "Portuguese": { lang: "pt", iAmDiabetic: "Sou diabético/a", needSugar: "Preciso de açúcar", needHelp: "Preciso de ajuda médica", emergencyNumber: "112" },
-  "Dutch": { lang: "nl", iAmDiabetic: "Ik heb diabetes", needSugar: "Ik heb suiker nodig", needHelp: "Ik heb medische hulp nodig", emergencyNumber: "112" },
-  "Greek": { lang: "el", iAmDiabetic: "Έχω διαβήτη", needSugar: "Χρειάζομαι ζάχαρη", needHelp: "Χρειάζομαι ιατρική βοήθεια", emergencyNumber: "166 / 112" },
-  "Turkish": { lang: "tr", iAmDiabetic: "Şeker hastasıyım", needSugar: "Şekere ihtiyacım var", needHelp: "Tıbbi yardıma ihtiyacım var", emergencyNumber: "112" },
-  "Arabic": { lang: "ar", iAmDiabetic: "أنا مصاب بالسكري", needSugar: "أحتاج سكر", needHelp: "أحتاج مساعدة طبية", emergencyNumber: "varies" },
-  "Chinese": { lang: "zh", iAmDiabetic: "我有糖尿病", needSugar: "我需要糖", needHelp: "我需要医疗帮助", emergencyNumber: "120" },
-  "Japanese": { lang: "ja", iAmDiabetic: "糖尿病です", needSugar: "砂糖が必要です", needHelp: "医療支援が必要です", emergencyNumber: "119" },
-  "Thai": { lang: "th", iAmDiabetic: "ฉันเป็นเบาหวาน", needSugar: "ฉันต้องการน้ำตาล", needHelp: "ฉันต้องการความช่วยเหลือทางการแพทย์", emergencyNumber: "1669" },
-  "Polish": { lang: "pl", iAmDiabetic: "Mam cukrzycę", needSugar: "Potrzebuję cukru", needHelp: "Potrzebuję pomocy medycznej", emergencyNumber: "112" },
-  "Hindi": { lang: "hi", iAmDiabetic: "मुझे मधुमेह है", needSugar: "मुझे चीनी चाहिए", needHelp: "मुझे चिकित्सा सहायता चाहिए", emergencyNumber: "102 / 112" },
-  "Croatian": { lang: "hr", iAmDiabetic: "Imam dijabetes", needSugar: "Trebam šećer", needHelp: "Trebam medicinsku pomoć", emergencyNumber: "112" },
-};
-
 export default function Travel() {
   const { user } = useAuth();
   const [step, setStep] = useState<"entry" | "inputs" | "results">("entry");
@@ -1025,27 +992,9 @@ export default function Travel() {
   const [activeTravelTab, setActiveTravelTab] = useState<"overview" | "plan" | "checklist">("overview");
 
   const [holidayPrep, setHolidayPrep] = useState<HolidayPrep | null>(null);
-  const [showPrepForm, setShowPrepForm] = useState(false);
-  const [prepDestination, setPrepDestination] = useState("");
-  const [prepDeparture, setPrepDeparture] = useState("");
-  const [prepReturn, setPrepReturn] = useState("");
-  const [prepNotes, setPrepNotes] = useState("");
-  const [prepChecklistOpen, setPrepChecklistOpen] = useState(false);
   const [resultsTab, setResultsTab] = useState<"packing" | "emergency" | "climate">("packing");
-  const [selectedLanguage, setSelectedLanguage] = useState<keyof typeof EMERGENCY_PHRASES>("English");
 
   const isPumpUser = isPumpDeliveryMethod(profile?.insulinDeliveryMethod);
-  const regionDefaults = getRegionDefaultsForProfile(profile);
-  const emergencyPhrases = useMemo((): Record<
-    string,
-    { lang: string; iAmDiabetic: string; needSugar: string; needHelp: string; emergencyNumber: string }
-  > => {
-    const englishNumber = travelEnglishEmergencyNumber(profile);
-    return {
-      ...EMERGENCY_PHRASES,
-      English: { ...EMERGENCY_PHRASES.English, emergencyNumber: englishNumber },
-    };
-  }, [profile]);
   const showClimateTab =
     plan.weatherChange !== "similar" || plan.timezoneChange !== "none";
 
@@ -1356,63 +1305,10 @@ export default function Travel() {
     { id: "snacks", label: "Pack carb snacks for journey delays", checked: false },
   ];
 
-  const handleSaveHolidayPrep = () => {
-    if (!prepDestination.trim() || !prepDeparture || !prepReturn) {
-      toast({ title: "Missing details", description: "Please fill in destination and dates", variant: "destructive" });
-      return;
-    }
-    if (new Date(prepReturn) <= new Date(prepDeparture)) {
-      toast({ title: "Invalid dates", description: "Return date must be after departure", variant: "destructive" });
-      return;
-    }
-    const prep: HolidayPrep = {
-      id: crypto.randomUUID(),
-      destination: prepDestination.trim(),
-      departureDate: prepDeparture,
-      returnDate: prepReturn,
-      notes: prepNotes.trim() || undefined,
-      checklist: defaultChecklist,
-      createdAt: new Date().toISOString(),
-    };
-    storage.saveHolidayPrep(prep);
-    setHolidayPrep(prep);
-    setShowPrepForm(false);
-    // Keep travel plan dates in sync so packing/supply math share one trip.
-    const duration = tripCalendarDaysBetween(prep.departureDate, prep.returnDate);
-    const nextPlan: TravelPlan = {
-      ...plan,
-      destination: prep.destination,
-      duration,
-      startDate: prep.departureDate,
-      endDate: prep.returnDate,
-    };
-    setPlan(nextPlan);
-    if (!storage.getScenarioState().travelModeActive) {
-      storage.saveTravelPlan(nextPlan);
-    }
-    toast({ title: "Trip saved", description: `${prep.destination} is on your travel guide` });
-  };
-
   const handleDeleteHolidayPrep = () => {
     storage.deleteHolidayPrep();
     setHolidayPrep(null);
-    setPrepDestination("");
-    setPrepDeparture("");
-    setPrepReturn("");
-    setPrepNotes("");
-    toast({ title: "Trip cleared", description: "Countdown and checklist removed" });
-  };
-
-  const handleTogglePrepChecklist = (itemId: string) => {
-    if (!holidayPrep) return;
-    const updated = {
-      ...holidayPrep,
-      checklist: holidayPrep.checklist.map(item =>
-        item.id === itemId ? { ...item, checked: !item.checked } : item
-      ),
-    };
-    storage.saveHolidayPrep(updated);
-    setHolidayPrep(updated);
+    toast({ title: "Trip cleared", description: "Removed from your travel guide" });
   };
 
   const getPrepDaysUntilDeparture = (): number | null => {
@@ -1998,8 +1894,38 @@ export default function Travel() {
   }
 
   if (step === "entry") {
+    const daysUntil = holidayPrep ? getPrepDaysUntilDeparture() : null;
+    const tripDays = holidayPrep ? getPrepTripDays() : 0;
+    const coverage = holidayPrep ? storage.getHolidaySupplyCoverage() : [];
+    const shortfallCount = coverage.filter((c) => c.shortfall > 0).length;
+    const isDepartureNear = daysUntil !== null && daysUntil <= 3 && daysUntil >= 0;
+    const hasDeparted = daysUntil !== null && daysUntil < 0;
+    const primaryTripAction = !holidayPrep
+      ? null
+      : isDepartureNear || hasDeparted
+        ? {
+            label: "Start travel",
+            testId: "button-activate-from-prep" as const,
+            onClick: () => {
+              const next = seedPlanFromHolidayPrep();
+              setPlan(next);
+              handleActivateTravelMode(next);
+            },
+          }
+        : packingPlanReady
+          ? {
+              label: "Open trip plan",
+              testId: "button-start-plan-from-prep" as const,
+              onClick: () => handleStartPlan(),
+            }
+          : {
+              label: "Continue trip plan",
+              testId: "button-start-plan-from-prep" as const,
+              onClick: () => handleStartPlan(),
+            };
+
     return (
-      <PageShell variant="narrow" density="compact" className="space-y-3 overflow-x-hidden pb-6">
+      <PageShell variant="narrow" density="compact" className="space-y-4 overflow-x-hidden pb-6">
         <PageHeader
           leading={<PageBackButton />}
           title="Travel"
@@ -2010,454 +1936,167 @@ export default function Travel() {
           }
         />
 
-        <Alert className="rounded-2xl border-sky-500/25 bg-sky-500/[0.06]" data-testid="alert-when-to-start-travel">
-          <Clock className="h-4 w-4" />
-          <AlertTitle className="text-sm">When to start Travel</AlertTitle>
-          <AlertDescription className="text-sm leading-snug">
-            Build your plan anytime. Turn Travel <span className="font-medium text-foreground">on</span> when you leave
-            or board — that unlocks today’s insulin clock in local destination time. Packing is optional.
-          </AlertDescription>
-        </Alert>
-
-        {!holidayPrep && !showPrepForm ? (
-          <section className="space-y-2.5">
-            <button
+        {!holidayPrep ? (
+          <section
+            className="overflow-hidden rounded-[1.75rem] border border-sky-500/20 bg-gradient-to-b from-sky-500/[0.12] via-card to-card px-5 pb-5 pt-6 shadow-[0_18px_40px_-28px_rgba(14,165,233,0.55)]"
+            data-testid="travel-empty-hero"
+          >
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500/25 to-cyan-500/10 text-sky-700 ring-1 ring-sky-500/25 dark:text-sky-200">
+              <Plane className="h-7 w-7" aria-hidden />
+            </div>
+            <h2 className="mt-4 text-center font-display text-2xl font-semibold tracking-tight text-foreground">
+              Plan your trip
+            </h2>
+            <p className="mx-auto mt-2 max-w-[18rem] text-center text-sm leading-relaxed text-muted-foreground">
+              Local insulin times across time zones, plus packing for the days you&apos;re away.
+            </p>
+            <Button
               type="button"
+              className="mt-5 h-12 w-full rounded-2xl text-[15px] font-semibold"
               onClick={handleStartPlan}
-              className={cn(
-                "group flex w-full items-center gap-3 rounded-2xl border border-sky-500/20 bg-gradient-to-b from-sky-500/[0.07] via-card to-card px-3.5 py-3.5 text-left transition-all",
-                "hover:border-sky-500/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              )}
               data-testid="button-start-travel-plan"
             >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500/20 to-indigo-500/10 text-sky-700 ring-1 ring-sky-500/20 dark:text-sky-200">
-                <MapPin className="h-5 w-5" aria-hidden />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-[15px] font-semibold text-foreground">Plan this trip</span>
-                <span className="mt-0.5 block text-xs text-muted-foreground">
-                  Time zones, insulin clock, packing
-                </span>
-              </span>
-              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/70" aria-hidden />
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowPrepForm(true)}
-              className={cn(
-                "group flex w-full items-center gap-3 rounded-2xl border border-border/60 bg-card/70 px-3.5 py-3 text-left transition-all",
-                "hover:border-primary/40 hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              )}
-              data-testid="button-start-holiday-prep"
-            >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted/60 text-foreground ring-1 ring-border/50">
-                <Luggage className="h-4 w-4" aria-hidden />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-[15px] font-semibold text-foreground">Save trip dates</span>
-                <span className="mt-0.5 block text-xs text-muted-foreground">
-                  Countdown and supply check
-                </span>
-              </span>
-              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/70" aria-hidden />
-            </button>
+              Plan a trip
+              <ChevronRight className="ml-1.5 h-4 w-4" aria-hidden />
+            </Button>
           </section>
-        ) : null}
-
-        {(showPrepForm || holidayPrep) && (
-          <Card className="overflow-hidden rounded-2xl border-border/50 shadow-none" data-testid="card-travel-entry-hub">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 px-3.5 pb-2 pt-3.5">
-              <CardTitle className="font-display text-base font-semibold tracking-tight">
-                {holidayPrep ? "Your trip" : "Trip dates"}
-              </CardTitle>
-              {showPrepForm && !holidayPrep ? (
+        ) : (
+          <Card
+            className="overflow-hidden rounded-[1.75rem] border-sky-500/20 bg-gradient-to-b from-sky-500/[0.10] via-card to-card shadow-[0_18px_40px_-28px_rgba(14,165,233,0.45)]"
+            data-testid="card-travel-entry-hub"
+          >
+            <CardContent className="space-y-4 p-4 sm:p-5">
+              <div className="flex items-start justify-between gap-3" data-testid="holiday-prep-active">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-700/80 dark:text-sky-300/90">
+                    Your trip
+                  </p>
+                  <h2 className="mt-1 truncate font-display text-2xl font-semibold tracking-tight text-foreground">
+                    {holidayPrep.destination}
+                  </h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {formatTripDate(holidayPrep.departureDate, profile, { day: "numeric", month: "short" }) ||
+                      "Departure"}
+                    {" – "}
+                    {formatTripDate(holidayPrep.returnDate, profile, {
+                      day: "numeric",
+                      month: "short",
+                    }) || "Return"}
+                    {tripDays > 0 ? ` · ${tripDays}d` : ""}
+                  </p>
+                </div>
                 <Button
-                  type="button"
                   variant="ghost"
-                  size="sm"
-                  className="h-8 rounded-lg px-2 text-muted-foreground"
-                  onClick={() => setShowPrepForm(false)}
-                  data-testid="button-cancel-holiday-prep"
+                  size="icon"
+                  className="h-10 w-10 shrink-0 rounded-full text-muted-foreground"
+                  onClick={handleDeleteHolidayPrep}
+                  aria-label="Delete trip"
+                  data-testid="button-delete-holiday-prep"
                 >
-                  Cancel
-                </Button>
-              ) : null}
-            </CardHeader>
-            <CardContent className="space-y-3.5 px-3.5 pb-3.5 pt-0">
-              {showPrepForm && !holidayPrep ? (
-              <div className="space-y-3" data-testid="holiday-prep-form">
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Where are you going?</Label>
-                  <Input 
-                    placeholder="e.g. Spain, Lake District"
-                    value={prepDestination}
-                    onChange={(e) => setPrepDestination(e.target.value)}
-                    className="h-11 rounded-xl text-base"
-                    autoComplete="off"
-                    enterKeyHint="next"
-                    data-testid="input-prep-destination"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div className="min-w-0 space-y-1.5">
-                    <Label className="text-xs text-muted-foreground">Departure</Label>
-                    <Input 
-                      type="date"
-                      value={prepDeparture}
-                      onChange={(e) => setPrepDeparture(e.target.value)}
-                      min={new Date().toISOString().split("T")[0]}
-                      className={travelDateInputClass}
-                      data-testid="input-prep-departure"
-                    />
-                  </div>
-                  <div className="min-w-0 space-y-1.5">
-                    <Label className="text-xs text-muted-foreground">Return</Label>
-                    <Input 
-                      type="date"
-                      value={prepReturn}
-                      onChange={(e) => setPrepReturn(e.target.value)}
-                      min={prepDeparture || new Date().toISOString().split("T")[0]}
-                      className={travelDateInputClass}
-                      data-testid="input-prep-return"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Notes (optional)</Label>
-                  <Input 
-                    placeholder="e.g. Hiking, wedding"
-                    value={prepNotes}
-                    onChange={(e) => setPrepNotes(e.target.value)}
-                    className="h-11 rounded-xl text-base"
-                    data-testid="input-prep-notes"
-                  />
-                </div>
-                <Button onClick={handleSaveHolidayPrep} className="h-11 w-full rounded-xl text-[15px] font-semibold" data-testid="button-save-holiday-prep">
-                  Save trip
+                  <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
+
+              {daysUntil !== null && daysUntil >= 0 ? (
+                <div
+                  className={cn(
+                    "rounded-2xl border px-4 py-4 text-center",
+                    daysUntil <= 3
+                      ? "border-orange-500/25 bg-orange-500/[0.08]"
+                      : daysUntil <= 7
+                        ? "border-amber-500/25 bg-amber-500/[0.08]"
+                        : "border-border/50 bg-background/70",
+                  )}
+                  data-testid="text-prep-countdown"
+                >
+                  <p className="font-display text-[2.75rem] font-bold leading-none tabular-nums tracking-tight text-foreground">
+                    {daysUntil}
+                  </p>
+                  <p className="mt-1.5 text-sm text-muted-foreground">
+                    {daysUntil === 0 ? "Departing today" : daysUntil === 1 ? "day to go" : "days to go"}
+                  </p>
+                </div>
               ) : null}
 
-            {holidayPrep && (() => {
-              const daysUntil = getPrepDaysUntilDeparture();
-              const tripDays = getPrepTripDays();
-              const coverage = storage.getHolidaySupplyCoverage();
-              const checkedCount = holidayPrep.checklist.filter(c => c.checked).length;
-              const totalChecklist = holidayPrep.checklist.length;
-              const prescriptionCycle = storage.getPrescriptionCycle();
-              const hasSupplyShortfall = coverage.some(c => c.shortfall > 0);
-              const isDepartureNear = daysUntil !== null && daysUntil <= 3 && daysUntil >= 0;
-              const hasDeparted = daysUntil !== null && daysUntil < 0;
+              {hasDeparted && !isTravelModeActive ? (
+                <p className="text-center text-sm text-muted-foreground">Departure date has passed — start travel for local insulin times.</p>
+              ) : null}
 
-              return (
-                <div className="space-y-3.5" data-testid="holiday-prep-active">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <h3 className="truncate text-[15px] font-semibold">{holidayPrep.destination}</h3>
-                      <p className="text-xs text-muted-foreground">
-                        {formatTripDate(holidayPrep.departureDate, profile, { day: "numeric", month: "short" }) ||
-                          "Departure"} 
-                        {" — "}
-                        {formatTripDate(holidayPrep.returnDate, profile, {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        }) || "Return"}
-                        {" · "}
-                        {tripDays}d
-                      </p>
-                      {holidayPrep.notes && (
-                        <p className="mt-1 truncate text-xs text-muted-foreground">{holidayPrep.notes}</p>
-                      )}
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-9 w-9 shrink-0"
-                      onClick={handleDeleteHolidayPrep}
-                      aria-label="Delete holiday prep"
-                      data-testid="button-delete-holiday-prep"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-
-                  {daysUntil !== null && daysUntil >= 0 && (
-                    <div
-                      className={cn(
-                        "overflow-hidden rounded-2xl border px-3 py-3 text-center",
-                        daysUntil <= 3
-                          ? "border-orange-500/30 bg-orange-500/[0.08]"
-                          : daysUntil <= 7
-                            ? "border-amber-500/30 bg-amber-500/[0.08]"
-                            : "border-sky-500/25 bg-sky-500/[0.08]",
-                      )}
-                      data-testid="text-prep-countdown"
-                    >
-                      <p className="font-display text-4xl font-bold tabular-nums tracking-tight text-foreground">{daysUntil}</p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {daysUntil === 0 ? "Departing today" : daysUntil === 1 ? "day to go" : "days to go"}
-                      </p>
-                    </div>
+              {coverage.length > 0 ? (
+                <Link
+                  href="/supplies"
+                  className={cn(
+                    "flex items-center gap-3 rounded-2xl border px-3.5 py-3 transition-colors",
+                    shortfallCount > 0
+                      ? "border-red-500/25 bg-red-500/[0.06] hover:bg-red-500/[0.09]"
+                      : "border-border/50 bg-background/60 hover:bg-background",
                   )}
+                  data-testid="link-travel-supply-summary"
+                >
+                  <Package
+                    className={cn(
+                      "h-4 w-4 shrink-0",
+                      shortfallCount > 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground",
+                    )}
+                    aria-hidden
+                  />
+                  <span className="min-w-0 flex-1 text-sm font-medium text-foreground">
+                    {shortfallCount > 0
+                      ? `${shortfallCount} supply item${shortfallCount === 1 ? "" : "s"} short for this trip`
+                      : "Supplies look covered for this trip"}
+                  </span>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                </Link>
+              ) : null}
 
-                  {hasDeparted && !isTravelModeActive && (
-                    <Alert className="border-orange-300 dark:border-orange-700">
-                      <Plane className="h-4 w-4" />
-                      <AlertTitle>Departure date has passed</AlertTitle>
-                      <AlertDescription>Open your packing list to start travel mode.</AlertDescription>
-                    </Alert>
-                  )}
-
-                  {coverage.length > 0 && (
-                    <div className="space-y-2">
-                      <h4 className="text-sm font-semibold flex items-center gap-1">
-                        <Package className="h-4 w-4" />
-                        Supplies
-                        <InlineInfoHint
-                          ariaLabel="How supply cover is calculated"
-                          content={
-                            <p className="text-sm">
-                              We check stock against about {coverage[0]?.daysNeeded ?? tripDays} days
-                              for this {tripDays}-day trip (includes a travel buffer). Green means enough; red means order more.
-                            </p>
-                          }
-                        />
-                      </h4>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        {coverage.map(({ supply, daysRemaining, shortfall, coveragePercent, orderByDate }) => (
-                          <div
-                            key={supply.id}
-                            className={cn(
-                              "rounded-xl border px-2.5 py-2",
-                              shortfall > 0 ? "border-red-500/30 bg-red-500/[0.06]" : "border-border/70 bg-background/70",
-                            )}
-                            data-testid={`prep-supply-${supply.id}`}
-                          >
-                            <p className="truncate text-[11px] font-medium text-muted-foreground">{supply.name}</p>
-                            <p className={cn(
-                              "mt-0.5 text-sm font-bold tabular-nums",
-                              shortfall > 0 ? "text-red-600 dark:text-red-400" : "text-foreground",
-                            )}>
-                              {daysRemaining >= 999
-                                ? "—"
-                                : shortfall > 0
-                                  ? `${shortfall}d short`
-                                  : `${daysRemaining}d`}
-                            </p>
-                            {orderByDate && shortfall > 0 ? (
-                              <p className="mt-0.5 text-[10px] font-medium text-red-700 dark:text-red-300" data-testid={`prep-supply-order-by-${supply.id}`}>
-                                Order by {formatTripDate(orderByDate, profile, { day: "numeric", month: "short" }) || orderByDate}
-                              </p>
-                            ) : null}
-                            {daysRemaining < 999 ? (
-                              <Progress
-                                value={coveragePercent}
-                                className={`mt-1.5 h-1.5 ${shortfall > 0 ? "[&>div]:bg-red-500" : "[&>div]:bg-emerald-500"}`}
-                              />
-                            ) : null}
-                          </div>
-                        ))}
-                      </div>
-                      {hasSupplyShortfall ? (
-                        <p className="text-xs text-red-600 dark:text-red-400">Order short items before you go.</p>
-                      ) : null}
-                    </div>
-                  )}
-
-                  {prescriptionCycle && daysUntil !== null && daysUntil > 0 && (() => {
-                    const interval = prescriptionCycle.intervalDays || 28;
-                    const insulinSupplies = supplies.filter(s => 
-                      s.type === "insulin_short" || s.type === "insulin_long" || s.type === "insulin_vial" || s.type === "insulin"
-                    );
-                    const relevantPickups = insulinSupplies.flatMap(s => storage.getPickupHistory(s.id));
-                    const sortedPickups = [...relevantPickups].sort((a, b) => new Date(b.pickupDate).getTime() - new Date(a.pickupDate).getTime());
-                    const lastPickup = sortedPickups[0];
-                    if (!lastPickup) return null;
-                    const lastDate = new Date(lastPickup.pickupDate);
-                    if (!Number.isFinite(lastDate.getTime())) return null;
-                    lastDate.setHours(0, 0, 0, 0);
-                    const nextDue = new Date(lastDate);
-                    nextDue.setDate(nextDue.getDate() + interval);
-                    if (!Number.isFinite(nextDue.getTime())) return null;
-                    const departure = new Date(holidayPrep.departureDate);
-                    if (!Number.isFinite(departure.getTime())) return null;
-                    departure.setHours(0, 0, 0, 0);
-                    const daysBeforeDeparture = Math.ceil((departure.getTime() - nextDue.getTime()) / (1000 * 60 * 60 * 24));
-                    if (!Number.isFinite(daysBeforeDeparture)) return null;
-                    
-                    if (daysBeforeDeparture >= -7 && daysBeforeDeparture <= 14) {
-                      const dueLabel =
-                        formatTripDate(nextDue.toISOString().slice(0, 10), profile, { day: "numeric", month: "short" }) ||
-                        "soon";
-                      return (
-                        <Alert className="border-blue-300 dark:border-blue-700" data-testid="alert-prescription-timing">
-                          <Calendar className="h-4 w-4" />
-                          <AlertTitle className="flex items-center gap-1 text-sm">
-                            Prescription
-                            <InlineInfoHint
-                              ariaLabel="Prescription timing tip"
-                              content={
-                                <p className="text-sm">
-                                  Due around {dueLabel}
-                                  {daysBeforeDeparture <= 0
-                                    ? ` (${Math.abs(daysBeforeDeparture)} days before departure).`
-                                    : " while you are away."}{" "}
-                                  Ask your pharmacy about collecting early.
-                                </p>
-                              }
-                            />
-                          </AlertTitle>
-                          <AlertDescription>Due {dueLabel} — collect early if you can.</AlertDescription>
-                        </Alert>
-                      );
-                    }
-                    return null;
-                  })()}
-
-                  <Collapsible open={prepChecklistOpen} onOpenChange={setPrepChecklistOpen}>
-                    <CollapsibleTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="w-full justify-between h-auto min-h-11 py-3 px-3"
-                        data-testid="button-prep-checklist-toggle"
-                      >
-                        <span className="flex items-center gap-2 text-left">
-                          <CheckCircle2 className="h-4 w-4 shrink-0" />
-                          <span className="font-medium text-sm">Checklist · {checkedCount}/{totalChecklist}</span>
-                        </span>
-                        {prepChecklistOpen ? (
-                          <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                        ) : (
-                          <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                        )}
-                      </Button>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="space-y-2 pt-2">
-                      <Progress value={(checkedCount / totalChecklist) * 100} className="h-2" />
-                      <div className="space-y-1">
-                        {holidayPrep.checklist.map((item) => (
-                          <label
-                            key={item.id}
-                            className="flex items-start gap-2 p-2 rounded-lg cursor-pointer hover-elevate"
-                            data-testid={`prep-check-${item.id}`}
-                          >
-                            <Checkbox 
-                              checked={item.checked}
-                              onCheckedChange={() => handleTogglePrepChecklist(item.id)}
-                            />
-                            <span className={`text-sm leading-tight ${item.checked ? "line-through text-muted-foreground" : ""}`}>
-                              {item.label}
-                            </span>
-                          </label>
-                        ))}
-                      </div>
-                    </CollapsibleContent>
-                  </Collapsible>
-
-                  {!isTravelModeActive && (
-                    <Button
-                      className="h-11 w-full rounded-xl"
-                      variant={isDepartureNear || hasDeparted ? "default" : "outline"}
-                      onClick={() => {
-                        if (isDepartureNear || hasDeparted) {
-                          const next = seedPlanFromHolidayPrep();
-                          setPlan(next);
-                          handleActivateTravelMode(next);
-                          return;
-                        }
-                        handleStartPlan();
-                      }}
-                      data-testid={
-                        isDepartureNear || hasDeparted
-                          ? "button-activate-from-prep"
-                          : "button-start-plan-from-prep"
-                      }
-                    >
-                      {isDepartureNear || hasDeparted
-                        ? "Start travel"
-                        : packingPlanReady
-                          ? "Open packing list"
-                          : "Make packing list"}
-                      <ChevronRight className="h-4 w-4 ml-1.5" />
-                    </Button>
-                  )}
-                </div>
-              );
-            })()}
+              {primaryTripAction && !isTravelModeActive ? (
+                <Button
+                  className="h-12 w-full rounded-2xl text-[15px] font-semibold"
+                  onClick={primaryTripAction.onClick}
+                  data-testid={primaryTripAction.testId}
+                >
+                  {primaryTripAction.label}
+                  <ChevronRight className="ml-1.5 h-4 w-4" aria-hidden />
+                </Button>
+              ) : null}
             </CardContent>
           </Card>
         )}
-        <section className="space-y-2.5" aria-labelledby="travel-extras-heading">
-          <h2 id="travel-extras-heading" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Before you go
-          </h2>
-          <div className="grid gap-2.5 sm:grid-cols-2">
-            <div className="space-y-2 rounded-2xl border border-border/50 bg-card/70 p-3" data-testid="card-pretravel-appointment">
-              <div className="flex flex-wrap items-center gap-1">
-                <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="text-sm font-semibold">Appointments</span>
-                <InlineInfoHint
-                  ariaLabel="Why book before you travel"
-                  content={
-                    <p className="text-sm">
-                      Letters for travel and extra supplies often need planning—book ahead where you can.
-                    </p>
-                  }
-                />
-              </div>
+
+        <section className="overflow-hidden rounded-2xl border border-border/50 bg-card/80" aria-label="Travel shortcuts">
+          <Link
+            href="/appointments"
+            className="flex min-h-12 items-center gap-3 border-b border-border/40 px-4 py-3.5 transition-colors hover:bg-muted/30"
+            data-testid="link-pretravel-appointments"
+          >
+            <Calendar className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold text-foreground">Appointments</span>
               {nextAppointment ? (
-                <Link
-                  href="/appointments"
-                  className="block rounded-xl border border-border/60 bg-background/70 px-3 py-2.5 transition-colors hover:border-border hover:bg-background"
-                  data-testid="link-pretravel-next-appointment"
-                >
-                  <p className="text-sm font-semibold text-foreground truncate">
-                    {nextAppointment.title?.trim() || "Appointment"}
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    Next: {formatNextAppointmentWhen(nextAppointment)}
-                    {nextAppointment.location?.trim()
-                      ? ` · ${nextAppointment.location.trim()}`
-                      : ""}
-                  </p>
-                </Link>
+                <span className="mt-0.5 block truncate text-xs text-muted-foreground" data-testid="link-pretravel-next-appointment">
+                  {nextAppointment.title?.trim() || "Appointment"} · {formatNextAppointmentWhen(nextAppointment)}
+                </span>
               ) : (
-                <p className="text-xs text-muted-foreground">
-                  No upcoming appointments saved yet.
-                </p>
+                <span className="mt-0.5 block text-xs text-muted-foreground">Letters and clinic visits</span>
               )}
-              <Link href="/appointments" className="block">
-                <Button variant="secondary" className="h-10 w-full rounded-xl" size="sm" data-testid="link-pretravel-appointments">
-                  {nextAppointment ? "View all appointments" : "Add appointment"}
-                </Button>
-              </Link>
-            </div>
-            <div className="space-y-2 rounded-2xl border border-border/50 bg-card/70 p-3">
-              <div className="flex flex-wrap items-center gap-1">
-                <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="text-sm font-semibold">Emergency card</span>
-                <InlineInfoHint
-                  ariaLabel="About the emergency card"
-                  content={
-                    <p className="text-sm">
-                      Short medical alert text you can show or translate when you need help abroad.
-                    </p>
-                  }
-                />
-              </div>
-              <Link href="/emergency-card" className="block">
-                <Button variant="secondary" className="h-10 w-full rounded-xl" size="sm" data-testid="button-emergency-card">
-                  Open emergency card
-                </Button>
-              </Link>
-            </div>
-          </div>
+            </span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+          </Link>
+          <Link
+            href="/emergency-card"
+            className="flex min-h-12 items-center gap-3 px-4 py-3.5 transition-colors hover:bg-muted/30"
+            data-testid="button-emergency-card"
+          >
+            <Globe className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold text-foreground">Emergency card</span>
+              <span className="mt-0.5 block text-xs text-muted-foreground">Show if you need help abroad</span>
+            </span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+          </Link>
         </section>
 
-        <TravelDisclaimerCard />
-
+        <TravelDisclaimerCard compact />
       </PageShell>
     );
   }
