@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import { LayoutGrid, AlertCircle, Dumbbell } from "lucide-react";
+import { LayoutGrid, AlertCircle, Dumbbell, Minus, TrendingDown, TrendingUp } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,6 +31,11 @@ import { getSupabase } from "@/lib/supabase";
 import { listCarerLinksForPatient } from "@/lib/carers";
 import { useToast } from "@/hooks/use-toast";
 import { runHypoTreatmentPipeline } from "@/lib/dashboard-hypo-pipeline";
+import { useBgPrefill } from "@/hooks/use-bg-prefill";
+import { isCgmPrefillActive } from "@/lib/cgm/preferences";
+import { useHomeNextBestAction } from "@/hooks/use-home-next-best-action";
+import type { HomeNextBestAction } from "@/lib/home-next-best-action";
+import { cn } from "@/lib/utils";
 
 function DashboardInfoDialog() {
   return (
@@ -38,17 +43,14 @@ function DashboardInfoDialog() {
       <InfoSection title="Customise your view">
         <p>Tap the layout button to edit widgets. You can show or hide cards and drag them into the order you prefer. Your layout is saved on this device.</p>
       </InfoSection>
-      <InfoSection title="Reordering">
-        <p>In the widget editor, drag the handle beside each row to change order. On tablets and larger screens, you can also switch some widgets between full and half width.</p>
+      <InfoSection title="Status">
+        <p>The status pill shows overall situation. When CGM is connected, your live reading appears beside it.</p>
       </InfoSection>
-      <InfoSection title="Status Indicator">
-        <p>The status shows your overall diabetes situation. Green means stable, amber means watch, and red means action is needed.</p>
+      <InfoSection title="Next action">
+        <p>One primary next step sits under status. Help Now and Treated a hypo stay visible for urgent moments.</p>
       </InfoSection>
       <InfoSection title="Quick Navigation">
         <p>Click the Diabeaters logo in the navigation bar to return to the dashboard from any page.</p>
-      </InfoSection>
-      <InfoSection title="Help Now Button">
-        <p>The red Help Now button gives you instant access to emergency resources, contacts, and guidance for urgent situations.</p>
       </InfoSection>
     </PageInfoDialog>
   );
@@ -60,12 +62,15 @@ export function HomeCommandHero({
   scenarioState,
   onEditWidgets,
   showCoach,
+  nextAction: nextActionProp,
 }: {
   status: HealthStatus;
   profile: UserProfile | null;
   scenarioState: ScenarioState;
   onEditWidgets: () => void;
   showCoach: boolean;
+  /** When provided (from dashboard), keeps Next Up / meal deduped with the same action. */
+  nextAction?: HomeNextBestAction;
 }) {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
@@ -74,6 +79,13 @@ export function HomeCommandHero({
   const [hypoDialogOpen, setHypoDialogOpen] = useState(false);
   const [quickHypoConfirmOpen, setQuickHypoConfirmOpen] = useState(false);
   const [hasLinkedSupporters, setHasLinkedSupporters] = useState<boolean | null>(null);
+
+  const cgmActive = isCgmPrefillActive();
+  const { prefill: bgPrefill } = useBgPrefill({
+    pollIntervalMs: cgmActive ? 5 * 60_000 : undefined,
+  });
+  const resolvedNext = useHomeNextBestAction({ status, scenarioState, showCoach });
+  const nextAction = nextActionProp ?? resolvedNext;
 
   const openFamilySupporters = () => setLocation("/family-carers");
 
@@ -140,11 +152,20 @@ export function HomeCommandHero({
   const quickConfirmHasSupporters = hasLinkedSupporters !== false;
 
   const activeExercise = storage.getActiveExercise();
-  const pumpFailureActive = storage.getScenarioState().pumpFailureActive === true;
+  const pumpFailureActive = scenarioState.pumpFailureActive === true;
+
+  const reading = bgPrefill?.fromCgm ? bgPrefill.reading : null;
+  const hasLiveBg = Boolean(bgPrefill?.fromCgm && bgPrefill.value != null);
+  const trendLabel =
+    reading?.trend === "rising" || reading?.trend === "falling" || reading?.trend === "flat"
+      ? reading.trend
+      : null;
+  const TrendIcon =
+    trendLabel === "rising" ? TrendingUp : trendLabel === "falling" ? TrendingDown : trendLabel === "flat" ? Minus : null;
 
   return (
     <>
-      <header className="pb-4 pt-1" data-testid="card-hero">
+      <header className="pb-3 pt-1" data-testid="card-hero">
         <div className="flex items-start justify-between gap-2 px-1">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
@@ -152,10 +173,26 @@ export function HomeCommandHero({
               <TodayActivityLink compact />
               <StagingChip />
             </div>
-            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            <div className="mt-2 flex flex-wrap items-center gap-2.5" data-testid="home-hero-status-row">
               <div data-testid="wrap-dashboard-status-pill">
                 <StatusPill status={status} />
               </div>
+              {hasLiveBg ? (
+                <div
+                  className="flex items-baseline gap-1.5"
+                  data-testid="home-hero-bg"
+                >
+                  <span className="font-display text-2xl font-bold tabular-nums tracking-tight text-foreground sm:text-[1.75rem]">
+                    {String(bgPrefill!.value)}
+                  </span>
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {reading?.units ?? profile?.bgUnits ?? ""}
+                  </span>
+                  {TrendIcon ? (
+                    <TrendIcon className="h-4 w-4 text-muted-foreground" aria-label={trendLabel ?? undefined} />
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
@@ -173,16 +210,11 @@ export function HomeCommandHero({
           </div>
         </div>
 
-        {(scenarioState.sickDayActive ||
-          Boolean(activeExercise) ||
-          pumpFailureActive) && (
+        {(scenarioState.sickDayActive || Boolean(activeExercise) || pumpFailureActive) && (
           <div
             className="mt-3 flex flex-wrap items-center gap-2 px-1"
             data-testid="home-active-scenario-chips"
           >
-            <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-              Active
-            </span>
             {scenarioState.sickDayActive ? (
               <Button asChild variant="secondary" size="sm" className="h-8 rounded-full px-3 text-xs font-semibold shadow-none">
                 <Link href="/scenarios/sick-day" data-testid="chip-active-sickday">
@@ -210,11 +242,12 @@ export function HomeCommandHero({
           </div>
         )}
 
-        <div className="mt-3">
+        <div className={cn("mt-3.5", !(scenarioState.sickDayActive || activeExercise || pumpFailureActive) && "mt-4")}>
           <HomeActionDock
             isUrgent={isUrgent}
             showCoach={showCoach}
             onTreatedHypo={handleTreatedHypoClick}
+            primary={nextAction}
           />
         </div>
       </header>

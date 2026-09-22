@@ -42,6 +42,7 @@ import { HomeMealMoment } from "@/components/home/HomeMealMoment";
 import { HomeSupplyGraph } from "@/components/home/HomeSupplyGraph";
 import { HomeNextUp } from "@/components/home/HomeNextUp";
 import { getHealthStatus } from "@/lib/dashboard-health-status";
+import { useHomeNextBestAction } from "@/hooks/use-home-next-best-action";
 import { useAskAnything } from "@/components/ai-coach/ask-anything-context";
 import { cn } from "@/lib/utils";
 
@@ -105,8 +106,7 @@ function SoftSettingsNudge({
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm leading-relaxed text-muted-foreground">
-          When you are ready, add a few numbers in Settings for fuller suggestions ({completion.completed}/
-          {completion.total} so far).
+          Finish a few preferences when you want ({completion.completed}/{completion.total} so far).
         </p>
         <div className="flex items-center gap-2 shrink-0">
           <Link href="/settings">
@@ -302,6 +302,12 @@ export default function Dashboard() {
   }, [search, setLocation, openAskModal]);
 
   const healthStatus = getHealthStatus(supplies, scenarioState);
+  const showCoach = isAiCoachEnabled && !isOffline;
+  const homeNextAction = useHomeNextBestAction({
+    status: healthStatus,
+    scenarioState,
+    showCoach,
+  });
 
   const mode = getActiveAppMode();
   const isCommunityDash =
@@ -390,16 +396,22 @@ export default function Dashboard() {
               profile={profile}
               scenarioState={scenarioState}
               onEditWidgets={() => setWidgetsDialogOpen(true)}
-              showCoach={isAiCoachEnabled && !isOffline}
+              showCoach={showCoach}
+              nextAction={homeNextAction}
             />
           </div>
         ) : null}
 
         {!isCommunityDash ? <HomeCgmGraph /> : null}
 
-        {!isCommunityDash ? <HomeMealMoment healthStatus={healthStatus} /> : null}
+        {!isCommunityDash ? (
+          <HomeMealMoment
+            healthStatus={healthStatus}
+            suppressed={homeNextAction.id === "meal"}
+          />
+        ) : null}
 
-        {!isCommunityDash ? <HomeNextUp /> : null}
+        {!isCommunityDash ? <HomeNextUp suppressActionId={homeNextAction.id} /> : null}
 
         {!isCommunityDash ? (
           <HomeTodayPulse healthStatus={healthStatus} suppressRunwayDuplicate />

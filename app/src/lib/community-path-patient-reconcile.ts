@@ -16,7 +16,7 @@ const ONBOARDING_LS = "diabeater_onboarding_completed";
 export const EXISTING_PATIENT_ON_COMMUNITY_PATH_TOAST: PostLoginToastMessage = {
   title: "Already have a full account",
   description:
-    "Community Member is for new sign-ups. You're signed in to User mode — you can open the community feed from the app anytime.",
+    "You're signed in with Type 1 tools — open the community feed anytime from the app. Community Member is for new exploring accounts.",
 };
 
 /** True when /welcome sent the user down the Community Member path on this device. */

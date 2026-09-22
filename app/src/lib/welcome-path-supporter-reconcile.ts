@@ -24,13 +24,13 @@ import type { PostLoginToastMessage } from "@/lib/post-login-toast-stash";
 export const EXISTING_SUPPORTER_ON_USER_PATH_TOAST: PostLoginToastMessage = {
   title: "You have a supporter account",
   description:
-    "The User path is for people with Type 1 diabetes. You're signed in to Supporter mode — link to or view someone you support.",
+    "Opening Supporter mode — enter their invite code or view the person you already support.",
 };
 
 export const EXISTING_SUPPORTER_ON_COMMUNITY_PATH_TOAST: PostLoginToastMessage = {
   title: "You have a supporter account",
   description:
-    "Community Member is for new sign-ups. Use Supporter mode to link to someone with Type 1 or view their shared essentials.",
+    "Opening Supporter mode — link with an invite code or view someone you already support.",
 };
 
 /** True when /welcome sent the user down the User (patient) path on this device. */

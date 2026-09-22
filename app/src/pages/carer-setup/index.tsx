@@ -14,14 +14,17 @@ import {
 } from "@/lib/carers";
 import { getSupabase } from "@/lib/supabase";
 import {
-  applySupporterAccountRoleAfterLink,
   clearCarerIntent,
+  clearOnboardingAccountPath,
   clearPendingCarer,
   hasPendingCarer,
   isCommunityMemberAccount,
   setActiveAppMode,
   setCarerLinkedBannerMessage,
   markCarerLinkJustCompleted,
+  setOnboardingAccountPath,
+  setPendingPatient,
+  setPrimaryAppRole,
 } from "@/lib/carer-session";
 import { finalizeSupporterLinkCloudSync } from "@/lib/profile-primary-role";
 import { clearCommunityProfileAfterSupporterLink } from "@/lib/community-to-supporter";
@@ -103,7 +106,17 @@ export default function CarerSetupPage() {
   const [, setLocation] = useLocation();
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
-  const [howToOpen, setHowToOpen] = useState(() => hasPendingCarer());
+  const [howToOpen, setHowToOpen] = useState(true);
+
+  function switchToType1Tools() {
+    clearPendingCarer();
+    clearCarerIntent();
+    clearOnboardingAccountPath();
+    setOnboardingAccountPath("patient");
+    setPrimaryAppRole("patient");
+    setPendingPatient();
+    setLocation("/onboarding");
+  }
 
   async function copyPatientInstructions() {
     try {
@@ -290,7 +303,7 @@ export default function CarerSetupPage() {
               <div className="space-y-1.5">
                 <CardTitle className="text-xl tracking-tight">Become a supporter</CardTitle>
                 <CardDescription className="text-sm leading-relaxed">
-                  Enter the invite code from the person you support. They create it under{" "}
+                  You&apos;ll need an invite code from the person you support. Ask them to send one from{" "}
                   <span className="font-medium text-foreground">Account → Family &amp; supporters</span>.
                 </CardDescription>
               </div>
@@ -336,6 +349,9 @@ export default function CarerSetupPage() {
                   </Button>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="space-y-3 pt-1">
+                  <p className="text-sm text-muted-foreground" data-testid="carer-setup-empty-hint">
+                    Ask them to send an invite from Family &amp; supporters — then paste the code above.
+                  </p>
                   <SupporterHowToGetCodeList />
                   <Button
                     type="button"
@@ -353,6 +369,19 @@ export default function CarerSetupPage() {
               <div className="space-y-2 border-t border-border/50 pt-4">
                 <p className="text-sm font-medium text-foreground">After you link</p>
                 <SupporterAfterLinkList />
+              </div>
+
+              <div className="border-t border-border/50 pt-4">
+                <p className="mb-2 text-center text-xs text-muted-foreground">Wrong path?</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full rounded-xl"
+                  onClick={switchToType1Tools}
+                  data-testid="carer-setup-switch-type1"
+                >
+                  Switch to Type 1 tools
+                </Button>
               </div>
             </CardContent>
           </Card>

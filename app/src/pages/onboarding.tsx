@@ -316,17 +316,21 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       }),
     [upgradeFlow, showCommunityPath, showBothPath, minimalSetup],
   );
-  const [currentStep, setCurrentStep] = useState<Step>(() =>
-    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("upgrade") === "1"
-      ? "details"
-      : "welcome",
-  );
+  const [currentStep, setCurrentStep] = useState<Step>(() => {
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("upgrade") === "1") {
+      return "details";
+    }
+    // Community keeps its short welcome → region → disclaimer → first_win flow.
+    if (getOnboardingAccountPath() === "community") return "welcome";
+    // Patient / both: essentials only (region → disclaimer).
+    return "region";
+  });
   const [data, setData] = useState<OnboardingData>({
     name: "",
     diabetesType: "type1",
     careContext: null,
     struggle: getInitialOnboardingStruggle(),
-    insulinDeliveryMethod: "",
+    insulinDeliveryMethod: "pen",
     dateOfBirth: "",
     bgUnits: "mmol/L",
     carbUnits: "grams",
@@ -404,7 +408,10 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       bgUnits: data.bgUnits,
       carbUnits: data.carbUnits,
       diabetesType: data.diabetesType || "type1",
-      insulinDeliveryMethod: data.insulinDeliveryMethod === "injections" ? "pen" : data.insulinDeliveryMethod,
+      insulinDeliveryMethod:
+        data.insulinDeliveryMethod === "injections"
+          ? "pen"
+          : data.insulinDeliveryMethod || "pen",
       usingInsulin: true,
       hasAcceptedDisclaimer: data.hasAcceptedDisclaimer,
       dateOfBirth: normalizeDateOfBirthInput(data.dateOfBirth) ?? "",
@@ -461,6 +468,8 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     }
   };
 
+  const isPatientEssentialsFlow = !upgradeFlow && !showCommunityPath;
+
   const handleNext = () => {
     if (currentStep === "struggle") {
       setMinimalSetup(false);
@@ -468,6 +477,11 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     const stepIndex = steps.indexOf(currentStep);
     if (stepIndex < steps.length - 1) {
       setCurrentStep(steps[stepIndex + 1]);
+      return;
+    }
+    // Patient/both essentials: disclaimer is the last step → Home with starter defaults.
+    if (currentStep === "disclaimer" && isPatientEssentialsFlow) {
+      void handleFinish("/");
     }
   };
 
@@ -653,7 +667,9 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
         ? "User Mode is ready — switch back to Supporter Mode anytime from Account or your supporter home."
         : upgradeFlow
           ? "Supplies, meal planning, situation guides, and the rest of the app are ready when you are."
-          : "Let's get started.",
+          : previousAccountPath === "both"
+            ? "Your Home is ready. Link someone later from Account → Family & supporters."
+            : "Your Home is ready — finish preferences anytime in Settings.",
     });
     if (onComplete) {
       onComplete(pathOverride);
@@ -690,7 +706,14 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       case "struggle":
         return <StruggleStep data={data} updateData={updateData} onMinimalSetup={handleMinimalSetup} />;
       case "region":
-        return <RegionStep data={data} updateData={updateData} pathCare={getPathDataCareContext(data)} />;
+        return (
+          <RegionStep
+            data={data}
+            updateData={updateData}
+            pathCare={getPathDataCareContext(data)}
+            essentialsOnly={isPatientEssentialsFlow}
+          />
+        );
       case "details":
         return (
           <div className="space-y-10">
@@ -700,7 +723,9 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           </div>
         );
       case "disclaimer":
-        return <DisclaimerStep data={data} updateData={updateData} />;
+        return (
+          <DisclaimerStep data={data} updateData={updateData} essentialsOnly={isPatientEssentialsFlow} />
+        );
       case "first_win":
         return showCommunityPath && !upgradeFlow ? (
           <CommunityMemberFirstWinStep onFinish={handleFinish} />
@@ -763,7 +788,13 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
         onBack={handleBack}
         showNext={showNextButton}
         onNext={handleNext}
-        nextLabel={currentStep === "disclaimer" ? "Let's go" : "Next"}
+        nextLabel={
+          currentStep === "disclaimer" && isPatientEssentialsFlow
+            ? "Open Home"
+            : currentStep === "disclaimer"
+              ? "Let's go"
+              : "Next"
+        }
         nextDisabled={!canProceed()}
         backTestId="button-onboarding-back"
         nextTestId="button-onboarding-next"
@@ -866,7 +897,7 @@ function WelcomeStep({
           <h1 className="font-display text-3xl font-bold tracking-tight">Diabeaters</h1>
           <p className="mx-auto max-w-sm text-pretty text-lg leading-relaxed text-muted-foreground">
             {communityFlow
-              ? "Learn at your own pace, join the conversation when you want, and keep things simple — no supply or dose tracking required."
+              ? "Feed and learning — explore Tools and the community without full clinical tools."
               : showBothPath
                 ? "We’ll set up your own tools first, then you can link Supporter access in a couple of taps."
                 : "You’ll leave with the one thing you care about most working for you — less guessing, more living."}
@@ -1235,10 +1266,12 @@ function RegionStep({
   data,
   updateData,
   pathCare,
+  essentialsOnly = false,
 }: {
   data: OnboardingData;
   updateData: (field: keyof OnboardingData, value: string | boolean | Struggle | CareContext | AppRegion) => void;
   pathCare?: CareContext | null;
+  essentialsOnly?: boolean;
 }) {
   const supporterHeavy = pathCare === "mostly_them" || pathCare === "both_equally";
 
@@ -1249,9 +1282,11 @@ function RegionStep({
         accent="primary"
         title="Where are you based?"
         subtitle={
-          supporterHeavy
-            ? "This sets default units and emergency numbers for the person you support. You can change units on the next step."
-            : "This sets your default blood glucose units, weight display, and local emergency number. You can override units on the next step."
+          essentialsOnly
+            ? "This sets your default blood glucose units, weight display, and local emergency number. You can change these anytime in Settings."
+            : supporterHeavy
+              ? "This sets default units and emergency numbers for the person you support. You can change units on the next step."
+              : "This sets your default blood glucose units, weight display, and local emergency number. You can override units on the next step."
         }
       />
 
@@ -1420,14 +1455,26 @@ function PathDataStep({ data }: { data: OnboardingData }) {
   }
 }
 
-function DisclaimerStep({ data, updateData }: { data: OnboardingData; updateData: (field: keyof OnboardingData, value: any) => void }) {
+function DisclaimerStep({
+  data,
+  updateData,
+  essentialsOnly = false,
+}: {
+  data: OnboardingData;
+  updateData: (field: keyof OnboardingData, value: any) => void;
+  essentialsOnly?: boolean;
+}) {
   return (
     <div className="space-y-6">
       <OnboardingStepHeader
         icon={AlertTriangle}
         accent="yellow"
         title="One important thing"
-        subtitle="Please read and accept before we continue"
+        subtitle={
+          essentialsOnly
+            ? "Accept to open your Home — other preferences stay optional in Settings."
+            : "Please read and accept before we continue"
+        }
       />
 
       <OnboardingCard accent="yellow" contentClassName="space-y-4 pt-6">

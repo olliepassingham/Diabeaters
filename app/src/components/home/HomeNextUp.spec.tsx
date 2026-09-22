@@ -29,6 +29,22 @@ describe("HomeNextUp", () => {
     expect(screen.getByTestId("home-travel-context").textContent).toMatch(/Departs in 2 days/);
   });
 
+  it("hides bedtime when the hero already owns that next action", () => {
+    storage.saveHolidayPrep({
+      id: "prep-1",
+      destination: "Wyoming",
+      departureDate: "2030-09-06",
+      returnDate: "2030-09-23",
+      checklist: [],
+      createdAt: new Date().toISOString(),
+    });
+
+    render(<HomeNextUp suppressActionId="bedtime" />);
+
+    expect(screen.queryByTestId("home-bedtime-moment")).toBeNull();
+    expect(screen.getByTestId("home-travel-context").textContent).toMatch(/Wyoming/);
+  });
+
   it("renders nothing when there is no trip and it is midday", () => {
     vi.setSystemTime(new Date("2030-09-04T14:00:00"));
     render(<HomeNextUp />);

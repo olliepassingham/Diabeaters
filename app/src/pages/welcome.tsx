@@ -16,7 +16,7 @@ import { resolveCommunityMemberLandingPath } from "@/lib/community-landing";
 import { useAuth } from "@/lib/auth-context";
 import { isUserVerified } from "@/lib/auth";
 import { reconcileWrongWelcomePathForSignedInUser } from "@/lib/welcome-path-reconcile";
-import { ArrowRight, Eye, HeartHandshake, Users } from "lucide-react";
+import { ArrowRight, Eye, HeartHandshake, Sparkles, Users } from "lucide-react";
 
 export default function Welcome() {
   const [, setLocation] = useLocation();
@@ -36,11 +36,7 @@ export default function Welcome() {
   /** First-time path → create account. Returning users use the Log in button below. */
   const goCreateAccount = () => setLocation("/signup");
 
-  const onPatient = () => {
-    clearOnboardingAccountPath();
-    setOnboardingAccountPath("patient");
-    setPrimaryAppRole("patient");
-    setPendingPatient();
+  const goPatientOnboarding = () => {
     if (alreadySignedIn && user?.id) {
       void (async () => {
         if (await reconcileSignedInWrongPath()) return;
@@ -49,6 +45,22 @@ export default function Welcome() {
       return;
     }
     goCreateAccount();
+  };
+
+  const onPatient = () => {
+    clearOnboardingAccountPath();
+    setOnboardingAccountPath("patient");
+    setPrimaryAppRole("patient");
+    setPendingPatient();
+    goPatientOnboarding();
+  };
+
+  const onBoth = () => {
+    clearOnboardingAccountPath();
+    setOnboardingAccountPath("both");
+    setPrimaryAppRole("patient");
+    setPendingPatient();
+    goPatientOnboarding();
   };
 
   const onSupporter = () => {
@@ -83,10 +95,10 @@ export default function Welcome() {
           <FaceLogo size={72} />
           <div className="space-y-2 text-center">
             <h1 className="text-balance font-display text-4xl font-bold tracking-tight">
-              Welcome to Diabeaters
+              Who is this for?
             </h1>
             <p className="text-pretty text-base leading-relaxed text-muted-foreground">
-              Pick how you&apos;ll use the app.
+              Choose one to get started — you can change later in Account.
             </p>
           </div>
         </div>
@@ -105,8 +117,10 @@ export default function Welcome() {
               <Users className="h-6 w-6" aria-hidden />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-base font-semibold text-foreground">I have Type 1 diabetes</span>
-              <span className="mt-0.5 block text-sm text-muted-foreground">Daily tools, guides, and your dashboard</span>
+              <span className="block text-base font-semibold text-foreground">For me (Type 1)</span>
+              <span className="mt-0.5 block text-sm text-muted-foreground">
+                Your dashboard, meals, travel, hypos
+              </span>
             </span>
             <ArrowRight className="h-5 w-5 shrink-0 text-primary/70 transition-transform group-hover:translate-x-0.5" aria-hidden />
           </button>
@@ -124,8 +138,10 @@ export default function Welcome() {
               <HeartHandshake className="h-5 w-5" aria-hidden />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold text-foreground">I&apos;m a supporter</span>
-              <span className="mt-0.5 block text-xs text-muted-foreground">Link to someone with Type 1</span>
+              <span className="block text-sm font-semibold text-foreground">For someone I support</span>
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                You&apos;ll need their invite code
+              </span>
             </span>
             <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform group-hover:translate-x-0.5" aria-hidden />
           </button>
@@ -143,14 +159,42 @@ export default function Welcome() {
               <Eye className="h-5 w-5" aria-hidden />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold text-foreground">Community Member</span>
-              <span className="mt-0.5 block text-xs text-muted-foreground">Learn, explore, and join the feed</span>
+              <span className="block text-sm font-semibold text-foreground">Just exploring / community</span>
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                Feed and learning — not full clinical tools
+              </span>
             </span>
             <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform group-hover:translate-x-0.5" aria-hidden />
           </button>
+
+          <button
+            type="button"
+            onClick={onBoth}
+            className={cn(
+              "pressable group flex min-h-12 w-full items-center gap-3 rounded-[1.25rem] border border-dashed border-border/80 bg-transparent px-4 py-3 text-left",
+              "active:scale-[0.99] hover:bg-muted/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            )}
+            data-testid="welcome-both"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted/50 text-muted-foreground">
+              <Sparkles className="h-4 w-4" aria-hidden />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold text-foreground">Both — Type 1 and I support someone</span>
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                Start with your tools; link a supporter later
+              </span>
+            </span>
+            <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground/60" aria-hidden />
+          </button>
         </div>
 
-        <div className="mt-auto space-y-3 pt-10">
+        <p className="mt-5 px-1 text-center text-xs leading-relaxed text-muted-foreground" data-testid="welcome-not-sure">
+          Not sure? If you live with Type 1 day to day, choose <span className="font-medium text-foreground">For me</span>.
+          If you only help someone else, choose supporter.
+        </p>
+
+        <div className="mt-auto space-y-3 pt-8">
           <Button
             type="button"
             variant="outline"

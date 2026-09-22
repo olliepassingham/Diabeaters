@@ -53,7 +53,14 @@ function getMealRoutines(slot: HomeMealSlot): Routine[] {
   }
 }
 
-export function HomeMealMoment({ healthStatus }: { healthStatus: HealthStatus }) {
+export function HomeMealMoment({
+  healthStatus,
+  suppressed = false,
+}: {
+  healthStatus: HealthStatus;
+  /** When the hero next-action already owns the meal CTA. */
+  suppressed?: boolean;
+}) {
   const [, setLocation] = useLocation();
   const [now, setNow] = useState(() => new Date());
   const [estimatorOpen, setEstimatorOpen] = useState(false);
@@ -79,6 +86,8 @@ export function HomeMealMoment({ healthStatus }: { healthStatus: HealthStatus })
   const currentDismissalKey = moment ? homeMealDismissalKey(now, moment.slot) : null;
   const isDismissed = currentDismissalKey != null && currentDismissalKey === dismissedKey;
   const routines = useMemo(() => (moment ? getMealRoutines(moment.slot) : []), [moment]);
+
+  if (suppressed) return null;
 
   if (healthStatus === "action") return null;
 

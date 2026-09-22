@@ -1,32 +1,38 @@
 import { HomeBedtimeMomentCard, useHomeBedtimePresence } from "@/components/home/HomeBedtimeMoment";
 import { HomeNextUpShell, HomeTravelContext, useHomeTravelPresence } from "@/components/home/HomeTravelContext";
+import type { HomeNextBestActionId } from "@/lib/home-next-best-action";
 
 /**
- * Groups time-sensitive home context (bedtime + trip) into one intentional block
- * so they stop floating as orphan rows under meal planning.
- *
- * Evening: bedtime leads (dynamic focus), trip sits underneath.
- * Otherwise: trip leads when present, morning overnight review follows when available.
+ * Time-sensitive home context (bedtime + trip).
+ * Skips items already claimed by the hero next-action CTA to avoid duplicates.
  */
-export function HomeNextUp() {
+export function HomeNextUp({
+  suppressActionId,
+}: {
+  /** Hero next-action id — hide matching cards here. */
+  suppressActionId?: HomeNextBestActionId;
+}) {
   const travel = useHomeTravelPresence();
   const bedtime = useHomeBedtimePresence();
 
-  if (!travel.visible && !bedtime.visible) return null;
+  const bedtimeVisible = bedtime.visible && suppressActionId !== "bedtime";
+  const travelVisible = travel.visible && suppressActionId !== "travel";
 
-  const eveningLead = bedtime.visible && bedtime.mode === "evening";
+  if (!travelVisible && !bedtimeVisible) return null;
+
+  const eveningLead = bedtimeVisible && bedtime.mode === "evening";
 
   return (
     <HomeNextUpShell hasContent>
       {eveningLead ? (
         <>
           <HomeBedtimeMomentCard presence={bedtime} />
-          {travel.visible ? <HomeTravelContext embedded /> : null}
+          {travelVisible ? <HomeTravelContext embedded /> : null}
         </>
       ) : (
         <>
-          {travel.visible ? <HomeTravelContext embedded /> : null}
-          {bedtime.visible ? <HomeBedtimeMomentCard presence={bedtime} /> : null}
+          {travelVisible ? <HomeTravelContext embedded /> : null}
+          {bedtimeVisible ? <HomeBedtimeMomentCard presence={bedtime} /> : null}
         </>
       )}
     </HomeNextUpShell>

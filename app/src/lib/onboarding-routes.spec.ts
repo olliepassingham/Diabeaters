@@ -2,13 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildOnboardingSteps,
+  getPostOnboardingPath,
   hasOnboardingMealRatios,
   ONBOARDING_EXERCISE_DEMO_HREF,
   shouldUseRatioAdviserFirstWin,
 } from "@/lib/onboarding-routes";
 
 describe("buildOnboardingSteps", () => {
-  it("builds patient onboarding path", () => {
+  it("builds patient essentials path (region + disclaimer only)", () => {
     expect(
       buildOnboardingSteps({
         upgradeFlow: false,
@@ -16,18 +17,18 @@ describe("buildOnboardingSteps", () => {
         showBothPath: false,
         minimalSetup: false,
       }),
-    ).toEqual(["welcome", "struggle", "region", "details", "disclaimer", "first_win"]);
+    ).toEqual(["region", "disclaimer"]);
   });
 
-  it("omits details when minimal setup is chosen", () => {
+  it("uses the same essentials path for both / dual-role and ignores minimalSetup", () => {
     expect(
       buildOnboardingSteps({
         upgradeFlow: false,
         showCommunityPath: false,
-        showBothPath: false,
+        showBothPath: true,
         minimalSetup: true,
       }),
-    ).toEqual(["welcome", "struggle", "region", "disclaimer", "first_win"]);
+    ).toEqual(["region", "disclaimer"]);
   });
 
   it("keeps community and upgrade flows unchanged", () => {
@@ -47,6 +48,13 @@ describe("buildOnboardingSteps", () => {
         minimalSetup: true,
       }),
     ).toEqual(["welcome", "region", "disclaimer", "first_win"]);
+  });
+});
+
+describe("getPostOnboardingPath", () => {
+  it("lands on Home when no struggle was chosen (essentials flow)", () => {
+    expect(getPostOnboardingPath(null)).toBe("/");
+    expect(getPostOnboardingPath(undefined)).toBe("/");
   });
 });
 

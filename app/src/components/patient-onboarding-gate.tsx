@@ -126,6 +126,7 @@ export function PatientOnboardingGate({ onPatientComplete }: PatientOnboardingGa
     <Onboarding
       onComplete={(pathOverride) => {
         onPatientComplete();
+        // Essentials flow finishes with pathOverride "/" (no struggle routing).
         const struggle = localStorage.getItem("diabeater_onboarding_struggle");
         setLocation(pathOverride ?? getPostOnboardingPath(struggle));
       }}
