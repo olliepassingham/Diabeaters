@@ -30,6 +30,8 @@ type CgmLiveBgChipProps = {
   rangeStatus?: GlucoseRangeStatus | null;
   /** Extra controls on the same bar (e.g. compact Travel) so chrome stays one row. */
   trailing?: ReactNode;
+  /** Render without outer bar chrome — for embedding inside the LIVE status bar. */
+  embedded?: boolean;
   className?: string;
 };
 
@@ -50,6 +52,8 @@ function trendLabel(trend: ExerciseBgTrend | null | undefined): string | null {
 const barBase =
   "flex items-center justify-between gap-2 rounded-2xl border px-3 py-2 backdrop-blur [padding-left:max(0.75rem,env(safe-area-inset-left))] [padding-right:max(0.75rem,env(safe-area-inset-right))]";
 
+const embeddedBase = "flex min-w-0 flex-1 items-center gap-2";
+
 export function CgmLiveBgChip({
   prefill,
   loading,
@@ -60,12 +64,15 @@ export function CgmLiveBgChip({
   waitingLabel = "Waiting for live BG",
   rangeStatus = null,
   trailing = null,
+  embedded = false,
   className,
 }: CgmLiveBgChipProps) {
+  const shell = embedded ? embeddedBase : barBase;
+
   if (loading && !prefill?.fromCgm) {
     return (
       <div
-        className={cn(barBase, "border-border/60 bg-background/55 text-xs text-muted-foreground", className)}
+        className={cn(shell, !embedded && "border-border/60 bg-background/55 text-xs text-muted-foreground", className)}
         role="status"
         aria-live="polite"
         data-testid="cgm-live-bg-chip-loading"
@@ -83,7 +90,7 @@ export function CgmLiveBgChip({
     if (!showWaiting) return null;
     return (
       <div
-        className={cn(barBase, "border-border/60 bg-background/55", className)}
+        className={cn(shell, !embedded && "border-border/60 bg-background/55", className)}
         role="status"
         aria-live="polite"
         data-testid="cgm-live-bg-chip-waiting"
@@ -124,11 +131,13 @@ export function CgmLiveBgChip({
   const trend = trendLabel(reading.trend);
   const stale = reading.isStale;
   const resolvedRange: GlucoseRangeStatus | null = rangeStatus ?? null;
-  const toneClass = resolvedRange
-    ? glucoseRangeCardClasses(resolvedRange)
-    : stale
-      ? "border-amber-500/30 bg-amber-500/10 dark:border-amber-500/40 dark:bg-amber-950/40"
-      : "border-emerald-500/25 bg-emerald-500/10 dark:border-emerald-500/35 dark:bg-emerald-950/30";
+  const toneClass = embedded
+    ? ""
+    : resolvedRange
+      ? glucoseRangeCardClasses(resolvedRange)
+      : stale
+        ? "border-amber-500/30 bg-amber-500/10 dark:border-amber-500/40 dark:bg-amber-950/40"
+        : "border-emerald-500/25 bg-emerald-500/10 dark:border-emerald-500/35 dark:bg-emerald-950/30";
 
   const body = (
     <>
@@ -139,10 +148,10 @@ export function CgmLiveBgChip({
       {TrendIcon && trend ? (
         <span className="inline-flex items-center gap-0.5 text-[11px] capitalize text-muted-foreground">
           <TrendIcon className="h-3.5 w-3.5 shrink-0" aria-hidden />
-          {trend}
+          {embedded ? null : trend}
         </span>
       ) : null}
-      {resolvedRange ? (
+      {resolvedRange && !embedded ? (
         <Badge
           variant="secondary"
           className="h-5 shrink-0 rounded-full border-0 bg-background/55 px-2 text-[10px] font-semibold"
@@ -150,16 +159,18 @@ export function CgmLiveBgChip({
           {glucoseRangeStatusLabel(resolvedRange)}
         </Badge>
       ) : null}
-      <span className="min-w-0 truncate text-[11px] text-muted-foreground">
-        {formatAgeMinutes(reading.ageMinutes)} ago
-        {reading.sourceLabel ? ` · ${reading.sourceLabel}` : ""}
-      </span>
+      {!embedded ? (
+        <span className="min-w-0 truncate text-[11px] text-muted-foreground">
+          {formatAgeMinutes(reading.ageMinutes)} ago
+          {reading.sourceLabel ? ` · ${reading.sourceLabel}` : ""}
+        </span>
+      ) : null}
     </>
   );
 
   return (
     <div
-      className={cn(barBase, toneClass, className)}
+      className={cn(shell, toneClass, className)}
       role="status"
       aria-live="polite"
       data-testid="cgm-live-bg-chip"
@@ -177,7 +188,7 @@ export function CgmLiveBgChip({
       ) : (
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5">{body}</div>
       )}
-      {onRefresh ? (
+      {onRefresh && !embedded ? (
         <Button
           type="button"
           variant="ghost"

@@ -27,6 +27,10 @@ export type ActiveTravelProgressInput = {
   daysUntilStart: number;
   daysRemaining: number;
   isPumpUser: boolean;
+  /** True from return travel day through the homebound insulin shift window. */
+  isHomebound?: boolean;
+  /** Days since endDate when homebound (0 = return travel day). */
+  daysPastReturn?: number;
 };
 
 export type TripProfileChip = { label: string };
@@ -103,7 +107,7 @@ function timezonePhase(dayNumber: number): 1 | 2 | 3 {
 
 /** One short line for the progress card — chips carry the rest. */
 export function buildActiveTravelTodayFocus(input: ActiveTravelProgressInput): string {
-  const { plan, dayNumber, hasStarted, hasEnded, daysUntilStart, isPumpUser } = input;
+  const { plan, dayNumber, hasStarted, hasEnded, daysUntilStart, isPumpUser, isHomebound } = input;
 
   if (hasEnded) return "Trip done — restock when you're home.";
 
@@ -116,6 +120,12 @@ export function buildActiveTravelTodayFocus(input: ActiveTravelProgressInput): s
       return "Active trip soon — add fast carbs to your carry-on checklist.";
     }
     return "Work through your packing list.";
+  }
+
+  if (isHomebound && plan.timezoneChange !== "none" && plan.timezoneHours > 0) {
+    return isPumpUser
+      ? "Homebound: shift pump clock back toward home time."
+      : "Shift long-acting back toward home local time — see Insulin times.";
   }
 
   if (plan.timezoneChange !== "none" && plan.timezoneHours > 0) {
@@ -153,7 +163,7 @@ export function buildActiveTravelTodayFocus(input: ActiveTravelProgressInput): s
 }
 
 export function buildActiveTravelCoachPrompt(input: ActiveTravelProgressInput): string {
-  const { plan, dayNumber, totalDays, hasStarted, hasEnded, daysUntilStart } = input;
+  const { plan, dayNumber, totalDays, hasStarted, hasEnded, daysUntilStart, isHomebound } = input;
   const dest = plan.destination.trim();
   const chips = buildActiveTravelTripProfileChips(plan)
     .map((c) => c.label)
@@ -166,6 +176,7 @@ export function buildActiveTravelCoachPrompt(input: ActiveTravelProgressInput): 
 
   let tripPhase: string;
   if (hasEnded) tripPhase = "My trip has just ended.";
+  else if (isHomebound) tripPhase = "I'm on the return / homebound leg of my trip.";
   else if (!hasStarted) {
     tripPhase =
       daysUntilStart <= 0

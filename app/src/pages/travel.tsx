@@ -93,10 +93,19 @@ import {
 } from "@/lib/travel-active-guidance";
 import { buildExerciseScenarioPlannerHref } from "@/lib/exercise-planner-href";
 import { getWorkoutElapsedMs } from "@/lib/exercise-session-timing";
+import {
+  ExerciseWorkoutProgressBar,
+  formatExerciseElapsedShort,
+} from "@/components/exercise-active-session-extras";
 import { TravelInsulinClockCard } from "@/components/travel-insulin-clock-card";
 import {
   buildBasalAdjustmentSchedule,
+  buildBasalReturnAdjustmentSchedule,
+  daysPastTravelEnd,
+  flipTimezoneDirection,
+  isTravelInsulinHomebound,
   pickBasalRowForDay,
+  shouldAutoEndTravelMode,
   timezoneChangeFromHours,
   type BasalAdjustmentRow,
 } from "@/lib/travel-insulin-clock";
@@ -305,7 +314,7 @@ function climateTimezoneGuidance(plan: TravelPlan): ClimateGuidanceSection & { p
     },
     {
       label: "Day 5+",
-      text: "You should be on local routine — return journey uses the same idea in reverse.",
+      text: "You should be on local routine — on your return travel day, Insulin times flips to a homebound schedule automatically.",
     },
   ];
 
@@ -1037,6 +1046,34 @@ export default function Travel() {
     settings.longActingInjectionsPerDay,
   ]);
 
+  const basalReturnSchedules = useMemo(() => {
+    if (isPumpUser || plan.timezoneChange === "none") return [];
+    const out: { doseLabel: string; rows: BasalAdjustmentRow[] }[] = [];
+    const firstLabel = usesTwoBasalDoses ? "First long-acting dose" : "Long-acting insulin";
+    if (basalInjectionTime.trim()) {
+      out.push({
+        doseLabel: firstLabel,
+        rows: buildBasalReturnAdjustmentSchedule(basalInjectionTime, plan),
+      });
+    }
+    if (usesTwoBasalDoses && basalInjectionTime2.trim()) {
+      out.push({
+        doseLabel: "Second long-acting dose",
+        rows: buildBasalReturnAdjustmentSchedule(basalInjectionTime2, plan),
+      });
+    }
+    return out.filter((s) => s.rows.length > 0);
+  }, [
+    isPumpUser,
+    plan.timezoneChange,
+    plan.timezoneHours,
+    plan.timezoneDirection,
+    basalInjectionTime,
+    basalInjectionTime2,
+    usesTwoBasalDoses,
+    settings.longActingInjectionsPerDay,
+  ]);
+
   useEffect(() => {
     if (storage.getScenarioState().travelModeActive) {
       recordLastInteraction("scenario:travel");
@@ -1617,11 +1654,34 @@ export default function Travel() {
 
     const totalDays = Math.max(1, plan.duration || Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
     const hasStarted = today >= startDate;
-    const hasEnded = today > endDate;
-    const daysElapsed = hasStarted ? Math.min(totalDays, Math.ceil((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))) : 0;
-    const daysUntilStart = !hasStarted ? Math.ceil((startDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : 0;
+    const tripCalendarEnded = today > endDate;
+    const isHomebound = isTravelInsulinHomebound(
+      today,
+      endDate,
+      plan.timezoneHours,
+      plan.timezoneChange,
+    );
+    const hasEnded = shouldAutoEndTravelMode(today, endDate, plan.timezoneHours);
+    const daysElapsed = hasStarted
+      ? Math.min(
+          totalDays,
+          Math.ceil((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)),
+        )
+      : 0;
+    const daysUntilStart = !hasStarted
+      ? Math.ceil((startDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+      : 0;
     const daysRemaining = Math.max(0, totalDays - daysElapsed);
-    const progressPercent = hasStarted ? Math.min(100, Math.round((daysElapsed / totalDays) * 100)) : 0;
+    const progressPercent = hasStarted && !tripCalendarEnded
+      ? Math.min(100, Math.round((daysElapsed / totalDays) * 100))
+      : tripCalendarEnded
+        ? 100
+        : 0;
+    const daysPastReturn = daysPastTravelEnd(today, endDate);
+    const activeBasalSchedules = isHomebound ? basalReturnSchedules : basalSchedules;
+    const clockDirection = isHomebound
+      ? flipTimezoneDirection(plan.timezoneDirection)
+      : plan.timezoneDirection;
 
     const checkedCount = packingList.filter(i => i.checked).length;
     const groupedItems = packingList.reduce((acc, item) => {
@@ -1631,11 +1691,11 @@ export default function Travel() {
     }, {} as Record<string, PackingItem[]>);
 
     const todayScheduleEntries = (() => {
-      if (plan.timezoneChange === "none" || !basalSchedules.length) return [];
-      const dayInTrip = daysElapsed;
-      return basalSchedules
+      if (plan.timezoneChange === "none" || !activeBasalSchedules.length) return [];
+      const dayIndex = isHomebound ? Math.max(0, daysPastReturn) : daysElapsed;
+      return activeBasalSchedules
         .map(({ doseLabel, rows }) => {
-          const entry = pickBasalRowForDay(rows, dayInTrip);
+          const entry = pickBasalRowForDay(rows, dayIndex);
           return entry ? { doseLabel, ...entry } : null;
         })
         .filter((x): x is BasalAdjustmentRow & { doseLabel: string } => x != null);
@@ -1651,6 +1711,8 @@ export default function Travel() {
       daysUntilStart,
       daysRemaining,
       isPumpUser,
+      isHomebound,
+      daysPastReturn: isHomebound ? daysPastReturn : undefined,
     };
     const todayFocus = buildActiveTravelTodayFocus(activeProgressInput);
     const activeCoachPrompt = buildActiveTravelCoachPrompt(activeProgressInput);
@@ -1711,27 +1773,31 @@ export default function Travel() {
           <div className="flex items-end justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-sky-700/80 dark:text-sky-300/90">
-                {hasEnded ? "Trip" : hasStarted ? "Today" : "Starts in"}
+                {isHomebound ? "Homebound" : hasEnded ? "Trip" : hasStarted ? "Today" : "Starts in"}
               </p>
               <p
                 className="mt-1 font-display text-[2.75rem] font-bold leading-none tabular-nums tracking-tight text-foreground"
                 data-testid="text-trip-progress"
               >
-                {hasEnded
-                  ? "Ended"
-                  : hasStarted
-                    ? daysElapsed + 1
-                    : daysUntilStart <= 0
-                      ? "Today"
-                      : daysUntilStart}
-                {hasStarted && !hasEnded ? (
+                {isHomebound
+                  ? daysPastReturn === 0
+                    ? "Return"
+                    : `D${daysPastReturn}`
+                  : hasEnded
+                    ? "Ended"
+                    : hasStarted
+                      ? daysElapsed + 1
+                      : daysUntilStart <= 0
+                        ? "Today"
+                        : daysUntilStart}
+                {hasStarted && !tripCalendarEnded && !isHomebound ? (
                   <span className="text-xl font-semibold text-muted-foreground">/{totalDays}</span>
                 ) : !hasStarted && !hasEnded && daysUntilStart > 0 ? (
                   <span className="ml-1 text-xl font-semibold text-muted-foreground">d</span>
                 ) : null}
               </p>
             </div>
-            {hasStarted && !hasEnded ? (
+            {hasStarted && !tripCalendarEnded ? (
               <div className="w-20 shrink-0 pb-1">
                 <Progress value={progressPercent} className="h-2" data-testid="progress-trip" />
               </div>
@@ -1745,15 +1811,16 @@ export default function Travel() {
         {plan.timezoneChange !== "none" && plan.timezoneHours > 0 ? (
           <TravelInsulinClockCard
             hours={plan.timezoneHours}
-            direction={plan.timezoneDirection}
+            direction={clockDirection}
             isPumpUser={isPumpUser}
             todayEntries={todayScheduleEntries}
-            schedules={basalSchedules}
+            schedules={activeBasalSchedules}
             hasStarted={hasStarted && !hasEnded}
+            homebound={isHomebound}
           />
         ) : null}
 
-        {plan.tripStyle === "active" && hasStarted && !hasEnded ? (
+        {plan.tripStyle === "active" && hasStarted && !tripCalendarEnded ? (
           <Card
             className="overflow-hidden rounded-[1.35rem] border-border/50 shadow-none"
             data-testid="card-travel-active-exercise"
@@ -2857,7 +2924,7 @@ export default function Travel() {
                 Turn on at the airport or when you board — not weeks before. Then open Insulin for today’s local injection time.
               </p>
             </div>
-            <Button size="sm" className="h-10 shrink-0 rounded-xl" onClick={handleActivateTravelMode} data-testid="button-activate-travel">
+            <Button size="sm" className="h-10 shrink-0 rounded-xl" onClick={() => handleActivateTravelMode()} data-testid="button-activate-travel">
               Start
             </Button>
           </>

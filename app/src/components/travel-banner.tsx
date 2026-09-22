@@ -1,9 +1,15 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
-import { Plane, X, ChevronRight, Power, Clock } from "lucide-react";
+import { Plane, X, ChevronRight, Power } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { storage, ScenarioState, DIABEATER_SCENARIO_STATE_CHANGED_EVENT } from "@/lib/storage";
 import { useToast } from "@/hooks/use-toast";
+import {
+  daysNeededForTimezoneShift,
+  daysPastTravelEnd,
+  isTravelInsulinHomebound,
+  shouldAutoEndTravelMode,
+} from "@/lib/travel-insulin-clock";
 
 export function TravelBanner() {
   const { toast } = useToast();
@@ -13,6 +19,7 @@ export function TravelBanner() {
   });
   const [dismissed, setDismissed] = useState(false);
   const [daysRemaining, setDaysRemaining] = useState<number | null>(null);
+  const [homebound, setHomebound] = useState(false);
 
   useEffect(() => {
     const state = storage.getScenarioState();
@@ -28,16 +35,26 @@ export function TravelBanner() {
       end.setHours(0, 0, 0, 0);
       const diff = Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
       setDaysRemaining(diff);
-      
-      if (diff < 0) {
+
+      const tzHours = Math.abs(state.travelTimezoneShift ?? 0);
+      const inHomebound = isTravelInsulinHomebound(today, end, tzHours);
+      setHomebound(inHomebound);
+
+      if (state.travelModeActive && shouldAutoEndTravelMode(today, end, tzHours)) {
         storage.deactivateTravelMode();
         localStorage.removeItem("diabeater_travel_session");
         setScenarioState({ ...state, travelModeActive: false });
+        setHomebound(false);
         toast({
           title: "Travel Mode Ended",
-          description: "Welcome back! Your trip has concluded.",
+          description:
+            tzHours > 0
+              ? "Back on home insulin time. Welcome home!"
+              : "Welcome back! Your trip has concluded.",
         });
       }
+    } else {
+      setHomebound(false);
     }
   };
 
@@ -59,11 +76,11 @@ export function TravelBanner() {
       const state = storage.getScenarioState();
       if (state.travelModeActive !== scenarioState.travelModeActive) {
         setScenarioState(state);
-        updateDaysRemaining(state);
         if (state.travelModeActive) {
           setDismissed(false);
         }
       }
+      updateDaysRemaining(state);
     }, 1000);
 
     return () => {
@@ -77,6 +94,7 @@ export function TravelBanner() {
     storage.deactivateTravelMode();
     localStorage.removeItem("diabeater_travel_session");
     setScenarioState({ ...scenarioState, travelModeActive: false });
+    setHomebound(false);
     toast({
       title: "Travel Mode Ended",
       description: "Welcome back home!",
@@ -97,6 +115,15 @@ export function TravelBanner() {
   };
 
   const timezoneText = getTimezoneText();
+  const tzHours = Math.abs(scenarioState.travelTimezoneShift ?? 0);
+  const homeboundDaysLeft =
+    homebound && scenarioState.travelEndDate
+      ? Math.max(
+          0,
+          daysNeededForTimezoneShift(tzHours) -
+            daysPastTravelEnd(new Date(), new Date(scenarioState.travelEndDate)),
+        )
+      : null;
 
   return (
     <div 
@@ -107,9 +134,17 @@ export function TravelBanner() {
         <Plane className="h-4 w-4 flex-shrink-0" />
         <span className="text-[13px] font-medium truncate">
           Travel Mode: {scenarioState.travelDestination}
-          {daysRemaining !== null && daysRemaining >= 0 && (
+          {homebound ? (
+            <span className="hidden sm:inline">
+              {" "}
+              — homebound
+              {homeboundDaysLeft != null && homeboundDaysLeft > 0
+                ? ` · ${homeboundDaysLeft} ${homeboundDaysLeft === 1 ? "day" : "days"} of insulin shift left`
+                : ""}
+            </span>
+          ) : daysRemaining !== null && daysRemaining >= 0 ? (
             <span className="hidden sm:inline"> — {daysRemaining} {daysRemaining === 1 ? "day" : "days"} left</span>
-          )}
+          ) : null}
           {timezoneText && (
             <span className="hidden md:inline text-blue-100"> ({timezoneText})</span>
           )}

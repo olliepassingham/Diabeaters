@@ -135,6 +135,23 @@ describe("buildActiveTravelTodayFocus", () => {
     expect(focus.toLowerCase()).toMatch(/long-acting|local time|pump/);
   });
 
+  it("prioritises homebound insulin shift over outbound timezone copy", () => {
+    const focus = buildActiveTravelTodayFocus({
+      ...baseInput,
+      dayNumber: 7,
+      isHomebound: true,
+      daysPastReturn: 0,
+      plan: {
+        ...basePlan,
+        timezoneChange: "major" as const,
+        timezoneHours: 7,
+        timezoneDirection: "east" as const,
+        tripStyle: "city",
+      },
+    });
+    expect(focus.toLowerCase()).toMatch(/home|insulin times|shift/);
+  });
+
   it("guides pre-departure briefly", () => {
     const focus = buildActiveTravelTodayFocus({
       ...baseInput,

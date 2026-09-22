@@ -13,6 +13,8 @@ type Props = {
   todayEntries: DoseRow[];
   schedules: { doseLabel: string; rows: BasalAdjustmentRow[] }[];
   hasStarted: boolean;
+  /** When true, heading reflects the reverse (homebound) leg. */
+  homebound?: boolean;
   className?: string;
 };
 
@@ -23,11 +25,17 @@ export function TravelInsulinClockCard({
   todayEntries,
   schedules,
   hasStarted,
+  homebound = false,
   className,
 }: Props) {
   const [showAllDays, setShowAllDays] = useState(false);
   const dirLabel = direction === "east" ? "ahead" : direction === "west" ? "behind" : "";
-  const heading = hours > 0 ? `${hours}h ${dirLabel}` : "Time zone";
+  const heading =
+    hours > 0
+      ? `${hours}h ${dirLabel}${homebound ? " · homebound" : ""}`
+      : homebound
+        ? "Homebound"
+        : "Time zone";
 
   return (
     <section
