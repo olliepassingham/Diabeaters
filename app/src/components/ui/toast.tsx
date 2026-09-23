@@ -14,8 +14,8 @@ const ToastViewport = React.forwardRef<
   <ToastPrimitives.Viewport
     ref={ref}
     className={cn(
-      // Show toasts within the app header area (but not under the iPhone notch/status bar).
-      "fixed top-[env(safe-area-inset-top)] z-[100] flex max-h-screen w-full flex-col-reverse p-4 sm:bottom-0 sm:right-0 sm:top-auto sm:flex-col md:max-w-[420px]",
+      // Above drawers/sheets (z-110) and popovers (z-120) so errors during New post are visible.
+      "fixed top-[env(safe-area-inset-top)] z-[200] flex max-h-screen w-full flex-col-reverse p-4 sm:bottom-0 sm:right-0 sm:top-auto sm:flex-col md:max-w-[420px]",
       className
     )}
     {...props}

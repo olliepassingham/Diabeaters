@@ -22,6 +22,7 @@ import {
 } from "@/lib/community";
 import { defaultEventStartsAtLocal } from "@/lib/community/event-display";
 import { isLikelyImageFile, pickPostImagesFromLibrary } from "@/lib/community/pick-post-images";
+import { preparePostImageFiles } from "@/lib/community/prepare-post-image";
 import { clickHiddenFileInput } from "@/lib/click-hidden-file-input";
 import { canEngageWithCommunityFeed, COMMUNITY_FEED_ENGAGE_REQUIRED_MESSAGE, useProfile } from "@/lib/profile";
 
@@ -139,20 +140,31 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
     return () => window.clearTimeout(t);
   }, [composer, composerTopic]);
 
-  function onPickImages(files: FileList | null) {
+  async function onPickImages(files: FileList | null) {
     if (!files?.length) return;
     setComposerVideoFile(null);
     if (videoInputRef.current) videoInputRef.current.value = "";
-    const next: File[] = [...composerFiles];
+    const raw: File[] = [];
     for (let i = 0; i < files.length; i++) {
       const f = files[i];
       if (!f) continue;
-      if (next.length >= MAX_POST_IMAGES) break;
+      if (composerFiles.length + raw.length >= MAX_POST_IMAGES) break;
       if (!isLikelyImageFile(f)) continue;
-      next.push(f);
+      raw.push(f);
     }
-    setComposerFiles(next);
     if (fileInputRef.current) fileInputRef.current.value = "";
+    if (raw.length === 0) return;
+
+    const prepared = await preparePostImageFiles(raw);
+    if (prepared.error) {
+      toast({
+        title: "Photo too large",
+        description: prepared.error.message,
+        variant: "destructive",
+      });
+    }
+    if (prepared.files.length === 0) return;
+    setComposerFiles((prev) => [...prev, ...prepared.files].slice(0, MAX_POST_IMAGES));
   }
 
   async function onPickVideo(files: FileList | null) {
@@ -193,7 +205,17 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
     try {
       const newFiles = await pickPostImagesFromLibrary(composerFiles.length, fileInputRef.current);
       if (newFiles.length > 0) {
-        setComposerFiles((prev) => [...prev, ...newFiles].slice(0, MAX_POST_IMAGES));
+        const prepared = await preparePostImageFiles(newFiles);
+        if (prepared.error) {
+          toast({
+            title: "Photo too large",
+            description: prepared.error.message,
+            variant: "destructive",
+          });
+        }
+        if (prepared.files.length > 0) {
+          setComposerFiles((prev) => [...prev, ...prepared.files].slice(0, MAX_POST_IMAGES));
+        }
         // Native path returned files — safe to reset the fallback input.
         if (fileInputRef.current) fileInputRef.current.value = "";
       }
@@ -295,77 +317,97 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
     }
     setSubmitting(true);
 
-    const mentions = await buildMentionsForPost(composer, user.id);
+    try {
+      const mentions = await buildMentionsForPost(composer, user.id);
 
-    let res: { data: CommunityPostRow | null; error: Error | null };
-    if (composerPostKind === "standard") {
-      res = await insertFeedPost({
-        kind: "standard",
-        topic: composerTopic,
-        body: composer,
-        imageFiles: composerFiles.length ? composerFiles : undefined,
-        videoFile: composerVideoFile ?? undefined,
-        imageAlts: composerImageAlts,
-        contentNote: composerVideoFile ? VIDEO_POST_DEFAULT_CONTENT_NOTE : null,
-        mentions,
-      });
-    } else if (composerPostKind === "poll") {
-      res = await insertFeedPost({
-        kind: "poll",
-        topic: composerTopic,
-        body: composer,
-        question: pollQuestion,
-        options: pollOptions,
-        imageFiles: composerFiles.length ? composerFiles : undefined,
-        imageAlts: composerImageAlts,
-        mentions,
-      });
-    } else {
-      const startDate = new Date(eventStartsAt);
-      if (Number.isNaN(startDate.getTime())) {
-        setSubmitting(false);
-        toast({ title: "Invalid date", description: "Choose a valid start date and time.", variant: "destructive" });
-        return;
+      let imageFiles = composerFiles;
+      if (imageFiles.length > 0) {
+        const prepared = await preparePostImageFiles(imageFiles);
+        imageFiles = prepared.files;
+        if (prepared.error) {
+          const canContinueWithoutPhotos =
+            Boolean(composer.trim()) || Boolean(composerVideoFile) || imageFiles.length > 0;
+          toast({
+            title: imageFiles.length > 0 ? "Some photos skipped" : "Photos couldn't be attached",
+            description: prepared.error.message,
+            variant: "destructive",
+          });
+          if (!canContinueWithoutPhotos) return;
+        }
+        if (imageFiles.length !== composerFiles.length) {
+          setComposerFiles(imageFiles);
+        }
       }
-      if (startDate.getTime() < Date.now() - 60_000) {
-        setSubmitting(false);
-        toast({
-          title: "Date is in the past",
-          description: "Choose a start time in the future so people know when to show up.",
-          variant: "destructive",
+
+      let res: { data: CommunityPostRow | null; error: Error | null };
+      if (composerPostKind === "standard") {
+        res = await insertFeedPost({
+          kind: "standard",
+          topic: composerTopic,
+          body: composer,
+          imageFiles: imageFiles.length ? imageFiles : undefined,
+          videoFile: composerVideoFile ?? undefined,
+          imageAlts: composerImageAlts,
+          contentNote: composerVideoFile ? VIDEO_POST_DEFAULT_CONTENT_NOTE : null,
+          mentions,
         });
+      } else if (composerPostKind === "poll") {
+        res = await insertFeedPost({
+          kind: "poll",
+          topic: composerTopic,
+          body: composer,
+          question: pollQuestion,
+          options: pollOptions,
+          imageFiles: imageFiles.length ? imageFiles : undefined,
+          imageAlts: composerImageAlts,
+          mentions,
+        });
+      } else {
+        const startDate = new Date(eventStartsAt);
+        if (Number.isNaN(startDate.getTime())) {
+          toast({ title: "Invalid date", description: "Choose a valid start date and time.", variant: "destructive" });
+          return;
+        }
+        if (startDate.getTime() < Date.now() - 60_000) {
+          toast({
+            title: "Date is in the past",
+            description: "Choose a start time in the future so people know when to show up.",
+            variant: "destructive",
+          });
+          return;
+        }
+        res = await insertFeedPost({
+          kind: "event",
+          topic: composerTopic,
+          body: composer,
+          title: eventTitle,
+          startsAt: startDate.toISOString(),
+          location: eventLocation.trim() || undefined,
+          details: eventDetails.trim() || undefined,
+          imageFiles: imageFiles.length ? imageFiles : undefined,
+          imageAlts: composerImageAlts,
+          mentions,
+        });
+      }
+
+      if (res.error) {
+        toast({ title: "Post failed", description: res.error.message, variant: "destructive" });
         return;
       }
-      res = await insertFeedPost({
-        kind: "event",
-        topic: composerTopic,
-        body: composer,
-        title: eventTitle,
-        startsAt: startDate.toISOString(),
-        location: eventLocation.trim() || undefined,
-        details: eventDetails.trim() || undefined,
-        imageFiles: composerFiles.length ? composerFiles : undefined,
-        imageAlts: composerImageAlts,
-        mentions,
-      });
-    }
-
-    setSubmitting(false);
-    if (res.error) {
-      toast({ title: "Post failed", description: res.error.message, variant: "destructive" });
-      return;
-    }
-    const postedKind = composerPostKind;
-    resetComposerAfterPost();
-    if (options.closeSheetOnPost !== false) setSheetOpen(false);
-    options.onPosted?.(res.data);
-    if (!options.suppressPostedToast) {
-      toast({
-        title:
-          options.postedToastTitle ??
-          (postedKind === "event" ? "Event shared" : "Posted"),
-        description: options.postedToastDescription,
-      });
+      const postedKind = composerPostKind;
+      resetComposerAfterPost();
+      if (options.closeSheetOnPost !== false) setSheetOpen(false);
+      options.onPosted?.(res.data);
+      if (!options.suppressPostedToast) {
+        toast({
+          title:
+            options.postedToastTitle ??
+            (postedKind === "event" ? "Event shared" : "Posted"),
+          description: options.postedToastDescription,
+        });
+      }
+    } finally {
+      setSubmitting(false);
     }
   }
 

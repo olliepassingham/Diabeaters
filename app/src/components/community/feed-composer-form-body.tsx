@@ -566,7 +566,13 @@ export function FeedComposerFormBody({
         disabled={submitting || !composerCanSubmit || !canComposeToFeed}
       >
         <Send className="h-4 w-4 mr-1.5" />
-        {composerPostKind === "event" ? "Share event" : composerPostKind === "poll" ? "Share poll" : "Post"}
+        {submitting
+          ? "Posting…"
+          : composerPostKind === "event"
+            ? "Share event"
+            : composerPostKind === "poll"
+              ? "Share poll"
+              : "Post"}
       </Button>
     </>
   );
