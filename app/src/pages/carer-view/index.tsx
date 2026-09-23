@@ -1855,6 +1855,9 @@ export default function CarerViewPage() {
                     aria-hidden
                   />
                   Recent treated hypos
+                  <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Shared
+                  </span>
                 </CardTitle>
               </CardHeader>
               <CardContent className={carerCardContentClass}>
@@ -1940,7 +1943,12 @@ export default function CarerViewPage() {
                 <CardHeader className={carerCardHeaderClass}>
                   <CardTitle className={carerCardTitleClass}>
                     <Package className="h-4 w-4 shrink-0 text-primary" aria-hidden />
-                    <span className="min-w-0 flex-1">{displayName}&apos;s supplies</span>
+                    <span className="min-w-0 flex-1">
+                      {displayName}&apos;s supplies
+                      <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        Shared
+                      </span>
+                    </span>
                     <InlineInfoHint
                       ariaLabel="About supplies"
                       content={<p>Cloud stock they have chosen to share with you.</p>}
@@ -2005,7 +2013,12 @@ export default function CarerViewPage() {
               <CardHeader className={carerCardHeaderClass}>
                 <CardTitle className={carerCardTitleClass}>
                   <Plane className="h-4 w-4 shrink-0 text-primary" aria-hidden />
-                  <span className="min-w-0 flex-1">Situations</span>
+                  <span className="min-w-0 flex-1">
+                    Situations
+                    <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Shared
+                    </span>
+                  </span>
                   <InlineInfoHint
                     ariaLabel="About situations"
                     content={

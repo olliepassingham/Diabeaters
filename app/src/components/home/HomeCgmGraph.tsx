@@ -102,9 +102,12 @@ function EmptyCgmChart({
           Now
         </text>
       </svg>
-      <div className="pointer-events-none absolute inset-x-10 top-1/2 -translate-y-1/2 text-center">
+      <div className="pointer-events-none absolute inset-x-8 top-1/2 -translate-y-1/2 text-center">
         <Activity className="mx-auto h-5 w-5 text-primary/55" aria-hidden />
-        <p className="mt-1 text-xs font-medium text-foreground/75">Your glucose trend will appear here</p>
+        <p className="mt-1 text-xs font-medium text-foreground/80">Your day through the green band</p>
+        <p className="mx-auto mt-0.5 max-w-[16rem] text-[11px] leading-snug text-muted-foreground">
+          The soft green strip is your in-range zone. Readings draw how you move through it over 12 hours.
+        </p>
       </div>
     </div>
   );
@@ -175,6 +178,11 @@ export function HomeCgmGraph() {
               </div>
             </div>
           ) : null}
+          {latest ? (
+            <p className="mt-1.5 max-w-[18rem] text-[11px] leading-snug text-muted-foreground">
+              Green band = your in-range zone. The line is how the last 12 hours moved through it — not a judgement.
+            </p>
+          ) : null}
         </div>
         <div className="flex items-center gap-1">
           <Button
@@ -215,14 +223,14 @@ export function HomeCgmGraph() {
           className="group block"
         >
           <EmptyCgmChart units={units} targetLow={target.low} targetHigh={target.high} />
-          <div className="-mt-2 text-center">
-            <p className="text-sm font-medium text-primary group-hover:underline">
-              {connected ? "Waiting for glucose history" : "Connect your CGM"}
+          <div className="-mt-1 space-y-1.5 text-center">
+            <p className="text-sm font-semibold text-primary group-hover:underline">
+              {connected ? "Waiting for the first readings" : "Connect your CGM"}
             </p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
+            <p className="mx-auto max-w-[20rem] text-xs leading-snug text-muted-foreground">
               {connected
-                ? "Your 12-hour trend will appear here after readings arrive."
-                : "Add your CGM in Settings to fill this graph."}
+                ? "Once readings arrive, this chart tells a short story of in-range, above, and below — education only."
+                : "Link Dexcom, Libre, or phone health in Settings. One connection fills this chart with your day."}
             </p>
           </div>
         </Link>

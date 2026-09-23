@@ -133,7 +133,7 @@ export function HomeBedtimeMomentCard({
             : "bg-gradient-to-br from-indigo-600/[0.16] via-indigo-500/[0.08] to-violet-500/[0.10] ring-1 ring-indigo-500/25 shadow-[0_16px_36px_-28px_rgba(79,70,229,0.65)]",
         )}
         data-testid="home-bedtime-moment"
-        aria-label={checkedTonight ? "Bedtime check done — open review" : "Start bedtime check"}
+        aria-label={checkedTonight ? "Overnight readiness done — open review" : "Start overnight readiness check"}
       >
         <div className="pointer-events-none absolute -right-8 -top-10 h-28 w-28 rounded-full bg-indigo-400/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-12 left-8 h-24 w-24 rounded-full bg-violet-400/15 blur-3xl" />
@@ -156,17 +156,17 @@ export function HomeBedtimeMomentCard({
               ) : (
                 <>
                   <Moon className="h-3 w-3" aria-hidden />
-                  Tonight
+                  Tonight · readiness
                 </>
               )}
             </span>
             <span className="mt-0.5 block font-display text-lg font-semibold tracking-tight text-foreground">
-              {checkedTonight ? "Bedtime check logged" : "Bedtime check"}
+              {checkedTonight ? "Overnight readiness logged" : "Overnight readiness"}
             </span>
             <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
               {checkedTonight
-                ? "Open to review glucose, food, and overnight readiness."
-                : "A quick readiness check before you sleep — glucose, food, and insulin."}
+                ? "Open to review glucose, food, and how ready you felt for overnight."
+                : "How ready do you feel for overnight — glucose, food, and insulin."}
             </span>
           </span>
           <span

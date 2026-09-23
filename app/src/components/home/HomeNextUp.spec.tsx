@@ -23,7 +23,7 @@ describe("HomeNextUp", () => {
     render(<HomeNextUp />);
 
     expect(screen.getByTestId("home-next-up")).not.toBeNull();
-    expect(screen.getByTestId("home-bedtime-moment").textContent).toMatch(/Bedtime check/);
+    expect(screen.getByTestId("home-bedtime-moment").textContent).toMatch(/Overnight readiness/);
     expect(screen.getByTestId("home-bedtime-moment").textContent).toMatch(/Start/);
     expect(screen.getByTestId("home-travel-context").textContent).toMatch(/Wyoming/);
     expect(screen.getByTestId("home-travel-context").textContent).toMatch(/Departs in 2 days/);

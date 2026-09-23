@@ -125,8 +125,8 @@ export function resolveHomeNextBestAction(input: ResolveHomeNextBestActionInput)
   if (input.bedtimeDue) {
     return {
       id: "bedtime",
-      label: "Bedtime check",
-      subline: "Evening window — a quick bedtime check helps overnight.",
+      label: "Overnight readiness",
+      subline: "A calm check of glucose, food, and insulin before sleep.",
       href: "/scenarios/bedtime",
       kind: "link",
     };

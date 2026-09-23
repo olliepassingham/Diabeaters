@@ -21,7 +21,7 @@ function primaryToneClasses(action: HomeNextBestAction, isUrgent: boolean): {
   if (action.id === "bedtime") {
     return {
       shell:
-        "bg-gradient-to-br from-indigo-500/[0.14] via-violet-500/[0.08] to-background ring-1 ring-indigo-500/25 text-indigo-950 hover:from-indigo-500/[0.18] dark:text-indigo-50",
+        "bg-gradient-to-br from-indigo-500/[0.18] via-violet-500/[0.10] to-background ring-1 ring-indigo-500/20 text-indigo-950 shadow-[0_18px_40px_-32px_rgba(79,70,229,0.55)] hover:from-indigo-500/[0.22] dark:text-indigo-50",
       chevron: "text-indigo-600/70 dark:text-indigo-300/80",
     };
   }

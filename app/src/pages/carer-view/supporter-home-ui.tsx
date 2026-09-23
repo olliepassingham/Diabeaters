@@ -1,4 +1,4 @@
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import {
   AlertTriangle,
   Check,
@@ -31,7 +31,6 @@ import {
   sortSuppliesByUrgency,
   type HomeGlanceType,
 } from "@/components/home/home-ui";
-import { setActiveAppMode } from "@/lib/carer-session";
 import type { ReactNode } from "react";
 
 /** Compact card chrome for Supporter Mode home — more value above the fold. */
@@ -162,33 +161,38 @@ function SupporterStatusBanner({
 }) {
   const StatusIcon = type === "warning" ? AlertTriangle : type === "info" ? Info : CheckCircle2;
   return (
-    <div
-      className={cn(
-        "flex items-start gap-3 rounded-2xl border px-3.5 py-3",
-        type === "warning" &&
-          "border-amber-500/30 bg-amber-500/[0.08] dark:border-amber-500/25 dark:bg-amber-950/25",
-        type === "info" &&
-          "border-sky-500/25 bg-sky-500/[0.06] dark:border-sky-500/20 dark:bg-sky-950/20",
-        type === "ok" &&
-          "border-emerald-500/25 bg-emerald-500/[0.07] dark:border-emerald-500/20 dark:bg-emerald-950/20",
-      )}
-      data-testid="carer-primary-status"
-      role="status"
-    >
-      <span
-        className={cn(
-          "mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
-          type === "warning" && "bg-amber-500/15 text-amber-700 dark:text-amber-300",
-          type === "info" && "bg-sky-500/15 text-sky-700 dark:text-sky-300",
-          type === "ok" && "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-        )}
-        aria-hidden
-      >
-        <StatusIcon className="h-5 w-5" />
-      </span>
-      <p className="min-w-0 flex-1 pt-1.5 text-sm font-semibold leading-snug tracking-tight text-foreground text-balance">
-        {message}
+    <div className="space-y-1.5" data-testid="carer-primary-status-wrap">
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        Shared status
       </p>
+      <div
+        className={cn(
+          "flex items-start gap-3 rounded-2xl border px-3.5 py-3",
+          type === "warning" &&
+            "border-amber-500/30 bg-amber-500/[0.08] dark:border-amber-500/25 dark:bg-amber-950/25",
+          type === "info" &&
+            "border-sky-500/25 bg-sky-500/[0.06] dark:border-sky-500/20 dark:bg-sky-950/20",
+          type === "ok" &&
+            "border-emerald-500/25 bg-emerald-500/[0.07] dark:border-emerald-500/20 dark:bg-emerald-950/20",
+        )}
+        data-testid="carer-primary-status"
+        role="status"
+      >
+        <span
+          className={cn(
+            "mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
+            type === "warning" && "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+            type === "info" && "bg-sky-500/15 text-sky-700 dark:text-sky-300",
+            type === "ok" && "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+          )}
+          aria-hidden
+        >
+          <StatusIcon className="h-5 w-5" />
+        </span>
+        <p className="min-w-0 flex-1 pt-1.5 text-sm font-semibold leading-snug tracking-tight text-foreground text-balance">
+          {message}
+        </p>
+      </div>
     </div>
   );
 }
@@ -243,13 +247,17 @@ export function SupporterHero({
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              {multiPerson ? `Supporter mode · ${linkedPeople.length} people` : "Supporter mode"}
+              Shared with you
+              {multiPerson ? ` · ${linkedPeople.length} people` : ""}
             </p>
             <p
               className="font-display text-lg font-semibold leading-snug tracking-tight text-foreground text-balance sm:text-xl"
               data-testid="text-carer-view-name"
             >
-              Supporting {displayName}
+              {displayName}
+            </p>
+            <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
+              Read-only context from what they choose to share — not a control panel.
             </p>
           </div>
           {showEmergencyLink ? (
@@ -349,7 +357,6 @@ export function SupporterQuickActions({
   patientId?: string;
   patientName?: string;
 }) {
-  const [, setLocation] = useLocation();
   const showCoach = isAiCoachEnabled;
   const secondaryCount = [showCoach, showActivity].filter(Boolean).length;
   const hasSecondaryRow = secondaryCount > 0;
@@ -364,75 +371,71 @@ export function SupporterQuickActions({
       data-testid="carer-quick-actions"
     >
       {showHypoCheckIn && patientId ? (
-        <SupporterHypoCheckInButton
-          patientId={patientId}
-          patientName={patientName ?? "them"}
-          prominence="primary"
-        />
+        <div className="space-y-1.5">
+          <p className="px-0.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Your one action
+          </p>
+          <SupporterHypoCheckInButton
+            patientId={patientId}
+            patientName={patientName ?? "them"}
+            prominence="primary"
+          />
+        </div>
       ) : null}
 
       {hasSecondaryRow ? (
-        <div className={cn("grid gap-2", secondaryGridCols)}>
-          {showCoach ? (
-            showHypoCheckIn ? (
+        <div className="space-y-1.5">
+          <p className="px-0.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            More
+          </p>
+          <div className={cn("grid gap-2", secondaryGridCols)}>
+            {showCoach ? (
               <Button
                 asChild
                 variant="outline"
-                className="min-h-10 w-full rounded-xl px-2 text-xs font-medium shadow-none sm:text-sm"
+                className={cn(
+                  "min-h-10 w-full rounded-xl px-2 text-xs font-medium shadow-none sm:text-sm",
+                  secondaryCount === 1 && "col-span-full",
+                )}
               >
                 <Link href="/coach?audience=supporter" data-testid="link-carer-coach-open">
                   <MessageCircle className="mr-1.5 h-4 w-4 shrink-0" aria-hidden />
                   {openAssistantCtaLabel()}
                 </Link>
               </Button>
-            ) : (
-              <div className="coach-entry-glow col-span-full w-full rounded-xl" data-testid="link-carer-coach-open-glow">
-                <Button
-                  asChild
-                  variant="default"
-                  className="min-h-10 w-full rounded-xl font-semibold tracking-tight shadow-none"
-                >
-                  <Link href="/coach?audience=supporter" data-testid="link-carer-coach-open">
-                    <MessageCircle className="mr-1.5 h-4 w-4 shrink-0" aria-hidden />
-                    {openAssistantCtaLabel()}
-                  </Link>
-                </Button>
-              </div>
-            )
-          ) : null}
-          {showActivity ? (
-            <Button
-              asChild
-              variant="outline"
-              className={cn(
-                "min-h-10 w-full rounded-xl px-2 text-xs font-medium shadow-none sm:text-sm",
-                secondaryCount === 1 && "col-span-full",
-              )}
-            >
-              <Link href="/carer-view/activity" data-testid="link-carer-activity">
-                <History className="mr-1.5 h-4 w-4 shrink-0" aria-hidden />
-                Activity
-              </Link>
-            </Button>
-          ) : null}
+            ) : null}
+            {showActivity ? (
+              <Button
+                asChild
+                variant="outline"
+                className={cn(
+                  "min-h-10 w-full rounded-xl px-2 text-xs font-medium shadow-none sm:text-sm",
+                  secondaryCount === 1 && "col-span-full",
+                )}
+              >
+                <Link href="/carer-view/activity" data-testid="link-carer-activity">
+                  <History className="mr-1.5 h-4 w-4 shrink-0" aria-hidden />
+                  Activity
+                </Link>
+              </Button>
+            ) : null}
+          </div>
         </div>
       ) : null}
 
       {showUserModeSwitch ? (
         <div className="flex justify-center">
           <Button
-            type="button"
+            asChild
             variant="ghost"
             size="sm"
             className="h-8 gap-1.5 rounded-full px-3 text-xs font-medium text-muted-foreground no-underline hover:bg-muted/40 hover:text-foreground active:bg-muted/55"
             data-testid="button-switch-user-mode"
-            onClick={() => {
-              setActiveAppMode("patient");
-              setLocation("/");
-            }}
           >
-            <UserIcon className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
-            Switch to User Mode
+            <Link href="/mode">
+              <UserIcon className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+              Switch mode
+            </Link>
           </Button>
         </div>
       ) : null}
@@ -442,6 +445,6 @@ export function SupporterQuickActions({
 
 export function SupporterPageFooter() {
   return (
-    <HomeTrustFooter>Read-only · only what they share · not medical advice</HomeTrustFooter>
+    <HomeTrustFooter>Shared context only · they stay in charge · not medical advice</HomeTrustFooter>
   );
 }
