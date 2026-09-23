@@ -115,7 +115,7 @@ describe("carer-session community-only accounts", () => {
     expect(getPrimaryAppRole()).toBeNull();
   });
 
-  it("clears clinical localStorage on logout so the next account is not affected", () => {
+  it("keeps clinical localStorage on role-marker logout (wipe happens only on account switch)", () => {
     storage.saveProfile({
       name: "Old Type1",
       email: "",
@@ -130,8 +130,8 @@ describe("carer-session community-only accounts", () => {
     });
     localStorage.setItem("diabeater_onboarding_completed", "true");
     clearCarerClientSessionKeys();
-    expect(storage.getProfile()).toBeNull();
-    expect(localStorage.getItem("diabeater_onboarding_completed")).toBeNull();
+    expect(storage.getProfile()?.name).toBe("Old Type1");
+    expect(localStorage.getItem("diabeater_onboarding_completed")).toBe("true");
   });
 
   it("converts community members to supporter-only after linking", () => {

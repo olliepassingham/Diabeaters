@@ -1,5 +1,4 @@
 import { localIndicatesPatientAccount } from "@/lib/community-path-patient-reconcile";
-import { clearLocalCacheForAccountSwitch } from "@/lib/storage";
 
 const CARER_INTENT_KEY = "diabeater_carer_intent";
 const CARER_LINKED_BANNER_KEY = "diabeater_carer_linked_banner";
@@ -102,9 +101,8 @@ export function clearCarerClientSessionKeys(): void {
   sessionStorage.removeItem(CLOUD_PRIMARY_APP_ROLE_KEY);
   sessionStorage.removeItem(ONBOARDING_ACCOUNT_PATH_KEY);
   clearPersistedAccountRoleMarkers();
-  // Always wipe clinical/local onboarding so the next account on this device cannot
-  // inherit Type 1 profile residue (even if ACTIVE_USER_ID was already cleared).
-  clearLocalCacheForAccountSwitch();
+  // Role markers only — clinical localStorage is cleared on account *switch*
+  // (see setActiveUserIdForLocalStorage), not on same-user logout.
   emitModeChanged(null);
 }
 

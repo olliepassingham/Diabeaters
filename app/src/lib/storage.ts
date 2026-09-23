@@ -239,9 +239,9 @@ function clearStorageKeys(keys: Iterable<StorageLogicalKey>): void {
 }
 
 /**
- * Wipe local clinical, settings, community drafts, and messages when the signed-in
- * account changes or logs out. Prevents one user's dashboard data appearing for another
- * on a shared device (cloud profile + clinical sync repopulate after login).
+ * Wipe local clinical, settings, community drafts, and messages when a *different*
+ * account signs in on this device. Same-user logout/login keeps local data so Settings
+ * and streaks survive; cloud profile + clinical sync still repopulate after a true switch.
  */
 export function clearLocalCacheForAccountSwitch(): void {
   if (typeof window === "undefined") return;
@@ -275,6 +275,13 @@ export function backupDeclaredScopesMismatchFile(
 
 /** Tracks which Supabase user id local appointment rows belong to (browser localStorage is shared across accounts). */
 export const ACTIVE_USER_ID_KEY = "diabeater_active_user_id";
+
+/**
+ * Last auth user that owned the clinical localStorage on this device.
+ * Survives logout so the same person can sign back in without a wipe; a different
+ * user id triggers {@link clearLocalCacheForAccountSwitch}.
+ */
+export const LAST_LOCAL_USER_ID_KEY = "diabeater_last_local_user_id";
 
 /** Dispatched on same-tab when `ACTIVE_USER_ID_KEY` changes so widgets can reload scoped data. */
 export const DIABEATER_ACTIVE_USER_CHANGED_EVENT = "diabeater-active-user-changed";
@@ -431,21 +438,49 @@ export function setActiveUserIdForLocalStorage(uid: string | null): void {
   if (typeof window === "undefined") return;
   const prev = localStorage.getItem(ACTIVE_USER_ID_KEY);
   const next = uid ?? null;
-  const isLogout = prev != null && next === null;
-  const isAccountSwitch = prev != null && next != null && prev !== next;
-  const isLegacyUnscopedHandoff = prev == null && next != null && localStorage.getItem(STORAGE_KEYS.PROFILE) != null;
-  if (isLogout || isAccountSwitch || isLegacyUnscopedHandoff) {
+  let lastOwner: string | null = null;
+  try {
+    lastOwner = localStorage.getItem(LAST_LOCAL_USER_ID_KEY);
+  } catch {
+    lastOwner = null;
+  }
+
+  if (next === null) {
+    // Logout: keep clinical data for same-user return; remember who owned it.
+    if (prev) {
+      try {
+        localStorage.setItem(LAST_LOCAL_USER_ID_KEY, prev);
+      } catch {
+        /* ignore */
+      }
+    }
+    localStorage.removeItem(ACTIVE_USER_ID_KEY);
+    if (prev !== null) {
+      window.dispatchEvent(new Event(DIABEATER_ACTIVE_USER_CHANGED_EVENT));
+    }
+    return;
+  }
+
+  const knownOwner = prev ?? lastOwner;
+  const isAccountSwitch = knownOwner != null && knownOwner !== next;
+  // Unknown leftover profile with no owner stamp — wipe so a shared device cannot leak data.
+  const isLegacyUnscopedHandoff =
+    knownOwner == null && localStorage.getItem(STORAGE_KEYS.PROFILE) != null;
+
+  if (isAccountSwitch || isLegacyUnscopedHandoff) {
     clearLocalCacheForAccountSwitch();
   }
-  if (uid) {
-    localStorage.setItem(ACTIVE_USER_ID_KEY, uid);
-    try {
-      localStorage.removeItem(STORAGE_KEYS.APPOINTMENTS);
-    } catch {
-      /* ignore */
-    }
-  } else {
-    localStorage.removeItem(ACTIVE_USER_ID_KEY);
+
+  localStorage.setItem(ACTIVE_USER_ID_KEY, next);
+  try {
+    localStorage.setItem(LAST_LOCAL_USER_ID_KEY, next);
+  } catch {
+    /* ignore */
+  }
+  try {
+    localStorage.removeItem(STORAGE_KEYS.APPOINTMENTS);
+  } catch {
+    /* ignore */
   }
   if (prev !== next) {
     window.dispatchEvent(new Event(DIABEATER_ACTIVE_USER_CHANGED_EVENT));
