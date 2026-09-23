@@ -91,7 +91,10 @@ export function PatientOnboardingGate({ onPatientComplete }: PatientOnboardingGa
         setLocation("/welcome");
         return;
       }
-      const wrongPath = await reconcileWrongWelcomePathForSignedInUser(user.id);
+      const wrongPath = await reconcileWrongWelcomePathForSignedInUser(
+        user.id,
+        onboardingAccountPathFromUserMetadata(user),
+      );
       if (cancelled) return;
       if (wrongPath.reconciled && wrongPath.destination) {
         setLocation(wrongPath.destination);

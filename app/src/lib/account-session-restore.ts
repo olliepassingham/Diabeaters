@@ -41,9 +41,9 @@ function onboardingPathForProfile(
   if (hasCarerLink && isPatient) return "both";
   if (cloudRole === "carer" && hasCarerLink) return "supporter";
   if (isPatient || cloudRole === "patient") return "patient";
-  // No cloud signal yet (brand-new profile row) — fall back to the durable signup-time
-  // intent so a lost session doesn't misroute a new Community Member into patient onboarding.
-  if (metadataAccountPath && !isPatient) return metadataAccountPath;
+  // No cloud patient/role signal yet (null profile or brand-new row) — durable signup
+  // metadata wins. Never invent "patient" from leftover localStorage of a previous account.
+  if (metadataAccountPath) return metadataAccountPath;
   return null;
 }
 

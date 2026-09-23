@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "wouter";
 import { ArrowLeft, Calculator, ChevronRight, Minus, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +25,12 @@ import {
   searchCarbFoods,
   type CarbEstimateSelection,
 } from "@/lib/carb-estimator";
+import {
+  listMealRoutinesForCarbEstimator,
+  ROUTINE_MEAL_TYPE_LABELS,
+} from "@/lib/carb-estimator-routines";
 import { mealCompositionSummaryLabel } from "@/lib/meal-impact";
+import { storage, type Routine } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 
 type CarbEstimatorSheetProps = {
@@ -32,6 +38,8 @@ type CarbEstimatorSheetProps = {
   onOpenChange: (open: boolean) => void;
   onConfirm: (result: { grams: number; compositionHint: CarbCompositionHint | null }) => void;
 };
+
+type BrowseCategory = CarbFoodCategory | "all" | "routines";
 
 const CATEGORIES: CarbFoodCategory[] = [
   "meals",
@@ -54,12 +62,32 @@ export function CarbEstimatorSheet({
   onOpenChange,
   onConfirm,
 }: CarbEstimatorSheetProps) {
+  const [, setLocation] = useLocation();
   const [query, setQuery] = useState("");
-  const [category, setCategory] = useState<CarbFoodCategory | "all">("meals");
+  const [category, setCategory] = useState<BrowseCategory>("meals");
   const [selections, setSelections] = useState<CarbEstimateSelection[]>([]);
   const [view, setView] = useState<"browse" | "meal">("browse");
   const estimate = useMemo(() => estimateCarbMeal(selections), [selections]);
   const [confirmedGrams, setConfirmedGrams] = useState("");
+
+  const savedRoutines = useMemo(
+    () => listMealRoutinesForCarbEstimator({ query: category === "routines" ? query : "", limit: 24 }),
+    // Recompute when sheet opens or category/query changes — storage is sync local.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- open refreshes after saves elsewhere
+    [category, query, open],
+  );
+  const hasAnySavedRoutines = useMemo(
+    () => listMealRoutinesForCarbEstimator({ limit: 1 }).length > 0,
+    [open],
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    setQuery("");
+    setSelections([]);
+    setView("browse");
+    setCategory(listMealRoutinesForCarbEstimator({ limit: 1 }).length > 0 ? "routines" : "meals");
+  }, [open]);
 
   useEffect(() => {
     setConfirmedGrams(estimate.suggestedGrams > 0 ? String(estimate.suggestedGrams) : "");
@@ -67,10 +95,12 @@ export function CarbEstimatorSheet({
 
   const results = useMemo(
     () =>
-      searchCarbFoods(query, {
-        category: query.trim() ? "all" : category,
-        limit: query.trim() ? 12 : 10,
-      }),
+      category === "routines"
+        ? []
+        : searchCarbFoods(query, {
+            category: query.trim() ? "all" : category === "all" ? "all" : category,
+            limit: query.trim() ? 12 : 10,
+          }),
     [category, query],
   );
 
@@ -89,6 +119,18 @@ export function CarbEstimatorSheet({
     setView("meal");
   };
 
+  const useRoutine = (routine: Routine) => {
+    const grams = Math.round(Number(routine.carbEstimate));
+    if (!Number.isFinite(grams) || grams <= 0 || grams > 1000) return;
+    try {
+      storage.useRoutine(routine.id);
+    } catch {
+      // Confirming carbs should still work if usage tracking fails.
+    }
+    onConfirm({ grams, compositionHint: null });
+    onOpenChange(false);
+  };
+
   const updateSelection = (id: string, updates: Partial<CarbEstimateSelection>) => {
     setSelections((current) =>
       current.map((selection) => (selection.id === id ? { ...selection, ...updates } : selection)),
@@ -102,8 +144,14 @@ export function CarbEstimatorSheet({
     onOpenChange(false);
   };
 
+  const openManageRoutines = () => {
+    onOpenChange(false);
+    setLocation("/routines");
+  };
+
   const finalGrams = Number(confirmedGrams);
   const finalGramsValid = Number.isFinite(finalGrams) && finalGrams > 0 && finalGrams <= 1000;
+  const browsingRoutines = view === "browse" && category === "routines";
 
   return (
     <BottomSheet
@@ -131,13 +179,23 @@ export function CarbEstimatorSheet({
             <Input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search food or meal"
+              placeholder={browsingRoutines ? "Search your routines" : "Search food or meal"}
               className="h-11 rounded-full pl-9"
               data-testid="input-carb-food-search"
             />
               </div>
 
               <div className="-mx-1 mt-2 flex gap-1.5 overflow-x-auto px-1 pb-1" aria-label="Food categories">
+            <Button
+              type="button"
+              variant={category === "routines" ? "default" : "ghost"}
+              size="sm"
+              className="h-8 shrink-0 rounded-full px-3 text-xs"
+              onClick={() => setCategory("routines")}
+              data-testid="button-carb-category-routines"
+            >
+              My routines
+            </Button>
             <Button
               type="button"
               variant={category === "all" ? "default" : "ghost"}
@@ -161,6 +219,79 @@ export function CarbEstimatorSheet({
             ))}
               </div>
 
+              {browsingRoutines ? (
+                <section className="mt-3" aria-labelledby="carb-routines-results-title">
+                  <h3
+                    id="carb-routines-results-title"
+                    className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
+                  >
+                    {query.trim() ? "Matching routines" : "Saved meals"}
+                  </h3>
+                  {savedRoutines.length ? (
+                    <div className="mt-1 grid grid-cols-1 gap-x-3 sm:grid-cols-2">
+                      {savedRoutines.map((routine) => {
+                        const carbs = Math.round(Number(routine.carbEstimate));
+                        return (
+                          <button
+                            key={routine.id}
+                            type="button"
+                            className="group flex min-h-11 items-center justify-between gap-2 border-b border-border/30 py-2 text-left"
+                            onClick={() => useRoutine(routine)}
+                            data-testid={`button-use-carb-routine-${routine.id}`}
+                          >
+                            <span className="min-w-0">
+                              <span className="block truncate text-sm font-medium text-foreground">
+                                {routine.name}
+                              </span>
+                              <span className="block truncate text-[11px] text-muted-foreground">
+                                {ROUTINE_MEAL_TYPE_LABELS[routine.mealType]} · {carbs}g carbs
+                              </span>
+                            </span>
+                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors group-hover:bg-primary/20">
+                              <Plus className="h-3.5 w-3.5" aria-hidden />
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="py-5 text-center" data-testid="carb-estimator-routines-empty">
+                      <p className="text-sm font-medium text-foreground">
+                        {query.trim()
+                          ? "No matching routine"
+                          : hasAnySavedRoutines
+                            ? "No routines with carbs saved yet"
+                            : "No saved meal routines yet"}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Save meals you eat often under Routines, then pick them here for a one-tap carb amount.
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-3 rounded-full"
+                        onClick={openManageRoutines}
+                        data-testid="button-carb-estimator-manage-routines"
+                      >
+                        Manage routines
+                      </Button>
+                    </div>
+                  )}
+                  {savedRoutines.length ? (
+                    <div className="pt-3 text-center">
+                      <button
+                        type="button"
+                        className="text-xs font-medium text-primary"
+                        onClick={openManageRoutines}
+                        data-testid="button-carb-estimator-manage-routines"
+                      >
+                        Manage routines
+                      </button>
+                    </div>
+                  ) : null}
+                </section>
+              ) : (
               <section className="mt-3" aria-labelledby="carb-search-results-title">
             <h3
               id="carb-search-results-title"
@@ -201,6 +332,7 @@ export function CarbEstimatorSheet({
               </p>
             )}
               </section>
+              )}
             </>
           ) : (
             <>
@@ -425,7 +557,9 @@ export function CarbEstimatorSheet({
             </>
           ) : view === "browse" ? (
             <p className="py-2 text-center text-xs text-muted-foreground">
-              Add a food to calculate a typical range.
+              {browsingRoutines
+                ? "Pick a saved meal, or browse foods to build an estimate."
+                : "Add a food to calculate a typical range."}
             </p>
           ) : null}
         </div>

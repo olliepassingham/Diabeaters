@@ -127,6 +127,34 @@ describe("account-session-restore", () => {
     expect(getOnboardingAccountPath()).toBe("community");
   });
 
+  it("keeps community metadata when previous Type 1 local data remains and cloud profile is null", async () => {
+    const { storage } = await import("@/lib/storage");
+    storage.saveProfile({
+      name: "Old Type1",
+      email: "",
+      bgUnits: "mmol/L",
+      carbUnits: "grams",
+      diabetesType: "type1",
+      insulinDeliveryMethod: "pen",
+      usingInsulin: true,
+      hasAcceptedDisclaimer: true,
+      dateOfBirth: "",
+      accountType: "patient",
+    });
+    localStorage.setItem("diabeater_onboarding_completed", "true");
+    getProfile.mockResolvedValue({ profile: null });
+
+    const { restoreAccountSessionFromCloud } = await import("@/lib/account-session-restore");
+    const { getPrimaryAppRole, getOnboardingAccountPath, getActiveAppMode } = await import(
+      "@/lib/carer-session"
+    );
+
+    await restoreAccountSessionFromCloud("new-community-user", "community");
+    expect(getPrimaryAppRole()).toBe("community");
+    expect(getOnboardingAccountPath()).toBe("community");
+    expect(getActiveAppMode()).toBe("community");
+  });
+
   it("ignores the metadata path once the cloud profile shows an existing patient account", async () => {
     getProfile.mockResolvedValue({
       profile: {

@@ -115,6 +115,25 @@ describe("carer-session community-only accounts", () => {
     expect(getPrimaryAppRole()).toBeNull();
   });
 
+  it("clears clinical localStorage on logout so the next account is not affected", () => {
+    storage.saveProfile({
+      name: "Old Type1",
+      email: "",
+      bgUnits: "mmol/L",
+      carbUnits: "grams",
+      diabetesType: "type1",
+      insulinDeliveryMethod: "pen",
+      usingInsulin: true,
+      hasAcceptedDisclaimer: true,
+      dateOfBirth: "",
+      accountType: "patient",
+    });
+    localStorage.setItem("diabeater_onboarding_completed", "true");
+    clearCarerClientSessionKeys();
+    expect(storage.getProfile()).toBeNull();
+    expect(localStorage.getItem("diabeater_onboarding_completed")).toBeNull();
+  });
+
   it("converts community members to supporter-only after linking", () => {
     setOnboardingAccountPath("community");
     setPrimaryAppRole("community");

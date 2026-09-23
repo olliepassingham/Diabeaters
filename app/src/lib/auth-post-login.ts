@@ -9,13 +9,15 @@ import {
   isSupporterOnlyAccount,
   onboardingAccountPathFromUserMetadata,
   setActiveAppMode,
+  cacheCloudPrimaryAppRoleFromProfile,
+  type OnboardingAccountPath,
 } from "@/lib/carer-session";
 import { resolveCommunityMemberLandingPath } from "@/lib/community-landing";
 import { ensureCommunityMemberSessionReady } from "@/lib/community-member-session";
 import { restoreAccountSessionFromCloud } from "@/lib/account-session-restore";
-import { cacheCloudPrimaryAppRoleFromProfile } from "@/lib/carer-session";
 import { getProfile } from "@/lib/profile";
 import { resolveSupporterOnlyAccount, syncLocalPrimaryAppRoleToCloud } from "@/lib/profile-primary-role";
+import { setActiveUserIdForLocalStorage } from "@/lib/storage";
 import { reconcileWrongWelcomePathForSignedInUser } from "@/lib/welcome-path-reconcile";
 
 /** Commit Supabase session to React auth state before entering protected routes. */
@@ -50,6 +52,7 @@ export async function navigateAfterLoginSuccess(
   setLocation: (path: string) => void,
   userId?: string | null,
   welcomeReconcileDestination?: string,
+  metadataAccountPath?: OnboardingAccountPath | null,
 ): Promise<void> {
   if (welcomeReconcileDestination) {
     applyWelcomeReconcileDestination(setLocation, welcomeReconcileDestination);
@@ -57,12 +60,12 @@ export async function navigateAfterLoginSuccess(
   }
 
   if (userId) {
-    const wrongPath = await reconcileWrongWelcomePathForSignedInUser(userId);
+    const wrongPath = await reconcileWrongWelcomePathForSignedInUser(userId, metadataAccountPath);
     if (wrongPath.reconciled && wrongPath.destination) {
       applyWelcomeReconcileDestination(setLocation, wrongPath.destination);
       return;
     }
-    await ensureCommunityMemberSessionReady(userId);
+    await ensureCommunityMemberSessionReady(userId, { metadataAccountPath });
   }
 
   const link = await getLinkedPatientForCarer();
@@ -118,9 +121,11 @@ export async function completeAuthAndNavigate(
   const userId = session?.user?.id ?? null;
   const metadataAccountPath = onboardingAccountPathFromUserMetadata(session?.user);
   let welcomeReconcileDestination: string | undefined;
-  // Reconcile before auth sync so PostLoginToast does not miss the message on first paint.
   if (userId) {
-    const wrongPath = await reconcileWrongWelcomePathForSignedInUser(userId);
+    // Wipe previous account's clinical localStorage before reconcile / restore so a
+    // shared device cannot treat leftover Type 1 markers as this new user's identity.
+    setActiveUserIdForLocalStorage(userId);
+    const wrongPath = await reconcileWrongWelcomePathForSignedInUser(userId, metadataAccountPath);
     if (wrongPath.reconciled) welcomeReconcileDestination = wrongPath.destination;
     else await restoreAccountSessionFromCloud(userId, metadataAccountPath);
     const { profile } = await getProfile(userId);
@@ -132,5 +137,5 @@ export async function completeAuthAndNavigate(
     void syncLocalPrimaryAppRoleToCloud(userId);
   }
   prepareAuthSessionBeforeNavigation(syncAuthSession, session);
-  await navigateAfterLoginSuccess(setLocation, userId, welcomeReconcileDestination);
+  await navigateAfterLoginSuccess(setLocation, userId, welcomeReconcileDestination, metadataAccountPath);
 }

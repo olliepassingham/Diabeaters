@@ -1,8 +1,20 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
 import { CarbEstimatorSheet } from "@/components/carb-estimator-sheet";
+import { storage } from "@/lib/storage";
+
+const setLocation = vi.fn();
+
+vi.mock("wouter", () => ({
+  useLocation: () => ["/", setLocation],
+}));
 
 describe("CarbEstimatorSheet", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    setLocation.mockReset();
+  });
+
   it("builds an estimate, lets the user edit it, and confirms grams", () => {
     const onConfirm = vi.fn();
     const onOpenChange = vi.fn();
@@ -78,5 +90,43 @@ describe("CarbEstimatorSheet", () => {
     fireEvent.click(screen.getByTestId("button-view-carb-estimator-meal"));
     expect(screen.getByText("Your meal · 1 item")).not.toBeNull();
     expect(screen.getByTestId("button-use-carb-estimate")).not.toBeNull();
+  });
+
+  it("lists My routines and confirms carbs in one tap", () => {
+    const routine = storage.addRoutine({
+      name: "Desk lunch wrap",
+      mealType: "lunch",
+      mealDescription: "",
+      carbEstimate: 48,
+      insulinTiming: "before",
+      outcome: "good",
+      tags: [],
+    });
+    const onConfirm = vi.fn();
+    const onOpenChange = vi.fn();
+
+    render(
+      <CarbEstimatorSheet open onOpenChange={onOpenChange} onConfirm={onConfirm} />,
+    );
+
+    expect(screen.getByTestId("button-carb-category-routines")).not.toBeNull();
+    expect(screen.getByText("Desk lunch wrap")).not.toBeNull();
+    expect(screen.getByText(/Lunch · 48g carbs/)).not.toBeNull();
+
+    fireEvent.click(screen.getByTestId(`button-use-carb-routine-${routine.id}`));
+    expect(onConfirm).toHaveBeenCalledWith({ grams: 48, compositionHint: null });
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(storage.getRoutine(routine.id)?.timesUsed).toBe(1);
+  });
+
+  it("shows an empty routines state with a manage link", () => {
+    render(
+      <CarbEstimatorSheet open onOpenChange={() => {}} onConfirm={() => {}} />,
+    );
+
+    fireEvent.click(screen.getByTestId("button-carb-category-routines"));
+    expect(screen.getByTestId("carb-estimator-routines-empty")).not.toBeNull();
+    fireEvent.click(screen.getByTestId("button-carb-estimator-manage-routines"));
+    expect(setLocation).toHaveBeenCalledWith("/routines");
   });
 });

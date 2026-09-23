@@ -125,6 +125,30 @@ describe("isPatientOnboardingSatisfied", () => {
       }),
     ).toBe(true);
   });
+
+  it("ignores stale local onboarding completion when online", () => {
+    expect(
+      isPatientOnboardingSatisfied({
+        ...base,
+        profileQueryFetched: true,
+        onboardingCompleteFromDb: false,
+        onboardingCompleteFromLocalStorage: true,
+        online: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("uses DB completion when online", () => {
+    expect(
+      isPatientOnboardingSatisfied({
+        ...base,
+        profileQueryFetched: true,
+        onboardingCompleteFromDb: true,
+        onboardingCompleteFromLocalStorage: false,
+        online: true,
+      }),
+    ).toBe(true);
+  });
 });
 
 describe("offline cloud UI filters", () => {

@@ -140,4 +140,51 @@ describe("community-member-session", () => {
     await ensureCommunityMemberSessionReady("u1");
     expect(upsertProfile).not.toHaveBeenCalled();
   });
+
+  it("resolves community from signup metadata even with leftover Type 1 localStorage", async () => {
+    const { storage } = await import("@/lib/storage");
+    storage.saveProfile({
+      name: "Old Type1",
+      email: "",
+      bgUnits: "mmol/L",
+      carbUnits: "grams",
+      diabetesType: "type1",
+      insulinDeliveryMethod: "pen",
+      usingInsulin: true,
+      hasAcceptedDisclaimer: true,
+      dateOfBirth: "",
+      accountType: "patient",
+    });
+    localStorage.setItem("diabeater_onboarding_completed", "true");
+
+    const { resolvesAsCommunityMemberAccount, shouldUseCommunityMemberSession } = await import(
+      "@/lib/community-member-session"
+    );
+
+    expect(
+      resolvesAsCommunityMemberAccount({
+        profile: null,
+        linkedCarer: false,
+        metadataAccountPath: "community",
+      }),
+    ).toBe(true);
+    expect(shouldUseCommunityMemberSession(null, "community")).toBe(true);
+    expect(
+      resolvesAsCommunityMemberAccount({
+        profile: {
+          id: "u1",
+          full_name: null,
+          avatar_url: null,
+          bio: null,
+          public_handle: null,
+          is_public: false,
+          onboarding_complete: false,
+          account_type: null,
+          primary_app_role: null,
+        },
+        linkedCarer: false,
+        metadataAccountPath: "community",
+      }),
+    ).toBe(true);
+  });
 });

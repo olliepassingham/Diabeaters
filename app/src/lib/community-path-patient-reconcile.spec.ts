@@ -144,4 +144,98 @@ describe("community-path-patient-reconcile", () => {
     expect(result.reconciled).toBe(false);
     expect(getPrimaryAppRole()).toBe("community");
   });
+
+  it("does not treat null cloud profile as patient from leftover local Type 1 data", async () => {
+    const { storage } = await import("@/lib/storage");
+    storage.saveProfile({
+      name: "Old Type1",
+      email: "",
+      bgUnits: "mmol/L",
+      carbUnits: "grams",
+      diabetesType: "type1",
+      insulinDeliveryMethod: "pen",
+      usingInsulin: true,
+      hasAcceptedDisclaimer: true,
+      dateOfBirth: "",
+      accountType: "patient",
+    });
+    localStorage.setItem("diabeater_onboarding_completed", "true");
+
+    const { profileIndicatesExistingPatientAccount, localIndicatesPatientAccount } = await import(
+      "@/lib/community-path-patient-reconcile"
+    );
+
+    expect(localIndicatesPatientAccount()).toBe(true);
+    expect(profileIndicatesExistingPatientAccount(null)).toBe(false);
+    expect(
+      profileIndicatesExistingPatientAccount({
+        id: "new-community",
+        full_name: null,
+        avatar_url: null,
+        bio: null,
+        public_handle: null,
+        is_public: false,
+        onboarding_complete: false,
+        account_type: null,
+        primary_app_role: null,
+      }),
+    ).toBe(false);
+  });
+
+  it("does not reconcile community signup when only previous-account local patient data exists", async () => {
+    const { setOnboardingAccountPath } = await import("@/lib/carer-session");
+    const { storage } = await import("@/lib/storage");
+    setOnboardingAccountPath("community");
+    storage.saveProfile({
+      name: "Old Type1",
+      email: "",
+      bgUnits: "mmol/L",
+      carbUnits: "grams",
+      diabetesType: "type1",
+      insulinDeliveryMethod: "pen",
+      usingInsulin: true,
+      hasAcceptedDisclaimer: true,
+      dateOfBirth: "",
+      accountType: "patient",
+    });
+    localStorage.setItem("diabeater_onboarding_completed", "true");
+    getProfile.mockResolvedValue({ profile: null });
+
+    const { reconcileCommunityWelcomeWithExistingPatient } = await import(
+      "@/lib/community-path-patient-reconcile"
+    );
+    const { getPrimaryAppRole, getOnboardingAccountPath } = await import("@/lib/carer-session");
+
+    const result = await reconcileCommunityWelcomeWithExistingPatient("new-u", "community");
+    expect(result.reconciled).toBe(false);
+    expect(getOnboardingAccountPath()).toBe("community");
+    expect(getPrimaryAppRole()).toBe("community");
+  });
+
+  it("does not steal community signup when cloud role was poisoned to patient but account_type is not", async () => {
+    const { setOnboardingAccountPath } = await import("@/lib/carer-session");
+    setOnboardingAccountPath("community");
+    getProfile.mockResolvedValue({
+      profile: {
+        id: "u-new",
+        full_name: null,
+        avatar_url: null,
+        bio: null,
+        public_handle: null,
+        is_public: false,
+        onboarding_complete: true,
+        account_type: null,
+        primary_app_role: "patient",
+      },
+    });
+
+    const { reconcileCommunityWelcomeWithExistingPatient } = await import(
+      "@/lib/community-path-patient-reconcile"
+    );
+    const { getOnboardingAccountPath } = await import("@/lib/carer-session");
+
+    const result = await reconcileCommunityWelcomeWithExistingPatient("u-new", "community");
+    expect(result.reconciled).toBe(false);
+    expect(getOnboardingAccountPath()).toBe("community");
+  });
 });

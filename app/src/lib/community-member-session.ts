@@ -34,14 +34,17 @@ export type CommunityMemberSessionParams = {
 /** Whether this account should skip patient onboarding and use Community Member mode. */
 export function resolvesAsCommunityMemberAccount(params: CommunityMemberSessionParams): boolean {
   if (params.linkedCarer) return false;
+  // Cloud patient wins over signup metadata (returning Type 1 who tapped Community by mistake).
   if (profileIndicatesExistingPatientAccount(params.profile)) return false;
+  // Durable signup intent before session markers — survives email verify on a shared device
+  // that still has leftover Type 1 localStorage from a previous account.
+  if (params.metadataAccountPath === "community") return true;
   if (params.profile?.account_type === "community") return true;
   if (params.profile?.primary_app_role === "community") return true;
   if (params.localCommunityProfile ?? isCommunityAccountProfile(storage.getProfile())) return true;
   if (params.primaryAppRole === "community") return true;
   if (params.primaryAppRole == null && getPrimaryAppRole() === "community") return true;
   if (isCommunityOnlyAccount() || isPersistedCommunityAccount()) return true;
-  if (params.metadataAccountPath === "community") return true;
   return false;
 }
 
@@ -55,8 +58,8 @@ export function shouldUseCommunityMemberSession(
   metadataAccountPath?: OnboardingAccountPath | null,
 ): boolean {
   if (profileIndicatesExistingPatientAccount(profile)) return false;
-  if (profile?.account_type === "community" || profile?.primary_app_role === "community") return true;
   if (metadataAccountPath === "community") return true;
+  if (profile?.account_type === "community" || profile?.primary_app_role === "community") return true;
   return hasCommunityMemberIntent();
 }
 

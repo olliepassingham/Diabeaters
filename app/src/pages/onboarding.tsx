@@ -54,6 +54,7 @@ import {
   clearPersistedSupporterAccount,
   getOnboardingAccountPath,
   isPersistedSupporterAccount,
+  onboardingAccountPathFromUserMetadata,
   setActiveAppMode,
   setOnboardingAccountPath,
   setPrimaryAppRole,
@@ -302,7 +303,11 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   const search = useSearch();
   const [, setLocation] = useLocation();
   const upgradeFlow = useMemo(() => new URLSearchParams(search).get("upgrade") === "1", [search]);
-  const accountPath = useMemo(() => getOnboardingAccountPath(), []);
+  const accountPath = useMemo(() => {
+    const sessionPath = getOnboardingAccountPath();
+    if (sessionPath) return sessionPath;
+    return onboardingAccountPathFromUserMetadata(user);
+  }, [user]);
   const showBothPath = accountPath === "both";
   const showCommunityPath = accountPath === "community";
   const [minimalSetup, setMinimalSetup] = useState(false);
@@ -321,10 +326,17 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       return "details";
     }
     // Community keeps its short welcome → region → disclaimer → first_win flow.
+    // Session path may be empty after email verify; metadata is applied via accountPath below.
     if (getOnboardingAccountPath() === "community") return "welcome";
-    // Patient / both: essentials only (region → disclaimer).
     return "region";
   });
+
+  useEffect(() => {
+    if (upgradeFlow || !showCommunityPath) return;
+    if (currentStep === "region" && steps[0] === "welcome") {
+      setCurrentStep("welcome");
+    }
+  }, [upgradeFlow, showCommunityPath, currentStep, steps]);
   const [data, setData] = useState<OnboardingData>({
     name: "",
     diabetesType: "type1",

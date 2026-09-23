@@ -63,7 +63,9 @@ export function isPatientOnboardingSatisfied(params: {
     return params.onboardingCompleteFromLocalStorage || params.onboardingCompleteFromDb;
   }
   if (!params.profileQueryFetched) return true;
-  return params.onboardingCompleteFromDb || params.onboardingCompleteFromLocalStorage;
+  // Online: trust the cloud profile only. Stale diabeater_onboarding_completed from a
+  // previous Type 1 account on this device must not skip onboarding for a new signup.
+  return params.onboardingCompleteFromDb;
 }
 
 export const OFFLINE_CLOUD_TOOL_IDS = new Set(["ai-coach"]);

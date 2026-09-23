@@ -4,6 +4,7 @@ import {
   setActiveAppMode,
   setOnboardingAccountPath,
   setPrimaryAppRole,
+  type OnboardingAccountPath,
 } from "@/lib/carer-session";
 import { getProfile, type ProfileRow } from "@/lib/profile";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
@@ -24,19 +25,18 @@ export function isCommunityWelcomePathChosen(): boolean {
   return isCommunityOnlyAccount() || getPrimaryAppRole() === "community";
 }
 
-/** Cloud or local markers show a completed patient account (not community-only). */
+/** Cloud profile shows a completed patient account (not community/supporter-only). */
 export function profileIndicatesExistingPatientAccount(profile: ProfileRow | null | undefined): boolean {
-  if (profile?.account_type === "community") return false;
-  if (profile?.primary_app_role === "community") return false;
+  if (!profile) return false;
+  if (profile.account_type === "community") return false;
+  if (profile.primary_app_role === "community") return false;
   /** Authoritative supporter-only persona — not a Type 1 user account for routing. */
-  if (profile?.primary_app_role === "carer") return false;
-  if (profile?.account_type === "patient") return true;
-  if (profile?.primary_app_role === "patient" && profile?.onboarding_complete === true) return true;
-  if (profile?.onboarding_complete === true) {
-    return true;
-  }
-  if (profile) return false;
-  return localIndicatesPatientAccount();
+  if (profile.primary_app_role === "carer") return false;
+  // Require an explicit patient signal — bare onboarding_complete is shared by community finalize
+  // and must not hijack a Community Member into User mode.
+  if (profile.account_type === "patient") return true;
+  if (profile.primary_app_role === "patient" && profile.onboarding_complete === true) return true;
+  return false;
 }
 
 /** Local device markers for a completed Type 1 / insulin user account (excludes community-only). */
@@ -73,16 +73,27 @@ export function stashExistingPatientOnCommunityPathToast(): void {
 /**
  * When someone with a completed patient account taps Community Member on /welcome,
  * keep their patient session and route to User mode instead of community-only.
+ * Uses cloud profile only — leftover Type 1 localStorage from a previous account on this
+ * device must not hijack a brand-new Community Member signup.
+ *
+ * Signup metadata `community` wins unless the cloud row is explicitly `account_type: patient`
+ * (a real Type 1 account). That blocks poisoned `primary_app_role: patient` from stealing
+ * a fresh Community Member signup.
  */
 export async function reconcileCommunityWelcomeWithExistingPatient(
   userId: string,
+  metadataAccountPath?: OnboardingAccountPath | null,
 ): Promise<{ reconciled: boolean }> {
   if (!userId.trim() || !isCommunityWelcomePathChosen()) {
     return { reconciled: false };
   }
 
   const { profile } = await getProfile(userId);
-  if (!profileIndicatesExistingPatientAccount(profile)) {
+  if (!profile || !profileIndicatesExistingPatientAccount(profile)) {
+    return { reconciled: false };
+  }
+
+  if (metadataAccountPath === "community" && profile.account_type !== "patient") {
     return { reconciled: false };
   }
 

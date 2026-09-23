@@ -4,7 +4,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
 import { getLinkedPatientForCarer } from "@/lib/carers";
-import { hasCarerIntent, hasPendingCarer } from "@/lib/carer-session";
+import {
+  getPrimaryAppRole,
+  hasCarerIntent,
+  hasPendingCarer,
+  isCommunityOnlyAccount,
+  onboardingAccountPathFromUserMetadata,
+  setActiveAppMode,
+} from "@/lib/carer-session";
+import { resolveCommunityMemberLandingPath } from "@/lib/community-landing";
 import { PageShell } from "@/components/layout";
 
 const VERIFIED_WELCOME_PENDING_KEY = "diabeater_verified_welcome_pending";
@@ -12,7 +20,7 @@ const VERIFIED_WELCOME_PENDING_KEY = "diabeater_verified_welcome_pending";
 export default function VerifiedSuccess() {
   const { user } = useAuth();
   const [primaryHref, setPrimaryHref] = useState("/");
-  const [primaryLabel, setPrimaryLabel] = useState("Go to Dashboard");
+  const [primaryLabel, setPrimaryLabel] = useState("Continue");
 
   useEffect(() => {
     try {
@@ -58,13 +66,22 @@ export default function VerifiedSuccess() {
         setPrimaryLabel("Enter invite code");
         return;
       }
+      const metadataPath = onboardingAccountPathFromUserMetadata(user);
+      if (isCommunityOnlyAccount() || getPrimaryAppRole() === "community" || metadataPath === "community") {
+        setActiveAppMode("community");
+        const home = await resolveCommunityMemberLandingPath(user.id);
+        if (cancelled) return;
+        setPrimaryHref(home);
+        setPrimaryLabel("Open community");
+        return;
+      }
       setPrimaryHref("/");
       setPrimaryLabel("Go to Dashboard");
     })();
     return () => {
       cancelled = true;
     };
-  }, [user?.id]);
+  }, [user]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
