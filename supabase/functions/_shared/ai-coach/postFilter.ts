@@ -217,12 +217,15 @@ function filterActions(
 
 const REFUSAL_REPLY: CoachReply = {
   reply:
-    "I cannot give specific clinical advice like that. Your diabetes team is the right place to set or change doses, ratios, or targets. The Meal Adviser in this app uses your own ratios and targets, so it will be more accurate than I can be. If something feels off, it is also a great thing to bring up at your next appointment.",
+    "I can't set or change a personal dose, ratio, or target in chat — those stay with your own plan and the numbers saved in Diabeaters. I can still explain how the idea works, and Meal Adviser can do the arithmetic with your saved ratios. Open Meal Adviser below if that fits, or Help Now if you feel unsafe right now.",
   suggestedQuestions: [
-    "What patterns from the last fortnight would you bring to your team?",
-    "What questions would you ask about your current ratios?",
+    "How is a meal bolus usually built from carbs and a correction?",
+    "Where do I check the ratios saved in this app?",
   ],
-  suggestedNextActions: [{ label: "Open Meal Adviser", href: "/adviser?tab=meal" }],
+  suggestedNextActions: [
+    { label: "Open Meal Adviser", href: "/adviser?tab=meal" },
+    { label: "Help Now", href: "/help-now" },
+  ],
   deferToTeam: true,
 };
 

@@ -14,13 +14,13 @@ export function coachPageTitle(audience: "patient" | "supporter"): string {
 /** Short context line shown in a card under the coach page title. */
 export function coachPageSubtitle(audience: "patient" | "supporter"): string {
   return audience === "supporter"
-    ? "Educational answers for people supporting someone with type 1 diabetes in the UK. Not personal medical advice for you or for them."
-    : "Friendly, educational answers and clinic-prep ideas for type 1 diabetes in the UK. Not medical advice — no insulin doses, ratios, or glucose targets.";
+    ? "Useful education for people supporting someone with type 1 diabetes in the UK. Not personal medical advice for you or for them."
+    : "Useful educational answers from your logs and Diabeaters tools. Not medical advice — no insulin doses, ratios, or glucose targets.";
 }
 
 /** One-line lead for the patient coach header on small screens (full text in details). */
 export function coachPatientHeaderLead(): string {
-  return "UK · Education & clinic-prep — not medical advice or dosing. Tap below for topic & full disclaimer.";
+  return "UK · Education first — not medical advice or dosing. Tap below for topic & full disclaimer.";
 }
 
 /**
