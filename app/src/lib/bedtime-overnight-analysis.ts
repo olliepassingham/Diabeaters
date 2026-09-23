@@ -157,100 +157,86 @@ function buildExplanations(
 
   if (!log) {
     if (stats.hadLow) {
-      lines.push(
-        `Glucose dipped to ${fmt(stats.min)} around ${formatTime(stats.minAtMs)}. A bedtime check tonight links this to food, insulin, and activity.`,
-      );
+      lines.push(`Dipped to ${fmt(stats.min)} around ${formatTime(stats.minAtMs)}.`);
     } else if (stats.hadHigh) {
-      lines.push(
-        `Glucose peaked at ${fmt(stats.max)} around ${formatTime(stats.maxAtMs)}. A bedtime check helps connect that rise to your evening context.`,
-      );
+      lines.push(`Peaked at ${fmt(stats.max)} around ${formatTime(stats.maxAtMs)}.`);
     } else if (lateRise(stats, units)) {
       lines.push(
-        `You stayed in target, but glucose rose from about ${fmt(stats.startValue)} to ${fmt(stats.endValue)} overnight — a dawn-style pattern many people see.`,
+        `In range, rising ${fmt(stats.startValue)} → ${fmt(stats.endValue)} overnight.`,
       );
     } else {
-      lines.push(
-        `All readings stayed between ${fmt(targetLow)} and ${fmt(targetHigh)}. A bedtime check adds evening context so future reviews can explain *why* nights like this work.`,
-      );
+      lines.push(`Stayed in ${fmt(targetLow)}–${fmt(targetHigh)}.`);
     }
-    return lines.slice(0, 4);
+    return lines.slice(0, 2);
   }
 
   if (stats.hadLow) {
     if (log.exercisedToday) {
-      lines.push("You logged exercise yesterday — delayed overnight lows are common for many hours after activity.");
+      lines.push("Exercise yesterday — delayed overnight lows are common for hours after.");
     }
     if (log.hadAlcohol) {
-      lines.push("Alcohol can delay lows; an early-morning dip is often seen when insulin was still on board.");
+      lines.push("Alcohol can delay lows when insulin is still on board.");
     }
     if (log.hoursSinceInsulin != null && log.hoursSinceInsulin <= 3) {
-      lines.push("Rapid insulin within a few hours of bed may still have been working when glucose fell.");
+      lines.push("Bolus within a few hours of bed may still have been working.");
     }
     if (log.hoursSinceFood != null && log.hoursSinceFood <= 2) {
-      lines.push("A recent meal may have worn off overnight, especially if bolus timing was close to sleep.");
+      lines.push("A recent meal may have worn off overnight.");
     }
     if (log.recentHypos) {
-      lines.push("You flagged recent hypos at bedtime — overnight dips can follow a day with earlier lows.");
+      lines.push("Recent hypos at bedtime — overnight dips can follow.");
     }
     if (log.bgTrend === "falling") {
-      lines.push("Glucose was falling at your bedtime check, which can carry into the first part of the night.");
+      lines.push("Falling at bedtime can carry into early night.");
     }
     if (earlyDip(stats, window)) {
       lines.push(
-        `The lowest point was earlier in the night (${fmt(stats.min)} around ${formatTime(stats.minAtMs)}) — often linked to residual bolus or post-exercise effect rather than dawn rise.`,
+        `Lowest earlier in the night (${fmt(stats.min)} · ${formatTime(stats.minAtMs)}).`,
       );
     }
     if (lines.length === 0) {
-      lines.push(
-        `Glucose dipped to ${fmt(stats.min)} around ${formatTime(stats.minAtMs)} — if this repeats, review sensor compression and your team's overnight plan.`,
-      );
+      lines.push(`Dipped to ${fmt(stats.min)} around ${formatTime(stats.minAtMs)}.`);
     }
   }
 
   if (stats.hadHigh) {
     if (log.bgTrend === "rising") {
-      lines.push("Glucose was already rising at bedtime — that can continue with dawn effect or late digestion.");
+      lines.push("Already rising at bedtime — can continue with dawn or late digestion.");
     }
     if (log.hoursSinceFood != null && log.hoursSinceFood <= 3) {
-      lines.push("Food within a few hours of sleep can still be digesting into the early hours.");
+      lines.push("Food close to sleep can still digest into the early hours.");
     }
     if (lateRise(stats, units) && stats.maxAtMs > (window.startMs + window.endMs) / 2) {
-      lines.push(
-        `The peak (${fmt(stats.max)} around ${formatTime(stats.maxAtMs)}) came later in the night — consistent with dawn phenomenon or overnight basal/food mismatch.`,
-      );
+      lines.push(`Later peak ${fmt(stats.max)} around ${formatTime(stats.maxAtMs)}.`);
     }
     if (lines.length === 0 || (stats.hadLow && lines.length < 2)) {
-      lines.push(
-        `Peak was ${fmt(stats.max)} around ${formatTime(stats.maxAtMs)} — compare with your usual overnight pattern and correction habits.`,
-      );
+      lines.push(`Peak ${fmt(stats.max)} around ${formatTime(stats.maxAtMs)}.`);
     }
   }
 
   if (!stats.hadLow && !stats.hadHigh) {
     if (lateRise(stats, units)) {
       lines.push(
-        `Fully in range, with a rise of about ${fmt(Math.abs(stats.overnightDelta))} from evening to morning (${fmt(stats.startValue)} → ${fmt(stats.endValue)}).`,
+        `In range, up about ${fmt(Math.abs(stats.overnightDelta))} (${fmt(stats.startValue)} → ${fmt(stats.endValue)}).`,
       );
       if (log.bgTrend === "rising") {
-        lines.push("That matches a rising trend at your bedtime check — worth watching if mornings climb further.");
+        lines.push("Matched a rising bedtime trend.");
       } else if (log.exercisedToday) {
-        lines.push("You exercised yesterday; some people rebound higher overnight after activity even when they stay in range.");
+        lines.push("Exercise yesterday — some people rebound higher overnight.");
       }
     } else if (stats.overnightDelta <= -thr) {
       lines.push(
-        `Fully in range, drifting down about ${fmt(Math.abs(stats.overnightDelta))} overnight (${fmt(stats.startValue)} → ${fmt(stats.endValue)}).`,
+        `In range, down about ${fmt(Math.abs(stats.overnightDelta))} (${fmt(stats.startValue)} → ${fmt(stats.endValue)}).`,
       );
       if (log.exercisedToday || log.hadAlcohol) {
-        lines.push("Evening exercise or alcohol can contribute to a gentle overnight fall — useful to note if lows appear on similar nights.");
+        lines.push("Exercise or alcohol can contribute to a gentle overnight fall.");
       }
     } else {
-      lines.push(
-        `All readings stayed between ${fmt(targetLow)} and ${fmt(targetHigh)} with little overnight drift — a steady night relative to your targets.`,
-      );
+      lines.push(`Steady in ${fmt(targetLow)}–${fmt(targetHigh)} with little overnight drift.`);
     }
   }
 
-  return lines.slice(0, 4);
+  return lines.slice(0, 2);
 }
 
 function buildConsiderations(
@@ -262,67 +248,44 @@ function buildConsiderations(
   units: BgUnits,
 ): string[] {
   const fmt = (n: number) => formatTargetBgInput(n, units);
-  const range = `${fmt(targetLow)}–${fmt(targetHigh)}`;
   const tips: string[] = [];
   const thr = riseThreshold(units);
 
   if (stats.hadLow) {
-    tips.push(
-      `Lowest was ${fmt(stats.min)} at ${formatTime(stats.minAtMs)}. If overnight dips repeat, note evening exercise, alcohol, and insulin timing before bed — and discuss repeated patterns with your care team.`,
-    );
     if (earlyDip(stats, window) && log?.exercisedToday) {
-      tips.push(
-        "Early-night lows after exercise days are common. A slightly higher bedtime snack carb (per your plan) or checking 2–3 hours after sleep starts can help you learn your pattern — not a dose change without your team.",
-      );
+      tips.push("Early-night low after exercise — note snack/check timing for similar evenings.");
     } else if (log?.hadAlcohol) {
+      tips.push("After alcohol, an early-hours check often helps more than changing basal tonight.");
+    } else {
       tips.push(
-        "After alcohol, an extra planned check in the early hours (and a bedtime snack if your clinic recommends one) is often more useful than changing basal on the night.",
+        `Lowest ${fmt(stats.min)} at ${formatTime(stats.minAtMs)}. If this repeats, note evening exercise, alcohol, and insulin timing.`,
       );
     }
   } else if (stats.hadHigh) {
     if (stats.inRangePercent >= 40 && lateRise(stats, units)) {
       tips.push(
-        `You were in range for ${stats.inRangePercent}% of the night, then rose to ${fmt(stats.max)} later. If mornings often climb, ask your team about dawn phenomenon vs evening food/insulin timing — don't change basal from this screen alone.`,
+        `In range ${stats.inRangePercent}% of the night, then rose to ${fmt(stats.max)}. Ask your team about dawn vs evening food/insulin — don’t change basal here.`,
       );
     } else {
       tips.push(
-        `Most of the night was above ${fmt(targetHigh)} (peak ${fmt(stats.max)}). Check whether glucose was already high or rising at bedtime; correcting earlier in the evening (safely, per your plan) often helps more than waiting until morning.`,
+        `Mostly above target (peak ${fmt(stats.max)}). Check if glucose was already rising at bedtime.`,
       );
     }
-    if (log?.hoursSinceFood != null && log.hoursSinceFood <= 3) {
-      tips.push(
-        "Evening food was close to sleep. Noting meal size and bolus timing tonight makes the next review much more specific.",
-      );
-    }
+  } else if (lateRise(stats, units)) {
+    tips.push(
+      `Rose about ${fmt(Math.abs(stats.overnightDelta))} overnight while in range. Note bedtime trend if mornings often climb.`,
+    );
+  } else if (stats.overnightDelta <= -thr && stats.endValue <= targetLow + thr) {
+    tips.push(
+      `Ended near the low end (${fmt(stats.endValue)}). On similar evenings, follow your clinic’s snack/check plan if you have one.`,
+    );
+  } else if (!log) {
+    tips.push("A quick bedtime check adds evening context so nights like this get a personal tip next time.");
   } else {
-    // Fully in range — still give shape-based, useful next steps
-    if (lateRise(stats, units)) {
-      tips.push(
-        stats.endValue >= targetHigh - thr
-          ? `You finished near the top of your target (${fmt(stats.endValue)}), rising from ${fmt(stats.startValue)}. If mornings often climb further, ask your team about dawn phenomenon vs evening food/insulin timing — don't change basal from this screen alone.`
-          : `Glucose rose about ${fmt(Math.abs(stats.overnightDelta))} overnight while staying in range (${fmt(stats.startValue)} → ${fmt(stats.endValue)}). If that pattern often becomes a morning high, a consistent bedtime check (trend + last food) helps you and your team spot dawn effect.`,
-      );
-    } else if (stats.overnightDelta <= -thr && stats.endValue <= targetLow + thr) {
-      tips.push(
-        `You ended near the low end of target (${fmt(stats.endValue)}). On similar evenings, plan a safe bedtime snack or an early-night check if your clinic has given you that option — especially after exercise or alcohol.`,
-      );
-    } else {
-      tips.push(
-        `Solid overnight control within ${range}. To keep nights like this, note one thing that went well yesterday evening (meal timing, activity, or no late correction) so you can repeat it.`,
-      );
-    }
-    if (!log) {
-      tips.push(
-        "A 30-second bedtime check adds food, insulin, exercise, and alcohol context — that's what turns this chart into personalised overnight insights next time.",
-      );
-    } else if (!log.exercisedToday && !log.hadAlcohol && (log.hoursSinceFood == null || log.hoursSinceFood > 3)) {
-      tips.push(
-        "Your bedtime notes look calm (no late meal flag, no alcohol, no exercise). If nights stay this steady, that evening routine is worth treating as your baseline.",
-      );
-    }
+    tips.push("Steady overnight in your target. Note one evening habit worth repeating.");
   }
 
-  return tips.slice(0, 3);
+  return tips.slice(0, 1);
 }
 
 export function analyzeBedtimeOvernight(
@@ -383,6 +346,66 @@ export function overnightTirTone(inRangePercent: number): "good" | "ok" | "low" 
   if (inRangePercent > 70) return "good";
   if (inRangePercent >= 40) return "ok";
   return "low";
+}
+
+export type OvernightTirCompare = {
+  currentPercent: number;
+  priorPercent: number;
+  deltaPts: number;
+  direction: "up" | "down" | "flat";
+};
+
+/** Compare two overnight TIR % values. Flat when within ±1 pt. */
+export function compareOvernightTir(currentPercent: number, priorPercent: number): OvernightTirCompare {
+  const current = Math.round(currentPercent);
+  const prior = Math.round(priorPercent);
+  const deltaPts = current - prior;
+  const direction: OvernightTirCompare["direction"] =
+    Math.abs(deltaPts) <= 1 ? "flat" : deltaPts > 0 ? "up" : "down";
+  return { currentPercent: current, priorPercent: prior, deltaPts, direction };
+}
+
+export function formatOvernightTirDelta(c: OvernightTirCompare): { label: string; tone: "up" | "down" | "flat" } {
+  if (c.direction === "flat") {
+    return { label: "Similar to last night", tone: "flat" };
+  }
+  if (c.direction === "up") {
+    return { label: `↑ ${c.deltaPts} pts vs last night`, tone: "up" };
+  }
+  return { label: `↓ ${Math.abs(c.deltaPts)} pts vs last night`, tone: "down" };
+}
+
+/**
+ * Prior night’s stored TIR for the log before `currentLogId` (by check date, newest first).
+ * Only uses summaries with enough readings.
+ */
+export function findPriorOvernightTirPercent(logs: BedtimeLog[], currentLogId: string): number | null {
+  const sorted = [...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const idx = sorted.findIndex((l) => l.id === currentLogId);
+  if (idx < 0) return null;
+  for (let i = idx + 1; i < sorted.length; i++) {
+    const s = sorted[i]?.overnightCgmSummary;
+    if (
+      s &&
+      typeof s.inRangePercent === "number" &&
+      Number.isFinite(s.inRangePercent) &&
+      s.readingCount >= BEDTIME_TIR_MIN_READINGS
+    ) {
+      return s.inRangePercent;
+    }
+  }
+  return null;
+}
+
+export function resolveOvernightTirCompare(
+  logs: BedtimeLog[],
+  currentLogId: string,
+  currentPercent: number | null | undefined,
+): OvernightTirCompare | null {
+  if (currentPercent == null || !Number.isFinite(currentPercent)) return null;
+  const prior = findPriorOvernightTirPercent(logs, currentLogId);
+  if (prior == null) return null;
+  return compareOvernightTir(currentPercent, prior);
 }
 
 export function bedtimeOvernightSummaryFromStats(

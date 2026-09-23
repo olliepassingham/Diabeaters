@@ -20,6 +20,7 @@ import { rescheduleBedtimeReminders } from "@/lib/bedtime-reminders";
 import {
   computeOvernightSummaryFromLocalHistory,
   overnightSummariesDiffer,
+  resolveOvernightTirCompare,
 } from "@/lib/bedtime-overnight-analysis";
 import { getCgmLocalHistory } from "@/lib/cgm/cgm-history-store";
 import {
@@ -378,6 +379,15 @@ export default function Bedtime() {
     reviewTarget: lastNightReview,
     refresh: refreshLastNight,
   } = useBedtimeLastNight(bedtimeLogs, bgUnits);
+
+  const lastNightTirCompare =
+    lastNightInsight && lastNightReview?.log
+      ? resolveOvernightTirCompare(
+          bedtimeLogs,
+          lastNightReview.log.id,
+          lastNightInsight.stats.inRangePercent,
+        )
+      : null;
 
   // Keep history rows in sync when last-night review persists a fresh TIR snapshot.
   useEffect(() => {
@@ -1133,6 +1143,7 @@ export default function Bedtime() {
         units={bgUnits}
         targetLow={targetRange.low}
         targetHigh={targetRange.high}
+        tirCompare={lastNightTirCompare}
         onRefresh={refreshLastNight}
       />
 

@@ -15,7 +15,10 @@ import {
 } from "@/lib/bedtime-overnight-window";
 import {
   computeOvernightSummaryFromLocalHistory,
+  formatOvernightTirDelta,
   overnightTirTone,
+  resolveOvernightTirCompare,
+  type OvernightTirCompare,
 } from "@/lib/bedtime-overnight-analysis";
 import { getCgmLocalHistory } from "@/lib/cgm/cgm-history-store";
 import { resolveUserTargetBgRange } from "@/lib/target-bg-range";
@@ -33,6 +36,12 @@ function tonightAlreadyChecked(logs: BedtimeLog[], now: Date): boolean {
   return logs.some((log) => toBedtimeStreakDayKey(log.date, log.hoursUntilSleep) === todayKey);
 }
 
+function tirDeltaClass(tone: OvernightTirCompare["direction"]): string {
+  if (tone === "up") return "text-emerald-700 dark:text-emerald-400";
+  if (tone === "down") return "text-rose-700/90 dark:text-rose-400";
+  return "text-muted-foreground";
+}
+
 export type HomeBedtimePresence =
   | { visible: false }
   | {
@@ -42,6 +51,7 @@ export type HomeBedtimePresence =
       morningLog: BedtimeLog | null;
       overnightTirPercent: number | null;
       tirTone: "good" | "ok" | "low" | null;
+      tirCompare: OvernightTirCompare | null;
     };
 
 export function useHomeBedtimePresence(): HomeBedtimePresence {
@@ -89,6 +99,11 @@ export function useHomeBedtimePresence(): HomeBedtimePresence {
     return summary?.inRangePercent ?? null;
   }, [morningLog]);
 
+  const tirCompare = useMemo(() => {
+    if (!morningLog || overnightTirPercent == null) return null;
+    return resolveOvernightTirCompare(logs, morningLog.id, overnightTirPercent);
+  }, [logs, morningLog, overnightTirPercent]);
+
   if (evening) {
     return {
       visible: true,
@@ -97,6 +112,7 @@ export function useHomeBedtimePresence(): HomeBedtimePresence {
       morningLog: null,
       overnightTirPercent: null,
       tirTone: null,
+      tirCompare: null,
     };
   }
 
@@ -109,6 +125,7 @@ export function useHomeBedtimePresence(): HomeBedtimePresence {
     morningLog,
     overnightTirPercent,
     tirTone: overnightTirPercent == null ? null : overnightTirTone(overnightTirPercent),
+    tirCompare,
   };
 }
 
@@ -185,9 +202,11 @@ export function HomeBedtimeMomentCard({
     );
   }
 
-  const { morningLog, overnightTirPercent, tirTone } = presence;
+  const { morningLog, overnightTirPercent, tirTone, tirCompare } = presence;
   if (!morningLog) return null;
   const readiness = bedtimeReadinessLabel(morningLog.readinessLevel);
+  const delta = tirCompare ? formatOvernightTirDelta(tirCompare) : null;
+  const ariaDelta = delta ? ` · ${delta.label}` : "";
 
   return (
     <Link
@@ -205,7 +224,7 @@ export function HomeBedtimeMomentCard({
       aria-label={
         overnightTirPercent == null
           ? "Last night — open bedtime review"
-          : `Last night · ${overnightTirPercent}% in range overnight`
+          : `Last night · ${overnightTirPercent}% in range overnight${ariaDelta}`
       }
     >
       <div className="relative flex items-center gap-3 px-4 py-3.5">
@@ -224,10 +243,18 @@ export function HomeBedtimeMomentCard({
           <span className="mt-0.5 block font-display text-lg font-semibold tracking-tight text-foreground">
             {overnightTirPercent == null ? `${readiness} overnight` : `${overnightTirPercent}% in range`}
           </span>
-          <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
+          <span
+            className={cn(
+              "mt-0.5 block text-xs leading-snug",
+              delta ? tirDeltaClass(delta.tone) : "text-muted-foreground",
+            )}
+            data-testid="home-bedtime-tir-delta"
+          >
             {overnightTirPercent == null
               ? "Open your bedtime review for patterns and tips."
-              : `Readiness was ${readiness.toLowerCase()} · tap for overnight review`}
+              : delta
+                ? delta.label
+                : `Readiness was ${readiness.toLowerCase()} · tap for overnight review`}
           </span>
         </span>
         <ArrowRight

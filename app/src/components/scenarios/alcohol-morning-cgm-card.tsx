@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { BedtimeLastNightCard } from "@/components/scenarios/bedtime-last-night-card";
 import { useBedtimeLastNight } from "@/hooks/use-bedtime-last-night";
+import { resolveOvernightTirCompare } from "@/lib/bedtime-overnight-analysis";
 import { resolveUserTargetBgRange } from "@/lib/target-bg-range";
 import { storage, type BedtimeLog } from "@/lib/storage";
 import type { BgUnits } from "@/lib/cgm/types";
@@ -13,6 +14,10 @@ export function AlcoholMorningCgmCard({ units }: { units: BgUnits }) {
   const { insight, status, message, reviewTarget, refresh } = useBedtimeLastNight(logs, units);
   const settings = storage.getSettings();
   const { low, high } = resolveUserTargetBgRange(settings, units);
+  const tirCompare =
+    insight && reviewTarget?.log
+      ? resolveOvernightTirCompare(logs, reviewTarget.log.id, insight.stats.inRangePercent)
+      : null;
 
   if (status === "no_cgm") {
     return (
@@ -43,6 +48,7 @@ export function AlcoholMorningCgmCard({ units }: { units: BgUnits }) {
         units={units}
         targetLow={low}
         targetHigh={high}
+        tirCompare={tirCompare}
         onRefresh={refresh}
       />
     </div>

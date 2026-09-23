@@ -5,7 +5,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { CgmGlucoseChart } from "@/components/cgm-glucose-chart";
 import type { BedtimeLastNightStatus } from "@/hooks/use-bedtime-last-night";
-import type { BedtimeOvernightInsight } from "@/lib/bedtime-overnight-analysis";
+import {
+  formatOvernightTirDelta,
+  type BedtimeOvernightInsight,
+  type OvernightTirCompare,
+} from "@/lib/bedtime-overnight-analysis";
 import type { CgmChartPoint } from "@/lib/cgm/cgm-chart";
 import type { BgUnits } from "@/lib/cgm/types";
 import { formatTargetBgInput } from "@/lib/hypo-context";
@@ -19,6 +23,7 @@ type BedtimeLastNightCardProps = {
   units: BgUnits;
   targetLow?: number;
   targetHigh?: number;
+  tirCompare?: OvernightTirCompare | null;
   onRefresh?: () => void;
   className?: string;
 };
@@ -47,6 +52,24 @@ function tirToneClass(insight: BedtimeOvernightInsight): string {
   if (insight.stats.hadLow) return "text-amber-700 dark:text-amber-400";
   if (insight.stats.hadHigh) return "text-orange-700 dark:text-orange-400";
   return "text-emerald-700 dark:text-emerald-400";
+}
+
+function tirDeltaClass(tone: OvernightTirCompare["direction"]): string {
+  if (tone === "up") return "text-emerald-700 dark:text-emerald-400";
+  if (tone === "down") return "text-rose-700/90 dark:text-rose-400";
+  return "text-muted-foreground";
+}
+
+function TirDeltaChip({ compare }: { compare: OvernightTirCompare }) {
+  const delta = formatOvernightTirDelta(compare);
+  return (
+    <p
+      className={cn("text-[11px] font-medium leading-snug", tirDeltaClass(delta.tone))}
+      data-testid="text-bedtime-last-night-tir-delta"
+    >
+      {delta.label}
+    </p>
+  );
 }
 
 function collapsedPreview(
@@ -109,12 +132,14 @@ function InsightBody({
   units,
   chartTargetLow,
   chartTargetHigh,
+  tirCompare,
 }: {
   insight: BedtimeOvernightInsight;
   usedCalendarFallback?: boolean;
   units: BgUnits;
   chartTargetLow: number | undefined;
   chartTargetHigh: number | undefined;
+  tirCompare?: OvernightTirCompare | null;
 }) {
   return (
     <>
@@ -130,6 +155,7 @@ function InsightBody({
             {insight.stats.inRangePercent}%
           </p>
           <p className="text-[11px] font-medium text-muted-foreground">in target</p>
+          {tirCompare ? <TirDeltaChip compare={tirCompare} /> : null}
         </div>
       </div>
 
@@ -197,6 +223,7 @@ export function BedtimeLastNightCard({
   units,
   targetLow,
   targetHigh,
+  tirCompare = null,
   onRefresh,
   className,
 }: BedtimeLastNightCardProps) {
@@ -248,6 +275,7 @@ export function BedtimeLastNightCard({
             {insight.stats.inRangePercent}%
           </span>
           <span className="block text-[10px] font-medium text-muted-foreground">in target</span>
+          {tirCompare ? <TirDeltaChip compare={tirCompare} /> : null}
         </div>
       ) : null}
     </>
@@ -315,6 +343,7 @@ export function BedtimeLastNightCard({
                 units={units}
                 chartTargetLow={chartTargetLow}
                 chartTargetHigh={chartTargetHigh}
+                tirCompare={tirCompare}
               />
             ) : null}
           </CardContent>

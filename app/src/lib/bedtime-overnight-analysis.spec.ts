@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
   analyzeBedtimeOvernight,
+  compareOvernightTir,
   computeOvernightStats,
   computeOvernightSummaryFromLocalHistory,
   BEDTIME_TIR_MIN_READINGS,
   entriesToOvernightReadings,
   filterEntriesToSleepWindow,
+  findPriorOvernightTirPercent,
+  formatOvernightTirDelta,
   overnightTirTone,
+  resolveOvernightTirCompare,
 } from "./bedtime-overnight-analysis";
 import { computeBedtimeSleepWindow, findReviewableBedtimeLog, resolveOvernightReviewTarget, findMorningHomeBedtimeLog, isBedtimeMorningHomeWindow, bedtimeReadinessLabel, toBedtimeStreakDayKey } from "./bedtime-overnight-window";
 import type { BedtimeLog } from "@/lib/storage";
@@ -215,5 +219,107 @@ describe("bedtime overnight analysis", () => {
     expect(overnightTirTone(70)).toBe("ok");
     expect(overnightTirTone(40)).toBe("ok");
     expect(overnightTirTone(39)).toBe("low");
+  });
+
+  it("compares overnight TIR with flat within ±1 pt", () => {
+    expect(compareOvernightTir(72, 64)).toEqual({
+      currentPercent: 72,
+      priorPercent: 64,
+      deltaPts: 8,
+      direction: "up",
+    });
+    expect(compareOvernightTir(55, 60)).toEqual({
+      currentPercent: 55,
+      priorPercent: 60,
+      deltaPts: -5,
+      direction: "down",
+    });
+    expect(compareOvernightTir(70, 71).direction).toBe("flat");
+    expect(compareOvernightTir(70.4, 69.6).direction).toBe("flat");
+    expect(formatOvernightTirDelta(compareOvernightTir(72, 64))).toEqual({
+      label: "↑ 8 pts vs last night",
+      tone: "up",
+    });
+    expect(formatOvernightTirDelta(compareOvernightTir(55, 60))).toEqual({
+      label: "↓ 5 pts vs last night",
+      tone: "down",
+    });
+    expect(formatOvernightTirDelta(compareOvernightTir(70, 71)).label).toBe("Similar to last night");
+  });
+
+  it("finds prior overnight TIR from an earlier log with a valid summary", () => {
+    const logs = [
+      makeLog({
+        id: "newer",
+        date: "2026-07-09T22:00:00.000Z",
+        overnightCgmSummary: {
+          inRangePercent: 80,
+          readingCount: 12,
+          hadLow: false,
+          hadHigh: false,
+          computedAt: "2026-07-10T08:00:00.000Z",
+        },
+      }),
+      makeLog({
+        id: "skip-thin",
+        date: "2026-07-08T22:00:00.000Z",
+        overnightCgmSummary: {
+          inRangePercent: 50,
+          readingCount: 2,
+          hadLow: false,
+          hadHigh: false,
+          computedAt: "2026-07-09T08:00:00.000Z",
+        },
+      }),
+      makeLog({
+        id: "prior",
+        date: "2026-07-07T22:00:00.000Z",
+        overnightCgmSummary: {
+          inRangePercent: 64,
+          readingCount: BEDTIME_TIR_MIN_READINGS,
+          hadLow: false,
+          hadHigh: false,
+          computedAt: "2026-07-08T08:00:00.000Z",
+        },
+      }),
+    ];
+    expect(findPriorOvernightTirPercent(logs, "newer")).toBe(64);
+    expect(findPriorOvernightTirPercent(logs, "prior")).toBeNull();
+    expect(resolveOvernightTirCompare(logs, "newer", 80)?.deltaPts).toBe(16);
+    expect(resolveOvernightTirCompare(logs, "newer", null)).toBeNull();
+  });
+
+  it("keeps overnight explanations to at most two lines and one consideration", () => {
+    const window = computeBedtimeSleepWindow(makeLog({ exercisedToday: true, hadAlcohol: true }))!;
+    const readings = [
+      {
+        timeMs: window.startMs,
+        recordedAt: new Date(window.startMs).toISOString(),
+        value: 5.5,
+        units: "mmol/L" as const,
+      },
+      {
+        timeMs: window.startMs + 60 * 60 * 1000,
+        recordedAt: new Date(window.startMs + 60 * 60 * 1000).toISOString(),
+        value: 3.2,
+        units: "mmol/L" as const,
+      },
+      {
+        timeMs: window.endMs,
+        recordedAt: new Date(window.endMs).toISOString(),
+        value: 6.0,
+        units: "mmol/L" as const,
+      },
+    ];
+    const insight = analyzeBedtimeOvernight(
+      makeLog({ exercisedToday: true, hadAlcohol: true, hoursSinceInsulin: 2 }),
+      readings,
+      window,
+      4,
+      10,
+    )!;
+    expect(insight.explanations.length).toBeLessThanOrEqual(2);
+    expect(insight.considerations.length).toBeLessThanOrEqual(1);
+    expect(insight.explanations[0]!.length).toBeLessThan(120);
   });
 });
