@@ -374,8 +374,7 @@ export default function Account() {
       ? formatLivingWithDiabetesLine(profile?.diabetes_onset_date ?? null)
       : null;
   const canOpenModeChooser = hasCarerLink && canSwitchAppMode();
-  const modeSwitchLabel =
-    activeMode === "carer" ? "Switch to User Mode" : "Switch to Supporter Mode";
+  const modeSwitchLabel = "Switch mode";
 
   useEffect(() => {
     const syncTabFromHash = () => {

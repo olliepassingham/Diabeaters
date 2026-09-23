@@ -62,7 +62,8 @@ function primaryToneClasses(action: HomeNextBestAction, isUrgent: boolean): {
 }
 
 /**
- * One primary next action + clear Help / Hypo controls (coach stays lighter).
+ * One primary next action + Help / Hypo controls.
+ * Ask Beatie stays as a light secondary link unless the primary strip is already Ask Beatie.
  */
 export function HomeActionDock({
   isUrgent,
@@ -161,7 +162,7 @@ export function HomeActionDock({
         </Button>
       </div>
 
-      {showCoach ? (
+      {showCoach && primary.id !== "coach" ? (
         <div className="flex justify-center">
           <Button
             asChild
