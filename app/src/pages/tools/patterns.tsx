@@ -9,6 +9,7 @@ import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { OverlappingBarChart } from "@/components/patterns/overlapping-bar-chart";
 import { WeeklyTrendChart } from "@/components/patterns/weekly-trend-chart";
 import { GlucoseDayOverlayChart } from "@/components/patterns/glucose-day-overlay-chart";
+import { Hba1cHistoryChart } from "@/components/patterns/hba1c-history-chart";
 import { PatternInsightCard } from "@/components/patterns/pattern-insight-card";
 import { computePatternInsights } from "@/lib/insights/pattern-insights";
 import {
@@ -17,7 +18,8 @@ import {
   computeWeeklyTrend,
 } from "@/lib/insights/pattern-charts";
 import { dismissPatternInsight, listDismissedPatternInsightIds } from "@/lib/insights/insights-dismiss";
-import { storage } from "@/lib/storage";
+import { DIABEATER_APPOINTMENTS_CHANGED_EVENT, storage } from "@/lib/storage";
+import { buildHba1cHistory } from "@/lib/appointment-outcomes";
 import { isCgmPrefillActive } from "@/lib/cgm/preferences";
 import { fetchLiveCgmHistory } from "@/lib/cgm/live-cgm-history";
 import { countCgmLocalHistoryDays, getCgmLocalHistory } from "@/lib/cgm/cgm-history-store";
@@ -90,6 +92,24 @@ function HypoHistoryEntryCard() {
   );
 }
 
+function Hba1cHistoryFromAppointments() {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const refresh = () => setTick((t) => t + 1);
+    window.addEventListener(DIABEATER_APPOINTMENTS_CHANGED_EVENT, refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.removeEventListener(DIABEATER_APPOINTMENTS_CHANGED_EVENT, refresh);
+      window.removeEventListener("focus", refresh);
+    };
+  }, []);
+  const points = useMemo(() => {
+    void tick;
+    return buildHba1cHistory(storage.getAppointments());
+  }, [tick]);
+  return <Hba1cHistoryChart points={points} />;
+}
+
 function PatternsInfoDialog() {
   return (
     <PageInfoDialog
@@ -106,6 +126,12 @@ function PatternsInfoDialog() {
         <p>
           When lows happen, which days, and weekly trend come from hypo treatments and exercise sessions you have logged
           in the app on this phone. Open Hypo history from this page for monthly counts and what you treated with.
+        </p>
+      </InfoSection>
+      <InfoSection title="HbA1c history">
+        <p>
+          When you log HbA1c on clinic or blood-test appointments, those values appear here as a simple trend. Educational
+          only — discuss changes with your diabetes team.
         </p>
       </InfoSection>
       <InfoSection title="Care team">
@@ -345,6 +371,8 @@ export default function PatternsPage() {
       />
 
       <GlucoseDayPatternCard />
+
+      <Hba1cHistoryFromAppointments />
 
       <HypoHistoryEntryCard />
 

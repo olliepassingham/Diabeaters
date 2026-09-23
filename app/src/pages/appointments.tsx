@@ -41,14 +41,23 @@ import {
   TestTube,
   Cpu,
   ChevronRight,
+  ClipboardList,
 } from "lucide-react";
 import { storage, Appointment, AppointmentType } from "@/lib/storage";
 import { format, isAfter, isBefore, addDays, differenceInCalendarDays } from "date-fns";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { ScenarioResultHero } from "@/components/scenarios/scenario-result-hero";
+import { AppointmentResultsFields } from "@/components/appointments/appointment-results-fields";
 import { syncAppointments } from "@/lib/appointments-supabase";
 import { rescheduleAppointmentReminders } from "@/lib/appointment-reminders";
+import {
+  appointmentHasOutcome,
+  clampHba1cInput,
+  formatOutcomeSummary,
+  normalizeAppointmentOutcome,
+  type AppointmentOutcome,
+} from "@/lib/appointment-outcomes";
 import { cn } from "@/lib/utils";
 
 const APPOINTMENT_TYPES: {
@@ -186,12 +195,14 @@ function UpcomingAppointmentCard({
   today,
   onComplete,
   onEdit,
+  onAddResults,
   onDelete,
 }: {
   appointment: Appointment;
   today: Date;
   onComplete: (id: string) => void;
   onEdit: (appointment: Appointment) => void;
+  onAddResults: (appointment: Appointment) => void;
   onDelete: (id: string) => void;
 }) {
   const meta = getTypeMeta(appointment.type);
@@ -252,10 +263,16 @@ function UpcomingAppointmentCard({
               {appointment.notes}
             </p>
           ) : null}
+          {formatOutcomeSummary(appointment) ? (
+            <p className="rounded-xl border border-primary/20 bg-primary/[0.06] px-3 py-2 text-sm leading-relaxed text-foreground">
+              <span className="font-medium">Results · </span>
+              {formatOutcomeSummary(appointment)}
+            </p>
+          ) : null}
         </div>
       </div>
 
-      <div className="flex gap-2 border-t border-border/50 bg-muted/15 px-4 py-3">
+      <div className="flex flex-wrap gap-2 border-t border-border/50 bg-muted/15 px-4 py-3">
         <Button
           size="sm"
           variant="outline"
@@ -269,13 +286,25 @@ function UpcomingAppointmentCard({
         <Button
           size="sm"
           variant="outline"
-          className="h-11 rounded-xl"
+          className="h-11 rounded-xl px-3"
           onClick={() => onEdit(appointment)}
           data-testid={`button-edit-${appointment.id}`}
-          aria-label="Edit appointment"
         >
-          <Pencil className="h-4 w-4" aria-hidden />
+          <Pencil className="mr-1.5 h-4 w-4" aria-hidden />
+          Edit
         </Button>
+        {!appointmentHasOutcome(appointment) ? (
+          <Button
+            size="sm"
+            variant="secondary"
+            className="h-11 rounded-xl px-3"
+            onClick={() => onAddResults(appointment)}
+            data-testid={`button-add-results-${appointment.id}`}
+          >
+            <ClipboardList className="mr-1.5 h-4 w-4" aria-hidden />
+            Results
+          </Button>
+        ) : null}
         <Button
           size="sm"
           variant="ghost"
@@ -309,6 +338,8 @@ export default function Appointments() {
   const [time, setTime] = useState("");
   const [location, setLocation] = useState("");
   const [notes, setNotes] = useState("");
+  const [outcome, setOutcome] = useState<AppointmentOutcome>({});
+  const [markCompleteOnSave, setMarkCompleteOnSave] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
 
@@ -332,6 +363,14 @@ export default function Appointments() {
   const handleSave = async () => {
     if (!title || !date || !user?.id) return;
 
+    const cleanedOutcome = normalizeAppointmentOutcome({
+      ...outcome,
+      hba1cPercent:
+        outcome.hba1cPercent != null
+          ? clampHba1cInput(String(outcome.hba1cPercent))
+          : undefined,
+    });
+
     if (editingAppointment) {
       storage.updateAppointment(editingAppointment.id, {
         title,
@@ -340,6 +379,8 @@ export default function Appointments() {
         time: time || undefined,
         location: location || undefined,
         notes: notes || undefined,
+        outcome: cleanedOutcome,
+        isCompleted: markCompleteOnSave ? true : editingAppointment.isCompleted,
       });
     } else {
       storage.addAppointment({
@@ -349,7 +390,8 @@ export default function Appointments() {
         time: time || undefined,
         location: location || undefined,
         notes: notes || undefined,
-        isCompleted: false,
+        outcome: cleanedOutcome,
+        isCompleted: markCompleteOnSave,
       });
     }
 
@@ -367,10 +409,12 @@ export default function Appointments() {
     setTime("");
     setLocation("");
     setNotes("");
+    setOutcome({});
+    setMarkCompleteOnSave(false);
     setEditingAppointment(null);
   };
 
-  const openEditDialog = (appointment: Appointment) => {
+  const openEditDialog = (appointment: Appointment, opts?: { focusResults?: boolean; markComplete?: boolean }) => {
     setEditingAppointment(appointment);
     setTitle(appointment.title);
     setType(appointment.type);
@@ -378,15 +422,32 @@ export default function Appointments() {
     setTime(appointment.time ?? "");
     setLocation(appointment.location ?? "");
     setNotes(appointment.notes ?? "");
+    setOutcome(appointment.outcome ? { ...appointment.outcome } : {});
+    setMarkCompleteOnSave(Boolean(opts?.markComplete));
     setIsFormOpen(true);
+  };
+
+  const openAddResults = (appointment: Appointment) => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const d = parseAppointmentDate(appointment.date);
+    const past = d != null && isBefore(d, start);
+    openEditDialog(appointment, {
+      focusResults: true,
+      markComplete: !appointment.isCompleted && past,
+    });
   };
 
   const handleComplete = async (id: string) => {
     if (!user?.id) return;
+    const appt = appointments.find((a) => a.id === id);
+    if (!appt) return;
+    // Mark done, then open edit so results can be added in the same flow.
     storage.updateAppointment(id, { isCompleted: true });
     setAppointments(storage.getAppointmentsForUser(user.id));
     await syncAppointments();
     await rescheduleAppointmentReminders(storage.getAppointmentsForUser(user.id));
+    openEditDialog({ ...appt, isCompleted: true }, { focusResults: true });
   };
 
   const requestDelete = (id: string) => {
@@ -475,10 +536,16 @@ export default function Appointments() {
                 </p>
               </InfoSection>
               <InfoSection title="Editing">
-                <p>Tap the pencil on any appointment to change the date, time, location, or notes.</p>
+                <p>Tap Edit on any appointment to change the date, time, location, notes, or results.</p>
+              </InfoSection>
+              <InfoSection title="Results">
+                <p>
+                  After a visit, add HbA1c, eye or foot screening outcomes. Logged HbA1c values appear as a calm
+                  history chart in Patterns — educational only, not a diagnosis.
+                </p>
               </InfoSection>
               <InfoSection title="Marking complete">
-                <p>After you attend, tap Mark done to move the visit to your history.</p>
+                <p>After you attend, tap Mark done — you can add results in the same step.</p>
               </InfoSection>
             </PageInfoDialog>
           }
@@ -506,10 +573,16 @@ export default function Appointments() {
             data-testid="dialog-appointment-form"
           >
             <DialogHeader>
-              <DialogTitle>{editingAppointment ? "Edit appointment" : "Add appointment"}</DialogTitle>
+              <DialogTitle>
+                {editingAppointment
+                  ? markCompleteOnSave || editingAppointment.isCompleted
+                    ? "Edit visit & results"
+                    : "Edit appointment"
+                  : "Add appointment"}
+              </DialogTitle>
               <DialogDescription>
                 {editingAppointment
-                  ? "Update the details for this visit"
+                  ? "Update visit details and optional results (HbA1c, eye, foot)."
                   : "Schedule a diabetes-related visit or check-up"}
               </DialogDescription>
             </DialogHeader>
@@ -590,6 +663,13 @@ export default function Appointments() {
                 />
               </div>
 
+              <AppointmentResultsFields
+                type={type}
+                visitDate={date}
+                outcome={outcome}
+                onChange={setOutcome}
+              />
+
               <div className="space-y-2">
                 <Label htmlFor="notes">Notes</Label>
                 <Textarea
@@ -621,7 +701,7 @@ export default function Appointments() {
           label="Next up"
           value={nextDays !== null && nextDays <= 0 ? "Today" : nextDays}
           footer={
-            <div className="flex gap-2 px-4 py-3">
+            <div className="flex flex-wrap gap-2 px-4 py-3">
               <Button
                 size="sm"
                 className="h-11 flex-1 rounded-xl"
@@ -634,12 +714,12 @@ export default function Appointments() {
               <Button
                 size="sm"
                 variant="outline"
-                className="h-11 rounded-xl"
+                className="h-11 rounded-xl px-3"
                 onClick={() => openEditDialog(nextAppointment)}
                 data-testid={`button-edit-${nextAppointment.id}`}
-                aria-label="Edit appointment"
               >
-                <Pencil className="h-4 w-4" aria-hidden />
+                <Pencil className="mr-1.5 h-4 w-4" aria-hidden />
+                Edit
               </Button>
               <Button
                 size="sm"
@@ -732,6 +812,7 @@ export default function Appointments() {
                     today={today}
                     onComplete={handleComplete}
                     onEdit={openEditDialog}
+                    onAddResults={openAddResults}
                     onDelete={requestDelete}
                   />
                 ))}
@@ -767,17 +848,32 @@ export default function Appointments() {
                           <p className="text-xs text-muted-foreground">
                             {d ? format(d, "d MMM yyyy") : "Date unknown"}
                             {appointment.isCompleted ? " · Completed" : ""}
+                            {formatOutcomeSummary(appointment)
+                              ? ` · ${formatOutcomeSummary(appointment)}`
+                              : ""}
                           </p>
                         </div>
+                        {!appointmentHasOutcome(appointment) ? (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="h-9 shrink-0 rounded-xl px-2.5 text-xs"
+                            onClick={() => openAddResults(appointment)}
+                            data-testid={`button-add-results-past-${appointment.id}`}
+                          >
+                            <ClipboardList className="mr-1 h-3.5 w-3.5" aria-hidden />
+                            Results
+                          </Button>
+                        ) : null}
                         <Button
-                          size="icon"
+                          size="sm"
                           variant="ghost"
-                          className="h-9 w-9 shrink-0 text-muted-foreground"
+                          className="h-9 shrink-0 rounded-xl px-2.5 text-xs text-muted-foreground"
                           onClick={() => openEditDialog(appointment)}
                           data-testid={`button-edit-past-${appointment.id}`}
-                          aria-label="Edit appointment"
                         >
-                          <Pencil className="h-4 w-4" aria-hidden />
+                          <Pencil className="mr-1 h-3.5 w-3.5" aria-hidden />
+                          Edit
                         </Button>
                         <Button
                           size="icon"

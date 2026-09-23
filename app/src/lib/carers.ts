@@ -801,7 +801,7 @@ export async function fetchAppointmentsForLinkedPatient(
   const { data, error } = await supabase
     .from("appointments")
     .select(
-      "id,user_id,client_id,title,type,date,time,scheduled_at,location,notes,is_completed,created_at,updated_at,deleted_at",
+      "id,user_id,client_id,title,type,date,time,scheduled_at,location,notes,outcome,is_completed,created_at,updated_at,deleted_at",
     )
     .eq("user_id", patientId)
     .is("deleted_at", null)

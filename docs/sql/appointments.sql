@@ -22,6 +22,8 @@ create table if not exists public.appointments (
   scheduled_at timestamptz,
   location text,
   notes text,
+  -- Post-visit results (HbA1c, eye/foot, short note). See app/src/lib/appointment-outcomes.ts
+  outcome jsonb,
   is_completed boolean not null default false,
 
   deleted_at timestamptz,

@@ -1,5 +1,6 @@
 import { isOnline } from "@/lib/offline";
 import { getSupabase } from "@/lib/supabase";
+import { parseAppointmentOutcome } from "@/lib/appointment-outcomes";
 import {
   getAppointmentsStorageKeyForUserId,
   setActiveUserIdForLocalStorage,
@@ -18,6 +19,7 @@ type CloudAppointmentRow = {
   scheduled_at: string | null;
   location: string | null;
   notes: string | null;
+  outcome: unknown | null;
   is_completed: boolean;
   created_at: string;
   updated_at: string;
@@ -61,6 +63,7 @@ function toCloudUpsert(
     scheduled_at: parseLocalScheduledAt(a.date, a.time ?? null),
     location: a.location ?? null,
     notes: a.notes ?? null,
+    outcome: parseAppointmentOutcome(a.outcome) ?? null,
     is_completed: a.isCompleted,
     deleted_at: a.deletedAt ?? null,
   };
@@ -94,6 +97,7 @@ function fromCloudRow(r: CloudAppointmentRow): Appointment {
     time,
     location: r.location ?? undefined,
     notes: r.notes ?? undefined,
+    outcome: parseAppointmentOutcome(r.outcome),
     isCompleted: !!r.is_completed,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -152,7 +156,7 @@ export async function pullCloudAppointmentsToLocal(): Promise<void> {
   const { data, error } = await supabase
     .from("appointments")
     .select(
-      "id,user_id,client_id,title,type,date,time,scheduled_at,location,notes,is_completed,created_at,updated_at,deleted_at",
+      "id,user_id,client_id,title,type,date,time,scheduled_at,location,notes,outcome,is_completed,created_at,updated_at,deleted_at",
     )
     .eq("user_id", userId)
     .order("updated_at", { ascending: false })

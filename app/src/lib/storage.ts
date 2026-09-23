@@ -1274,6 +1274,15 @@ export interface NotificationSettings {
 
 export type AppointmentType = "clinic" | "eye_check" | "foot_check" | "blood_test" | "pump_review" | "other";
 
+/** Post-visit results — see `appointment-outcomes.ts` for parsing helpers. */
+export type AppointmentOutcome = {
+  hba1cPercent?: number;
+  resultDate?: string;
+  eyeResult?: "clear" | "follow_up" | "referral" | "other";
+  footResult?: "clear" | "follow_up" | "referral" | "other";
+  outcomeNote?: string;
+};
+
 export interface Appointment {
   id: string;
   title: string;
@@ -1282,6 +1291,8 @@ export interface Appointment {
   time?: string;
   location?: string;
   notes?: string;
+  /** Structured results from the visit (HbA1c, eye/foot, short note). */
+  outcome?: AppointmentOutcome;
   reminderDays?: number;
   isCompleted: boolean;
   createdAt: string;
