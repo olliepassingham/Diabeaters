@@ -64,6 +64,7 @@ export default function Login() {
     required: captchaRequired,
     token: captchaToken,
     reset: resetCaptcha,
+    loadError,
   } = captcha;
   const verifiedToastShown = useRef(false);
 
@@ -112,7 +113,15 @@ export default function Login() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (captchaRequired && !captchaToken) return;
+    if (captchaRequired && !captchaToken) {
+      toast({
+        title: "Security check needed",
+        description: loadError
+          ? "The security check did not load. Tap Try again under the checkbox, then log in."
+          : "Wait for the security check to finish (or complete it), then tap Log in again.",
+      });
+      return;
+    }
     setSubmitting(true);
     setError(null);
 
@@ -228,8 +237,17 @@ export default function Login() {
               className="h-12 w-full rounded-xl text-base font-semibold"
               disabled={submitting || (captchaRequired && !captchaToken)}
             >
-              {submitting ? "Logging in..." : "Log in"}
+              {submitting
+                ? "Logging in..."
+                : captchaRequired && !captchaToken
+                  ? "Waiting for security check…"
+                  : "Log in"}
             </Button>
+            {captchaRequired && !captchaToken && !loadError ? (
+              <p className="text-center text-xs text-muted-foreground">
+                The security check usually finishes in a second — then Log in will unlock.
+              </p>
+            ) : null}
           </form>
 
           <div className="relative py-1">

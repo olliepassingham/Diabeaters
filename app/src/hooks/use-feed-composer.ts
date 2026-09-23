@@ -192,7 +192,13 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
   async function pickImagesFromLibraryOnly() {
     try {
       const newFiles = await pickPostImagesFromLibrary(composerFiles.length, fileInputRef.current);
-      if (newFiles.length > 0) setComposerFiles((prev) => [...prev, ...newFiles].slice(0, MAX_POST_IMAGES));
+      if (newFiles.length > 0) {
+        setComposerFiles((prev) => [...prev, ...newFiles].slice(0, MAX_POST_IMAGES));
+        // Native path returned files — safe to reset the fallback input.
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+      // Web path: pickPostImagesFromLibrary only clicks the input and returns [].
+      // Do not clear the input here — that races the system picker and drops the first selection.
     } catch (e) {
       clickHiddenFileInput(fileInputRef.current);
       toast({
@@ -200,8 +206,6 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
         description: e instanceof Error ? e.message : "Try selecting from your camera roll.",
         variant: "destructive",
       });
-    } finally {
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
 

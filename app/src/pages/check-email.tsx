@@ -41,7 +41,13 @@ export default function CheckEmail() {
 
   async function handleResend(e: FormEvent) {
     e.preventDefault();
-    if (captchaRequired && !captchaToken) return;
+    if (captchaRequired && !captchaToken) {
+      toast({
+        title: "Security check needed",
+        description: "Wait for the security check to finish, then try again.",
+      });
+      return;
+    }
     setSubmitting(true);
     setError(null);
 

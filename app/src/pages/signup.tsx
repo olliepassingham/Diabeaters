@@ -45,14 +45,29 @@ export default function Signup() {
     required: captchaRequired,
     token: captchaToken,
     reset: resetCaptcha,
+    loadError,
   } = captcha;
 
   const communitySignup = useMemo(() => getOnboardingAccountPath() === "community", []);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (captchaRequired && !captchaToken) return;
-    if (communitySignup && !acceptedTerms) return;
+    if (captchaRequired && !captchaToken) {
+      toast({
+        title: "Security check needed",
+        description: loadError
+          ? "The security check did not load. Tap Try again under the checkbox, then create your account."
+          : "Wait for the security check to finish (or complete it), then tap Create account again.",
+      });
+      return;
+    }
+    if (communitySignup && !acceptedTerms) {
+      toast({
+        title: "Accept the terms",
+        description: "Tick “I understand and accept” to continue.",
+      });
+      return;
+    }
 
     const passwordCheck = validatePassword(password);
     if (!passwordCheck.ok) {
@@ -225,8 +240,17 @@ export default function Signup() {
               }
               data-testid="button-create-account"
             >
-              {submitting ? "Creating account..." : "Create account"}
+              {submitting
+                ? "Creating account..."
+                : captchaRequired && !captchaToken
+                  ? "Waiting for security check…"
+                  : "Create account"}
             </Button>
+            {captchaRequired && !captchaToken && !loadError ? (
+              <p className="text-center text-xs text-muted-foreground">
+                The security check usually finishes in a second — then Create account will unlock.
+              </p>
+            ) : null}
           </form>
           </div>
 

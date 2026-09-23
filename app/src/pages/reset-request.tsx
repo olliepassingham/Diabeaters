@@ -8,8 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { authInlineLinkClass, authMutedNavLinkClass } from "@/components/auth/auth-link-styles";
 import { AuthCaptcha, useTurnstileCaptcha } from "@/components/auth/Turnstile";
+import { useToast } from "@/hooks/use-toast";
 
 export default function ResetRequest() {
+  const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -23,7 +25,13 @@ export default function ResetRequest() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (captchaRequired && !captchaToken) return;
+    if (captchaRequired && !captchaToken) {
+      toast({
+        title: "Security check needed",
+        description: "Wait for the security check to finish, then try again.",
+      });
+      return;
+    }
     setSubmitting(true);
     setError(null);
 
