@@ -161,11 +161,11 @@ export function AppTopBar({ isCarer, isCommunityMode = false, pathOnly, onBrandC
           </Button>
         </div>
 
-        <div className="pointer-events-none absolute left-1/2 top-1/2 flex max-w-[min(12rem,calc(100vw-8rem))] -translate-x-1/2 -translate-y-1/2 items-center justify-center text-h2 font-semibold text-foreground">
+        <div className="pointer-events-none absolute left-1/2 top-[46%] flex max-w-[min(12rem,calc(100vw-8rem))] -translate-x-1/2 -translate-y-1/2 items-center justify-center text-h2 font-semibold text-foreground">
           <button
             type="button"
             onClick={onBrandClick}
-            className={`pointer-events-auto flex min-w-0 max-w-full items-center gap-1.5 rounded-lg px-0.5 py-1 transition-all sm:gap-2 sm:px-1 ${
+            className={`pointer-events-auto flex min-w-0 max-w-full items-center gap-1.5 rounded-lg px-0.5 transition-all sm:gap-2 sm:px-1 ${
               homeActive
                 ? "cursor-default"
                 : "cursor-pointer hover:opacity-80 active:opacity-60 active:scale-[0.98]"
@@ -173,7 +173,7 @@ export function AppTopBar({ isCarer, isCommunityMode = false, pathOnly, onBrandC
             data-testid="button-home-brand"
           >
             <FaceLogo size={32} />
-            <span className="truncate">Diabeaters</span>
+            <span className="truncate leading-none">Diabeaters</span>
           </button>
         </div>
 
@@ -187,7 +187,7 @@ export function AppTopBar({ isCarer, isCommunityMode = false, pathOnly, onBrandC
         <div className="h-px w-full bg-border/40" />
       </div>
       <span
-        className="pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 rounded-full border border-primary/20 bg-transparent px-2.5 py-[3px] text-[11px] font-medium leading-none tracking-[0.04em] text-primary"
+        className="pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 rounded-full border border-primary/15 bg-primary/[0.05] px-2 py-px text-[9px] font-medium uppercase leading-none tracking-[0.16em] text-primary"
         data-testid="header-mode-chip"
       >
         {modeLabel}

@@ -409,14 +409,14 @@ export default function Dashboard() {
 
         {!isCommunityDash ? <HomeCgmGraph /> : null}
 
+        {!isCommunityDash ? <HomeNextUp suppressActionId={homeNextAction.id} /> : null}
+
         {!isCommunityDash ? (
           <HomeMealMoment
             healthStatus={healthStatus}
             suppressed={homeNextAction.id === "meal"}
           />
         ) : null}
-
-        {!isCommunityDash ? <HomeNextUp suppressActionId={homeNextAction.id} /> : null}
 
         {!isCommunityDash ? (
           <HomeTodayPulse healthStatus={healthStatus} suppressRunwayDuplicate />

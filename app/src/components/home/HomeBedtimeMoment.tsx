@@ -180,11 +180,11 @@ export function HomeBedtimeMomentCard({
             <span className="mt-0.5 block font-display text-lg font-semibold tracking-tight text-foreground">
               {checkedTonight ? "Overnight readiness logged" : "Overnight readiness"}
             </span>
-            <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
-              {checkedTonight
-                ? "Open to review glucose, food, and how ready you felt for overnight."
-                : "How ready do you feel for overnight — glucose, food, and insulin."}
-            </span>
+            {checkedTonight ? null : (
+              <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
+                How ready do you feel for overnight — glucose, food, and insulin.
+              </span>
+            )}
           </span>
           <span
             className={cn(
