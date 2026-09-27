@@ -59,9 +59,60 @@ export function armSystemPickerPointerUnlock(): void {
   document.addEventListener("visibilitychange", onVis);
 }
 
+/**
+ * Sheets dismiss when the OS file dialog opens, which drops the selection before
+ * `change` fires. Hold them open until the picker finishes.
+ */
+let filePickerHold = 0;
+const filePickerListeners = new Set<() => void>();
+
+function emitFilePickerHold() {
+  filePickerListeners.forEach((listener) => listener());
+}
+
+export function isFilePickerActive(): boolean {
+  return filePickerHold > 0;
+}
+
+export function subscribeFilePickerActive(listener: () => void): () => void {
+  filePickerListeners.add(listener);
+  return () => filePickerListeners.delete(listener);
+}
+
+function retainFilePicker(): () => void {
+  filePickerHold += 1;
+  emitFilePickerHold();
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    filePickerHold = Math.max(0, filePickerHold - 1);
+    emitFilePickerHold();
+  };
+}
+
+/** Arm pointer-events and keep the surrounding sheet open for this input's picker. */
+export function prepareFileInputForPicker(input: HTMLInputElement | null | undefined): void {
+  if (!input || input.disabled) return;
+  armSystemPickerPointerUnlock();
+  const release = retainFilePicker();
+  const finish = () => {
+    input.removeEventListener("change", onChange);
+    input.removeEventListener("cancel", onCancel);
+    window.removeEventListener("focus", onFocus);
+    release();
+  };
+  const onChange = () => window.setTimeout(finish, 0);
+  const onCancel = () => finish();
+  const onFocus = () => window.setTimeout(finish, 400);
+  input.addEventListener("change", onChange);
+  input.addEventListener("cancel", onCancel);
+  window.setTimeout(() => window.addEventListener("focus", onFocus), 0);
+}
+
 /** Programmatic file-input click that keeps the first Photos tap working. */
 export function clickHiddenFileInput(input: HTMLInputElement | null | undefined): void {
   if (!input || input.disabled) return;
-  armSystemPickerPointerUnlock();
+  prepareFileInputForPicker(input);
   input.click();
 }

@@ -1,6 +1,8 @@
+import { useSyncExternalStore } from "react";
 import { Drawer as DrawerPrimitive } from "vaul";
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
+import { isFilePickerActive, subscribeFilePickerActive } from "@/lib/click-hidden-file-input";
 import { cn } from "@/lib/utils";
 
 type BottomSheetProps = {
@@ -37,10 +39,15 @@ export function BottomSheet({
   showClose = true,
   onOpenAutoFocus,
 }: BottomSheetProps) {
+  const pickerActive = useSyncExternalStore(subscribeFilePickerActive, isFilePickerActive, () => false);
   return (
     <DrawerPrimitive.Root
       open={open}
-      onOpenChange={onOpenChange}
+      dismissible={!pickerActive}
+      onOpenChange={(next) => {
+        if (!next && isFilePickerActive()) return;
+        onOpenChange(next);
+      }}
       handleOnly={handleOnly}
       shouldScaleBackground={false}
       repositionInputs={false}

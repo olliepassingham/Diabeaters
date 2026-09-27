@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   clickHiddenFileInput,
+  isFilePickerActive,
   unlockSystemPickerPointerEvents,
 } from "./click-hidden-file-input";
 
@@ -28,6 +29,20 @@ describe("clickHiddenFileInput", () => {
     clickHiddenFileInput(input);
     expect(document.body.style.getPropertyValue("pointer-events")).toBe("auto");
     expect(click).toHaveBeenCalledTimes(1);
+    input.dispatchEvent(new Event("cancel"));
+    expect(isFilePickerActive()).toBe(false);
+    click.mockRestore();
+  });
+
+  it("holds the sheet open until the file selection finishes", async () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    const click = vi.spyOn(input, "click").mockImplementation(() => {});
+    clickHiddenFileInput(input);
+    expect(isFilePickerActive()).toBe(true);
+    input.dispatchEvent(new Event("change"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(isFilePickerActive()).toBe(false);
     click.mockRestore();
   });
 

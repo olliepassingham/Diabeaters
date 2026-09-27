@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Clock3, ImagePlus, Loader2, RefreshCw, Send, Video } from "lucide-react";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Button } from "@/components/ui/button";
@@ -109,9 +110,11 @@ export function StoryCreateSheet({
   }, [open, prefillFile, prefillOverlayText, sourcePostId]);
 
   function onPick(files: FileList | null) {
-    const f = files?.[0];
-    if (!f) return;
-    applyPickedFile(f);
+    const picked = files?.[0];
+    if (photoInputRef.current) photoInputRef.current.value = "";
+    if (videoInputRef.current) videoInputRef.current.value = "";
+    if (!picked) return;
+    applyPickedFile(picked);
   }
 
   function applyPickedFile(f: File) {
@@ -157,20 +160,29 @@ export function StoryCreateSheet({
       description="Visible for 24 hours on your profile."
       bodyClassName="flex min-h-0 flex-col overflow-hidden"
     >
-      <input
-        ref={photoInputRef}
-        type="file"
-        accept="image/*"
-        className={FILE_INPUT_HIDDEN_CLASS}
-        onChange={(e) => onPick(e.target.files)}
-      />
-      <input
-        ref={videoInputRef}
-        type="file"
-        accept="video/*"
-        className={FILE_INPUT_HIDDEN_CLASS}
-        onChange={(e) => onPick(e.target.files)}
-      />
+      {typeof document !== "undefined"
+        ? createPortal(
+            <>
+              <input
+                ref={photoInputRef}
+                id="story-photo-input"
+                type="file"
+                accept="image/*,.heic,.heif"
+                className={FILE_INPUT_HIDDEN_CLASS}
+                onChange={(e) => onPick(e.target.files)}
+              />
+              <input
+                ref={videoInputRef}
+                id="story-video-input"
+                type="file"
+                accept="video/*"
+                className={FILE_INPUT_HIDDEN_CLASS}
+                onChange={(e) => onPick(e.target.files)}
+              />
+            </>,
+            document.body,
+          )
+        : null}
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-3">
         {hasMedia ? (

@@ -1,4 +1,5 @@
 import type { Dispatch, RefObject, SetStateAction } from "react";
+import { createPortal } from "react-dom";
 import { BarChart2, Calendar, ImagePlus, Plus, Send, Video, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -417,7 +418,14 @@ export function FeedComposerFormBody({
               return (
                 <div key={`${src}-${i}`} className="relative w-[5.5rem] shrink-0 sm:w-24">
                   <div className="relative aspect-square overflow-hidden rounded-lg border border-border/70 bg-background shadow-sm">
-                    <img src={src} alt="" className="h-full w-full object-cover" />
+                    <img
+                      src={src}
+                      alt=""
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
+                    />
                     <button
                       type="button"
                       className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-full border border-border/60 bg-background/95 text-foreground shadow-sm backdrop-blur-sm transition-colors hover:bg-destructive/10 hover:text-destructive"
@@ -466,31 +474,45 @@ export function FeedComposerFormBody({
         </div>
       ) : null}
       <div className="flex flex-wrap items-center gap-1.5">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          className={FILE_INPUT_HIDDEN_CLASS}
-          id="feed-composer-images"
-          disabled={
-            submitting ||
-            !user ||
-            !canComposeToFeed ||
-            composerFiles.length >= MAX_POST_IMAGES ||
-            Boolean(composerVideoFile)
-          }
-          onChange={(e) => onPickImages(e.target.files)}
-        />
-        <input
-          ref={videoInputRef}
-          type="file"
-          accept="video/*"
-          className={FILE_INPUT_HIDDEN_CLASS}
-          id="feed-composer-video"
-          disabled={submitting || !user || !canComposeToFeed || composerPostKind !== "standard" || Boolean(composerVideoFile) || composerFiles.length > 0}
-          onChange={(e) => onPickVideo(e.target.files)}
-        />
+        {typeof document !== "undefined"
+          ? createPortal(
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,.heic,.heif"
+                  multiple
+                  className={FILE_INPUT_HIDDEN_CLASS}
+                  id="feed-composer-images"
+                  disabled={
+                    submitting ||
+                    !user ||
+                    !canComposeToFeed ||
+                    composerFiles.length >= MAX_POST_IMAGES ||
+                    Boolean(composerVideoFile)
+                  }
+                  onChange={(e) => onPickImages(e.target.files)}
+                />
+                <input
+                  ref={videoInputRef}
+                  type="file"
+                  accept="video/*"
+                  className={FILE_INPUT_HIDDEN_CLASS}
+                  id="feed-composer-video"
+                  disabled={
+                    submitting ||
+                    !user ||
+                    !canComposeToFeed ||
+                    composerPostKind !== "standard" ||
+                    Boolean(composerVideoFile) ||
+                    composerFiles.length > 0
+                  }
+                  onChange={(e) => onPickVideo(e.target.files)}
+                />
+              </>,
+              document.body,
+            )
+          : null}
         <Button
           type="button"
           variant="outline"

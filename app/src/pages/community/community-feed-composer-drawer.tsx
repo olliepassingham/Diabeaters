@@ -1,6 +1,7 @@
+import { useSyncExternalStore, type ReactNode } from "react";
 import { Drawer } from "vaul";
 import { X } from "lucide-react";
-import type { ReactNode } from "react";
+import { isFilePickerActive, subscribeFilePickerActive } from "@/lib/click-hidden-file-input";
 import { cn } from "@/lib/utils";
 
 /**
@@ -16,8 +17,17 @@ export function CommunityFeedComposerDrawer({
   onOpenChange: (open: boolean) => void;
   children: ReactNode;
 }) {
+  const pickerActive = useSyncExternalStore(subscribeFilePickerActive, isFilePickerActive, () => false);
   return (
-    <Drawer.Root open={open} onOpenChange={onOpenChange} shouldScaleBackground={false}>
+    <Drawer.Root
+      open={open}
+      dismissible={!pickerActive}
+      shouldScaleBackground={false}
+      onOpenChange={(next) => {
+        if (!next && isFilePickerActive()) return;
+        onOpenChange(next);
+      }}
+    >
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 z-[110] bg-black/80" />
         <Drawer.Content

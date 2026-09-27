@@ -152,10 +152,21 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
       if (!isLikelyImageFile(f)) continue;
       raw.push(f);
     }
+    // Snapshot first, then clear — FileList is live and dies if the input resets.
+    const picked = raw.slice();
     if (fileInputRef.current) fileInputRef.current.value = "";
-    if (raw.length === 0) return;
+    if (picked.length === 0) {
+      toast({
+        title: "Couldn't add that photo",
+        description: "Choose a JPG, PNG, or HEIC image.",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    const prepared = await preparePostImageFiles(raw);
+    setComposerFiles((prev) => [...prev, ...picked].slice(0, MAX_POST_IMAGES));
+
+    const prepared = await preparePostImageFiles(picked);
     if (prepared.error) {
       toast({
         title: "Photo too large",
@@ -163,8 +174,10 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
         variant: "destructive",
       });
     }
-    if (prepared.files.length === 0) return;
-    setComposerFiles((prev) => [...prev, ...prepared.files].slice(0, MAX_POST_IMAGES));
+    setComposerFiles((prev) => {
+      const kept = prev.filter((f) => !picked.includes(f));
+      return [...kept, ...prepared.files].slice(0, MAX_POST_IMAGES);
+    });
   }
 
   async function onPickVideo(files: FileList | null) {
