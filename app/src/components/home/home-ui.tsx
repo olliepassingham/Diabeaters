@@ -137,14 +137,14 @@ export function HomeQuickActions({
 
   return (
     <div
-      className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3 animate-soft-in"
+      className="grid grid-cols-2 gap-2 animate-soft-in"
       style={{ animationDelay: "40ms" }}
       data-testid={testId}
     >
       {actions.map((action) => {
         const Icon = action.icon;
         const isPrimary = action.variant === "primary";
-        const gridClass = isPrimary ? "col-span-2 sm:col-span-1" : undefined;
+        const gridClass = isPrimary ? "col-span-2" : undefined;
         const btnClass = cn(
           "min-h-11 w-full rounded-2xl",
           isPrimary && "font-semibold tracking-tight shadow-sm",

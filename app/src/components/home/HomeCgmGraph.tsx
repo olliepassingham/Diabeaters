@@ -102,13 +102,6 @@ function EmptyCgmChart({
           Now
         </text>
       </svg>
-      <div className="pointer-events-none absolute inset-x-8 top-1/2 -translate-y-1/2 text-center">
-        <Activity className="mx-auto h-5 w-5 text-primary/55" aria-hidden />
-        <p className="mt-1 text-xs font-medium text-foreground/80">Your day through the green band</p>
-        <p className="mx-auto mt-0.5 max-w-[16rem] text-[11px] leading-snug text-muted-foreground">
-          The soft green strip is your in-range zone. Readings draw how you move through it over 12 hours.
-        </p>
-      </div>
     </div>
   );
 }
@@ -177,11 +170,6 @@ export function HomeCgmGraph() {
                 </p>
               </div>
             </div>
-          ) : null}
-          {latest ? (
-            <p className="mt-1.5 max-w-[18rem] text-[11px] leading-snug text-muted-foreground">
-              Green band = your in-range zone. The line is how the last 12 hours moved through it — not a judgement.
-            </p>
           ) : null}
         </div>
         <div className="flex items-center gap-1">

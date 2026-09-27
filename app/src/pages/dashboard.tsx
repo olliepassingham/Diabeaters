@@ -339,7 +339,12 @@ export default function Dashboard() {
   }
 
   return (
-    <PageShell variant="wide" density="compact" data-testid="dashboard-page">
+    <PageShell
+      variant="narrow"
+      density="compact"
+      className={isCommunityDash ? undefined : "max-w-[26.75rem]"}
+      data-testid="dashboard-page"
+    >
       <PageHeader
         screenReaderOnly
         title={<span data-testid="dashboard-title">Dashboard</span>}
@@ -461,7 +466,12 @@ export default function Dashboard() {
       />
 
       <section className="home-widget-flow" data-testid="dashboard-widgets">
-        <div className="animate-stagger grid grid-cols-1 items-start md:grid-cols-2">
+        <div
+          className={cn(
+            "animate-stagger grid grid-cols-1 items-start",
+            isCommunityDash && "md:grid-cols-2",
+          )}
+        >
           {widgetsToRender.map((w) => {
             const Comp = w.Component;
             if (!Comp) return null;

@@ -148,7 +148,7 @@ export function AppTopBar({ isCarer, isCommunityMode = false, pathOnly, onBrandC
   return (
     <header
       className={cn(
-        "surface-chrome sticky top-0 z-50 flex min-h-14 items-center border-b border-border/40 px-4 pb-2 pt-[env(safe-area-inset-top)] [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]",
+        "surface-chrome relative sticky top-0 z-50 flex min-h-14 items-center px-4 pb-2 pt-[env(safe-area-inset-top)] [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]",
       )}
     >
       <div className="relative flex w-full min-w-0 items-center">
@@ -177,18 +177,21 @@ export function AppTopBar({ isCarer, isCommunityMode = false, pathOnly, onBrandC
           </button>
         </div>
 
-        <span
-          className="pointer-events-none absolute left-1/2 top-[calc(50%+1.375rem)] -translate-x-1/2 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary"
-          data-testid="header-mode-chip"
-        >
-          {modeLabel}
-        </span>
-
         <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-1 sm:gap-2">
           {isCommunityEnabled && <MessagesInboxNavButton />}
           <NotificationBell />
         </div>
       </div>
+
+      <div className="pointer-events-none absolute inset-x-0 bottom-0" aria-hidden>
+        <div className="h-px w-full bg-border/40" />
+      </div>
+      <span
+        className="pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 rounded-full border border-primary/20 bg-transparent px-2.5 py-[3px] text-[11px] font-medium leading-none tracking-[0.04em] text-primary"
+        data-testid="header-mode-chip"
+      >
+        {modeLabel}
+      </span>
     </header>
   );
 }
