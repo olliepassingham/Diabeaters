@@ -57,7 +57,11 @@ import { cn } from "@/lib/utils";
 import { BgTrendThreeButtons } from "@/components/bg-trend-three-buttons";
 import { CgmPrefillButton } from "@/components/cgm-prefill-button";
 import { useAutoCgmBgField } from "@/hooks/use-auto-cgm-bg-field";
-import { AlcoholMorningCgmCard } from "@/components/scenarios/alcohol-morning-cgm-card";
+import { AlcoholLastRecommendationCard } from "@/components/scenarios/alcohol-last-recommendation-card";
+import {
+  alcoholRecommendationSummary,
+  saveAlcoholLastRecommendation,
+} from "@/lib/alcohol-last-recommendation";
 import { cgmTrendForAlcohol } from "@/lib/cgm/apply-cgm-trend";
 
 const FROM_SCENARIOS = "from=/scenarios";
@@ -816,6 +820,10 @@ export default function AlcoholScenarioPage() {
       return;
     }
     const o = buildAlcoholSituationOutcome(built.payload, settings, profile.bgUnits);
+    const summary = alcoholRecommendationSummary(built.payload, o);
+    if (summary) {
+      saveAlcoholLastRecommendation({ askedAtIso: new Date().toISOString(), summary });
+    }
     setOutcome(o);
     setPhase("result");
   };
@@ -934,7 +942,7 @@ export default function AlcoholScenarioPage() {
           </p>
         ) : null}
 
-        {phase === "situation" ? <AlcoholMorningCgmCard units={bgUnits} /> : null}
+        {phase === "situation" ? <AlcoholLastRecommendationCard /> : null}
 
         {phase === "situation" ? (
           <section className="space-y-3">
