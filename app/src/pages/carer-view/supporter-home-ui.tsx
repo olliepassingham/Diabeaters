@@ -124,20 +124,17 @@ function PersonSwitcherChip({
       role="radio"
       aria-checked={person.active}
       aria-label={person.active ? `Looking at ${person.label}` : `Switch to ${person.label}`}
-      variant={person.active ? "default" : "outline"}
+      variant="outline"
       className={cn(
-        "h-12 shrink-0 gap-2 rounded-2xl px-3 text-sm font-semibold shadow-none",
+        "h-11 shrink-0 gap-2 rounded-full px-2.5 pr-3 text-sm font-semibold shadow-none",
         person.active
-          ? "border-primary/30 bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
-          : "border-border/60 bg-background/80 text-foreground",
+          ? "border-primary/25 bg-background text-foreground ring-2 ring-primary/25 hover:bg-background"
+          : "border-border/70 bg-background/70 text-foreground",
       )}
       onClick={onSelect}
     >
       <span
-        className={cn(
-          "flex h-8 w-8 items-center justify-center overflow-hidden rounded-xl text-xs font-bold",
-          person.active ? "bg-primary-foreground/20 text-primary-foreground" : "bg-primary/10 text-primary",
-        )}
+        className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-xs font-bold text-primary"
         aria-hidden
       >
         {displayUrl ? (
@@ -147,7 +144,7 @@ function PersonSwitcherChip({
         )}
       </span>
       {shortLabel}
-      {person.active ? <Check className="h-4 w-4 opacity-90" aria-hidden /> : null}
+      {person.active ? <Check className="h-3.5 w-3.5 text-primary" aria-hidden /> : null}
     </Button>
   );
 }
@@ -161,13 +158,10 @@ function SupporterStatusBanner({
 }) {
   const StatusIcon = type === "warning" ? AlertTriangle : type === "info" ? Info : CheckCircle2;
   return (
-    <div className="space-y-1.5" data-testid="carer-primary-status-wrap">
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-        Shared status
-      </p>
+    <div data-testid="carer-primary-status-wrap">
       <div
         className={cn(
-          "flex items-start gap-3 rounded-2xl border px-3.5 py-3",
+          "flex items-center gap-3 rounded-2xl border px-3 py-2.5",
           type === "warning" &&
             "border-amber-500/30 bg-amber-500/[0.08] dark:border-amber-500/25 dark:bg-amber-950/25",
           type === "info" &&
@@ -180,7 +174,7 @@ function SupporterStatusBanner({
       >
         <span
           className={cn(
-            "mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
+            "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
             type === "warning" && "bg-amber-500/15 text-amber-700 dark:text-amber-300",
             type === "info" && "bg-sky-500/15 text-sky-700 dark:text-sky-300",
             type === "ok" && "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
@@ -189,7 +183,7 @@ function SupporterStatusBanner({
         >
           <StatusIcon className="h-5 w-5" />
         </span>
-        <p className="min-w-0 flex-1 pt-1.5 text-sm font-semibold leading-snug tracking-tight text-foreground text-balance">
+        <p className="min-w-0 flex-1 text-sm font-semibold leading-snug tracking-tight text-foreground text-balance">
           {message}
         </p>
       </div>
@@ -226,10 +220,7 @@ export function SupporterHero({
       variant="glass-strong"
       className={cn(
         carerCardShellClass,
-        "dashboard-card-hover animate-soft-in overflow-hidden rounded-[1.35rem]",
-        calm
-          ? "bg-gradient-to-br from-emerald-500/[0.06] via-primary/[0.03] to-transparent"
-          : "bg-gradient-to-br from-primary/[0.06] via-transparent to-transparent",
+        "dashboard-card-hover animate-soft-in overflow-hidden rounded-[1.5rem] bg-card",
       )}
       data-testid="carer-view-header"
     >
@@ -246,18 +237,15 @@ export function SupporterHero({
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <p className="text-[13px] font-medium text-muted-foreground">
               Shared with you
               {multiPerson ? ` · ${linkedPeople.length} people` : ""}
             </p>
             <p
-              className="font-display text-lg font-semibold leading-snug tracking-tight text-foreground text-balance sm:text-xl"
+              className="font-display text-lg font-semibold leading-tight tracking-tight text-foreground text-balance sm:text-xl"
               data-testid="text-carer-view-name"
             >
               {displayName}
-            </p>
-            <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
-              Read-only context from what they choose to share — not a control panel.
             </p>
           </div>
           {showEmergencyLink ? (
@@ -284,10 +272,7 @@ export function SupporterHero({
         </div>
 
         {multiPerson ? (
-          <div className="space-y-1.5" data-testid="carer-hero-people-switcher">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Looking at
-            </p>
+          <div data-testid="carer-hero-people-switcher">
             <div
               className="flex gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
               role="radiogroup"
@@ -371,55 +356,46 @@ export function SupporterQuickActions({
       data-testid="carer-quick-actions"
     >
       {showHypoCheckIn && patientId ? (
-        <div className="space-y-1.5">
-          <p className="px-0.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Your one action
-          </p>
-          <SupporterHypoCheckInButton
-            patientId={patientId}
-            patientName={patientName ?? "them"}
-            prominence="primary"
-          />
-        </div>
+        <SupporterHypoCheckInButton
+          patientId={patientId}
+          patientName={patientName ?? "them"}
+          prominence="primary"
+          className="h-12 rounded-2xl text-[15px]"
+        />
       ) : null}
 
       {hasSecondaryRow ? (
-        <div className="space-y-1.5">
-          <p className="px-0.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            More
-          </p>
-          <div className={cn("grid gap-2", secondaryGridCols)}>
-            {showCoach ? (
-              <Button
-                asChild
-                variant="outline"
-                className={cn(
-                  "min-h-10 w-full rounded-xl px-2 text-xs font-medium shadow-none sm:text-sm",
-                  secondaryCount === 1 && "col-span-full",
-                )}
-              >
-                <Link href="/coach?audience=supporter" data-testid="link-carer-coach-open">
-                  <MessageCircle className="mr-1.5 h-4 w-4 shrink-0" aria-hidden />
-                  {openAssistantCtaLabel()}
-                </Link>
-              </Button>
-            ) : null}
-            {showActivity ? (
-              <Button
-                asChild
-                variant="outline"
-                className={cn(
-                  "min-h-10 w-full rounded-xl px-2 text-xs font-medium shadow-none sm:text-sm",
-                  secondaryCount === 1 && "col-span-full",
-                )}
-              >
-                <Link href="/carer-view/activity" data-testid="link-carer-activity">
-                  <History className="mr-1.5 h-4 w-4 shrink-0" aria-hidden />
-                  Activity
-                </Link>
-              </Button>
-            ) : null}
-          </div>
+        <div className={cn("grid gap-2", secondaryGridCols)}>
+          {showCoach ? (
+            <Button
+              asChild
+              variant="outline"
+              className={cn(
+                "h-11 w-full rounded-2xl px-3 text-sm font-medium shadow-none",
+                secondaryCount === 1 && "col-span-full",
+              )}
+            >
+              <Link href="/coach?audience=supporter" data-testid="link-carer-coach-open">
+                <MessageCircle className="mr-1.5 h-4 w-4 shrink-0" aria-hidden />
+                {openAssistantCtaLabel()}
+              </Link>
+            </Button>
+          ) : null}
+          {showActivity ? (
+            <Button
+              asChild
+              variant="outline"
+              className={cn(
+                "h-11 w-full rounded-2xl px-3 text-sm font-medium shadow-none",
+                secondaryCount === 1 && "col-span-full",
+              )}
+            >
+              <Link href="/carer-view/activity" data-testid="link-carer-activity">
+                <History className="mr-1.5 h-4 w-4 shrink-0" aria-hidden />
+                Activity
+              </Link>
+            </Button>
+          ) : null}
         </div>
       ) : null}
 
