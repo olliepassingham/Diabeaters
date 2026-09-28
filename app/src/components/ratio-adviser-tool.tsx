@@ -10,22 +10,13 @@ import {
   Cookie,
   ArrowLeft,
   AlertCircle,
-  Search,
   CheckCircle2,
-  RotateCcw,
-  TrendingDown,
-  TrendingUp,
   Sparkles,
   Calculator,
   ArrowRight,
   Save,
-  Copy,
-  ChevronDown,
-  BookOpen,
   Pencil,
 } from "lucide-react";
-import { Link } from "wouter";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { storage, UserSettings, RatioFormat, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
 import { ageInWholeYearsUtc } from "@/lib/user-age";
@@ -34,7 +25,6 @@ import {
   formatRatioForStorage,
   formatRatioForDisplay,
   parseRatioToGramsPerUnit,
-  calculateDoseFromCarbs,
 } from "@/lib/ratio-utils";
 import { STARTER_ICR_GRAMS_PER_UNIT } from "@/lib/starter-ratios";
 import { formatTargetBgRangeLabel, resolveUserTargetBgRange } from "@/lib/target-bg-range";
@@ -43,113 +33,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { InlineInfoHint } from "@/components/ui/field-label-with-info";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
 import { RatiosEditPanel } from "@/components/ratios-edit-panel";
-import { insulinRoundIncrement, roundInsulinUnits } from "@/lib/insulin-rounding";
+import { formatInsulinUnits, insulinRoundIncrement } from "@/lib/insulin-rounding";
+import { assessMealRatio, compareLaterBg, illustrateRatioStep } from "@/lib/ratio-adviser";
+import { formatTargetBgInput } from "@/lib/hypo-context";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { cn } from "@/lib/utils";
 
 type MealKey = "breakfast" | "lunch" | "dinner" | "snack";
-type PatternAnswer = "consistently_high" | "consistently_low" | "sometimes_high" | "on_target" | "not_sure";
-type TimingAnswer = "2_hours" | "3_4_hours" | "varies" | "not_sure";
-type FrequencyAnswer = "most_days" | "few_days" | "rarely" | "not_sure";
-
-interface AdviserResult {
-  summary: string;
-  direction: "tighten" | "loosen" | "monitor" | "on_track";
-  detail: string;
-  talkingPoints: string[];
-}
-
-function getAdviserResult(
-  meal: MealKey,
-  pattern: PatternAnswer,
-  timing: TimingAnswer,
-  frequency: FrequencyAnswer,
-  currentRatio: string | undefined,
-): AdviserResult {
-  const mealLabel = meal.charAt(0).toUpperCase() + meal.slice(1);
-  const ratioText = currentRatio ? ` (currently ${currentRatio})` : "";
-
-  if (pattern === "on_target") {
-    return {
-      summary: `Your ${mealLabel} ratio looks good`,
-      direction: "on_track",
-      detail: `Your blood sugars after ${mealLabel.toLowerCase()} are generally on target. Your current ratio${ratioText} appears to be working well for you right now.`,
-      talkingPoints: [
-        `${mealLabel} ratio seems well-matched to your current needs`,
-        "Continue monitoring \u2014 ratios can shift over time",
-        "Seasonal changes, stress, or activity levels may affect this",
-      ],
-    };
-  }
-
-  if (pattern === "not_sure") {
-    return {
-      summary: `More data needed for ${mealLabel}`,
-      direction: "monitor",
-      detail: `To assess your ${mealLabel.toLowerCase()} ratio, try checking your blood sugar about 2-3 hours after eating for the next few days. Write down what you ate (especially the carbs) and your reading.`,
-      talkingPoints: [
-        `Try checking BG 2-3 hours after ${mealLabel.toLowerCase()} for a week`,
-        "Note the carbs in each meal alongside your readings",
-        "Look for patterns \u2014 are readings mostly above, below, or within your target?",
-      ],
-    };
-  }
-
-  if (pattern === "consistently_high") {
-    const isStrong = frequency === "most_days";
-    const confidence = isStrong ? "strong" : frequency === "few_days" ? "possible" : "weak";
-
-    return {
-      summary: `Your ${mealLabel} ratio may need tightening`,
-      direction: "tighten",
-      detail: isStrong
-        ? `You're running high after ${mealLabel.toLowerCase()} on most days${ratioText}. This is a ${confidence} pattern that suggests your current ratio may not be covering your carbs fully. Your diabetes team can help you decide whether an adjustment is appropriate.`
-        : `You're sometimes high after ${mealLabel.toLowerCase()}${ratioText}. This could be a ratio issue, but it could also be due to food choices, portion estimation, timing, or other factors. Worth monitoring more closely before drawing conclusions.`,
-      talkingPoints: [
-        `Consistently high after ${mealLabel.toLowerCase()}${frequency === "most_days" ? " on most days" : ""}`,
-        timing === "2_hours"
-          ? "High readings at 2 hours suggest the ratio itself may be the issue"
-          : timing === "3_4_hours"
-          ? "High readings at 3-4 hours could also involve delayed digestion or high-fat meals"
-          : "Timing of highs varies \u2014 worth tracking more precisely",
-        `Current ratio${ratioText} \u2014 your diabetes team can advise whether this needs changing`,
-        isStrong ? "Persistent highs after meals should be discussed with your diabetes team soon" : "Monitor for another week to confirm the pattern before making changes",
-      ],
-    };
-  }
-
-  if (pattern === "consistently_low") {
-    const isStrong = frequency === "most_days";
-
-    return {
-      summary: `Your ${mealLabel} ratio may need loosening`,
-      direction: "loosen",
-      detail: isStrong
-        ? `You're dropping low after ${mealLabel.toLowerCase()} on most days${ratioText}. This pattern suggests your current ratio may be giving you more insulin than you need for the carbs you're eating. Contact your diabetes team to discuss \u2014 frequent hypos after meals are important to address.`
-        : `You're sometimes going low after ${mealLabel.toLowerCase()}${ratioText}. This could be a ratio issue, or it might be related to activity levels, meal timing, or portion sizes. Worth keeping a closer eye on before drawing conclusions.`,
-      talkingPoints: [
-        `Going low after ${mealLabel.toLowerCase()}${frequency === "most_days" ? " on most days" : ""}`,
-        timing === "2_hours"
-          ? "Lows at 2 hours suggest the ratio may be too strong for the carbs consumed"
-          : "Consider whether activity or meal timing might also be contributing",
-        `Current ratio${ratioText} \u2014 discuss with your diabetes team whether adjustment is needed`,
-        isStrong ? "Frequent post-meal hypos should be discussed with your diabetes team promptly" : "Track your readings for another week to see if the pattern continues",
-      ],
-    };
-  }
-
-  return {
-    summary: `${meal.charAt(0).toUpperCase() + meal.slice(1)} pattern is variable`,
-    direction: "monitor",
-    detail: `Your post-${meal.toLowerCase()} readings are sometimes high${ratioText}. Variable patterns can be harder to pin down \u2014 it might be the ratio, but it could also be affected by the type of food, portion estimation, activity, or stress.`,
-    talkingPoints: [
-      `Post-${meal.toLowerCase()} readings are inconsistent`,
-      "Try eating a similar, measured meal for a few days to isolate the ratio",
-      "Variable patterns might point to food type (high fat/protein) rather than ratio",
-      "Keep a brief food + BG diary for 5-7 days to spot trends",
-    ],
-  };
-}
 
 function mealLabel(key: MealKey): string {
   return key.charAt(0).toUpperCase() + key.slice(1);
@@ -183,8 +73,8 @@ function RatioAdviserDisclaimerFooter({ className }: { className?: string }) {
           <div className="min-w-0 text-sm">
             <p className="font-semibold text-amber-950 dark:text-amber-50">Not medical advice</p>
             <p className="mt-1.5 leading-relaxed text-amber-900/90 dark:text-amber-100/90">
-              This tool helps you spot patterns and prepare for clinic — it does not prescribe ratio changes. Always
-              confirm adjustments with your diabetes team.
+              This shows what your saved ratio does for one meal. A suggested step is an illustration — confirm it with
+              your diabetes team before you rely on it.
             </p>
             <div className="pt-2.5">
               <MedicalSourcesLink anchor="insulin" compact />
@@ -210,12 +100,10 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
   const hasAnyRatio = !!(settings.breakfastRatio || settings.lunchRatio || settings.dinnerRatio || settings.snackRatio);
 
   const [mode, setMode] = useState<AdviserMode>(hasAnyRatio ? "refine" : "detect");
-  const [step, setStep] = useState(0);
   const [selectedMeal, setSelectedMeal] = useState<MealKey | null>(null);
-  const [pattern, setPattern] = useState<PatternAnswer | null>(null);
-  const [timing, setTiming] = useState<TimingAnswer | null>(null);
-  const [frequency, setFrequency] = useState<FrequencyAnswer | null>(null);
-  const [result, setResult] = useState<AdviserResult | null>(null);
+  const [carbsInput, setCarbsInput] = useState("");
+  const [bgNowInput, setBgNowInput] = useState("");
+  const [laterBgInput, setLaterBgInput] = useState("");
 
   const [tddInput, setTddInput] = useState(() => {
     const effective = getEffectiveTdd(settings);
@@ -226,8 +114,6 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
   const [ratioFormat, setRatioFormat] = useState<RatioFormat>("per10g");
   const [cpSize, setCpSize] = useState<number | undefined>(undefined);
 
-  const [previewMeal, setPreviewMeal] = useState<MealKey>("lunch");
-  const [previewCarbs, setPreviewCarbs] = useState("");
   const [minorKnown, setMinorKnown] = useState(false);
   const [ratiosEditOpen, setRatiosEditOpen] = useState(false);
 
@@ -259,10 +145,6 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
   useEffect(() => {
     if (minorKnown && mode === "scratch_tdd") setMode("scratch_intro");
   }, [minorKnown, mode]);
-
-  useEffect(() => {
-    if (step !== 0) setRatiosEditOpen(false);
-  }, [step]);
 
   useEffect(() => {
     const profile = storage.getProfile();
@@ -301,41 +183,10 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
   ];
 
   const handleReset = () => {
-    setStep(0);
     setSelectedMeal(null);
-    setPattern(null);
-    setTiming(null);
-    setFrequency(null);
-    setResult(null);
-  };
-
-  const handleSelectMeal = (meal: MealKey) => {
-    setSelectedMeal(meal);
-    setPreviewMeal(meal);
-    setStep(1);
-  };
-
-  const handleSelectPattern = (p: PatternAnswer) => {
-    setPattern(p);
-    if (p === "on_target" || p === "not_sure") {
-      const currentRatio = selectedMeal ? formatStoredRatio(settings[`${selectedMeal}Ratio` as keyof UserSettings] as string | undefined) : undefined;
-      setResult(getAdviserResult(selectedMeal!, p, "not_sure", "not_sure", currentRatio));
-      setStep(4);
-    } else {
-      setStep(2);
-    }
-  };
-
-  const handleSelectTiming = (t: TimingAnswer) => {
-    setTiming(t);
-    setStep(3);
-  };
-
-  const handleSelectFrequency = (f: FrequencyAnswer) => {
-    setFrequency(f);
-    const currentRatio = selectedMeal ? formatStoredRatio(settings[`${selectedMeal}Ratio` as keyof UserSettings] as string | undefined) : undefined;
-    setResult(getAdviserResult(selectedMeal!, pattern!, timing!, f, currentRatio));
-    setStep(4);
+    setCarbsInput("");
+    setBgNowInput("");
+    setLaterBgInput("");
   };
 
   const handleCalculateFromTDD = () => {
@@ -404,38 +255,6 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
     setMode("scratch_saved");
   };
 
-  const copyAssessmentToClipboard = async () => {
-    if (!result || !selectedMeal) return;
-    const meal = mealLabel(selectedMeal);
-    const lines = [
-      `Diabeaters Ratio Adviser — ${meal}`,
-      "",
-      result.summary,
-      "",
-      result.detail,
-      "",
-      "Talking points for my diabetes team:",
-      ...result.talkingPoints.map((p) => `• ${p}`),
-      "",
-      "Not medical advice — for discussion with my care team only.",
-    ];
-    try {
-      await navigator.clipboard.writeText(lines.join("\n"));
-      toast({ title: "Copied", description: "You can paste this into notes or take it to your clinic." });
-    } catch {
-      toast({ title: "Could not copy", description: "Try selecting the text manually.", variant: "destructive" });
-    }
-  };
-
-  const previewRatioStr = settings[settingsRatioKey(previewMeal)] as string | undefined;
-  const previewCarbsNum = parseFloat(previewCarbs);
-  const previewExact =
-    Number.isFinite(previewCarbsNum) && previewCarbsNum > 0 ? calculateDoseFromCarbs(previewCarbsNum, previewRatioStr) : 0;
-  const previewRounded = previewExact > 0 ? roundInsulinUnits(previewExact, insulinRoundIncrement(isPumpDeliveryMethod(storage.getProfile()?.insulinDeliveryMethod))) : 0;
-  const previewHasRatio = !!previewRatioStr && parseRatioToGramsPerUnit(previewRatioStr);
-
-  const stepLabels = ["Select meal", "Post-meal pattern", "When does it happen?", "How often?", "Assessment"];
-
   if (mode === "detect") {
     return (
       <RatioAdviserShell>
@@ -493,7 +312,7 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
               onClick={() => setMode("refine")}
               data-testid="button-adviser-have-ratios"
             >
-              <p className="font-medium text-sm">I have ratios — check a pattern</p>
+              <p className="font-medium text-sm">I have ratios — check a meal</p>
             </Button>
           </div>
           ) : null}
@@ -748,7 +567,7 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
               Try the Meal Planner
             </Button>
             <Button variant="outline" className="min-h-11 w-full sm:w-auto" onClick={() => { setMode("refine"); handleReset(); }} data-testid="button-check-ratios">
-              <Search className="h-4 w-4 mr-1" />
+              <Calculator className="h-4 w-4 mr-1" />
               Check a ratio
             </Button>
           </div>
@@ -758,504 +577,316 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
     );
   }
 
+  const units = bgUnit === "mg/dL" ? "mg/dL" : "mmol/L";
+  const target = resolveUserTargetBgRange(settings, units);
+  const roundIncrement = insulinRoundIncrement(isPumpDeliveryMethod(storage.getProfile()?.insulinDeliveryMethod));
+  const selectedRatio = selectedMeal ? (settings[settingsRatioKey(selectedMeal)] as string | undefined) : undefined;
+  const carbs = parseFloat(carbsInput.replace(",", "."));
+  const bgNow = parseFloat(bgNowInput.replace(",", "."));
+  const laterBg = parseFloat(laterBgInput.replace(",", "."));
+  const check =
+    selectedMeal && selectedRatio
+      ? assessMealRatio({
+          carbs,
+          currentBg: bgNow,
+          ratio: selectedRatio,
+          correctionFactor: settings.correctionFactor,
+          targetLow: target.low,
+          targetHigh: target.high,
+          bgUnits: units,
+          roundIncrement,
+        })
+      : null;
+  const verdict = Number.isFinite(laterBg) ? compareLaterBg(laterBg, target.low, target.high) : null;
+  const step =
+    check && (verdict === "high" || verdict === "low")
+      ? illustrateRatioStep({
+          gramsPerUnit: check.gramsPerUnit,
+          direction: verdict === "high" ? "tighten" : "loosen",
+          carbs,
+          roundIncrement,
+          ratioFormat,
+          carbPortionSize: cpSize,
+        })
+      : null;
+
+  const unitsLabel = (n: number) => `${formatInsulinUnits(n, roundIncrement)}u`;
+  const exactLabel = (n: number) => {
+    const rounded = Math.round(n * 10) / 10;
+    return `${Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1)}u`;
+  };
+
+  const saveIllustratedRatio = () => {
+    if (!selectedMeal || !step) return;
+    const updated: UserSettings = {
+      ...settings,
+      [settingsRatioKey(selectedMeal)]: step.storageRatio,
+    };
+    storage.saveSettings(updated);
+    onSettingsUpdate?.(updated);
+    toast({
+      title: "Ratio saved",
+      description: `${mealLabel(selectedMeal)} is now ${step.ratioLabel}.`,
+    });
+  };
+
   return (
     <RatioAdviserShell>
-    <Card data-testid="card-ratio-adviser">
-      <CardHeader className="space-y-0 pb-3">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <Search className="h-5 w-5 shrink-0 text-primary" aria-hidden />
-            <CardTitle className="text-lg tracking-tight">Ratio Adviser</CardTitle>
+      <Card data-testid="card-ratio-adviser">
+        <CardHeader className="space-y-0 pb-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <Calculator className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+              <CardTitle className="text-lg tracking-tight">Ratio Adviser</CardTitle>
+            </div>
+            <InlineInfoHint
+              ariaLabel="About Ratio Adviser"
+              content="Enter the carbs and glucose for one meal. This shows what your saved ratio does, and what one small step would change. It does not change a ratio unless you save it."
+            />
           </div>
-          <InlineInfoHint
-            ariaLabel="About Ratio Adviser"
-            content="Answer a few questions about post-meal blood sugars to spot patterns and prepare talking points for your clinic. This does not prescribe ratio changes."
-          />
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-          {step >= 1 && step < 4 && selectedMeal && (
-            <div
-              className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border bg-muted/30 px-3 py-2 text-sm"
-              data-testid="adviser-wizard-meal-context"
+          <p className="pt-2 text-sm text-muted-foreground">
+            See what this meal&apos;s ratio does, then compare it with the reading about 2 hours later.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {ratiosEditOpen ? (
+            <RatiosEditPanel
+              settings={settings}
+              bgUnit={bgUnit}
+              ratioFormat={ratioFormat}
+              carbPortionSize={cpSize}
+              onSaved={handleRatiosSaved}
+              onCancel={() => setRatiosEditOpen(false)}
+              idPrefix="ratio-adviser-edit"
+            />
+          ) : (
+            <Button
+              type="button"
+              className="min-h-12 w-full rounded-xl text-base font-semibold shadow-sm"
+              onClick={() => setRatiosEditOpen(true)}
+              data-testid="button-open-ratio-edit"
             >
-              <span className="font-medium text-foreground">{mealLabel(selectedMeal)}</span>
-              <span className="text-muted-foreground hidden sm:inline">·</span>
-              <span className="text-muted-foreground">
-                Saved ratio:{" "}
-                <strong className="text-foreground tabular-nums">
-                  {formatStoredRatio(settings[settingsRatioKey(selectedMeal)] as string | undefined) ?? "Not set"}
-                </strong>
-              </span>
-            </div>
+              <Pencil className="mr-2 h-4 w-4" aria-hidden />
+              Edit ratios &amp; targets
+            </Button>
           )}
 
-          {step > 0 && step < 4 && (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              {stepLabels.map((label, i) => (
-                <span key={i} className={`${i === step ? "font-medium text-foreground" : ""} ${i > step ? "hidden sm:inline" : ""}`}>
-                  {i > 0 && i <= step && <span className="mx-1">&rsaquo;</span>}
-                  {i <= step && label}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {step === 0 && (
+          {!ratiosEditOpen ? (
             <>
-              {ratiosEditOpen ? (
-                <RatiosEditPanel
-                  settings={settings}
-                  bgUnit={bgUnit}
-                  ratioFormat={ratioFormat}
-                  carbPortionSize={cpSize}
-                  onSaved={handleRatiosSaved}
-                  onCancel={() => setRatiosEditOpen(false)}
-                  idPrefix="ratio-adviser-edit"
-                />
-              ) : (
-                <Button
-                  type="button"
-                  className="min-h-12 w-full rounded-xl text-base font-semibold shadow-sm"
-                  onClick={() => setRatiosEditOpen(true)}
-                  data-testid="button-open-ratio-edit"
-                >
-                  <Pencil className="mr-2 h-4 w-4" aria-hidden />
-                  Edit ratios &amp; targets
-                </Button>
-              )}
-
-              {!ratiosEditOpen && hasAnyRatio && (
-                <div
-                  className="space-y-3 rounded-xl border border-primary/25 bg-primary/[0.04] p-3 dark:bg-primary/10 sm:p-4"
-                  data-testid="adviser-saved-ratios-strip"
-                >
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Your saved ratios</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {mealOptions.map(({ key, label, icon: Icon, ratio }) => (
-                      <div
-                        key={key}
-                        className="rounded-lg border border-border/80 bg-background/60 px-2 py-2 dark:bg-background/40"
-                      >
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Icon className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
-                          <span className="font-medium text-foreground/90">{label}</span>
-                        </div>
-                        <p className="mt-0.5 text-lg font-bold tabular-nums tracking-tight" data-testid={`adviser-strip-ratio-${key}`}>
-                          {ratio ?? "Not set"}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-border/60 pt-2 text-sm">
-                    <span>
-                      <span className="text-muted-foreground">ISF </span>
-                      <span className="font-semibold tabular-nums">
-                        {settings.correctionFactor != null
-                          ? `${settings.correctionFactor} ${bgUnit}`
-                          : <span className="font-normal italic text-muted-foreground">Not set</span>}
-                      </span>
-                    </span>
-                    <span>
-                      <span className="text-muted-foreground">Target </span>
-                      <span className="font-semibold tabular-nums">
-                        {formatTargetBgRangeLabel(settings, bgUnit === "mg/dL" ? "mg/dL" : "mmol/L")}
-                      </span>
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {!ratiosEditOpen ? (
-              <>
               <div className="space-y-2">
-                <p className="text-sm font-medium">Which meal do you want to check?</p>
+                <p className="text-sm font-medium">Which meal?</p>
                 <div className="grid grid-cols-2 gap-2">
-                  {mealOptions.map(({ key, label, icon: Icon, ratio }) => (
-                    <Button
-                      key={key}
-                      variant="outline"
-                      className="min-h-[4.25rem] h-auto flex-col items-stretch justify-start gap-2 py-3 text-left"
-                      onClick={() => handleSelectMeal(key)}
-                      data-testid={`button-adviser-meal-${key}`}
-                    >
-                      <div className="flex items-center gap-2 w-full">
-                        <Icon className="h-4 w-4 shrink-0" />
-                        <span className="font-medium">{label}</span>
-                      </div>
-                      {ratio ? (
-                        <span className="text-base font-bold tabular-nums tracking-tight text-foreground w-full" data-testid={`adviser-meal-button-ratio-${key}`}>
-                          {ratio}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">Not set</span>
-                      )}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
-              {hasAnyRatio && (
-                <Collapsible defaultOpen={false} className="rounded-xl border border-border/80 bg-muted/15">
-                  <CollapsibleTrigger
-                    className="group flex w-full min-h-11 items-center justify-between gap-2 px-3 py-2.5 text-left text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
-                    data-testid="adviser-quick-bolus-preview-trigger"
-                  >
-                    <span className="flex items-center gap-2">
-                      <Calculator className="h-4 w-4 shrink-0 text-primary" aria-hidden />
-                      Quick carb bolus preview
-                    </span>
-                    <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" aria-hidden />
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="space-y-3 border-t border-border/60 px-3 pb-3 pt-2" data-testid="adviser-quick-bolus-preview">
-                    <div className="flex items-start gap-0.5">
-                      <p className="flex-1 text-xs text-muted-foreground">Carb-only estimate from your saved meal ratio.</p>
-                      <InlineInfoHint
-                        ariaLabel="About bolus preview"
-                        content="Uses only your meal ratio and carb grams — no correction for high BG, no IOB, no fat/protein bolus. Your team may use different rules."
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      {mealOptions.map(({ key, label, icon: Icon }) => (
-                        <Button
-                          key={key}
-                          type="button"
-                          size="sm"
-                          variant={previewMeal === key ? "default" : "outline"}
-                          className="min-h-11 h-auto justify-start gap-2 py-2"
-                          onClick={() => setPreviewMeal(key)}
-                        >
+                  {mealOptions.map(({ key, label, icon: Icon, ratio }) => {
+                    const selected = selectedMeal === key;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        className={cn(
+                          "flex min-h-[4.25rem] flex-col items-start justify-center gap-0.5 rounded-xl border px-3 py-2.5 text-left transition-all",
+                          selected
+                            ? "border-primary bg-primary/5 text-foreground ring-1 ring-primary/30"
+                            : "border-border/70 bg-muted/20 text-muted-foreground hover:border-border hover:bg-muted/40",
+                        )}
+                        onClick={() => setSelectedMeal(key)}
+                        data-testid={`button-adviser-meal-${key}`}
+                      >
+                        <span className="flex items-center gap-2 text-sm font-medium text-foreground">
                           <Icon className="h-4 w-4 shrink-0" aria-hidden />
                           {label}
-                        </Button>
-                      ))}
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="preview-carbs">Carbs for this meal (g)</Label>
+                        </span>
+                        <span className="text-base font-bold tabular-nums tracking-tight text-foreground">
+                          {ratio ?? "Not set"}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  ISF{" "}
+                  <span className="font-medium text-foreground">
+                    {settings.correctionFactor != null ? `${settings.correctionFactor} ${units}` : "not set"}
+                  </span>
+                  {" · "}
+                  Target <span className="font-medium text-foreground">{formatTargetBgRangeLabel(settings, units)}</span>
+                </p>
+              </div>
+
+              {selectedMeal && !selectedRatio ? (
+                <p className="text-sm text-muted-foreground" data-testid="adviser-missing-ratio">
+                  No ratio saved for {mealLabel(selectedMeal).toLowerCase()} yet. Use Edit ratios &amp; targets above.
+                </p>
+              ) : null}
+
+              {selectedMeal && selectedRatio ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="min-w-0 space-y-1.5">
+                      <Label htmlFor="ratio-check-carbs" className="text-xs font-medium text-muted-foreground">
+                        Carbs (g)
+                      </Label>
                       <Input
-                        id="preview-carbs"
+                        id="ratio-check-carbs"
                         type="number"
                         inputMode="decimal"
                         min={0}
                         step="1"
-                        placeholder="e.g. 45"
-                        className="h-11 text-base"
-                        value={previewCarbs}
-                        onChange={(e) => setPreviewCarbs(e.target.value)}
-                        data-testid="input-ratio-preview-carbs"
+                        placeholder="e.g. 40"
+                        className="h-11 rounded-xl"
+                        value={carbsInput}
+                        onChange={(e) => setCarbsInput(e.target.value)}
+                        data-testid="input-ratio-check-carbs"
                       />
                     </div>
-                    {previewCarbsNum > 0 && (
-                      <div className="space-y-1 rounded-md bg-muted/40 p-3 text-sm">
-                        {!previewHasRatio ? (
-                          <p className="text-muted-foreground">
-                            No ratio saved for {mealLabel(previewMeal).toLowerCase()} yet. Use{" "}
-                            <span className="font-medium text-foreground">Edit ratios &amp; targets</span> above.
-                          </p>
-                        ) : (
-                          <>
-                            <p>
-                              <span className="text-muted-foreground">Carb bolus estimate:</span>{" "}
-                              <span className="text-lg font-semibold tabular-nums">{previewRounded} units</span>
-                              {Math.abs(previewRounded - previewExact) >= 0.05 && (
-                                <span className="text-xs text-muted-foreground">
-                                  {" "}
-                                  (exact {previewExact.toFixed(2)}u)
-                                </span>
-                              )}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              Ratio: {formatStoredRatio(previewRatioStr)}
-                            </p>
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </CollapsibleContent>
-                </Collapsible>
-              )}
+                    <div className="min-w-0 space-y-1.5">
+                      <Label htmlFor="ratio-check-bg" className="text-xs font-medium text-muted-foreground">
+                        BG now ({units})
+                      </Label>
+                      <Input
+                        id="ratio-check-bg"
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        step={units === "mmol/L" ? "0.1" : "1"}
+                        placeholder={units === "mmol/L" ? "e.g. 8.2" : "e.g. 148"}
+                        className="h-11 w-full min-w-0 rounded-xl"
+                        value={bgNowInput}
+                        onChange={(e) => setBgNowInput(e.target.value)}
+                        data-testid="input-ratio-check-bg"
+                      />
+                    </div>
+                  </div>
 
-              {!hasAnyRatio && (
-                <Button
-                  variant="outline"
-                  className="min-h-11 w-full justify-start gap-2"
-                  onClick={() => setMode("scratch_intro")}
-                  data-testid="button-open-estimate-flow"
-                >
-                  <Sparkles className="h-4 w-4 shrink-0" aria-hidden />
-                  Estimate starting ratios
-                </Button>
-              )}
-              </>
+                  {check ? (
+                    <div className="space-y-2 rounded-xl border border-border/70 bg-muted/20 px-3.5 py-3" data-testid="ratio-check-result">
+                      <p className="text-sm">
+                        <span className="text-muted-foreground">Carb bolus </span>
+                        <span className="font-semibold tabular-nums">{exactLabel(check.carbBolusExact)}</span>
+                        <span className="text-muted-foreground"> from {formatStoredRatio(selectedRatio)}</span>
+                      </p>
+                      <p className="text-sm">
+                        <span className="text-muted-foreground">Correction </span>
+                        <span className="font-semibold tabular-nums">
+                          {Math.abs(check.correctionExact) < 0.05
+                            ? "none"
+                            : `${check.correctionExact > 0 ? "+" : "−"}${exactLabel(Math.abs(check.correctionExact)).replace(/u$/, "")}u`}
+                        </span>
+                        <span className="text-muted-foreground">
+                          {settings.correctionFactor == null
+                            ? " — set an ISF to include one"
+                            : Math.abs(check.correctionExact) < 0.05
+                              ? " — glucose is inside your target"
+                              : check.correctionExact > 0
+                                ? " — glucose is above your target"
+                                : " — glucose is below your target"}
+                        </span>
+                      </p>
+                      <p className="text-sm">
+                        <span className="text-muted-foreground">Rounded total </span>
+                        <span className="text-lg font-semibold tabular-nums" data-testid="text-ratio-check-total">
+                          {unitsLabel(check.totalRounded)}
+                        </span>
+                        {Math.abs(check.totalRounded - check.totalExact) >= 0.05 ? (
+                          <span className="text-xs text-muted-foreground"> (exact {exactLabel(check.totalExact)})</span>
+                        ) : null}
+                      </p>
+                      {check.expectedLanding != null ? (
+                        <p className="text-sm text-muted-foreground" data-testid="text-ratio-check-landing">
+                          With this dose, glucose would be expected around{" "}
+                          <span className="font-semibold text-foreground">
+                            {formatTargetBgInput(check.expectedLanding, units)} {units}
+                          </span>
+                          .
+                        </p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground" data-testid="text-ratio-check-landing">
+                          Add an ISF under Edit ratios to see where this dose would land.
+                        </p>
+                      )}
+                    </div>
+                  ) : null}
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="ratio-check-later" className="text-xs font-medium text-muted-foreground">
+                      BG about 2 hours later ({units})
+                    </Label>
+                    <Input
+                      id="ratio-check-later"
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      step={units === "mmol/L" ? "0.1" : "1"}
+                      placeholder={units === "mmol/L" ? "e.g. 9.4" : "e.g. 170"}
+                      className="h-11 rounded-xl"
+                      value={laterBgInput}
+                      onChange={(e) => setLaterBgInput(e.target.value)}
+                      data-testid="input-ratio-check-later"
+                    />
+                  </div>
+
+                  {verdict === "held" ? (
+                    <p className="text-sm font-medium" data-testid="text-ratio-check-verdict">
+                      This ratio held for this meal. The 2-hour reading is inside your target.
+                    </p>
+                  ) : null}
+
+                  {verdict === "high" || verdict === "low" ? (
+                    <div className="space-y-3 rounded-xl border border-border/70 px-3.5 py-3" data-testid="text-ratio-check-verdict">
+                      <p className="text-sm font-medium">
+                        {verdict === "high"
+                          ? "Above your target. The ratio may be too weak — one unit is covering too many grams."
+                          : "Below your target. The ratio may be too strong — one unit is covering too few grams."}
+                      </p>
+                      {check && step ? (
+                        <div className="space-y-2 text-sm">
+                          <p className="text-muted-foreground">
+                            Now{" "}
+                            <span className="font-semibold text-foreground">{formatStoredRatio(selectedRatio)}</span>
+                            {" · "}
+                            <span className="font-semibold tabular-nums text-foreground">
+                              {unitsLabel(step.currentCarbBolusRounded)}
+                            </span>{" "}
+                            for {carbs}g
+                          </p>
+                          <p>
+                            One step {verdict === "high" ? "tighter" : "looser"}{" "}
+                            <span className="font-semibold">
+                              {step.ratioLabel}
+                              {step.ratioLabel !== `${step.storageRatio}g` ? ` · ${step.storageRatio}` : ""}
+                            </span>
+                            {" · "}
+                            <span className="font-semibold tabular-nums">{unitsLabel(step.carbBolusRounded)}</span> for the
+                            same carbs
+                          </p>
+                          <p className="text-xs leading-relaxed text-muted-foreground">
+                            An illustration for you and your team, not a dose order. Fat, protein, illness, and activity
+                            can move the landing too.
+                          </p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-11 w-full rounded-xl"
+                            onClick={saveIllustratedRatio}
+                            data-testid="button-save-ratio-step"
+                          >
+                            <Save className="mr-2 h-4 w-4" aria-hidden />
+                            Save this ratio
+                          </Button>
+                        </div>
+                      ) : check ? (
+                        <p className="text-xs text-muted-foreground">
+                          This ratio is already at the edge of a small step. Fat, protein, illness, and activity can move
+                          the landing too.
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
               ) : null}
             </>
-          )}
-
-          {step === 1 && selectedMeal && (
-            <div className="space-y-3">
-              <p className="text-sm font-medium">
-                After {mealLabel(selectedMeal).toLowerCase()}, where do your blood sugars tend to end up?
-              </p>
-              <div className="space-y-2">
-                {([
-                  { value: "consistently_high" as const, label: "Consistently too high", desc: `Above my target range (>${resolveUserTargetBgRange(settings, bgUnit === "mg/dL" ? "mg/dL" : "mmol/L").high} ${bgUnit})` },
-                  { value: "consistently_low" as const, label: "Consistently too low", desc: `Below my target range (<${resolveUserTargetBgRange(settings, bgUnit === "mg/dL" ? "mg/dL" : "mmol/L").low} ${bgUnit})` },
-                  { value: "sometimes_high" as const, label: "Sometimes high, sometimes OK", desc: "It varies from day to day" },
-                  { value: "on_target" as const, label: "Usually on target", desc: "Within my target range most of the time" },
-                  { value: "not_sure" as const, label: "I'm not sure", desc: "I haven't been checking regularly" },
-                ]).map(opt => (
-                  <Button
-                    key={opt.value}
-                    variant="outline"
-                    className="w-full h-auto py-3 justify-start text-left"
-                    onClick={() => handleSelectPattern(opt.value)}
-                    data-testid={`button-pattern-${opt.value}`}
-                  >
-                    <div>
-                      <p className="font-medium text-sm">{opt.label}</p>
-                      <p className="text-xs text-muted-foreground">{opt.desc}</p>
-                    </div>
-                  </Button>
-                ))}
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => { setStep(0); setSelectedMeal(null); }} data-testid="button-adviser-back-meal">
-                <ArrowLeft className="h-4 w-4 mr-1" />
-                Back
-              </Button>
-            </div>
-          )}
-
-          {step === 2 && (
-            <div className="space-y-3">
-              <p className="text-sm font-medium">
-                When do you notice the {pattern === "consistently_high" ? "high" : pattern === "consistently_low" ? "low" : "unusual"} readings?
-              </p>
-              <div className="space-y-2">
-                {([
-                  { value: "2_hours" as const, label: "About 2 hours after eating", desc: "The peak of fast-acting insulin" },
-                  { value: "3_4_hours" as const, label: "3-4 hours after eating", desc: "When insulin is wearing off" },
-                  { value: "varies" as const, label: "It varies", desc: "No consistent timing" },
-                  { value: "not_sure" as const, label: "I'm not sure", desc: "I don't always check at the same time" },
-                ]).map(opt => (
-                  <Button
-                    key={opt.value}
-                    variant="outline"
-                    className="w-full h-auto py-3 justify-start text-left"
-                    onClick={() => handleSelectTiming(opt.value)}
-                    data-testid={`button-timing-${opt.value}`}
-                  >
-                    <div>
-                      <p className="font-medium text-sm">{opt.label}</p>
-                      <p className="text-xs text-muted-foreground">{opt.desc}</p>
-                    </div>
-                  </Button>
-                ))}
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => { setStep(1); setPattern(null); }} data-testid="button-adviser-back-pattern">
-                <ArrowLeft className="h-4 w-4 mr-1" />
-                Back
-              </Button>
-            </div>
-          )}
-
-          {step === 3 && (
-            <div className="space-y-3">
-              <p className="text-sm font-medium">How often does this happen?</p>
-              <div className="space-y-2">
-                {([
-                  { value: "most_days" as const, label: "Most days", desc: "4+ days a week" },
-                  { value: "few_days" as const, label: "A few days a week", desc: "2-3 days a week" },
-                  { value: "rarely" as const, label: "Occasionally", desc: "Once a week or less" },
-                  { value: "not_sure" as const, label: "I'm not sure", desc: "I haven't tracked it closely" },
-                ]).map(opt => (
-                  <Button
-                    key={opt.value}
-                    variant="outline"
-                    className="w-full h-auto py-3 justify-start text-left"
-                    onClick={() => handleSelectFrequency(opt.value)}
-                    data-testid={`button-frequency-${opt.value}`}
-                  >
-                    <div>
-                      <p className="font-medium text-sm">{opt.label}</p>
-                      <p className="text-xs text-muted-foreground">{opt.desc}</p>
-                    </div>
-                  </Button>
-                ))}
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => { setStep(2); setTiming(null); }} data-testid="button-adviser-back-timing">
-                <ArrowLeft className="h-4 w-4 mr-1" />
-                Back
-              </Button>
-            </div>
-          )}
-
-          {step === 4 && result && (
-            <div className="space-y-4">
-              {(() => {
-                const accent =
-                  result.direction === "tighten"
-                    ? "border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20"
-                    : result.direction === "loosen"
-                      ? "border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/20"
-                      : result.direction === "on_track"
-                        ? "border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20"
-                        : "border-border bg-muted/20";
-                const Icon =
-                  result.direction === "tighten"
-                    ? TrendingDown
-                    : result.direction === "loosen"
-                      ? TrendingUp
-                      : result.direction === "on_track"
-                        ? CheckCircle2
-                        : Search;
-                const iconClass =
-                  result.direction === "tighten"
-                    ? "text-amber-600 dark:text-amber-400"
-                    : result.direction === "loosen"
-                      ? "text-blue-600 dark:text-blue-400"
-                      : result.direction === "on_track"
-                        ? "text-green-600 dark:text-green-400"
-                        : "text-muted-foreground";
-
-                const sentences = result.detail
-                  .split(/(?<=[.!?])\s+/)
-                  .map((s) => s.trim())
-                  .filter(Boolean);
-                const shortDetail = sentences.slice(0, 2).join(" ");
-                const remainingDetail = sentences.slice(2).join(" ");
-
-                const nextSteps: string[] =
-                  result.direction === "monitor"
-                    ? [
-                        "Check 2–3 hours after this meal for 5–7 days",
-                        "Write down the carbs (and any high-fat/high-protein meals)",
-                        "Note insulin timing (before/after eating) and activity",
-                      ]
-                    : result.direction === "on_track"
-                      ? [
-                          "Keep an eye on it — needs can change with stress, illness, activity, and seasons",
-                          "If you start seeing a new pattern, re-run this tool for that meal",
-                        ]
-                      : [
-                          "Track 3–5 examples of this meal with carbs + timing + BG at 2h and 4h",
-                          "Bring the pattern to your diabetes team before changing ratios",
-                          "If you’re having frequent hypos, treat per your plan and contact your team promptly",
-                        ];
-
-                return (
-                  <>
-                    <div className={`rounded-xl border p-4 space-y-3 ${accent}`}>
-                      <div className="flex items-start gap-3">
-                        <div className="mt-0.5 shrink-0">
-                          <Icon className={`h-5 w-5 ${iconClass}`} aria-hidden />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <h4 className="font-semibold leading-snug">{result.summary}</h4>
-                          <p className="text-sm text-muted-foreground mt-1 leading-relaxed">{shortDetail}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={copyAssessmentToClipboard}
-                          data-testid="button-copy-ratio-assessment"
-                        >
-                          <Copy className="h-4 w-4 mr-1" />
-                          Copy
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={handleReset} data-testid="button-adviser-start-over">
-                          <RotateCcw className="h-4 w-4 mr-1" />
-                          Another meal
-                        </Button>
-                        <Button variant="outline" size="sm" asChild data-testid="link-assessment-to-ratios">
-                          <Link href="/settings/ratios">Ratios</Link>
-                        </Button>
-                        {onNavigateToMeal && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => onNavigateToMeal()}
-                            data-testid="button-assessment-meal-planner"
-                          >
-                            <ArrowRight className="h-4 w-4 mr-1" />
-                            Meal planner
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-3">
-                      <div className="rounded-xl border border-border/60 bg-background/60 p-4">
-                        <p className="text-sm font-semibold">What to do next</p>
-                        <ul className="mt-2 space-y-2">
-                          {nextSteps.map((s, i) => (
-                            <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
-                              <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary/70 shrink-0" />
-                              <span>{s}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-
-                      <div className="rounded-xl border border-border/60 bg-background/60 p-4">
-                        <p className="text-sm font-semibold">Talking points for your diabetes team</p>
-                        <ul className="mt-2 space-y-2">
-                          {result.talkingPoints.map((point, i) => (
-                            <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
-                              <span className="mt-1 h-1.5 w-1.5 rounded-full bg-muted-foreground/40 shrink-0" />
-                              <span>{point}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-
-                    <Collapsible className="border rounded-xl px-3 py-2">
-                      <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 text-sm font-semibold py-2 hover:opacity-90">
-                        <span className="flex items-center gap-2 text-left">
-                          <BookOpen className="h-4 w-4 shrink-0 text-primary" />
-                          Details (why this is the suggestion)
-                        </span>
-                        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className="space-y-2 pb-3 text-xs text-muted-foreground leading-relaxed">
-                        <p>{result.detail}</p>
-                        {remainingDetail ? null : null}
-                      </CollapsibleContent>
-                    </Collapsible>
-                  </>
-                );
-              })()}
-
-              {(result.direction === "tighten" || result.direction === "loosen") && (
-                <Collapsible className="border rounded-lg px-3 py-2">
-                  <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 text-sm font-medium py-2 hover:opacity-90">
-                    <span className="flex items-center gap-2 text-left">
-                      <BookOpen className="h-4 w-4 shrink-0 text-primary" />
-                      How teams often approach ratio changes
-                    </span>
-                    <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="space-y-2 pb-3 text-xs text-muted-foreground leading-relaxed">
-                    <p>
-                      Many clinics change carb ratios in <strong>small steps</strong> (often around 10–20% at a time), then
-                      review glucose data for several days before the next tweak. They also rule out carb counting,
-                      timing, illness, stress, and activity before blaming the ratio alone.
-                    </p>
-                    <p>
-                      <strong>Do not change ratios on your own</strong> unless your team has given you a clear plan for
-                      self-adjustment. This app does not calculate a new ratio for you.
-                    </p>
-                  </CollapsibleContent>
-                </Collapsible>
-              )}
-
-            </div>
-          )}
+          ) : null}
         </CardContent>
-    </Card>
+      </Card>
     </RatioAdviserShell>
   );
 }
