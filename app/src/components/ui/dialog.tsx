@@ -218,8 +218,10 @@ const DialogContent = React.forwardRef<
             </DrawerPrimitive.Close>
           </div>
           <div
+            data-vaul-no-drag
             className={cn(
-              "min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6 pt-2",
+              "min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain px-5 pb-4 pt-1",
+              "max-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-3.25rem)]",
               className,
             )}
           >

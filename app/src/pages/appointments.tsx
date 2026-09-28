@@ -340,6 +340,7 @@ export default function Appointments() {
   const [notes, setNotes] = useState("");
   const [outcome, setOutcome] = useState<AppointmentOutcome>({});
   const [markCompleteOnSave, setMarkCompleteOnSave] = useState(false);
+  const [resultsMode, setResultsMode] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
 
@@ -411,6 +412,7 @@ export default function Appointments() {
     setNotes("");
     setOutcome({});
     setMarkCompleteOnSave(false);
+    setResultsMode(false);
     setEditingAppointment(null);
   };
 
@@ -424,6 +426,7 @@ export default function Appointments() {
     setNotes(appointment.notes ?? "");
     setOutcome(appointment.outcome ? { ...appointment.outcome } : {});
     setMarkCompleteOnSave(Boolean(opts?.markComplete));
+    setResultsMode(Boolean(opts?.focusResults));
     setIsFormOpen(true);
   };
 
@@ -508,6 +511,12 @@ export default function Appointments() {
     [appointments, today],
   );
 
+  const visitDate = parseAppointmentDate(date);
+  const visitHasStarted = visitDate != null && !isAfter(visitDate, today);
+  const showResults =
+    editingAppointment != null &&
+    (resultsMode || markCompleteOnSave || editingAppointment.isCompleted || visitHasStarted);
+
   const nextAppointment = upcomingAppointments[0] ?? null;
   const moreUpcoming = upcomingAppointments.slice(1);
   const nextDays = nextAppointment
@@ -569,29 +578,42 @@ export default function Appointments() {
             </Button>
           </DialogTrigger>
           <DialogContent
-            className="max-h-[min(90dvh,720px)] overflow-y-auto rounded-3xl sm:max-w-md"
+            className="sm:max-h-[min(90dvh,720px)] sm:max-w-md"
             data-testid="dialog-appointment-form"
           >
-            <DialogHeader>
+            <DialogHeader className="space-y-1 pr-8 text-left">
               <DialogTitle>
-                {editingAppointment
-                  ? markCompleteOnSave || editingAppointment.isCompleted
-                    ? "Edit visit & results"
-                    : "Edit appointment"
-                  : "Add appointment"}
+                {resultsMode
+                  ? "Add results"
+                  : editingAppointment
+                    ? "Edit appointment"
+                    : "Add appointment"}
               </DialogTitle>
               <DialogDescription>
-                {editingAppointment
-                  ? "Update visit details and optional results (HbA1c, eye, foot)."
-                  : "Schedule a diabetes-related visit or check-up"}
+                {resultsMode
+                  ? "Log what you were told. For your records, not a diagnosis."
+                  : editingAppointment
+                    ? showResults
+                      ? "Update the visit, or log what you were told."
+                      : "Update the date, time, or location."
+                    : "Title, when, and where. Add results after the visit."}
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-5 pt-2">
+            <div className="space-y-4 pt-3">
+              {showResults && resultsMode ? (
+                <AppointmentResultsFields
+                  type={type}
+                  visitDate={date}
+                  outcome={outcome}
+                  onChange={setOutcome}
+                />
+              ) : null}
+
               <div className="space-y-2">
                 <Label htmlFor="title" className="text-xs font-medium text-muted-foreground">Title</Label>
                 <Input
                   id="title"
-                  className="h-12 rounded-xl"
+                  className="h-11 rounded-xl"
                   placeholder="e.g. Annual diabetes review"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
@@ -600,8 +622,8 @@ export default function Appointments() {
               </div>
 
               <div className="space-y-2">
-                <Label>Type</Label>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                <Label className="text-xs font-medium text-muted-foreground">Type</Label>
+                <div className="grid grid-cols-3 gap-1.5">
                   {APPOINTMENT_TYPES.map((t) => {
                     const TypeIcon = t.icon;
                     const selected = type === t.value;
@@ -610,15 +632,15 @@ export default function Appointments() {
                         key={t.value}
                         type="button"
                         className={cn(
-                          "flex min-h-[4.25rem] flex-col items-center justify-center gap-1 rounded-[1.15rem] border px-2 py-2.5 text-center text-xs font-semibold transition-all",
+                          "flex min-h-[3.25rem] flex-col items-center justify-center gap-0.5 rounded-xl border px-1 py-1.5 text-center text-[11px] font-semibold leading-tight transition-all",
                           selected
                             ? "border-primary bg-primary/5 text-foreground ring-1 ring-primary/30"
                             : "border-border/70 bg-muted/20 text-muted-foreground hover:border-border hover:bg-muted/40",
                         )}
                         onClick={() => setType(t.value)}
-                        data-testid={t.value === "clinic" ? "select-appointment-type" : undefined}
+                        data-testid={t.value === "clinic" ? "select-appointment-type" : `button-appointment-type-${t.value}`}
                       >
-                        <TypeIcon className="h-4 w-4 shrink-0" aria-hidden />
+                        <TypeIcon className="h-3.5 w-3.5 shrink-0" aria-hidden />
                         {t.shortLabel}
                       </button>
                     );
@@ -626,23 +648,23 @@ export default function Appointments() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="min-w-0 space-y-1.5">
                   <Label htmlFor="date" className="text-xs font-medium text-muted-foreground">Date</Label>
                   <Input
                     id="date"
-                    className="h-12 rounded-xl"
+                    className="h-11 w-full min-w-0 rounded-xl"
                     type="date"
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
                     data-testid="input-appointment-date"
                   />
                 </div>
-                <div className="space-y-1.5">
+                <div className="min-w-0 space-y-1.5">
                   <Label htmlFor="time" className="text-xs font-medium text-muted-foreground">Time</Label>
                   <Input
                     id="time"
-                    className="h-12 rounded-xl"
+                    className="h-11 w-full min-w-0 rounded-xl"
                     type="time"
                     value={time}
                     onChange={(e) => setTime(e.target.value)}
@@ -652,10 +674,10 @@ export default function Appointments() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="location">Location</Label>
+                <Label htmlFor="location" className="text-xs font-medium text-muted-foreground">Location</Label>
                 <Input
                   id="location"
-                  className="rounded-xl"
+                  className="h-11 rounded-xl"
                   placeholder="e.g. City Hospital"
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
@@ -663,18 +685,20 @@ export default function Appointments() {
                 />
               </div>
 
-              <AppointmentResultsFields
-                type={type}
-                visitDate={date}
-                outcome={outcome}
-                onChange={setOutcome}
-              />
+              {showResults && !resultsMode ? (
+                <AppointmentResultsFields
+                  type={type}
+                  visitDate={date}
+                  outcome={outcome}
+                  onChange={setOutcome}
+                />
+              ) : null}
 
               <div className="space-y-2">
-                <Label htmlFor="notes">Notes</Label>
+                <Label htmlFor="notes" className="text-xs font-medium text-muted-foreground">Notes</Label>
                 <Textarea
                   id="notes"
-                  className="min-h-[88px] rounded-xl"
+                  className="min-h-[72px] rounded-xl"
                   placeholder="Questions to ask, things to bring…"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
@@ -682,14 +706,16 @@ export default function Appointments() {
                 />
               </div>
 
-              <Button
-                onClick={() => void handleSave()}
-                className="h-12 w-full rounded-2xl"
-                disabled={!title || !date}
-                data-testid="button-save-appointment"
-              >
-                {editingAppointment ? "Save changes" : "Save appointment"}
-              </Button>
+              <div className="sticky bottom-0 z-10 -mx-5 bg-gradient-to-t from-background from-65% to-transparent px-5 pb-1 pt-4">
+                <Button
+                  onClick={() => void handleSave()}
+                  className="h-12 w-full rounded-2xl shadow-sm"
+                  disabled={!title || !date}
+                  data-testid="button-save-appointment"
+                >
+                  {resultsMode ? "Save results" : editingAppointment ? "Save changes" : "Save appointment"}
+                </Button>
+              </div>
             </div>
           </DialogContent>
         </Dialog>
