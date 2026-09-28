@@ -223,7 +223,7 @@ export function StorySharedPostStage({ postId, className, onOpenPost, onOpenAuth
     <div
       className={cn(
         "absolute inset-0 overflow-hidden",
-        showMediaCard ? "bg-black" : "bg-gradient-to-br from-[#d7ebe4] via-[#f6f1e8] to-[#e8f4f1]",
+        "bg-black",
         className,
       )}
       data-testid="story-shared-post-stage"
@@ -251,7 +251,7 @@ export function StorySharedPostStage({ postId, className, onOpenPost, onOpenAuth
         </>
       ) : null}
 
-      <div className="pointer-events-none absolute inset-0 z-[9] flex flex-col px-3.5 pb-[max(6.75rem,env(safe-area-inset-bottom))] pt-[max(5.25rem,calc(env(safe-area-inset-top)+4rem))] sm:px-5">
+      <div className="pointer-events-none absolute inset-0 z-[9] flex flex-col justify-center px-3.5 pb-[max(6.75rem,env(safe-area-inset-bottom))] pt-[max(5.25rem,calc(env(safe-area-inset-top)+4rem))] sm:px-5">
         {showMediaCard && media ? (
           <div className="mx-auto flex min-h-0 w-full max-w-lg flex-1 flex-col overflow-hidden rounded-[1.6rem] bg-white shadow-[0_24px_60px_-24px_rgba(0,0,0,0.65)]">
             <div className="pointer-events-auto flex shrink-0 items-center gap-2 px-3 pb-2 pt-3">
@@ -331,10 +331,18 @@ export function StorySharedPostStage({ postId, className, onOpenPost, onOpenAuth
             </div>
           </div>
         ) : (
-          <div className="mx-auto flex min-h-0 w-full max-w-lg flex-1 flex-col justify-center px-1">
+          <div className="mx-auto flex w-full max-w-lg flex-col overflow-hidden rounded-[1.6rem] bg-white shadow-[0_24px_60px_-24px_rgba(0,0,0,0.65)]">
+            <div className="pointer-events-auto flex shrink-0 items-center gap-2 px-3 pb-1 pt-3">
+              <div className="min-w-0 flex-1">
+                <AuthorChip author={author} post={post} onLight onOpenAuthor={onOpenAuthor} />
+              </div>
+              <span className="shrink-0 rounded-full bg-teal-700/10 px-2.5 py-1 text-[11px] font-semibold tracking-tight text-teal-800">
+                Shared post
+              </span>
+            </div>
             <button
               type="button"
-              className="pointer-events-auto min-h-0 overflow-hidden text-left"
+              className="pointer-events-auto line-clamp-[12] whitespace-pre-wrap px-4 pb-2 pt-1 text-left text-[15px] font-normal leading-[1.45] text-foreground"
               aria-label="View original post"
               data-testid="button-story-open-post"
               onClick={(e) => {
@@ -342,31 +350,30 @@ export function StorySharedPostStage({ postId, className, onOpenPost, onOpenAuth
                 onOpenPost();
               }}
             >
-              <p
-                className="mb-3 select-none font-serif text-[4.75rem] leading-none text-teal-700/20"
-                aria-hidden
-              >
-                “
-              </p>
-              <p className="-mt-8 line-clamp-[10] text-balance font-serif text-[1.45rem] font-medium leading-snug tracking-tight text-slate-900 sm:text-[1.7rem]">
-                {poll ? quoteText : renderBodyWithMentions(quoteText, {})}
-              </p>
-              {poll?.options?.length ? (
-                <ul className="mt-5 space-y-2">
-                  {poll.options.slice(0, 4).map((opt) => (
-                    <li
-                      key={opt}
-                      className="rounded-2xl border border-slate-900/10 bg-white/75 px-3.5 py-2.5 text-sm font-medium text-slate-800"
-                    >
-                      {opt}
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
+              {poll ? quoteText : renderBodyWithMentions(quoteText, post.mention_map ?? {})}
             </button>
-            <div className="pointer-events-auto mt-6 rounded-2xl bg-white/75 p-1 shadow-sm ring-1 ring-slate-900/5">
-              <AuthorChip author={author} post={post} onLight onOpenAuthor={onOpenAuthor} />
-            </div>
+            {poll?.options?.length ? (
+              <ul className="pointer-events-none space-y-2 px-4 pb-2">
+                {poll.options.slice(0, 4).map((opt) => (
+                  <li
+                    key={opt}
+                    className="rounded-2xl border border-slate-900/10 bg-slate-50 px-3.5 py-2.5 text-sm font-medium text-slate-800"
+                  >
+                    {opt}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <button
+              type="button"
+              className="pointer-events-auto self-start px-4 pb-4 pt-1 text-sm font-semibold text-teal-800"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenPost();
+              }}
+            >
+              View post
+            </button>
           </div>
         )}
       </div>

@@ -20,8 +20,6 @@ const POST_FONT = '"Inter Variable", Inter, system-ui, sans-serif';
 const POST_SCALE = W / 390;
 const POST_INK = "#1c1b23";
 const POST_MUTED = "#404656";
-const FONT_SERIF = 'Georgia, "Iowan Old Style", "Times New Roman", serif';
-
 const INK = "#12141a";
 const INK_MUTED = "#5c6473";
 const CREAM = "#f6f1e8";
@@ -424,14 +422,6 @@ function initialOf(name: string): string {
   return ch ? ch.toUpperCase() : "M";
 }
 
-function quoteMetrics(text: string): { size: number; lh: number; maxLines: number } {
-  const len = text.trim().length;
-  if (len <= 70) return { size: 54, lh: 68, maxLines: 7 };
-  if (len <= 140) return { size: 44, lh: 58, maxLines: 8 };
-  if (len <= 240) return { size: 38, lh: 50, maxLines: 10 };
-  return { size: 34, lh: 46, maxLines: 12 };
-}
-
 function eventParts(iso: string): { weekday: string; day: string; month: string; time: string } {
   const d = parseEventDate(iso);
   if (!d) return { weekday: "EVENT", day: "·", month: "", time: iso };
@@ -750,43 +740,81 @@ function drawPin(ctx: CanvasRenderingContext2D, x: number, y: number, color: str
   ctx.restore();
 }
 
-function drawQuoteCard(
+/** Text posts use the same card as a photo share: author, the post body, then View post. */
+function drawTextFeedCard(
   ctx: CanvasRenderingContext2D,
   body: string,
   name: string,
   handle: string | null,
   photo: CanvasImageSource | null,
+  timeLabel: string,
 ) {
-  // Full-bleed cream story — no floating card on a black void.
-  const wash = ctx.createLinearGradient(0, 0, W, H);
-  wash.addColorStop(0, "#d7ebe4");
-  wash.addColorStop(0.45, CREAM);
-  wash.addColorStop(1, "#e8f4f1");
-  ctx.fillStyle = wash;
+  ctx.fillStyle = "#07080b";
   ctx.fillRect(0, 0, W, H);
 
-  const padX = 72;
-  const textW = W - padX * 2;
-  const metrics = quoteMetrics(body);
-  const topY = TOP_SAFE + 40;
-  const authorH = 72;
-  const authorY = H - BOTTOM_SAFE - authorH;
+  const cardX = 56;
+  const cardW = W - 112;
+  const radius = 40;
+  const pad = 36;
+  const textW = cardW - pad * 2;
+  const topSafe = 260;
+  const bottomSafe = 390;
+  const maxCardH = H - topSafe - bottomSafe;
+  const av = 84;
+  const headerH = 28 + av + 28;
+  const viewRow = postPx(44);
+  const bodySize = postPx(15);
+  const lineH = postPx(15 * 1.45);
+  const maxLines = 12;
+  ctx.font = `400 ${bodySize}px ${POST_FONT}`;
+  const bodyH = wrappedHeight(ctx, body, textW, lineH, maxLines);
+  const cardH = Math.min(maxCardH, headerH + postPx(10) + bodyH + viewRow);
+  const cardY = topSafe + Math.max(0, Math.round((maxCardH - cardH) / 2));
 
-  ctx.fillStyle = "rgba(15, 118, 110, 0.16)";
-  ctx.font = `700 200px ${FONT_SERIF}`;
-  ctx.fillText("“", padX - 12, topY + 120);
+  drawLiftedCard(ctx, cardX, cardY, cardW, cardH, radius, CARD_WHITE);
+  ctx.save();
+  roundRect(ctx, cardX, cardY, cardW, cardH, radius);
+  ctx.clip();
 
-  ctx.fillStyle = INK;
-  ctx.font = `500 ${metrics.size}px ${FONT_SERIF}`;
-  drawWrapped(ctx, body, padX, topY + 132, textW, metrics.lh, metrics.maxLines);
+  const avX = cardX + pad;
+  const avY = cardY + 28;
+  drawAvatar(ctx, avX, avY, av, name, photo, true);
+  ctx.font = `600 ${postPx(11)}px ${POST_FONT}`;
+  const badge = "Shared post";
+  const badgeW = ctx.measureText(badge).width + postPx(16);
+  const badgeH = postPx(20);
+  const badgeX = cardX + cardW - pad - badgeW;
+  const badgeY = avY + postPx(2);
+  fillRoundRect(ctx, badgeX, badgeY, badgeW, badgeH, badgeH / 2, "rgba(15, 118, 110, 0.12)");
+  ctx.fillStyle = TEAL_DEEP;
+  ctx.textAlign = "center";
+  ctx.fillText(badge, badgeX + badgeW / 2, badgeY + postPx(14));
+  ctx.textAlign = "left";
 
-  ctx.strokeStyle = "rgba(18, 20, 26, 0.08)";
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(padX, authorY - 28);
-  ctx.lineTo(W - padX, authorY - 28);
+  const textX = avX + av + 20;
+  const textMax = Math.max(80, badgeX - 16 - textX);
+  ctx.fillStyle = POST_INK;
+  ctx.font = `600 ${postPx(15)}px ${POST_FONT}`;
+  ctx.fillText(ellipsize(ctx, name, textMax), textX, avY + postPx(16));
+  ctx.fillStyle = POST_MUTED;
+  ctx.font = `400 ${postPx(13)}px ${POST_FONT}`;
+  const byline = [handle ? `@${handle}` : null, timeLabel || null].filter(Boolean).join("  ·  ");
+  ctx.fillText(ellipsize(ctx, byline || "From the feed", textMax), textX, avY + postPx(34));
+
+  ctx.fillStyle = POST_INK;
+  ctx.font = `400 ${bodySize}px ${POST_FONT}`;
+  const bodyTop = cardY + headerH + postPx(10) + bodySize;
+  drawWrapped(ctx, body, cardX + pad, bodyTop, textW, lineH, maxLines);
+
+  ctx.fillStyle = TEAL_DEEP;
+  ctx.font = `600 ${postPx(13)}px ${POST_FONT}`;
+  ctx.fillText("View post", cardX + pad, cardY + cardH - postPx(22));
+  ctx.restore();
+
+  roundRect(ctx, cardX, cardY, cardW, cardH, radius);
+  ctx.strokeStyle = "rgba(255,255,255,0.16)";
+  ctx.lineWidth = 2;
   ctx.stroke();
-  drawAuthorRow(ctx, padX, authorY, name, handle, true, photo);
 }
 
 function drawEventCard(
@@ -972,8 +1000,7 @@ export async function renderPostAsStoryFile(
   } else if (shots.length > 0) {
     drawSharedFeedCard(ctx, shots, caption, name, handle, photo, postedAgo);
   } else {
-    drawAtmosphere(ctx, null);
-    drawQuoteCard(ctx, caption || "Shared from the feed", name, handle, photo);
+    drawTextFeedCard(ctx, caption || "Shared from the feed", name, handle, photo, postedAgo);
   }
 
   return canvasToFile(canvas);
