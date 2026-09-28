@@ -255,7 +255,11 @@ export function StoryCreateSheet({
                   playsInline
                 />
               ) : (
-                <img src={preview} alt="" className="h-full w-full object-cover" />
+                <img
+                  src={preview}
+                  alt=""
+                  className={linkedPostId ? "h-full w-full object-contain" : "h-full w-full object-cover"}
+                />
               )}
             </StoryOverlayEditor>
 
@@ -275,7 +279,7 @@ export function StoryCreateSheet({
               </div>
             ) : null}
 
-            {!textEditing && overlays.every((o) => !o.text.trim()) ? (
+            {!textEditing && !linkedPostId && overlays.every((o) => !o.text.trim()) ? (
               <p className="pointer-events-none absolute inset-x-0 bottom-[max(5.5rem,calc(env(safe-area-inset-bottom)+4.5rem))] z-10 px-16 text-center text-[13px] font-medium tracking-wide text-white/75 drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]">
                 Tap the photo to add text
               </p>
@@ -291,13 +295,7 @@ export function StoryCreateSheet({
                 >
                   <RefreshCw className="h-4 w-4" />
                 </button>
-                {linkedPostId ? (
-                  <p className="mb-2 min-w-0 flex-1 truncate text-center text-[11px] font-medium text-white/75">
-                    Links to the original post
-                  </p>
-                ) : (
-                  <span className="flex-1" />
-                )}
+                <span className="flex-1" />
                 <Button
                   type="button"
                   className="h-11 rounded-full px-5 text-sm font-semibold shadow-lg active:scale-95"

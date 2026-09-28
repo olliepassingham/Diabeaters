@@ -2,7 +2,6 @@ import { format, formatDistanceToNow } from "date-fns";
 import { fileFromPostMediaPath } from "@/lib/community/post-media-signed-urls";
 import { parseEventDate } from "@/lib/community/event-display";
 import { parseEventExtra, parsePollExtra } from "@/lib/community/post-kinds";
-import { communityTopicLabel } from "@/lib/community/topics";
 import { resolveProfileImageUrl } from "@/lib/storage-profile";
 import type { CommunityPostRow } from "@/lib/community";
 
@@ -15,6 +14,12 @@ const BOTTOM_SAFE = 260;
 const SIDE = 72;
 
 const FONT = 'Outfit, "Inter Variable", Inter, system-ui, sans-serif';
+/** Same family as feed posts (Inter), not the display face used on story stickers. */
+const POST_FONT = '"Inter Variable", Inter, system-ui, sans-serif';
+/** Maps a feed CSS pixel onto the 1080-wide story so it reads the same on a phone. */
+const POST_SCALE = W / 390;
+const POST_INK = "#1c1b23";
+const POST_MUTED = "#404656";
 const FONT_SERIF = 'Georgia, "Iowan Old Style", "Times New Roman", serif';
 
 const INK = "#12141a";
@@ -23,10 +28,7 @@ const CREAM = "#f6f1e8";
 const TEAL = "#14b8a6";
 const TEAL_DEEP = "#0f766e";
 const WHITE = "#f8fafc";
-const PAGE_MINT = "#d7ebe4";
 const CARD_WHITE = "#ffffff";
-const PILL = "#e8ecef";
-
 export type StoryPostShareMeta = {
   authorName: string;
   authorHandle?: string | null;
@@ -109,11 +111,20 @@ function drawWrapped(
   maxLines: number,
 ): number {
   const lines = wrapText(ctx, text, maxWidth, maxLines);
+  const full = text.replace(/\s+/g, " ").trim();
+  const shown = lines.join(" ").replace(/\s+/g, " ").trim();
+  const truncated = shown.length > 0 && shown.length < full.length;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i] ?? "";
-    const last = i === lines.length - 1 && lines.length === maxLines;
-    const overflow = last && ctx.measureText(line).width > maxWidth - 4;
-    const out = overflow ? `${line.replace(/\s+\S*$/, "").trimEnd()}…` : line;
+    const last = i === lines.length - 1;
+    let out = line;
+    if (last && truncated) {
+      const ellipsis = "…";
+      while (out && ctx.measureText(`${out}${ellipsis}`).width > maxWidth) {
+        out = out.replace(/\s+\S*$|\S$/, "").trimEnd();
+      }
+      out = out ? `${out}${ellipsis}` : ellipsis;
+    }
     ctx.fillText(out, x, baseline + i * lineHeight);
   }
   return lines.length * lineHeight;
@@ -127,6 +138,130 @@ function wrappedHeight(
   maxLines: number,
 ): number {
   return wrapText(ctx, text, maxWidth, maxLines).length * lineHeight;
+}
+
+function postPx(cssPx: number): number {
+  return Math.round(cssPx * POST_SCALE);
+}
+
+type PostWord = { text: string; weight: "600" | "400"; gapBefore: number; breakBefore: boolean };
+
+/** Feed photo captions: semibold name, then the body in regular Inter at text-sm / leading-snug. */
+function postCaptionWords(name: string, body: string): PostWord[] {
+  const words: PostWord[] = [];
+  const space = postPx(3.5);
+  const nameGap = postPx(6);
+  name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .forEach((text, i) => {
+      words.push({ text, weight: "600", gapBefore: i === 0 ? 0 : space, breakBefore: false });
+    });
+  body
+    .replace(/\r/g, "")
+    .split("\n")
+    .forEach((para, pi) => {
+      para
+        .split(/\s+/)
+        .filter(Boolean)
+        .forEach((text, i) => {
+          const first = words.length > 0 && i === 0 && pi === 0;
+          words.push({
+            text,
+            weight: "400",
+            gapBefore: words.length === 0 ? 0 : first ? nameGap : space,
+            breakBefore: pi > 0 && i === 0,
+          });
+        });
+    });
+  return words;
+}
+
+function layoutPostCaption(
+  ctx: CanvasRenderingContext2D,
+  words: PostWord[],
+  maxWidth: number,
+  maxLines: number,
+): { lines: PostWord[][]; truncated: boolean } {
+  const size = postPx(14);
+  const lines: PostWord[][] = [];
+  let current: PostWord[] = [];
+  let width = 0;
+  const pushLine = () => {
+    if (current.length === 0) return;
+    lines.push(current);
+    current = [];
+    width = 0;
+  };
+  for (const word of words) {
+    if (word.breakBefore) pushLine();
+    if (lines.length >= maxLines) return { lines, truncated: true };
+    ctx.font = `${word.weight} ${size}px ${POST_FONT}`;
+    const wordW = ctx.measureText(word.text).width;
+    const gap = current.length === 0 ? 0 : word.gapBefore;
+    if (current.length > 0 && width + gap + wordW > maxWidth) {
+      pushLine();
+      if (lines.length >= maxLines) return { lines, truncated: true };
+      current = [{ ...word, gapBefore: 0, breakBefore: false }];
+      width = wordW;
+    } else {
+      current.push(current.length === 0 ? { ...word, gapBefore: 0 } : word);
+      width += gap + wordW;
+    }
+  }
+  pushLine();
+  return { lines, truncated: false };
+}
+
+function postCaptionHeight(
+  ctx: CanvasRenderingContext2D,
+  name: string,
+  body: string,
+  maxWidth: number,
+  maxLines: number,
+): number {
+  const words = postCaptionWords(name, body);
+  if (words.length === 0) return 0;
+  const { lines } = layoutPostCaption(ctx, words, maxWidth, maxLines);
+  return lines.length * postPx(14 * 1.375);
+}
+
+function drawPostCaption(
+  ctx: CanvasRenderingContext2D,
+  name: string,
+  body: string,
+  x: number,
+  baseline: number,
+  maxWidth: number,
+  maxLines: number,
+): number {
+  const words = postCaptionWords(name, body);
+  if (words.length === 0) return 0;
+  const size = postPx(14);
+  const lineHeight = postPx(14 * 1.375);
+  const { lines, truncated } = layoutPostCaption(ctx, words, maxWidth, maxLines);
+  ctx.fillStyle = POST_INK;
+  ctx.textAlign = "left";
+  lines.forEach((line, i) => {
+    let cursor = x;
+    const lastLine = i === lines.length - 1;
+    line.forEach((word, wi) => {
+      if (wi > 0) cursor += word.gapBefore;
+      ctx.font = `${word.weight} ${size}px ${POST_FONT}`;
+      let text = word.text;
+      if (truncated && lastLine && wi === line.length - 1) {
+        const ellipsis = "…";
+        while (text && ctx.measureText(`${text}${ellipsis}`).width > maxWidth - (cursor - x)) {
+          text = text.slice(0, -1);
+        }
+        text = text ? `${text}${ellipsis}` : ellipsis;
+      }
+      ctx.fillText(text, cursor, baseline + i * lineHeight);
+      cursor += ctx.measureText(text).width;
+    });
+  });
+  return lines.length * lineHeight;
 }
 
 function sourceSize(img: CanvasImageSource): { w: number; h: number } {
@@ -430,17 +565,6 @@ function timeAgo(iso: string): string {
   return formatDistanceToNow(d, { addSuffix: true });
 }
 
-function drawTopicPill(ctx: CanvasRenderingContext2D, x: number, y: number, label: string): number {
-  ctx.font = `600 22px ${FONT}`;
-  const text = ellipsize(ctx, label, 420);
-  const w = ctx.measureText(text).width + 28;
-  const h = 40;
-  fillRoundRect(ctx, x, y, w, h, h / 2, PILL);
-  ctx.fillStyle = "rgba(18, 20, 26, 0.72)";
-  ctx.fillText(text, x + 14, y + 28);
-  return w;
-}
-
 function drawNameAndCaption(
   ctx: CanvasRenderingContext2D,
   name: string,
@@ -479,104 +603,134 @@ function drawNameAndCaption(
   return lineHeight + drawWrapped(ctx, rest, x, baseline + lineHeight, maxWidth, lineHeight, maxLines - 1);
 }
 
-/** Reshared post: a feed card so it’s obvious this is someone else’s post. */
+function drawCollage(
+  ctx: CanvasRenderingContext2D,
+  images: CanvasImageSource[],
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+) {
+  const gap = 8;
+  const shots = images.slice(0, 4);
+  if (shots.length <= 1) {
+    if (shots[0]) drawCover(ctx, shots[0], x, y, w, h, 0);
+    return;
+  }
+  if (shots.length === 2) {
+    const cw = (w - gap) / 2;
+    drawCover(ctx, shots[0]!, x, y, cw, h, 0);
+    drawCover(ctx, shots[1]!, x + cw + gap, y, cw, h, 0);
+    return;
+  }
+  if (shots.length === 3) {
+    const topH = Math.round(h * 0.56);
+    const botH = h - gap - topH;
+    const cw = (w - gap) / 2;
+    drawCover(ctx, shots[0]!, x, y, w, topH, 0);
+    drawCover(ctx, shots[1]!, x, y + topH + gap, cw, botH, 0);
+    drawCover(ctx, shots[2]!, x + cw + gap, y + topH + gap, cw, botH, 0);
+    return;
+  }
+  const cw = (w - gap) / 2;
+  const ch = (h - gap) / 2;
+  shots.forEach((img, i) => {
+    const col = i % 2;
+    const row = Math.floor(i / 2);
+    drawCover(ctx, img, x + col * (cw + gap), y + row * (ch + gap), cw, ch, 0);
+  });
+}
+
+/** Feed-style card that fits a phone story, with room for the share controls. */
 function drawSharedFeedCard(
   ctx: CanvasRenderingContext2D,
-  media: CanvasImageSource,
+  images: CanvasImageSource[],
   caption: string,
   name: string,
   handle: string | null,
   photo: CanvasImageSource | null,
-  topicLabel: string,
   timeLabel: string,
 ) {
-  ctx.fillStyle = PAGE_MINT;
+  const hero = images[0] ?? null;
+  ctx.fillStyle = "#07080b";
   ctx.fillRect(0, 0, W, H);
-  ctx.save();
-  ctx.filter = "blur(64px)";
-  ctx.globalAlpha = 0.35;
-  drawCover(ctx, media, -100, -100, W + 200, H + 200, 0);
-  ctx.restore();
-  ctx.fillStyle = "rgba(215, 235, 228, 0.78)";
-  ctx.fillRect(0, 0, W, H);
-
-  const cardX = 28;
-  const cardW = W - 56;
-  const radius = 44;
-  const pad = 32;
-  const av = 88;
-  const headerH = pad + av + 28;
-
-  const { w: srcW, h: srcH } = sourceSize(media);
-  const aspect = srcW / Math.max(srcH, 1);
-  const imageH =
-    aspect >= 1
-      ? Math.round(Math.min(880, Math.max(620, cardW / aspect)))
-      : Math.round(Math.min(cardW * 1.12, cardW / Math.max(aspect, 0.72)));
-
-  ctx.font = `500 30px ${FONT}`;
-  const capH = caption ? Math.max(36, wrappedHeight(ctx, caption, cardW - pad * 2, 38, 3) + 4) : 0;
-  const captionBlock = pad + (caption ? capH : 4) + pad;
-  let cardH = headerH + imageH + captionBlock;
-  const maxCardH = H - 72;
-  let drawImageH = imageH;
-  if (cardH > maxCardH) {
-    // Prefer keeping the photo large; shrink caption space first, then image.
-    const overflow = cardH - maxCardH;
-    const reducedCap = Math.max(0, capH - overflow);
-    const stillOver = cardH - maxCardH - (capH - reducedCap);
-    drawImageH = Math.max(640, imageH - Math.max(0, stillOver));
-    cardH = headerH + drawImageH + pad + (caption ? Math.max(36, reducedCap) : 4) + pad;
+  if (hero) {
+    ctx.save();
+    ctx.filter = "blur(42px)";
+    ctx.globalAlpha = 0.45;
+    drawCover(ctx, hero, -80, -80, W + 160, H + 160, 0);
+    ctx.restore();
+    ctx.fillStyle = "rgba(7, 8, 11, 0.72)";
+    ctx.fillRect(0, 0, W, H);
   }
-  const cardY = Math.max(36, Math.round((H - cardH) / 2));
+
+  const cardX = 56;
+  const cardW = W - 112;
+  const radius = 40;
+  const pad = 32;
+  const topSafe = 260;
+  const bottomSafe = 390;
+  const maxCardH = H - topSafe - bottomSafe;
+  const av = 84;
+  const headerH = 28 + av + 28;
+  const viewRow = 64;
+  const capLines = caption ? 4 : 0;
+  const capH = caption ? postCaptionHeight(ctx, name, caption, cardW - pad * 2, capLines) : 0;
+  const captionBlock = caption ? postPx(6) + capH + postPx(4) : 0;
+  const imageH = Math.max(520, maxCardH - headerH - captionBlock - viewRow);
+  const cardH = Math.min(maxCardH, headerH + imageH + captionBlock + viewRow);
+  const cardY = topSafe + Math.max(0, Math.round((maxCardH - cardH) / 2));
 
   drawLiftedCard(ctx, cardX, cardY, cardW, cardH, radius, CARD_WHITE);
-
   ctx.save();
   roundRect(ctx, cardX, cardY, cardW, cardH, radius);
   ctx.clip();
 
   const avX = cardX + pad;
-  const avY = cardY + pad;
+  const avY = cardY + 28;
   drawAvatar(ctx, avX, avY, av, name, photo, true);
+  ctx.font = `600 ${postPx(11)}px ${POST_FONT}`;
+  const badge = "Shared post";
+  const badgeW = ctx.measureText(badge).width + postPx(16);
+  const badgeH = postPx(20);
+  const badgeX = cardX + cardW - pad - badgeW;
+  const badgeY = avY + postPx(2);
+  fillRoundRect(ctx, badgeX, badgeY, badgeW, badgeH, badgeH / 2, "rgba(15, 118, 110, 0.12)");
+  ctx.fillStyle = TEAL_DEEP;
+  ctx.textAlign = "center";
+  ctx.fillText(badge, badgeX + badgeW / 2, badgeY + postPx(14));
+  ctx.textAlign = "left";
 
   const textX = avX + av + 20;
-  const textMax = cardX + cardW - pad - textX;
-  ctx.fillStyle = INK;
-  ctx.font = `700 34px ${FONT}`;
-  const nameLabel = ellipsize(ctx, name, handle ? textMax * 0.55 : textMax);
-  ctx.fillText(nameLabel, textX, avY + 34);
-  if (handle) {
-    const nameW = ctx.measureText(nameLabel).width;
-    ctx.fillStyle = INK_MUTED;
-    ctx.font = `500 26px ${FONT}`;
-    ctx.fillText(ellipsize(ctx, `@${handle}`, textMax - nameW - 16), textX + nameW + 14, avY + 34);
-  }
-  const pillW = drawTopicPill(ctx, textX, avY + 48, topicLabel);
-  if (timeLabel) {
-    ctx.fillStyle = INK_MUTED;
-    ctx.font = `500 22px ${FONT}`;
-    ctx.fillText(`·  ${timeLabel}`, textX + pillW + 12, avY + 76);
-  }
+  const textMax = Math.max(80, badgeX - 16 - textX);
+  ctx.fillStyle = POST_INK;
+  ctx.font = `600 ${postPx(15)}px ${POST_FONT}`;
+  ctx.fillText(ellipsize(ctx, name, textMax), textX, avY + postPx(16));
+  ctx.fillStyle = POST_MUTED;
+  ctx.font = `400 ${postPx(13)}px ${POST_FONT}`;
+  const byline = [handle ? `@${handle}` : null, timeLabel || null].filter(Boolean).join("  ·  ");
+  ctx.fillText(ellipsize(ctx, byline || "From the feed", textMax), textX, avY + postPx(34));
 
-  drawCover(ctx, media, cardX, cardY + headerH, cardW, drawImageH, 0);
+  const mediaY = cardY + headerH;
+  const mediaH = cardH - headerH - captionBlock - viewRow;
+  ctx.fillStyle = "#eef1f4";
+  ctx.fillRect(cardX, mediaY, cardW, mediaH);
+  drawCollage(ctx, images, cardX, mediaY, cardW, mediaH);
 
+  let y = mediaY + mediaH;
   if (caption) {
-    ctx.fillStyle = INK;
-    ctx.font = `500 30px ${FONT}`;
-    drawWrapped(
-      ctx,
-      caption,
-      cardX + pad,
-      cardY + headerH + drawImageH + pad + 28,
-      cardW - pad * 2,
-      38,
-      3,
-    );
+    const capSize = postPx(14);
+    drawPostCaption(ctx, name, caption, cardX + pad, y + postPx(6) + capSize, cardW - pad * 2, capLines);
+    y += captionBlock;
   }
+
+  ctx.fillStyle = TEAL_DEEP;
+  ctx.font = `600 ${postPx(13)}px ${POST_FONT}`;
+  ctx.fillText("View post", cardX + pad, y + postPx(18));
   ctx.restore();
+
   roundRect(ctx, cardX, cardY, cardW, cardH, radius);
-  ctx.strokeStyle = "rgba(18, 20, 26, 0.10)";
+  ctx.strokeStyle = "rgba(255,255,255,0.16)";
   ctx.lineWidth = 2;
   ctx.stroke();
 }
@@ -721,47 +875,6 @@ function drawEventCard(
   ctx.fillText(handle ? `${name}  ·  @${handle}` : name, metaX, y + 110);
 }
 
-function drawMediaStory(
-  ctx: CanvasRenderingContext2D,
-  media: CanvasImageSource,
-  caption: string,
-) {
-  ctx.fillStyle = "#05060a";
-  ctx.fillRect(0, 0, W, H);
-  drawCover(ctx, media, 0, 0, W, H, 0);
-
-  const top = ctx.createLinearGradient(0, 0, 0, 460);
-  top.addColorStop(0, "rgba(0,0,0,0.58)");
-  top.addColorStop(0.45, "rgba(0,0,0,0.18)");
-  top.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = top;
-  ctx.fillRect(0, 0, W, 460);
-
-  const bottomH = 620;
-  const bot = ctx.createLinearGradient(0, H - bottomH, 0, H);
-  bot.addColorStop(0, "rgba(0,0,0,0)");
-  bot.addColorStop(0.38, "rgba(0,0,0,0.22)");
-  bot.addColorStop(1, "rgba(0,0,0,0.7)");
-  ctx.fillStyle = bot;
-  ctx.fillRect(0, H - bottomH, W, bottomH);
-
-  const textX = 72;
-  const textW = W - 144;
-  ctx.font = `500 36px ${FONT}`;
-  const capH = caption ? wrappedHeight(ctx, caption, textW, 46, 4) : 0;
-  const y = H - BOTTOM_SAFE - 12 - capH;
-
-  if (caption) {
-    ctx.save();
-    ctx.shadowColor = "rgba(0,0,0,0.55)";
-    ctx.shadowBlur = 16;
-    ctx.fillStyle = WHITE;
-    ctx.font = `500 36px ${FONT}`;
-    drawWrapped(ctx, caption, textX, y + 36, textW, 46, 4);
-    ctx.restore();
-  }
-}
-
 function drawPollCard(
   ctx: CanvasRenderingContext2D,
   question: string,
@@ -831,8 +944,13 @@ export async function renderPostAsStoryFile(
   const event = post.post_kind === "event" ? parseEventExtra(post.post_extra) : null;
   // Video posts: freeze one frame into the same shared card as photos (caption below).
   // The story viewer then plays the live post video inside StorySharedPostStage.
-  const mediaPath = event ? post.image_urls[0] || null : post.video_url || post.image_urls[0] || null;
-  const media = await loadMedia(mediaPath);
+  const imagePaths = (post.image_urls ?? []).filter(Boolean).slice(0, 4);
+  const videoPath = post.video_url?.trim() || null;
+  const loaded = await Promise.all(
+    (event ? imagePaths.slice(0, 1) : videoPath ? [videoPath] : imagePaths).map((path) => loadMedia(path)),
+  );
+  const shots = loaded.filter((item): item is CanvasImageSource => item != null);
+  const media = shots[0] ?? null;
   const caption = (() => {
     const body = post.body.trim();
     if (!body) return "";
@@ -843,7 +961,6 @@ export async function renderPostAsStoryFile(
   const handle = handleOf(meta);
   const name = nameOf(meta);
   const photo = await loadAvatar(meta);
-  const topicLabel = communityTopicLabel(post.topic);
   const postedAgo = timeAgo(post.created_at);
 
   if (poll) {
@@ -852,12 +969,8 @@ export async function renderPostAsStoryFile(
   } else if (event) {
     drawAtmosphere(ctx, media);
     drawEventCard(ctx, event, media, name, handle);
-  } else if (media) {
-    if (meta.isOwn) {
-      drawMediaStory(ctx, media, caption);
-    } else {
-      drawSharedFeedCard(ctx, media, caption, name, handle, photo, topicLabel, postedAgo);
-    }
+  } else if (shots.length > 0) {
+    drawSharedFeedCard(ctx, shots, caption, name, handle, photo, postedAgo);
   } else {
     drawAtmosphere(ctx, null);
     drawQuoteCard(ctx, caption || "Shared from the feed", name, handle, photo);

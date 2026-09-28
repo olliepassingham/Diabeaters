@@ -23,7 +23,7 @@ type AuthorMeta = {
 };
 
 type SharedMedia =
-  | { kind: "image"; url: string }
+  | { kind: "images"; urls: string[] }
   | { kind: "video"; url: string };
 
 type Props = {
@@ -66,9 +66,9 @@ function AuthorChip({
         size="sm"
         className="!h-10 !w-10 shrink-0"
       />
-      <span className={cn("min-w-0 flex-1 text-left", onLight ? "text-slate-900" : "text-white")}>
-        <span className="block truncate text-sm font-semibold tracking-tight">{author.name}</span>
-        <span className={cn("block truncate text-xs", onLight ? "text-slate-500" : "text-white/70")}>
+      <span className={cn("min-w-0 flex-1 text-left", onLight ? "text-foreground" : "text-white")}>
+        <span className="block truncate text-[15px] font-semibold leading-tight">{author.name}</span>
+        <span className={cn("block truncate text-[13px] leading-tight", onLight ? "text-muted-foreground" : "text-white/70")}>
           {author.handle ? `@${author.handle}` : "View profile"}
           {post.created_at
             ? ` · ${formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}`
@@ -79,9 +79,42 @@ function AuthorChip({
   );
 }
 
+function PhotoCollage({ urls }: { urls: string[] }) {
+  if (urls.length <= 1) {
+    return <img src={urls[0]} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" />;
+  }
+  if (urls.length === 2) {
+    return (
+      <div className="pointer-events-none absolute inset-0 grid grid-cols-2 gap-0.5">
+        {urls.map((url) => (
+          <img key={url} src={url} alt="" className="h-full w-full object-cover" />
+        ))}
+      </div>
+    );
+  }
+  if (urls.length === 3) {
+    return (
+      <div className="pointer-events-none absolute inset-0 grid grid-rows-[1.15fr_0.85fr] gap-0.5">
+        <img src={urls[0]} alt="" className="h-full w-full object-cover" />
+        <div className="grid grid-cols-2 gap-0.5">
+          <img src={urls[1]} alt="" className="h-full w-full object-cover" />
+          <img src={urls[2]} alt="" className="h-full w-full object-cover" />
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="pointer-events-none absolute inset-0 grid grid-cols-2 grid-rows-2 gap-0.5">
+      {urls.slice(0, 4).map((url) => (
+        <img key={url} src={url} alt="" className="h-full w-full object-cover" />
+      ))}
+    </div>
+  );
+}
+
 /**
- * Full-bleed interactive stage for stories that reshare a feed post.
- * Photos and videos use the same card: media on top, caption + author below.
+ * Full-bleed story stage for a reshared feed post.
+ * The card matches the feed: author, photos, caption, and a tap through to the post.
  */
 export function StorySharedPostStage({ postId, className, onOpenPost, onOpenAuthor }: Props) {
   const [post, setPost] = useState<CommunityPostRow | null>(null);
@@ -134,10 +167,10 @@ export function StorySharedPostStage({ postId, className, onOpenPost, onOpenAuth
         const url = await getPostVideoSignedUrl(videoPath);
         if (!cancelled && url) setMedia({ kind: "video", url });
       } else {
-        const imagePath = row.image_urls?.[0] || null;
-        if (imagePath) {
-          const urls = await getPostImageSignedUrls([imagePath]);
-          if (!cancelled && urls[0]) setMedia({ kind: "image", url: urls[0] });
+        const paths = (row.image_urls ?? []).filter(Boolean).slice(0, 4);
+        if (paths.length > 0) {
+          const urls = (await getPostImageSignedUrls(paths)).filter((url): url is string => Boolean(url));
+          if (!cancelled && urls.length > 0) setMedia({ kind: "images", urls });
         }
       }
       setLoading(false);
@@ -152,7 +185,7 @@ export function StorySharedPostStage({ postId, className, onOpenPost, onOpenAuth
     return (
       <div
         className={cn(
-          "absolute inset-0 flex items-center justify-center bg-gradient-to-br from-[#d7ebe4] via-[#f6f1e8] to-[#e8f4f1]",
+          "absolute inset-0 flex items-center justify-center bg-black",
           className,
         )}
         aria-hidden
@@ -166,11 +199,11 @@ export function StorySharedPostStage({ postId, className, onOpenPost, onOpenAuth
     return (
       <div
         className={cn(
-          "absolute inset-0 flex items-center justify-center bg-gradient-to-br from-[#d7ebe4] via-[#f6f1e8] to-[#e8f4f1] px-8",
+          "absolute inset-0 flex items-center justify-center bg-black px-8",
           className,
         )}
       >
-        <p className="text-center text-sm text-slate-600">This post is no longer available.</p>
+        <p className="text-center text-sm text-white/75">This post is no longer available.</p>
       </div>
     );
   }
@@ -189,17 +222,17 @@ export function StorySharedPostStage({ postId, className, onOpenPost, onOpenAuth
   return (
     <div
       className={cn(
-        "absolute inset-0 overflow-hidden bg-gradient-to-br from-[#d7ebe4] via-[#f6f1e8] to-[#e8f4f1]",
+        "absolute inset-0 overflow-hidden",
+        showMediaCard ? "bg-black" : "bg-gradient-to-br from-[#d7ebe4] via-[#f6f1e8] to-[#e8f4f1]",
         className,
       )}
       data-testid="story-shared-post-stage"
     >
-      {/* Soft wash behind the card — same treatment for photo and video. */}
       {showMediaCard && media ? (
         <>
-          {media.kind === "image" ? (
+          {media.kind === "images" ? (
             <img
-              src={media.url}
+              src={media.urls[0]}
               alt=""
               className="absolute inset-0 h-full w-full scale-110 object-cover opacity-40 blur-2xl"
               aria-hidden
@@ -214,15 +247,23 @@ export function StorySharedPostStage({ postId, className, onOpenPost, onOpenAuth
               aria-hidden
             />
           )}
-          <div className="absolute inset-0 bg-gradient-to-br from-[#d7ebe4]/88 via-[#f6f1e8]/92 to-[#e8f4f1]/95" />
+          <div className="absolute inset-0 bg-black/70" />
         </>
       ) : null}
 
       <div className="pointer-events-none absolute inset-0 z-[9] flex flex-col px-3.5 pb-[max(6.75rem,env(safe-area-inset-bottom))] pt-[max(5.25rem,calc(env(safe-area-inset-top)+4rem))] sm:px-5">
         {showMediaCard && media ? (
-          <div className="mx-auto flex min-h-0 w-full max-w-lg flex-1 flex-col overflow-hidden rounded-[1.5rem] bg-white shadow-[0_18px_50px_-20px_rgba(15,23,42,0.35)] ring-1 ring-slate-900/8">
-            {/* Media on top — caption never overlays it. */}
-            <div className="relative min-h-0 flex-[1.35] overflow-hidden bg-slate-100">
+          <div className="mx-auto flex min-h-0 w-full max-w-lg flex-1 flex-col overflow-hidden rounded-[1.6rem] bg-white shadow-[0_24px_60px_-24px_rgba(0,0,0,0.65)]">
+            <div className="pointer-events-auto flex shrink-0 items-center gap-2 px-3 pb-2 pt-3">
+              <div className="min-w-0 flex-1">
+                <AuthorChip author={author} post={post} onLight onOpenAuthor={onOpenAuthor} />
+              </div>
+              <span className="shrink-0 rounded-full bg-teal-700/10 px-2.5 py-1 text-[11px] font-semibold tracking-tight text-teal-800">
+                Shared post
+              </span>
+            </div>
+
+            <div className="relative min-h-0 flex-1 overflow-hidden bg-slate-100">
               <button
                 type="button"
                 className="pointer-events-auto absolute inset-0 z-0 cursor-pointer border-0 bg-transparent"
@@ -233,12 +274,8 @@ export function StorySharedPostStage({ postId, className, onOpenPost, onOpenAuth
                   onOpenPost();
                 }}
               />
-              {media.kind === "image" ? (
-                <img
-                  src={media.url}
-                  alt=""
-                  className="pointer-events-none absolute inset-0 h-full w-full object-cover"
-                />
+              {media.kind === "images" ? (
+                <PhotoCollage urls={media.urls} />
               ) : (
                 <video
                   src={media.url}
@@ -264,43 +301,33 @@ export function StorySharedPostStage({ postId, className, onOpenPost, onOpenAuth
                   {muted ? <VolumeX className="h-4 w-4" aria-hidden /> : <Volume2 className="h-4 w-4" aria-hidden />}
                 </button>
               ) : null}
-              {event ? (
-                <div className="pointer-events-none absolute left-3 top-3 rounded-full bg-black/45 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white backdrop-blur-md">
-                  Event
-                </div>
-              ) : null}
             </div>
 
-            <div className="flex shrink-0 flex-col gap-2.5 px-3.5 pb-3 pt-3">
+            <div className="flex shrink-0 flex-col gap-2 px-4 pb-3.5 pt-3">
               {footerCaption ? (
                 <button
                   type="button"
-                  className="pointer-events-auto line-clamp-4 whitespace-pre-wrap text-left text-[0.95rem] font-medium leading-snug tracking-tight text-slate-900 sm:text-base"
+                  className="pointer-events-auto line-clamp-4 text-left text-sm font-normal leading-snug text-foreground"
                   data-testid="story-shared-post-caption"
                   onClick={(e) => {
                     e.stopPropagation();
                     onOpenPost();
                   }}
                 >
-                  {event && event.title.trim() && caption && caption !== event.title.trim() ? (
-                    <>
-                      <span className="font-semibold">{event.title.trim()}</span>
-                      <span className="text-slate-400"> · </span>
-                      {renderBodyWithMentions(caption, {})}
-                    </>
-                  ) : (
-                    renderBodyWithMentions(footerCaption, {})
-                  )}
+                  <span className="mr-1.5 font-semibold">{author.name}</span>
+                  <span className="whitespace-pre-wrap">{renderBodyWithMentions(footerCaption, post.mention_map ?? {})}</span>
                 </button>
               ) : null}
-              <div
-                className={cn(
-                  "pointer-events-auto",
-                  footerCaption ? "border-t border-slate-900/8 pt-2" : undefined,
-                )}
+              <button
+                type="button"
+                className="pointer-events-auto self-start text-sm font-semibold text-teal-800"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenPost();
+                }}
               >
-                <AuthorChip author={author} post={post} onLight onOpenAuthor={onOpenAuthor} />
-              </div>
+                View post
+              </button>
             </div>
           </div>
         ) : (
