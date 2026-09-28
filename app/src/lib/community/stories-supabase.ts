@@ -134,11 +134,23 @@ function validateStoryOverlays(overlays: StoryOverlay[]): Error | null {
   return null;
 }
 
+const STORY_IMAGE_NAME_RE = /\.(heic|heif|jpe?g|png|webp|gif|avif)$/i;
+
+function storyFileIsImage(file: File): boolean {
+  const t = file.type.toLowerCase();
+  const name = file.name.toLowerCase();
+  if (t.startsWith("video/") || /\.(mp4|mov|webm)$/i.test(name)) return false;
+  if (t.startsWith("image/") || STORY_IMAGE_NAME_RE.test(name)) return true;
+  return !t || t === "application/octet-stream";
+}
+
 function extFromStoryFile(f: File): string {
   const t = f.type.toLowerCase();
-  if (t.startsWith("image/")) {
+  if (storyFileIsImage(f)) {
     if (t.includes("png")) return "png";
     if (t.includes("webp")) return "webp";
+    if (t.includes("heic") || f.name.toLowerCase().endsWith(".heic")) return "heic";
+    if (t.includes("heif") || f.name.toLowerCase().endsWith(".heif")) return "heif";
     return "jpg";
   }
   if (t.includes("webm")) return "webm";
@@ -147,7 +159,7 @@ function extFromStoryFile(f: File): string {
 }
 
 function mediaKindFromFile(f: File): CommunityStoryMediaKind {
-  return f.type.startsWith("image/") ? "image" : "video";
+  return storyFileIsImage(f) ? "image" : "video";
 }
 
 function validateStoryFile(file: File): Error | null {
@@ -156,11 +168,11 @@ function validateStoryFile(file: File): Error | null {
   }
   const t = file.type.toLowerCase();
   const ok =
-    t.startsWith("image/") ||
+    storyFileIsImage(file) ||
     t === "video/mp4" ||
     t === "video/quicktime" ||
     t === "video/webm" ||
-    /\.(mp4|mov|webm|jpe?g|png|webp)$/i.test(file.name);
+    /\.(mp4|mov|webm)$/i.test(file.name);
   if (!ok) {
     return new Error("Use a photo (JPG/PNG) or short video (MP4/MOV/WebM).");
   }

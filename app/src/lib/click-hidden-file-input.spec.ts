@@ -22,6 +22,7 @@ describe("unlockSystemPickerPointerEvents", () => {
 
 describe("clickHiddenFileInput", () => {
   it("clicks the input after unlocking pointer events", () => {
+    vi.useFakeTimers();
     document.body.style.setProperty("pointer-events", "none");
     const input = document.createElement("input");
     input.type = "file";
@@ -30,20 +31,28 @@ describe("clickHiddenFileInput", () => {
     expect(document.body.style.getPropertyValue("pointer-events")).toBe("auto");
     expect(click).toHaveBeenCalledTimes(1);
     input.dispatchEvent(new Event("cancel"));
+    expect(isFilePickerActive()).toBe(true);
+    vi.advanceTimersByTime(600);
     expect(isFilePickerActive()).toBe(false);
     click.mockRestore();
+    vi.useRealTimers();
   });
 
-  it("holds the sheet open until the file selection finishes", async () => {
+  it("holds the sheet open until the file selection finishes", () => {
+    vi.useFakeTimers();
     const input = document.createElement("input");
     input.type = "file";
     const click = vi.spyOn(input, "click").mockImplementation(() => {});
     clickHiddenFileInput(input);
     expect(isFilePickerActive()).toBe(true);
     input.dispatchEvent(new Event("change"));
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(isFilePickerActive()).toBe(true);
+    vi.advanceTimersByTime(599);
+    expect(isFilePickerActive()).toBe(true);
+    vi.advanceTimersByTime(1);
     expect(isFilePickerActive()).toBe(false);
     click.mockRestore();
+    vi.useRealTimers();
   });
 
   it("does nothing when the input is disabled", () => {

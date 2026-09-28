@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Clock3, ImagePlus, Loader2, RefreshCw, Send, Video } from "lucide-react";
+import heic2any from "heic2any";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { StoryOverlayEditor } from "@/components/community/story-overlay-editor";
 import { useToast } from "@/hooks/use-toast";
-import { clickHiddenFileInput, FILE_INPUT_HIDDEN_CLASS } from "@/lib/click-hidden-file-input";
+import { clickHiddenFileInput, FILE_INPUT_HIDDEN_CLASS, isFilePickerActive } from "@/lib/click-hidden-file-input";
 import { pickSingleImageFromLibrary } from "@/lib/community/pick-post-images";
 import {
   insertCommunityStory,
@@ -28,6 +29,24 @@ type Props = {
   /** Feed post this story should link back to (cleared if the user changes media). */
   sourcePostId?: string | null;
 };
+
+function isHeicFile(file: File): boolean {
+  const t = file.type.toLowerCase();
+  const name = file.name.toLowerCase();
+  return t === "image/heic" || t === "image/heif" || name.endsWith(".heic") || name.endsWith(".heif");
+}
+
+async function jpegFromHeic(file: File): Promise<File> {
+  const converted = (await heic2any({
+    blob: file,
+    toType: "image/jpeg",
+    quality: 0.9,
+  })) as Blob | Blob[];
+  const blob = Array.isArray(converted) ? converted[0] : converted;
+  if (!blob) throw new Error("No image data returned");
+  const base = file.name.replace(/\.(heic|heif)$/i, "") || "photo";
+  return new File([blob], `${base}.jpg`, { type: "image/jpeg" });
+}
 
 function MediaPickCard({
   icon,
@@ -110,21 +129,35 @@ export function StoryCreateSheet({
   }, [open, prefillFile, prefillOverlayText, sourcePostId]);
 
   function onPick(files: FileList | null) {
-    const picked = files?.[0];
+    const picked = files?.[0] ?? null;
     if (photoInputRef.current) photoInputRef.current.value = "";
     if (videoInputRef.current) videoInputRef.current.value = "";
     if (!picked) return;
-    applyPickedFile(picked);
+    void applyPickedFile(picked);
   }
 
-  function applyPickedFile(f: File) {
+  async function applyPickedFile(f: File) {
+    let next = f;
+    if (isHeicFile(f)) {
+      try {
+        next = await jpegFromHeic(f);
+      } catch (err) {
+        toast({
+          title: "Could not read that photo",
+          description: err instanceof Error ? err.message : "Try a JPG or PNG.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
     if (preview) URL.revokeObjectURL(preview);
-    setFile(f);
-    setPreview(URL.createObjectURL(f));
+    setFile(next);
+    setPreview(URL.createObjectURL(next));
     setOverlays([]);
     setLinkedPostId(null);
     if (photoInputRef.current) photoInputRef.current.value = "";
     if (videoInputRef.current) videoInputRef.current.value = "";
+    onOpenChange(true);
   }
 
   async function handlePost() {
@@ -153,7 +186,10 @@ export function StoryCreateSheet({
     <BottomSheet
       open={open}
       onOpenChange={(v) => {
-        if (!v) reset();
+        if (!v) {
+          if (isFilePickerActive()) return;
+          reset();
+        }
         onOpenChange(v);
       }}
       title="New story"
@@ -234,7 +270,7 @@ export function StoryCreateSheet({
                 onClick={() => {
                   void (async () => {
                     const picked = await pickSingleImageFromLibrary(photoInputRef.current);
-                    if (picked) applyPickedFile(picked);
+                    if (picked) await applyPickedFile(picked);
                   })();
                 }}
               />

@@ -91,23 +91,47 @@ function retainFilePicker(): () => void {
   };
 }
 
+/** How long to keep the sheet from dismissing after the OS picker closes. */
+const PICKER_SETTLE_MS = 600;
+
+/**
+ * Hold surrounding sheets open for a system picker, and for a short beat after it
+ * closes. The close often lands as a tap on the sheet overlay and would wipe a
+ * selection that just arrived.
+ */
+export function beginFilePickerHold(): () => void {
+  const release = retainFilePicker();
+  let settled = false;
+  return () => {
+    if (settled) return;
+    settled = true;
+    window.setTimeout(release, PICKER_SETTLE_MS);
+  };
+}
+
 /** Arm pointer-events and keep the surrounding sheet open for this input's picker. */
 export function prepareFileInputForPicker(input: HTMLInputElement | null | undefined): void {
   if (!input || input.disabled) return;
   armSystemPickerPointerUnlock();
-  const release = retainFilePicker();
+  const release = beginFilePickerHold();
+  let closed = false;
   const finish = () => {
+    if (closed) return;
+    closed = true;
     input.removeEventListener("change", onChange);
     input.removeEventListener("cancel", onCancel);
     window.removeEventListener("focus", onFocus);
     release();
   };
-  const onChange = () => window.setTimeout(finish, 0);
+  const onChange = () => finish();
   const onCancel = () => finish();
-  const onFocus = () => window.setTimeout(finish, 400);
+  const onFocus = () => finish();
   input.addEventListener("change", onChange);
   input.addEventListener("cancel", onCancel);
-  window.setTimeout(() => window.addEventListener("focus", onFocus), 0);
+  window.setTimeout(() => {
+    if (closed) return;
+    window.addEventListener("focus", onFocus);
+  }, 0);
 }
 
 /** Programmatic file-input click that keeps the first Photos tap working. */

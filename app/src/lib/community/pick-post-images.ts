@@ -1,6 +1,6 @@
 import { Camera, CameraResultType, CameraSource } from "@capacitor/camera";
 import { Capacitor } from "@capacitor/core";
-import { clickHiddenFileInput, unlockSystemPickerPointerEvents } from "@/lib/click-hidden-file-input";
+import { beginFilePickerHold, clickHiddenFileInput, unlockSystemPickerPointerEvents } from "@/lib/click-hidden-file-input";
 
 const MAX_POST_IMAGES = 4;
 
@@ -52,6 +52,7 @@ export async function pickPostImagesFromLibrary(
     return [];
   }
 
+  const endHold = beginFilePickerHold();
   const restore = unlockSystemPickerPointerEvents();
   try {
     const res = await Camera.pickImages({ limit: remaining, quality: 90 });
@@ -71,6 +72,7 @@ export async function pickPostImagesFromLibrary(
     return newFiles;
   } finally {
     restore();
+    endHold();
   }
 }
 
@@ -83,6 +85,7 @@ export async function pickSingleImageFromLibrary(
     return null;
   }
 
+  const endHold = beginFilePickerHold();
   const restore = unlockSystemPickerPointerEvents();
   try {
     const photo = await Camera.getPhoto({
@@ -94,9 +97,13 @@ export async function pickSingleImageFromLibrary(
     if (!webPath) return null;
     const ext = photo.format ? `.${photo.format}` : ".jpg";
     return await fileFromWebPath(webPath, `photo-${Date.now()}${ext}`);
-  } catch {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error ?? "");
+    if (/cancel/i.test(message)) return null;
+    clickHiddenFileInput(fallbackInput);
     return null;
   } finally {
     restore();
+    endHold();
   }
 }
