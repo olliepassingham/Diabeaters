@@ -4,8 +4,8 @@ import type { StoryOverlay, StoryOverlayStyle } from "@/lib/community/stories-su
 
 export function storyOverlayClassName(style: StoryOverlayStyle): string {
   return style === "pill"
-    ? "rounded-full bg-black/55 px-3 py-1.5 text-sm font-semibold text-white backdrop-blur-sm"
-    : "text-lg font-bold text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.85)]";
+    ? "rounded-full bg-black/55 px-3.5 py-2 text-xl font-semibold text-white backdrop-blur-md"
+    : "text-[1.65rem] font-bold leading-tight tracking-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]";
 }
 
 type StoryOverlayLayerProps = {
@@ -34,8 +34,8 @@ export function StoryOverlayLayer({
           key={overlay.id}
           className={cn(
             "absolute max-w-[85%] -translate-x-1/2 -translate-y-1/2 text-center",
-            interactive && "pointer-events-auto touch-none",
-            interactive && selectedOverlayId === overlay.id && "ring-2 ring-white/80 ring-offset-2 ring-offset-transparent rounded-lg",
+            interactive && "pointer-events-auto touch-none px-2 py-1.5",
+            interactive && selectedOverlayId === overlay.id && "rounded-lg ring-2 ring-white/70",
           )}
           style={{ left: `${overlay.x * 100}%`, top: `${overlay.y * 100}%` }}
           onPointerDown={

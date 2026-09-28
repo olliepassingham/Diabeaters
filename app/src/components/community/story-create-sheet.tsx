@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Clock3, ImagePlus, Loader2, RefreshCw, Send, Video } from "lucide-react";
+import { Clock3, ImagePlus, Loader2, RefreshCw, Send, Video, X } from "lucide-react";
 import heic2any from "heic2any";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { StoryOverlayEditor } from "@/components/community/story-overlay-editor";
 import { useToast } from "@/hooks/use-toast";
 import { clickHiddenFileInput, FILE_INPUT_HIDDEN_CLASS, isFilePickerActive } from "@/lib/click-hidden-file-input";
@@ -12,11 +11,9 @@ import { pickSingleImageFromLibrary } from "@/lib/community/pick-post-images";
 import {
   insertCommunityStory,
   MAX_STORY_BYTES,
-  MAX_STORY_CAPTION_LENGTH,
   MAX_STORY_OVERLAY_TEXT_LENGTH,
   type StoryOverlay,
 } from "@/lib/community/stories-supabase";
-import { cn } from "@/lib/utils";
 
 type Props = {
   open: boolean;
@@ -89,22 +86,48 @@ export function StoryCreateSheet({
   const videoInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
-  const [caption, setCaption] = useState("");
   const [overlays, setOverlays] = useState<StoryOverlay[]>([]);
   const [busy, setBusy] = useState(false);
+  const [textEditing, setTextEditing] = useState(false);
   const [linkedPostId, setLinkedPostId] = useState<string | null>(null);
   const appliedPrefill = useRef<File | null>(null);
+  const hasMedia = Boolean(preview && file);
+  const hasMediaRef = useRef(hasMedia);
+  hasMediaRef.current = hasMedia;
 
   function reset() {
     setFile(null);
     if (preview) URL.revokeObjectURL(preview);
     setPreview(null);
-    setCaption("");
     setOverlays([]);
+    setTextEditing(false);
     setLinkedPostId(null);
     if (photoInputRef.current) photoInputRef.current.value = "";
     if (videoInputRef.current) videoInputRef.current.value = "";
   }
+
+  useEffect(() => {
+    if (!hasMedia) return;
+    const body = document.body;
+    const scrollY = window.scrollY;
+    const prev = {
+      overflow: body.style.overflow,
+      position: body.style.position,
+      top: body.style.top,
+      width: body.style.width,
+    };
+    body.style.overflow = "hidden";
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.width = "100%";
+    return () => {
+      body.style.overflow = prev.overflow;
+      body.style.position = prev.position;
+      body.style.top = prev.top;
+      body.style.width = prev.width;
+      window.scrollTo(0, scrollY);
+    };
+  }, [hasMedia]);
 
   useEffect(() => {
     if (!open) {
@@ -114,12 +137,11 @@ export function StoryCreateSheet({
     if (!prefillFile || appliedPrefill.current === prefillFile) return;
     appliedPrefill.current = prefillFile;
     setFile(prefillFile);
-    setCaption("");
     setLinkedPostId(sourcePostId?.trim() || null);
     const credit = prefillOverlayText?.trim().slice(0, MAX_STORY_OVERLAY_TEXT_LENGTH);
     setOverlays(
       credit
-        ? [{ id: crypto.randomUUID(), text: credit, x: 0.5, y: 0.86, style: "pill" }]
+        ? [{ id: crypto.randomUUID(), text: credit, x: 0.5, y: 0.72, style: "pill" }]
         : [],
     );
     setPreview((prev) => {
@@ -164,8 +186,7 @@ export function StoryCreateSheet({
     if (!file || busy) return;
     setBusy(true);
     const res = await insertCommunityStory(file, {
-      caption: caption.trim() || undefined,
-      overlays,
+      overlays: overlays.filter((o) => o.text.trim()),
       sourcePostId: linkedPostId,
     });
     setBusy(false);
@@ -180,14 +201,128 @@ export function StoryCreateSheet({
   }
 
   const maxMb = Math.round(MAX_STORY_BYTES / (1024 * 1024));
-  const hasMedia = Boolean(preview && file);
+  const fileInputs =
+    typeof document !== "undefined"
+      ? createPortal(
+          <>
+            <input
+              ref={photoInputRef}
+              id="story-photo-input"
+              type="file"
+              accept="image/*,.heic,.heif"
+              className={FILE_INPUT_HIDDEN_CLASS}
+              onChange={(e) => onPick(e.target.files)}
+            />
+            <input
+              ref={videoInputRef}
+              id="story-video-input"
+              type="file"
+              accept="video/*"
+              className={FILE_INPUT_HIDDEN_CLASS}
+              onChange={(e) => onPick(e.target.files)}
+            />
+          </>,
+          document.body,
+        )
+      : null;
+
+  if (hasMedia && preview && typeof document !== "undefined") {
+    return (
+      <>
+        {fileInputs}
+        {createPortal(
+          <div
+            data-story-stage
+            className="fixed inset-0 z-[140] flex h-dvh max-h-dvh items-center justify-center bg-black text-white touch-manipulation [-webkit-tap-highlight-color:transparent]"
+          >
+            <div
+              className="relative h-full w-full max-w-[min(100%,calc(100dvh*9/16))] overflow-hidden"
+              data-testid="story-editor-stage"
+            >
+            <StoryOverlayEditor
+              overlays={overlays}
+              onChange={setOverlays}
+              onEditingChange={setTextEditing}
+              className="absolute inset-0"
+            >
+              {file?.type.startsWith("video/") ? (
+                <video
+                  src={preview}
+                  className="h-full w-full object-cover"
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                />
+              ) : (
+                <img src={preview} alt="" className="h-full w-full object-cover" />
+              )}
+            </StoryOverlayEditor>
+
+            {!textEditing ? (
+              <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between px-3 pt-[max(0.75rem,env(safe-area-inset-top))] [padding-left:max(0.75rem,env(safe-area-inset-left))] [padding-right:max(0.75rem,env(safe-area-inset-right))]">
+                <button
+                  type="button"
+                  className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-md active:scale-95"
+                  aria-label="Close story"
+                  onClick={() => {
+                    reset();
+                    onOpenChange(false);
+                  }}
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            ) : null}
+
+            {!textEditing && overlays.every((o) => !o.text.trim()) ? (
+              <p className="pointer-events-none absolute inset-x-0 bottom-[max(5.5rem,calc(env(safe-area-inset-bottom)+4.5rem))] z-10 px-16 text-center text-[13px] font-medium tracking-wide text-white/75 drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]">
+                Tap the photo to add text
+              </p>
+            ) : null}
+
+            {!textEditing ? (
+              <div className="absolute inset-x-0 bottom-0 z-20 flex items-end justify-between gap-3 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]">
+                <button
+                  type="button"
+                  className="flex h-11 w-11 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-md active:scale-95"
+                  aria-label="Change photo or video"
+                  onClick={reset}
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </button>
+                {linkedPostId ? (
+                  <p className="mb-2 min-w-0 flex-1 truncate text-center text-[11px] font-medium text-white/75">
+                    Links to the original post
+                  </p>
+                ) : (
+                  <span className="flex-1" />
+                )}
+                <Button
+                  type="button"
+                  className="h-11 rounded-full px-5 text-sm font-semibold shadow-lg active:scale-95"
+                  disabled={!file || busy}
+                  onClick={() => void handlePost()}
+                >
+                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="mr-1.5 h-4 w-4" aria-hidden />}
+                  {busy ? "Sharing" : "Share"}
+                </Button>
+              </div>
+            ) : null}
+            </div>
+          </div>,
+          document.body,
+        )}
+      </>
+    );
+  }
 
   return (
     <BottomSheet
       open={open}
       onOpenChange={(v) => {
         if (!v) {
-          if (isFilePickerActive()) return;
+          if (isFilePickerActive() || hasMediaRef.current) return;
           reset();
         }
         onOpenChange(v);
@@ -196,71 +331,9 @@ export function StoryCreateSheet({
       description="Visible for 24 hours on your profile."
       bodyClassName="flex min-h-0 flex-col overflow-hidden"
     >
-      {typeof document !== "undefined"
-        ? createPortal(
-            <>
-              <input
-                ref={photoInputRef}
-                id="story-photo-input"
-                type="file"
-                accept="image/*,.heic,.heif"
-                className={FILE_INPUT_HIDDEN_CLASS}
-                onChange={(e) => onPick(e.target.files)}
-              />
-              <input
-                ref={videoInputRef}
-                id="story-video-input"
-                type="file"
-                accept="video/*"
-                className={FILE_INPUT_HIDDEN_CLASS}
-                onChange={(e) => onPick(e.target.files)}
-              />
-            </>,
-            document.body,
-          )
-        : null}
+      {fileInputs}
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-3">
-        {hasMedia ? (
-          <div className="space-y-3">
-            <StoryOverlayEditor
-              overlays={overlays}
-              onChange={setOverlays}
-              className="mx-auto aspect-[9/16] h-[min(52vh,28rem)] w-auto max-w-full rounded-[1.35rem] border-white/10 shadow-lg"
-            >
-              {file?.type.startsWith("video/") ? (
-                <video src={preview ?? undefined} className="h-full w-full object-contain" controls playsInline />
-              ) : (
-                <img src={preview ?? undefined} alt="" className="h-full w-full object-contain" />
-              )}
-            </StoryOverlayEditor>
-            <button
-              type="button"
-              className="mx-auto flex items-center gap-1.5 rounded-full border border-border/50 bg-muted/30 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-              onClick={reset}
-            >
-              <RefreshCw className="h-3.5 w-3.5" aria-hidden />
-              Change media
-            </button>
-            {linkedPostId ? (
-              <p className="text-center text-[11px] text-muted-foreground">
-                Viewers can open the original post from this story.
-              </p>
-            ) : null}
-            <Textarea
-              id="story-caption"
-              value={caption}
-              onChange={(e) => setCaption(e.target.value)}
-              maxLength={MAX_STORY_CAPTION_LENGTH}
-              placeholder="Add a caption (optional)"
-              rows={2}
-              className="min-h-[4.25rem] resize-none rounded-2xl border-border/50 bg-muted/20"
-            />
-            <p className="text-right text-[11px] tabular-nums text-muted-foreground">
-              {caption.length}/{MAX_STORY_CAPTION_LENGTH}
-            </p>
-          </div>
-        ) : (
           <div className="space-y-4 pt-1">
             <div className="flex gap-2.5">
               <MediaPickCard
@@ -286,31 +359,7 @@ export function StoryCreateSheet({
               <span>Friends can rewatch until it expires · up to {maxMb} MB</span>
             </div>
           </div>
-        )}
       </div>
-
-      {hasMedia ? (
-        <div className="shrink-0 border-t border-border/50 px-4 py-3">
-          <Button
-            type="button"
-            className={cn("h-12 w-full rounded-full text-[15px] font-semibold")}
-            disabled={!file || busy}
-            onClick={() => void handlePost()}
-          >
-            {busy ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Uploading…
-              </>
-            ) : (
-              <>
-                <Send className="mr-2 h-4 w-4" aria-hidden />
-                Share story
-              </>
-            )}
-          </Button>
-        </div>
-      ) : null}
     </BottomSheet>
   );
 }
