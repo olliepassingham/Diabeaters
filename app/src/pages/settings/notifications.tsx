@@ -10,11 +10,7 @@ import { isNativePushPlatform, nativePlatformLabel } from "@/lib/native-platform
 import { BEDTIME_REMINDER_TIME_OPTIONS, DEFAULT_BEDTIME_REMINDER_TIME } from "@/lib/bedtime-reminder-schedule";
 import { shouldReceiveBedtimeCheckReminders } from "@/lib/bedtime-reminder-eligibility";
 import { isCgmPrefillActive } from "@/lib/cgm/preferences";
-import {
-  exerciseCgmAlertThresholdOptions,
-  formatExerciseCgmAlertThresholdOption,
-  resolveExerciseCgmAlertThreshold,
-} from "@/lib/exercise-cgm-alert-thresholds";
+import { ExerciseAlertLevelControl } from "@/components/exercise-alert-level-control";
 import {
   formatSupporterAlertLimitOption,
   mmolToDisplayBg,
@@ -54,7 +50,7 @@ export function NotificationsTab({
   onToggle,
   onThreshold,
   onBedtimeReminderTimeChange,
-  onExerciseCgmAlertThresholdChange,
+  onExerciseCgmAlertLevelsChange,
   onSupporterLiveGlucoseAlertLimitsChange,
   embedded = false,
   supporterMode = false,
@@ -64,7 +60,9 @@ export function NotificationsTab({
   onToggle: (key: keyof NotificationSettings, value: boolean) => void;
   onThreshold: (key: "criticalThresholdDays" | "lowThresholdDays", value: string) => void;
   onBedtimeReminderTimeChange?: (time: string) => void;
-  onExerciseCgmAlertThresholdChange?: (threshold: number) => void;
+  onExerciseCgmAlertLevelsChange?: (
+    patch: Pick<NotificationSettings, "exerciseCgmAlertThreshold" | "exerciseCgmAlertAimBg">,
+  ) => void;
   onSupporterLiveGlucoseAlertLimitsChange?: (limits: { lowMmol: number; highMmol: number }) => void;
   embedded?: boolean;
   supporterMode?: boolean;
@@ -82,8 +80,6 @@ export function NotificationsTab({
   const masterOff = !notifSettings.enabled;
   const bgUnits = normalizeBgUnits(storage.getProfile()?.bgUnits);
   const cgmActive = isCgmPrefillActive();
-  const exerciseAlertThreshold = resolveExerciseCgmAlertThreshold(notifSettings, bgUnits);
-  const exerciseAlertThresholdOptions = exerciseCgmAlertThresholdOptions(bgUnits);
   const liveAlertLimits = resolveSupporterLiveGlucoseAlertLimitsMmol(notifSettings);
 
   const inner = (
@@ -340,8 +336,8 @@ export function NotificationsTab({
                 label="Exercise low-glucose alerts"
                 description={
                   cgmActive
-                    ? "While your exercise guide is active, alert when live CGM crosses your threshold with carb suggestions"
-                    : "Connect live CGM in CGM settings to enable alerts during active exercise"
+                    ? "On your watch and phone while a workout is active"
+                    : "Connect live CGM in CGM settings to enable alerts during a workout"
                 }
                 checked={notifSettings.exerciseCgmAlerts !== false}
                 onCheckedChange={(checked) => onToggle("exerciseCgmAlerts", checked)}
@@ -350,49 +346,22 @@ export function NotificationsTab({
               />
               {notifSettings.exerciseCgmAlerts !== false && cgmActive ? (
                 <div className="space-y-3 px-3.5 py-3 sm:px-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="exercise-cgm-alert-threshold" className="text-xs font-medium text-muted-foreground">
-                      Alert when BG falls below ({bgUnits})
-                    </Label>
-                    <Select
-                      value={String(exerciseAlertThreshold)}
-                      onValueChange={(v) => {
-                        const n = parseFloat(v);
-                        if (Number.isFinite(n)) onExerciseCgmAlertThresholdChange?.(n);
-                      }}
-                      disabled={masterOff}
-                    >
-                      <SelectTrigger
-                        id="exercise-cgm-alert-threshold"
-                        className="h-12 rounded-xl"
-                        data-testid="select-exercise-cgm-alert-threshold"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {exerciseAlertThresholdOptions.map((t) => (
-                          <SelectItem key={t} value={String(t)}>
-                            {formatExerciseCgmAlertThresholdOption(t, bgUnits)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <ExerciseAlertLevelControl
+                    bgUnits={bgUnits}
+                    settings={notifSettings}
+                    disabled={masterOff}
+                    onChange={(patch) => onExerciseCgmAlertLevelsChange?.(patch)}
+                  />
                   <SettingsToggleRow
                     id="exercise-cgm-alert-trend"
-                    label="Trend-aware alerts"
-                    description="Also alert when BG is falling toward your threshold, not only when already below it"
+                    label="Also when falling"
+                    description="Alert as BG is heading toward that level"
                     checked={notifSettings.exerciseCgmAlertTrendAware !== false}
                     onCheckedChange={(checked) => onToggle("exerciseCgmAlertTrendAware", checked)}
                     disabled={masterOff}
                     testId="switch-exercise-cgm-alert-trend"
                     className="px-0"
                   />
-                  <p className="text-[11px] text-muted-foreground">
-                    Uses your exercise-during carb favourite. Only fires while an exercise session is in the active
-                    phase. With Dexcom Share and push enabled, alerts can reach you when the app is in the background.
-                    Educational — confirm on meter/CGM before treating.
-                  </p>
                 </div>
               ) : null}
               <SettingsToggleRow
@@ -504,7 +473,9 @@ type SettingsNotificationsRouteProps = {
   onToggle: (key: keyof NotificationSettings, value: boolean) => void;
   onThreshold: (key: "criticalThresholdDays" | "lowThresholdDays", value: string) => void;
   onBedtimeReminderTimeChange?: (time: string) => void;
-  onExerciseCgmAlertThresholdChange?: (threshold: number) => void;
+  onExerciseCgmAlertLevelsChange?: (
+    patch: Pick<NotificationSettings, "exerciseCgmAlertThreshold" | "exerciseCgmAlertAimBg">,
+  ) => void;
   onSupporterLiveGlucoseAlertLimitsChange?: (limits: { lowMmol: number; highMmol: number }) => void;
   supporterMode?: boolean;
   showBedtimeCheckReminders?: boolean;
@@ -515,7 +486,7 @@ export function SettingsNotificationsRoute({
   onToggle,
   onThreshold,
   onBedtimeReminderTimeChange,
-  onExerciseCgmAlertThresholdChange,
+  onExerciseCgmAlertLevelsChange,
   onSupporterLiveGlucoseAlertLimitsChange,
   supporterMode = false,
   showBedtimeCheckReminders,
@@ -551,7 +522,7 @@ export function SettingsNotificationsRoute({
             onToggle={onToggle}
             onThreshold={onThreshold}
             onBedtimeReminderTimeChange={onBedtimeReminderTimeChange}
-            onExerciseCgmAlertThresholdChange={onExerciseCgmAlertThresholdChange}
+            onExerciseCgmAlertLevelsChange={onExerciseCgmAlertLevelsChange}
             onSupporterLiveGlucoseAlertLimitsChange={onSupporterLiveGlucoseAlertLimitsChange}
             embedded
             supporterMode={supporterMode}

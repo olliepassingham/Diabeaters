@@ -1,6 +1,11 @@
 import { calculateExercisePlan, type ExercisePlanContext } from "@/lib/exercise-plan";
-import { resolveExerciseCgmAlertThreshold } from "@/lib/exercise-cgm-alert-thresholds";
-import { computeExerciseHypoSuggestion, hypoRangeThreshold } from "@/lib/exercise-hypo-auto";
+import {
+  encodeExerciseAlertFuel,
+  resolveExerciseCgmAlertAim,
+  resolveExerciseCgmAlertThreshold,
+} from "@/lib/exercise-cgm-alert-thresholds";
+import { getBodyWeightKgFromProfile } from "@/lib/body-weight";
+import { hypoRangeThreshold } from "@/lib/exercise-hypo-auto";
 import { bgForPlannerFromActiveSession } from "@/lib/exercise-planner-href";
 import { hasDexcomShareCredentials, readCgmPreferences } from "@/lib/cgm/preferences";
 import { normalizeBgUnits } from "@/lib/alcohol-night-tool";
@@ -9,7 +14,7 @@ import { storage, type ActiveExerciseSession } from "@/lib/storage";
 
 const REGISTER_REFRESH_MS = 15 * 60_000;
 
-let lastRegistered: { sessionId: string; at: number } | null = null;
+let lastRegistered: { sessionId: string; at: number; fingerprint: string } | null = null;
 let unregisterInFlight: string | null = null;
 
 function parsePlanNumber(value: string | number | null | undefined): number | null {
@@ -31,14 +36,14 @@ export function shouldUseExerciseCgmServerMonitor(session: ActiveExerciseSession
   return true;
 }
 
-function shouldRegisterAgain(sessionId: string): boolean {
+function shouldRegisterAgain(sessionId: string, fingerprint: string): boolean {
   if (!lastRegistered || lastRegistered.sessionId !== sessionId) return true;
+  if (lastRegistered.fingerprint !== fingerprint) return true;
   return Date.now() - lastRegistered.at >= REGISTER_REFRESH_MS;
 }
 
 export async function registerExerciseCgmServerMonitor(session: ActiveExerciseSession): Promise<void> {
   if (!shouldUseExerciseCgmServerMonitor(session)) return;
-  if (!shouldRegisterAgain(session.id)) return;
 
   const prefs = readCgmPreferences();
   const username = prefs.dexcomShareUsername?.trim();
@@ -50,10 +55,15 @@ export async function registerExerciseCgmServerMonitor(session: ActiveExerciseSe
   const notif = storage.getNotificationSettings();
   const userSettings = storage.getSettings();
   const threshold = resolveExerciseCgmAlertThreshold(notif, bgUnits);
+  const aim = resolveExerciseCgmAlertAim(notif, bgUnits);
+  const weightKg = getBodyWeightKgFromProfile(profile) ?? 70;
+  const fingerprint = `${threshold}|${aim}|${notif.exerciseCgmAlertTrendAware !== false}|${weightKg}`;
   const clinicalHypoThreshold = hypoRangeThreshold(userSettings, bgUnits);
 
+  if (!shouldRegisterAgain(session.id, fingerprint)) return;
+
   let carbsIfLow: number | undefined;
-  let carbLine: string | undefined;
+  const carbLine = encodeExerciseAlertFuel(aim, weightKg);
   try {
     const bg = bgForPlannerFromActiveSession(session) ?? threshold;
     const planCtx: ExercisePlanContext = {
@@ -68,12 +78,6 @@ export async function registerExerciseCgmServerMonitor(session: ActiveExerciseSe
     if (session.preEnvironments?.length) planCtx.environments = [...session.preEnvironments];
     const plan = calculateExercisePlan(planCtx, userSettings);
     carbsIfLow = parsePlanNumber(plan.pre.carbsIfLow) ?? undefined;
-    const suggestion = computeExerciseHypoSuggestion(bg, userSettings, bgUnits, profile ?? {}, {
-      phase: "active",
-      exerciseLowThreshold: threshold,
-      carbsIfLow,
-    });
-    carbLine = suggestion?.primaryTreatmentLine;
   } catch {
     // optional plan context
   }
@@ -100,7 +104,7 @@ export async function registerExerciseCgmServerMonitor(session: ActiveExerciseSe
   });
 
   if (result.success) {
-    lastRegistered = { sessionId: session.id, at: Date.now() };
+    lastRegistered = { sessionId: session.id, at: Date.now(), fingerprint };
   }
 }
 

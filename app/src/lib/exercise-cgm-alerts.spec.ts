@@ -7,7 +7,7 @@ import {
   resetExerciseCgmAlertCooldown,
   shouldSkipExerciseCgmAlertDueToCooldown,
 } from "./exercise-cgm-alerts";
-import { resolveExerciseCgmAlertThreshold } from "./exercise-cgm-alert-thresholds";
+import { resolveExerciseCgmAlertAim, resolveExerciseCgmAlertThreshold } from "./exercise-cgm-alert-thresholds";
 
 describe("resolveExerciseCgmAlertThreshold", () => {
   it("uses custom threshold when set", () => {
@@ -20,6 +20,18 @@ describe("resolveExerciseCgmAlertThreshold", () => {
     expect(
       resolveExerciseCgmAlertThreshold({ enabled: true, pushNotifications: true, supplyAlerts: true, criticalThresholdDays: 3, lowThresholdDays: 7, appointmentReminders: true }, "mmol/L"),
     ).toBe(5.6);
+  });
+});
+
+describe("resolveExerciseCgmAlertAim", () => {
+  const base = { enabled: true, pushNotifications: true, supplyAlerts: true, criticalThresholdDays: 3, lowThresholdDays: 7, appointmentReminders: true };
+
+  it("defaults to 1.5 above the notify level", () => {
+    expect(resolveExerciseCgmAlertAim(base, "mmol/L")).toBe(7.1);
+  });
+
+  it("keeps a saved aim above the notify level", () => {
+    expect(resolveExerciseCgmAlertAim({ ...base, exerciseCgmAlertThreshold: 5, exerciseCgmAlertAimBg: 7 }, "mmol/L")).toBe(7);
   });
 });
 
@@ -46,6 +58,20 @@ describe("evaluateExerciseCgmAlert", () => {
     });
     expect(result.shouldAlert).toBe(true);
     expect(result.carbLine).toContain("gel");
+  });
+
+  it("sizes carbs to the chosen aim", () => {
+    const result = evaluateExerciseCgmAlert({
+      bg: 5.2,
+      bgUnits: "mmol/L",
+      trend: "flat",
+      threshold: 5.6,
+      trendAware: true,
+      userSettings: { targetBgLow: 3.9 },
+      profile,
+      exerciseAimBg: 7,
+    });
+    expect(result.carbsGrams).toBe(8);
   });
 
   it("alerts when falling toward threshold", () => {
@@ -114,7 +140,7 @@ describe("exercise CGM alert cooldown", () => {
 });
 
 describe("buildExerciseCgmAlertCopy", () => {
-  it("includes BG, trend, and carb favourite", () => {
+  it("keeps the watch alert to the reading and grams", () => {
     const copy = buildExerciseCgmAlertCopy({
       bg: 5.4,
       bgUnits: "mmol/L",
@@ -127,11 +153,7 @@ describe("buildExerciseCgmAlertCopy", () => {
         carbLine: "about ½ Running gel",
       },
     });
-    expect(copy.title).toContain("Treat now");
-    expect(copy.title).toContain("11g");
-    expect(copy.body).toContain("5.4");
-    expect(copy.body).toContain("↓");
-    expect(copy.body).toContain("Tennis");
-    expect(copy.body).toContain("½ Running gel");
+    expect(copy.title).toBe("5.4 ↓");
+    expect(copy.body).toBe("11g");
   });
 });

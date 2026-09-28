@@ -58,6 +58,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ExerciseRecoverySummary } from "@/components/exercise-recovery-summary";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
@@ -75,6 +83,8 @@ import {
   ExerciseRoutineAdjustTrigger,
   type ExerciseRoutineAdjustValues,
 } from "@/components/exercise-routine-adjust-sheet";
+import { ExerciseAlertLevelControl } from "@/components/exercise-alert-level-control";
+import { syncNotificationPreferences } from "@/lib/notification-preferences";
 import {
   storage,
   DIABEATER_EXERCISE_OUTCOMES_CHANGED_EVENT,
@@ -89,6 +99,7 @@ import {
   type ExerciseSymptomFlag,
   type ExerciseType,
   type PreRapidInsulin2h,
+  type NotificationSettings,
   type UserProfile,
   type UserSettings,
 } from "@/lib/storage";
@@ -367,6 +378,7 @@ export function ExerciseGuidedCoach() {
   const [profile, setProfile] = useState<Partial<UserProfile>>({});
   const [settings, setSettings] = useState<UserSettings>(() => storage.getSettings());
   const [activeSession, setActiveSession] = useState<ActiveExerciseSession | null>(() => storage.getActiveExercise());
+  const [finishSummaryOpen, setFinishSummaryOpen] = useState(false);
   const [now, setNow] = useState<number>(() => Date.now());
   const [routines, setRoutines] = useState<ExerciseRoutine[]>(() => storage.getRecentExercises?.(8) ?? []);
   const [adjustRoutine, setAdjustRoutine] = useState<ExerciseRoutine | null>(null);
@@ -856,6 +868,7 @@ export function ExerciseGuidedCoach() {
 
   const onEndSession = () => {
     if (!activeSession) return;
+    setFinishSummaryOpen(false);
     sessionActions.endSession();
     setActiveSession(null);
     toast({ title: "Exercise ended", description: "Session cleared." });
@@ -1293,15 +1306,45 @@ export function ExerciseGuidedCoach() {
               </Button>
             </div>
           ) : phase === "recovery" ? (
-            <Button
-              size="lg"
-              onClick={onEndSession}
-              className="h-12 w-full rounded-2xl text-base font-semibold"
-              data-testid="button-coach-finish-session"
-            >
-              <CircleCheck className="mr-2 h-5 w-5" aria-hidden />
-              Finish
-            </Button>
+            <>
+              <Button
+                size="lg"
+                onClick={() => setFinishSummaryOpen(true)}
+                className="h-12 w-full rounded-2xl text-base font-semibold"
+                data-testid="button-coach-finish-session"
+              >
+                <CircleCheck className="mr-2 h-5 w-5" aria-hidden />
+                Finish
+              </Button>
+              <Dialog open={finishSummaryOpen} onOpenChange={setFinishSummaryOpen}>
+                <DialogContent className="gap-0 p-0 sm:max-w-md" data-testid="dialog-exercise-recovery-summary">
+                  <DialogHeader className="px-5 pb-0 pt-5 text-left">
+                    <DialogTitle className="text-sm font-medium text-muted-foreground">Session</DialogTitle>
+                  </DialogHeader>
+                  <div className="px-5 py-4">
+                    <ExerciseRecoverySummary session={activeSession} units={bgUnits} />
+                  </div>
+                  <DialogFooter className="gap-2 border-t border-border/50 px-5 py-4 sm:gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-11 rounded-xl"
+                      onClick={() => setFinishSummaryOpen(false)}
+                    >
+                      Back
+                    </Button>
+                    <Button
+                      type="button"
+                      className="h-11 rounded-xl"
+                      onClick={onEndSession}
+                      data-testid="button-coach-finish-session-confirm"
+                    >
+                      Close session
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </>
           ) : null}
 
           <ExercisePhaseStepper phase={phase} />
@@ -1794,6 +1837,7 @@ function DuringQuestions({
   onBgFieldChange,
 }: PhaseProps) {
   const bgRef = useRef<HTMLInputElement | null>(null);
+  const [notifSettings, setNotifSettings] = useState(() => storage.getNotificationSettings());
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [hypoRecheckEndsAt, setHypoRecheckEndsAt] = useState<number | null>(null);
 
@@ -1806,6 +1850,21 @@ function DuringQuestions({
   useEffect(() => {
     setHypoRecheckEndsAt(null);
   }, [session.id]);
+
+  useEffect(() => {
+    const sync = () => setNotifSettings(storage.getNotificationSettings());
+    window.addEventListener(DIABEATER_SETTINGS_CHANGED_EVENT, sync);
+    return () => window.removeEventListener(DIABEATER_SETTINGS_CHANGED_EVENT, sync);
+  }, []);
+
+  const saveAlertLevels = (
+    patch: Pick<NotificationSettings, "exerciseCgmAlertThreshold" | "exerciseCgmAlertAimBg">,
+  ) => {
+    const updated = { ...storage.getNotificationSettings(), ...patch };
+    storage.saveNotificationSettings(updated);
+    setNotifSettings(updated);
+    void syncNotificationPreferences(updated);
+  };
 
   const trend =
     session.phase === "active"
@@ -1835,6 +1894,11 @@ function DuringQuestions({
       {/* Mid-workout check-in: BG + trend + feel-low — sits in the light sheet below the dark stage. */}
       <div className="space-y-3" data-testid="coach-during-checkin">
         <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">BG check-in</p>
+        <ExerciseAlertLevelControl
+          bgUnits={bgUnits}
+          settings={notifSettings}
+          onChange={saveAlertLevels}
+        />
         <ExerciseCgmBgField
           bgUnits={bgUnits}
           bgValue={bgInput}

@@ -70,6 +70,8 @@ export type ExerciseHypoContext = {
   exerciseLowThreshold?: number;
   /** Plan pre.carbsIfLow — unused as a gram floor; treat-now uses the weight-based rise. */
   carbsIfLow?: number;
+  /** When set, carbs close the gap to this BG (same units as the reading) instead of the default comfort band. */
+  exerciseAimBg?: number;
   /**
    * Subjective symptom severity logged mid-session. "severe" escalates treat-now
    * guidance even when the reading itself is only borderline, and moderate/severe
@@ -148,8 +150,9 @@ export function needsImmediateExerciseBgTreatment(
 
 /**
  * Carbohydrate estimate for exercise lows — clinical hypo band and exercise-low / falling bands.
- * Same weight-based rise as Hypo help (1g ≈ 0.25 mmol/L at 70kg). Exercise-low aims at the
- * usual start-comfort band (~7 mmol/L); clinical hypo aims at the midpoint of the saved range.
+ * Same weight-based rise as Hypo help (1g ≈ 0.25 mmol/L at 70kg). With an exercise aim,
+ * carbs close the gap to that level. Otherwise exercise-low aims at the usual start-comfort
+ * band (~7 mmol/L) and clinical hypo aims at the midpoint of the saved range.
  */
 export function computeExerciseHypoSuggestion(
   bg: number,
@@ -170,7 +173,16 @@ export function computeExerciseHypoSuggestion(
       ? toMmol(suggestedRecoveryTargetBg(settings, bgUnits)!, bgUnits)
       : Math.max(5.5, thresholdMmol + 1.2);
   const exerciseTargetMmol = toMmol(exerciseIdealStartMinimum(bgUnits), bgUnits);
-  const targetMmol = clinicalHypo ? recoveryTargetMmol : Math.max(recoveryTargetMmol, exerciseTargetMmol);
+  const userAimMmol =
+    context?.exerciseAimBg != null && context.exerciseAimBg > 0
+      ? toMmol(context.exerciseAimBg, bgUnits)
+      : null;
+  const targetMmol =
+    userAimMmol != null
+      ? Math.max(userAimMmol, clinicalHypo ? recoveryTargetMmol : userAimMmol)
+      : clinicalHypo
+        ? recoveryTargetMmol
+        : Math.max(recoveryTargetMmol, exerciseTargetMmol);
   const targetDisplay = bgUnits === "mg/dL" ? Math.round(targetMmol * 18) : Math.round(targetMmol * 10) / 10;
 
   if (hypoCalculatorRequiresExplicitWeight(profile.dateOfBirth)) {

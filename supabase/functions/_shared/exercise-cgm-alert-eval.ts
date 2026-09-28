@@ -118,6 +118,43 @@ function formatBg(value: number, bgUnits: "mmol/L" | "mg/dL"): string {
   return (Math.round(value * 10) / 10).toFixed(1);
 }
 
+/** Same 1g ≈ 0.25 mmol/L at 70kg model as the app hypo calculator. */
+export function carbsGramsForExerciseAim(input: {
+  bg: number;
+  aim: number;
+  weightKg: number;
+  bgUnits: "mmol/L" | "mg/dL";
+}): number {
+  const toMmol = (value: number) => (input.bgUnits === "mg/dL" ? value / 18 : value);
+  const gap = toMmol(input.aim) - toMmol(input.bg);
+  if (gap <= 0) return 5;
+  const sensitivity = 70 / Math.max(input.weightKg, 20);
+  const rise = 0.25 * sensitivity;
+  if (!(rise > 0)) return 5;
+  return Math.max(5, Math.ceil(gap / rise));
+}
+
+export function parseExerciseAlertFuel(
+  line: string | null | undefined,
+): { aim: number; kg: number } | null {
+  if (!line) return null;
+  const match = /^aim=([0-9.]+);kg=([0-9.]+)$/.exec(line.trim());
+  if (!match) return null;
+  const aim = Number(match[1]);
+  const kg = Number(match[2]);
+  if (!(aim > 0) || !(kg > 0)) return null;
+  return { aim, kg };
+}
+
+function shortCarbLine(line: string | undefined): string {
+  if (!line) return "Carbs";
+  const trimmed = line.trim();
+  if (/^aim=/.test(trimmed)) return "Carbs";
+  const one = trimmed.replace(/^about\s+/i, "").split("\n")[0]?.trim() ?? "";
+  if (!one) return "Carbs";
+  return one.length > 22 ? `${one.slice(0, 20)}…` : one;
+}
+
 export function buildExerciseCgmAlertCopy(input: {
   bg: number;
   bgUnits: "mmol/L" | "mg/dL";
@@ -127,21 +164,9 @@ export function buildExerciseCgmAlertCopy(input: {
 }): { title: string; body: string } {
   const bgLabel = formatBg(input.bg, input.bgUnits);
   const arrow = trendArrow(input.trend);
-  const carbPart = input.evaluation.carbLine ?? "fast carbs";
-  const sessionLabel = input.exerciseName?.trim() || "";
-  const bgLine = `BG ${bgLabel}${arrow ? ` ${arrow}` : ""}`;
-  const contextBits = [bgLine, sessionLabel].filter(Boolean).join(" · ");
-
-  if (input.evaluation.reason === "clinical_hypo") {
-    return {
-      title: "Treat low BG",
-      body: `${contextBits}\n${carbPart}\nConfirm on meter or CGM, then treat.`,
-    };
-  }
-
   return {
-    title: "Treat now",
-    body: `${contextBits}\n${carbPart}\nTreat first, then open Exercise.`,
+    title: `${bgLabel}${arrow ? ` ${arrow}` : ""}`,
+    body: shortCarbLine(input.evaluation.carbLine),
   };
 }
 

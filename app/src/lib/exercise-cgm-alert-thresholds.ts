@@ -17,6 +17,43 @@ export function resolveExerciseCgmAlertThreshold(
   return defaultExerciseLowThreshold(bgUnits);
 }
 
+const AIM_STEPS_MMOL = [1, 1.5, 2] as const;
+const AIM_STEPS_MGDL = [18, 27, 36] as const;
+
+function roundAim(value: number, bgUnits: "mmol/L" | "mg/dL"): number {
+  return bgUnits === "mmol/L" ? Math.round(value * 10) / 10 : Math.round(value);
+}
+
+/** Levels to bring BG back to, each a step above the notify threshold. */
+export function exerciseCgmAlertAimOptions(
+  threshold: number,
+  bgUnits: "mmol/L" | "mg/dL",
+): number[] {
+  const steps = bgUnits === "mmol/L" ? AIM_STEPS_MMOL : AIM_STEPS_MGDL;
+  return steps.map((step) => roundAim(threshold + step, bgUnits));
+}
+
+/** BG the carb estimate aims for. Defaults to 1.5 mmol/L (27 mg/dL) above the notify level. */
+export function resolveExerciseCgmAlertAim(
+  settings: NotificationSettings,
+  bgUnits: "mmol/L" | "mg/dL",
+): number {
+  const threshold = resolveExerciseCgmAlertThreshold(settings, bgUnits);
+  const minGap = bgUnits === "mmol/L" ? 0.5 : 9;
+  const custom = settings.exerciseCgmAlertAimBg;
+  if (typeof custom === "number" && Number.isFinite(custom) && custom >= threshold + minGap - 0.05) {
+    return roundAim(custom, bgUnits);
+  }
+  const bump = bgUnits === "mmol/L" ? 1.5 : 27;
+  return roundAim(threshold + bump, bgUnits);
+}
+
+/** Compact token stored for background alerts so grams are calculated from the live reading. */
+export function encodeExerciseAlertFuel(aim: number, weightKg: number): string {
+  const kg = Math.round(Math.max(weightKg, 20) * 10) / 10;
+  return `aim=${aim};kg=${kg}`;
+}
+
 export function formatExerciseCgmAlertThresholdOption(value: number, bgUnits: "mmol/L" | "mg/dL"): string {
   const defaultVal = defaultExerciseLowThreshold(bgUnits);
   const formatted = bgUnits === "mmol/L" ? value.toFixed(1) : String(Math.round(value));

@@ -9,8 +9,10 @@ import { fetchLatestDexcomShareReading } from "../_shared/dexcom-share-client.ts
 import { decryptExerciseCgmSecret } from "../_shared/exercise-cgm-crypto.ts";
 import {
   buildExerciseCgmAlertCopy,
+  carbsGramsForExerciseAim,
   evaluateExerciseCgmAlert,
   isExerciseCgmReadingStale,
+  parseExerciseAlertFuel,
   mapDexcomShareTrend,
   mgDlToDisplay,
   shouldSkipExerciseCgmAlertDueToCooldown,
@@ -110,6 +112,16 @@ async function processMonitorRow(
     return { polled: true, alerted: false };
   }
 
+  const fuel = parseExerciseAlertFuel(row.carb_line);
+  const liveCarbLine = fuel
+    ? `${carbsGramsForExerciseAim({
+        bg,
+        aim: fuel.aim,
+        weightKg: fuel.kg,
+        bgUnits: row.bg_units,
+      })}g`
+    : row.carb_line;
+
   const evaluation = evaluateExerciseCgmAlert({
     bg,
     bgUnits: row.bg_units,
@@ -118,7 +130,7 @@ async function processMonitorRow(
     trendAware: row.trend_aware,
     clinicalHypoThreshold: row.clinical_hypo_threshold,
     carbsIfLow: row.carbs_if_low,
-    carbLine: row.carb_line,
+    carbLine: liveCarbLine,
   });
 
   if (!evaluation.shouldAlert || !evaluation.reason) {

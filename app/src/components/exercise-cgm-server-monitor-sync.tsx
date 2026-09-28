@@ -5,7 +5,7 @@ import {
   shouldUseExerciseCgmServerMonitor,
   unregisterExerciseCgmServerMonitor,
 } from "@/lib/exercise-cgm-server-monitor";
-import { DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT, storage } from "@/lib/storage";
+import { DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT, DIABEATER_SETTINGS_CHANGED_EVENT, storage } from "@/lib/storage";
 
 /**
  * Registers server-side Dexcom Share polling while exercise is active so low-BG
@@ -41,11 +41,13 @@ export function ExerciseCgmServerMonitorSync() {
     void sync();
     const interval = window.setInterval(() => void sync(), 60_000);
     window.addEventListener(DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT, sync);
+    window.addEventListener(DIABEATER_SETTINGS_CHANGED_EVENT, sync);
 
     return () => {
       mounted = false;
       window.clearInterval(interval);
       window.removeEventListener(DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT, sync);
+      window.removeEventListener(DIABEATER_SETTINGS_CHANGED_EVENT, sync);
       const prevId = lastSessionIdRef.current;
       lastSessionIdRef.current = null;
       if (prevId) void unregisterExerciseCgmServerMonitor(prevId);

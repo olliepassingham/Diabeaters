@@ -1268,6 +1268,8 @@ export interface NotificationSettings {
   exerciseCgmAlerts?: boolean;
   /** Alert when BG falls below this (profile BG units). Default 5.6 mmol/L · 100 mg/dL. */
   exerciseCgmAlertThreshold?: number;
+  /** Carb estimate aims for this BG (profile units). Default is 1.5 mmol/L above the notify level. */
+  exerciseCgmAlertAimBg?: number;
   /** When true (default), also alert when BG is falling toward your threshold. */
   exerciseCgmAlertTrendAware?: boolean;
 }
@@ -4032,6 +4034,12 @@ export const storage = {
         Number.isFinite(parsed.exerciseCgmAlertThreshold) &&
         parsed.exerciseCgmAlertThreshold > 0
           ? parsed.exerciseCgmAlertThreshold
+          : undefined,
+      exerciseCgmAlertAimBg:
+        typeof parsed.exerciseCgmAlertAimBg === "number" &&
+        Number.isFinite(parsed.exerciseCgmAlertAimBg) &&
+        parsed.exerciseCgmAlertAimBg > 0
+          ? parsed.exerciseCgmAlertAimBg
           : undefined,
     };
   },

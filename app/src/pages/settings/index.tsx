@@ -1720,8 +1720,10 @@ export default function Settings() {
     });
   };
 
-  const handleExerciseCgmAlertThreshold = (threshold: number) => {
-    const updated = { ...notifSettings, exerciseCgmAlertThreshold: threshold };
+  const handleExerciseCgmAlertLevels = (
+    patch: Pick<NotificationSettings, "exerciseCgmAlertThreshold" | "exerciseCgmAlertAimBg">,
+  ) => {
+    const updated = { ...notifSettings, ...patch };
     setNotifSettings(updated);
     storage.saveNotificationSettings(updated);
     void syncNotificationPreferences(updated);
@@ -2229,7 +2231,7 @@ export default function Settings() {
         onToggle={handleNotifToggle}
         onThreshold={handleNotifThreshold}
         onBedtimeReminderTimeChange={handleBedtimeReminderTime}
-        onExerciseCgmAlertThresholdChange={handleExerciseCgmAlertThreshold}
+        onExerciseCgmAlertLevelsChange={handleExerciseCgmAlertLevels}
         onSupporterLiveGlucoseAlertLimitsChange={handleSupporterLiveGlucoseAlertLimits}
         supporterMode={inSupporterSession}
         showBedtimeCheckReminders={showBedtimeCheckReminders}
