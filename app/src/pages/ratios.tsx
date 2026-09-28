@@ -56,6 +56,8 @@ import { recordLastInteraction } from "@/lib/last-interaction";
 import { parseRatioToGramsPerUnit, formatRatioForDisplay, formatRatioForStorage, gramsPerUnitToInputValue, parseInputToGramsPerUnit, formatRatioInputPlaceholder, formatRatioInputLabel } from "@/lib/ratio-utils";
 import type { RatioFormat } from "@/lib/storage";
 import { InfoTooltip } from "@/components/info-tooltip";
+import { seedDefaultTargetBgRangeIfNeeded } from "@/lib/starter-target-range";
+import { formatTargetBgRangeLabel, targetBgRangeInputValues } from "@/lib/target-bg-range";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 
 interface ScenarioAdjustment {
@@ -191,6 +193,7 @@ export default function Ratios() {
   const [showSnapshotDialog, setShowSnapshotDialog] = useState(false);
 
   useEffect(() => {
+    seedDefaultTargetBgRangeIfNeeded();
     const s = storage.getSettings();
     const profile = storage.getProfile();
     const fmt = profile?.ratioFormat || "per10g";
@@ -205,14 +208,15 @@ export default function Ratios() {
     const lGpu = parseRatioToGramsPerUnit(s.lunchRatio);
     const dGpu = parseRatioToGramsPerUnit(s.dinnerRatio);
     const sGpu = parseRatioToGramsPerUnit(s.snackRatio);
+    const targetInputs = targetBgRangeInputValues(s, profile?.bgUnits === "mg/dL" ? "mg/dL" : "mmol/L");
     setEditValues({
       breakfastRatio: bGpu ? gramsPerUnitToInputValue(bGpu, fmt, cpSizeVal) : s.breakfastRatio || "",
       lunchRatio: lGpu ? gramsPerUnitToInputValue(lGpu, fmt, cpSizeVal) : s.lunchRatio || "",
       dinnerRatio: dGpu ? gramsPerUnitToInputValue(dGpu, fmt, cpSizeVal) : s.dinnerRatio || "",
       snackRatio: sGpu ? gramsPerUnitToInputValue(sGpu, fmt, cpSizeVal) : s.snackRatio || "",
       correctionFactor: s.correctionFactor?.toString() || "",
-      targetBgLow: s.targetBgLow?.toString() || "",
-      targetBgHigh: s.targetBgHigh?.toString() || "",
+      targetBgLow: targetInputs.low,
+      targetBgHigh: targetInputs.high,
     });
   }, []);
 
@@ -567,7 +571,7 @@ export default function Ratios() {
                       id="target-low"
                       type="number"
                       step="0.1"
-                      placeholder="4.0"
+                      placeholder={bgUnit === "mg/dL" ? "72" : "4"}
                       value={editValues.targetBgLow}
                       onChange={(e) => setEditValues((prev) => ({ ...prev, targetBgLow: e.target.value }))}
                       data-testid="input-target-low"
@@ -584,7 +588,7 @@ export default function Ratios() {
                       id="target-high"
                       type="number"
                       step="0.1"
-                      placeholder="8.0"
+                      placeholder={bgUnit === "mg/dL" ? "180" : "10"}
                       value={editValues.targetBgHigh}
                       onChange={(e) => setEditValues((prev) => ({ ...prev, targetBgHigh: e.target.value }))}
                       data-testid="input-target-high"
@@ -608,11 +612,7 @@ export default function Ratios() {
               <div>
                 <span className="text-muted-foreground">Target </span>
                 <span className="font-semibold tabular-nums" data-testid="at-a-glance-target">
-                  {settings.targetBgLow != null && settings.targetBgHigh != null ? (
-                    `${settings.targetBgLow}–${settings.targetBgHigh} ${bgUnit}`
-                  ) : (
-                    <span className="text-muted-foreground italic font-normal">Not set</span>
-                  )}
+                  {formatTargetBgRangeLabel(settings, bgUnit)}
                 </span>
               </div>
             </div>

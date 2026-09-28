@@ -1,5 +1,6 @@
 import type { UserSettings } from "@/lib/storage";
 import { PEN_INSULIN_INCREMENT, roundInsulinUnits } from "@/lib/insulin-rounding";
+import { DEFAULT_TARGET_BG_MGDL, DEFAULT_TARGET_BG_MMOL } from "@/lib/target-bg-range";
 
 /** BG display units as used in profile / ratios. */
 export type BgUnits = "mmol/L" | "mg/dL";
@@ -70,7 +71,7 @@ export function computeSimpleCorrectionDose(params: {
   };
 }
 
-/** Upper end of target range for correction (same default as Bedtime when settings omit targets). */
+/** Upper end of the target range for correction. Defaults to 10 mmol/L or 180 mg/dL. */
 export function getDefaultCorrectionTargetHigh(
   settings: Pick<UserSettings, "targetBgHigh">,
   bgUnits: BgUnits,
@@ -78,5 +79,5 @@ export function getDefaultCorrectionTargetHigh(
   if (settings.targetBgHigh != null && Number.isFinite(settings.targetBgHigh)) {
     return settings.targetBgHigh;
   }
-  return bgUnits === "mg/dL" ? 144 : 8.0;
+  return bgUnits === "mg/dL" ? DEFAULT_TARGET_BG_MGDL.high : DEFAULT_TARGET_BG_MMOL.high;
 }

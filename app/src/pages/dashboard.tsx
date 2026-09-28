@@ -22,6 +22,7 @@ import {
 } from "@/lib/storage";
 import { getActiveAppMode } from "@/lib/carer-session";
 import { seedPatientFirstRunDefaultsIfNeeded } from "@/lib/starter-patient-defaults";
+import { seedDefaultTargetBgRangeIfNeeded } from "@/lib/starter-target-range";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { WelcomeWidget, shouldOfferWelcomeWidget } from "@/components/widgets/welcome-widget";
 import { useDashboardWidgets } from "@/hooks/useDashboardWidgets";
@@ -227,6 +228,7 @@ export default function Dashboard() {
       setSettingsCompletion(storage.getSettingsCompletion());
     };
 
+    seedDefaultTargetBgRangeIfNeeded();
     seedPatientFirstRunDefaultsIfNeeded();
     refreshData();
     if (getSupabase()) {

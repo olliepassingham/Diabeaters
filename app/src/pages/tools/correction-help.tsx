@@ -76,8 +76,7 @@ export default function CorrectionHelpPage() {
   }, [load]);
 
   const defaultTarget = useMemo(() => {
-    if (!settings) return bgUnits === "mg/dL" ? 144 : 8.0;
-    return getDefaultCorrectionTargetHigh(settings, bgUnits);
+    return getDefaultCorrectionTargetHigh(settings ?? {}, bgUnits);
   }, [settings, bgUnits]);
 
   const targetForCalc = useMemo(() => {

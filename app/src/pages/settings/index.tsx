@@ -40,6 +40,8 @@ import { rescheduleBedtimeReminders } from "@/lib/bedtime-reminders";
 import { shouldReceiveBedtimeCheckReminders } from "@/lib/bedtime-reminder-eligibility";
 import { reschedulePumpChangeReminders } from "@/lib/pump-change-reminders";
 import { seedPatientFirstRunDefaultsIfNeeded } from "@/lib/starter-patient-defaults";
+import { seedDefaultTargetBgRangeIfNeeded } from "@/lib/starter-target-range";
+import { targetBgRangeInputValues } from "@/lib/target-bg-range";
 import { syncNotificationPreferences } from "@/lib/notification-preferences";
 import { ensureNativePushRegistered, resetNativePushRegistrationState } from "@/lib/push-tokens";
 import { Link, useLocation } from "wouter";
@@ -434,11 +436,11 @@ function InsulinTab({
               Target Range ({bgUnits})
             </StaticLabelWithInfo>
             <div className="flex items-center gap-2">
-              <Input id="target-bg-low" type="number" placeholder="Low" value={targetBgLow} onChange={(e) => setTargetBgLow(e.target.value)} data-testid="input-target-bg-low" aria-label={`Target low (${bgUnits})`} />
+              <Input id="target-bg-low" type="number" placeholder={bgUnits === "mg/dL" ? "72" : "4"} value={targetBgLow} onChange={(e) => setTargetBgLow(e.target.value)} data-testid="input-target-bg-low" aria-label={`Target low (${bgUnits})`} />
               <span className="text-muted-foreground" aria-hidden>
                 -
               </span>
-              <Input id="target-bg-high" type="number" placeholder="High" value={targetBgHigh} onChange={(e) => setTargetBgHigh(e.target.value)} data-testid="input-target-bg-high" aria-label={`Target high (${bgUnits})`} />
+              <Input id="target-bg-high" type="number" placeholder={bgUnits === "mg/dL" ? "180" : "10"} value={targetBgHigh} onChange={(e) => setTargetBgHigh(e.target.value)} data-testid="input-target-bg-high" aria-label={`Target high (${bgUnits})`} />
             </div>
             <ClinicalWarningHint warning={validateTargetBgLow(targetBgLow, bgUnits)} />
             <ClinicalWarningHint warning={validateTargetBgHigh(targetBgHigh, bgUnits)} />
@@ -1093,6 +1095,7 @@ export default function Settings() {
   }, [cloudProfile?.full_name]);
 
   useEffect(() => {
+    seedDefaultTargetBgRangeIfNeeded();
     const storedProfile = storage.getProfile();
     const storedSettings = storage.getSettings();
     
@@ -1148,8 +1151,12 @@ export default function Settings() {
       const sGpu = parseRatioToGramsPerUnit(storedSettings.snackRatio);
       setSnackRatio(sGpu ? gramsPerUnitToInputValue(sGpu, format, cpSize) : "");
       setCorrectionFactor(storedSettings.correctionFactor?.toString() || "");
-      setTargetBgLow(storedSettings.targetBgLow?.toString() || "");
-      setTargetBgHigh(storedSettings.targetBgHigh?.toString() || "");
+      const targetInputs = targetBgRangeInputValues(
+        storedSettings,
+        storedProfile?.bgUnits === "mg/dL" ? "mg/dL" : "mmol/L",
+      );
+      setTargetBgLow(targetInputs.low);
+      setTargetBgHigh(targetInputs.high);
       setShortActingUnitsPerDay(storedSettings.shortActingUnitsPerDay?.toString() || "");
       setLongActingUnitsPerDay(storedSettings.longActingUnitsPerDay?.toString() || "");
       setInjectionsPerDay(storedSettings.injectionsPerDay?.toString() || "");
@@ -1189,6 +1196,12 @@ export default function Settings() {
       setReservoirCapacity("300");
       setUnitsPerInsulinPen(String(UK_DEFAULT_UNITS_PER_INSULIN_PEN));
       setNeedlesPerBox(String(UK_DEFAULT_NEEDLES_PER_BOX));
+      const targetInputs = targetBgRangeInputValues(
+        null,
+        storedProfile?.bgUnits === "mg/dL" ? "mg/dL" : "mmol/L",
+      );
+      setTargetBgLow(targetInputs.low);
+      setTargetBgHigh(targetInputs.high);
     }
     
     setNotifSettings(storage.getNotificationSettings());

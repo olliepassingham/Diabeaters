@@ -20,12 +20,10 @@ function markStarterTargetRangeSeeded(): void {
 }
 
 /**
- * Prefill a typical clinic target range (4–10 mmol/L or 72–180 mg/dL) when unset.
- * Does not overwrite values the user already saved; clearing both after seed will not re-fill.
+ * Prefill a typical clinic target range (4–10 mmol/L or 72–180 mg/dL) when both bounds are unset.
+ * Does not overwrite a range the user already saved. If both bounds are cleared later, the default is written again.
  */
 export function seedDefaultTargetBgRangeIfNeeded(): { seeded: boolean } {
-  if (hasStarterTargetRangeBeenSeeded()) return { seeded: false };
-
   const settings = storage.getSettings();
   if (settings.targetBgLow != null || settings.targetBgHigh != null) {
     markStarterTargetRangeSeeded();

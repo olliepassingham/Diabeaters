@@ -49,11 +49,11 @@ describe("seedDefaultTargetBgRangeIfNeeded", () => {
     expect(localStorage.getItem(STARTER_TARGET_RANGE_SEEDED_KEY)).toBe("1");
   });
 
-  it("does not re-seed after the user clears targets", () => {
+  it("writes the default again if both bounds are cleared later", () => {
     seedDefaultTargetBgRangeIfNeeded();
     storageMock.getSettings.mockReturnValue({});
     const r2 = seedDefaultTargetBgRangeIfNeeded();
-    expect(r2.seeded).toBe(false);
-    expect(storageMock.saveSettings).toHaveBeenCalledTimes(1);
+    expect(r2.seeded).toBe(true);
+    expect(storageMock.saveSettings).toHaveBeenCalledTimes(2);
   });
 });

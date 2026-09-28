@@ -16,6 +16,7 @@ import {
   parseRatioToGramsPerUnit,
 } from "@/lib/ratio-utils";
 import { useToast } from "@/hooks/use-toast";
+import { targetBgRangeInputValues } from "@/lib/target-bg-range";
 
 export type RatiosEditValues = {
   breakfastRatio: string;
@@ -38,19 +39,21 @@ export function settingsToEditValues(
   settings: UserSettings,
   ratioFormat: RatioFormat,
   carbPortionSize?: number,
+  bgUnits: "mmol/L" | "mg/dL" = "mmol/L",
 ): RatiosEditValues {
   const toInput = (stored: string | undefined) => {
     const gpu = parseRatioToGramsPerUnit(stored);
     return gpu ? gramsPerUnitToInputValue(gpu, ratioFormat, carbPortionSize) : stored || "";
   };
+  const targetInputs = targetBgRangeInputValues(settings, bgUnits);
   return {
     breakfastRatio: toInput(settings.breakfastRatio),
     lunchRatio: toInput(settings.lunchRatio),
     dinnerRatio: toInput(settings.dinnerRatio),
     snackRatio: toInput(settings.snackRatio),
     correctionFactor: settings.correctionFactor?.toString() || "",
-    targetBgLow: settings.targetBgLow?.toString() || "",
-    targetBgHigh: settings.targetBgHigh?.toString() || "",
+    targetBgLow: targetInputs.low,
+    targetBgHigh: targetInputs.high,
   };
 }
 
@@ -98,11 +101,14 @@ export function RatiosEditPanel({
   idPrefix = "ratio-adviser-edit",
 }: RatiosEditPanelProps) {
   const { toast } = useToast();
-  const [editValues, setEditValues] = useState(() => settingsToEditValues(settings, ratioFormat, carbPortionSize));
+  const bgUnits = bgUnit === "mg/dL" ? "mg/dL" : "mmol/L";
+  const [editValues, setEditValues] = useState(() =>
+    settingsToEditValues(settings, ratioFormat, carbPortionSize, bgUnits),
+  );
 
   useEffect(() => {
-    setEditValues(settingsToEditValues(settings, ratioFormat, carbPortionSize));
-  }, [settings, ratioFormat, carbPortionSize]);
+    setEditValues(settingsToEditValues(settings, ratioFormat, carbPortionSize, bgUnits));
+  }, [settings, ratioFormat, carbPortionSize, bgUnits]);
 
   const handleSave = () => {
     const oldSettings = storage.getSettings();
@@ -217,7 +223,7 @@ export function RatiosEditPanel({
                 type="number"
                 inputMode="decimal"
                 step="0.1"
-                placeholder="4.0"
+                placeholder={bgUnits === "mg/dL" ? "72" : "4"}
                 value={editValues.targetBgLow}
                 onChange={(e) => setEditValues((prev) => ({ ...prev, targetBgLow: e.target.value }))}
                 className="h-11 text-base"
@@ -236,7 +242,7 @@ export function RatiosEditPanel({
                 type="number"
                 inputMode="decimal"
                 step="0.1"
-                placeholder="8.0"
+                placeholder={bgUnits === "mg/dL" ? "180" : "10"}
                 value={editValues.targetBgHigh}
                 onChange={(e) => setEditValues((prev) => ({ ...prev, targetBgHigh: e.target.value }))}
                 className="h-11 text-base"

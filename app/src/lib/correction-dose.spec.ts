@@ -95,7 +95,7 @@ describe("getDefaultCorrectionTargetHigh", () => {
   });
 
   it("falls back to app defaults when unset", () => {
-    expect(getDefaultCorrectionTargetHigh({}, "mmol/L")).toBe(8.0);
-    expect(getDefaultCorrectionTargetHigh({}, "mg/dL")).toBe(144);
+    expect(getDefaultCorrectionTargetHigh({}, "mmol/L")).toBe(10);
+    expect(getDefaultCorrectionTargetHigh({}, "mg/dL")).toBe(180);
   });
 });

@@ -37,6 +37,7 @@ import {
   calculateDoseFromCarbs,
 } from "@/lib/ratio-utils";
 import { STARTER_ICR_GRAMS_PER_UNIT } from "@/lib/starter-ratios";
+import { formatTargetBgRangeLabel, resolveUserTargetBgRange } from "@/lib/target-bg-range";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { InlineInfoHint } from "@/components/ui/field-label-with-info";
@@ -858,9 +859,7 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
                     <span>
                       <span className="text-muted-foreground">Target </span>
                       <span className="font-semibold tabular-nums">
-                        {settings.targetBgLow != null && settings.targetBgHigh != null
-                          ? `${settings.targetBgLow}–${settings.targetBgHigh} ${bgUnit}`
-                          : <span className="font-normal italic text-muted-foreground">Not set</span>}
+                        {formatTargetBgRangeLabel(settings, bgUnit === "mg/dL" ? "mg/dL" : "mmol/L")}
                       </span>
                     </span>
                   </div>
@@ -999,8 +998,8 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
               </p>
               <div className="space-y-2">
                 {([
-                  { value: "consistently_high" as const, label: "Consistently too high", desc: `Above my target range (>${settings.targetBgHigh || "8"} ${bgUnit})` },
-                  { value: "consistently_low" as const, label: "Consistently too low", desc: `Below my target range (<${settings.targetBgLow || "4"} ${bgUnit})` },
+                  { value: "consistently_high" as const, label: "Consistently too high", desc: `Above my target range (>${resolveUserTargetBgRange(settings, bgUnit === "mg/dL" ? "mg/dL" : "mmol/L").high} ${bgUnit})` },
+                  { value: "consistently_low" as const, label: "Consistently too low", desc: `Below my target range (<${resolveUserTargetBgRange(settings, bgUnit === "mg/dL" ? "mg/dL" : "mmol/L").low} ${bgUnit})` },
                   { value: "sometimes_high" as const, label: "Sometimes high, sometimes OK", desc: "It varies from day to day" },
                   { value: "on_target" as const, label: "Usually on target", desc: "Within my target range most of the time" },
                   { value: "not_sure" as const, label: "I'm not sure", desc: "I haven't been checking regularly" },
