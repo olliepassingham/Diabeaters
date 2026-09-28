@@ -10,7 +10,8 @@ const SIGN_CHUNK_SIZE = 40;
 type CacheEntry = { url: string; expiresAt: number };
 
 const urlCache = new Map<string, CacheEntry>();
-const inflightPaths = new Set<string>();
+/** In-flight sign jobs. Later callers await these instead of returning empty URLs. */
+const inflight = new Map<string, Promise<void>>();
 
 function normalizePath(path: string): string {
   return String(path ?? "").trim();
@@ -59,11 +60,23 @@ async function signChunk(paths: string[]): Promise<Map<string, string | null>> {
   if (typeof batchApi.createSignedUrls === "function") {
     const { data, error } = await batchApi.createSignedUrls(paths, SIGNED_URL_SECONDS);
     if (!error && data) {
-      for (const item of data) {
-        const url = item.error ? null : item.signedUrl || null;
-        out.set(item.path, url);
+      const byReturnedPath = data.length === paths.length && data.every((item) => paths.includes(item.path));
+      if (byReturnedPath) {
+        for (const item of data) {
+          out.set(item.path, item.error ? null : item.signedUrl || null);
+        }
+      } else if (data.length === paths.length) {
+        paths.forEach((path, i) => {
+          const item = data[i];
+          out.set(path, item?.error ? null : item?.signedUrl || null);
+        });
+      } else {
+        for (const item of data) {
+          if (!paths.includes(item.path)) continue;
+          out.set(item.path, item.error ? null : item.signedUrl || null);
+        }
       }
-      return out;
+      if (out.size === paths.length) return out;
     }
   }
 
@@ -78,21 +91,34 @@ async function signChunk(paths: string[]): Promise<Map<string, string | null>> {
 
 async function signMissingPaths(paths: string[]): Promise<void> {
   const unique = [...new Set(paths.map(normalizePath).filter(Boolean))];
-  const missing = unique.filter((p) => !readCache(p) && !inflightPaths.has(p));
-  if (missing.length === 0) return;
+  const missing = unique.filter((p) => !readCache(p) && !inflight.has(p));
 
-  for (const p of missing) inflightPaths.add(p);
-  try {
-    for (let i = 0; i < missing.length; i += SIGN_CHUNK_SIZE) {
-      const chunk = missing.slice(i, i + SIGN_CHUNK_SIZE);
-      const signed = await signChunk(chunk);
-      for (const [path, url] of signed) {
-        if (url) writeCache(path, url);
+  if (missing.length > 0) {
+    let finish!: () => void;
+    const job = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    for (const p of missing) inflight.set(p, job);
+
+    void (async () => {
+      try {
+        for (let i = 0; i < missing.length; i += SIGN_CHUNK_SIZE) {
+          const chunk = missing.slice(i, i + SIGN_CHUNK_SIZE);
+          const signed = await signChunk(chunk);
+          for (const path of chunk) {
+            const url = signed.get(path);
+            if (url) writeCache(path, url);
+          }
+        }
+      } finally {
+        for (const p of missing) inflight.delete(p);
+        finish();
       }
-    }
-  } finally {
-    for (const p of missing) inflightPaths.delete(p);
+    })();
   }
+
+  const pending = unique.map((p) => inflight.get(p)).filter((job): job is Promise<void> => Boolean(job));
+  if (pending.length > 0) await Promise.all(pending);
 }
 
 async function resolveSignedUrls(paths: string[]): Promise<(string | null)[]> {

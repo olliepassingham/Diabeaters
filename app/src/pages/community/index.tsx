@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { Bookmark, Search as SearchIcon } from "lucide-react";
+import { Bookmark, Search as SearchIcon, SlidersHorizontal } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { FeedFollowSuggestionsStrip } from "@/components/community/feed-follow-suggestions-strip";
 import { FeedWatchLearnPlayer } from "@/components/community/feed-watch-learn-player";
@@ -733,6 +733,7 @@ export default function CommunityHomePage() {
       />
 
       <div className="space-y-2.5">
+        <div className="flex items-center gap-1.5">
         <Tabs
           value={watchLearnOpen ? "watch" : feedTab}
           onValueChange={(v) => {
@@ -746,9 +747,9 @@ export default function CommunityHomePage() {
             setScrollByTab((prev) => ({ ...prev, [feedTab]: getAppScrollTop() }));
             setFeedTab(v as FeedTab);
           }}
-          className="w-full"
+          className="min-w-0 flex-1"
         >
-          <TabsList className="grid h-12 w-full grid-cols-3 rounded-full bg-muted/45 p-1 dark:bg-muted/30">
+          <TabsList className="grid h-10 w-full grid-cols-3 rounded-full bg-muted/45 p-1 dark:bg-muted/30">
             <TabsTrigger
               value="following"
               className="rounded-full px-2 text-[13px] font-semibold sm:text-sm data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
@@ -770,6 +771,20 @@ export default function CommunityHomePage() {
             </TabsTrigger>
           </TabsList>
         </Tabs>
+        {isMobile ? (
+          <Button
+            type="button"
+            variant={feedSearchExpanded || savedOnly || topicFilter || feedSearch.trim() ? "secondary" : "outline"}
+            size="icon"
+            className="h-10 w-10 shrink-0 rounded-full"
+            aria-expanded={feedSearchExpanded}
+            aria-label="Search and topics"
+            onClick={() => setFeedSearchExpanded((open) => !open)}
+          >
+            <SlidersHorizontal className="h-4 w-4" aria-hidden />
+          </Button>
+        ) : null}
+        </div>
 
         <div
           role="tablist"
@@ -820,27 +835,15 @@ export default function CommunityHomePage() {
                 value={feedSearch}
                 onChange={(e) => setFeedSearch(e.target.value)}
                 placeholder="Search posts…"
-                className="h-11 pl-9 pr-20 rounded-2xl"
+                className="h-10 rounded-2xl pl-9 pr-3"
                 aria-label="Search posts"
                 title="Search posts (header search finds people by @handle)"
               />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="absolute right-1 top-1/2 h-7 -translate-y-1/2 px-2 text-xs"
-                onClick={() => {
-                  setFeedSearch("");
-                  setFeedSearchExpanded(false);
-                }}
-              >
-                Close
-              </Button>
             </div>
-            <div className="flex items-center gap-1.5 sm:hidden">
+            <div className="flex items-center gap-1.5">
               <div className="min-w-0 flex-1">
                 {savedOnly ? (
-                  <div className="flex h-11 w-full items-center rounded-2xl border border-border/50 bg-muted/30 px-3 text-sm text-muted-foreground">
+                  <div className="flex h-10 w-full items-center rounded-2xl border border-border/50 bg-muted/30 px-3 text-sm text-muted-foreground">
                     Saved posts
                   </div>
                 ) : (
@@ -852,7 +855,7 @@ export default function CommunityHomePage() {
                       else if (isCommunityTopicId(v)) setTopicFilter(v);
                     }}
                   >
-                    <SelectTrigger className="h-11 w-full rounded-2xl border-border/50 bg-background/80" aria-label="Feed topic">
+                    <SelectTrigger className="h-10 w-full rounded-2xl border-border/50 bg-background/80" aria-label="Feed topic">
                       <SelectValue placeholder="Topic" />
                     </SelectTrigger>
                     <SelectContent>
@@ -870,26 +873,7 @@ export default function CommunityHomePage() {
                 type="button"
                 variant={savedOnly ? "secondary" : "outline"}
                 size="icon"
-                className="h-11 w-11 shrink-0 rounded-2xl"
-                aria-pressed={savedOnly}
-                aria-label={savedOnly ? "Saved posts filter on" : "Show saved posts"}
-                onClick={() => {
-                  setSavedOnly((s) => {
-                    const next = !s;
-                    if (next) setTopicFilter(null);
-                    return next;
-                  });
-                }}
-              >
-                <Bookmark className="h-4 w-4" aria-hidden />
-              </Button>
-            </div>
-            <div className="hidden items-center justify-end gap-2 sm:flex md:hidden">
-              <Button
-                type="button"
-                variant={savedOnly ? "secondary" : "outline"}
-                size="icon"
-                className="h-11 w-11 shrink-0 rounded-2xl"
+                className="h-10 w-10 shrink-0 rounded-2xl"
                 aria-pressed={savedOnly}
                 aria-label={savedOnly ? "Saved posts filter on" : "Show saved posts"}
                 onClick={() => {
@@ -906,97 +890,15 @@ export default function CommunityHomePage() {
           </div>
         ) : null}
 
-        {isMobile && !feedSearchExpanded ? (
-          <>
-            <div className="flex items-center gap-1.5 sm:hidden">
-              <div className="min-w-0 flex-1">
-                {savedOnly ? (
-                  <div className="flex h-11 w-full items-center rounded-2xl border border-border/50 bg-muted/30 px-3 text-sm text-muted-foreground">
-                    Saved posts
-                  </div>
-                ) : (
-                  <Select
-                    value={topicFilter === null ? "__all" : topicFilter}
-                    onValueChange={(v) => {
-                      setSavedOnly(false);
-                      if (v === "__all") setTopicFilter(null);
-                      else if (isCommunityTopicId(v)) setTopicFilter(v);
-                    }}
-                  >
-                    <SelectTrigger className="h-11 w-full rounded-2xl border-border/50 bg-background/80" aria-label="Feed topic">
-                      <SelectValue placeholder="Topic" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__all">All topics</SelectItem>
-                      {orderedTopics.map((t) => (
-                        <SelectItem key={t.id} value={t.id}>
-                          {t.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-              <Button
-                type="button"
-                variant={savedOnly ? "secondary" : "outline"}
-                size="icon"
-                className="h-11 w-11 shrink-0 rounded-2xl"
-                aria-pressed={savedOnly}
-                aria-label={savedOnly ? "Saved posts filter on" : "Show saved posts"}
-                onClick={() => {
-                  setSavedOnly((s) => {
-                    const next = !s;
-                    if (next) setTopicFilter(null);
-                    return next;
-                  });
-                }}
-              >
-                <Bookmark className="h-4 w-4" aria-hidden />
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="h-11 w-11 shrink-0 rounded-2xl"
-                aria-label="Search posts"
-                title="Search posts"
-                onClick={() => setFeedSearchExpanded(true)}
-              >
-                <SearchIcon className="h-4 w-4" aria-hidden />
-              </Button>
-            </div>
-            <div className="hidden items-center justify-end gap-2 sm:flex md:hidden">
-              <Button
-                type="button"
-                variant={savedOnly ? "secondary" : "outline"}
-                size="icon"
-                className="h-11 w-11 shrink-0 rounded-2xl"
-                aria-pressed={savedOnly}
-                aria-label={savedOnly ? "Saved posts filter on" : "Show saved posts"}
-                onClick={() => {
-                  setSavedOnly((s) => {
-                    const next = !s;
-                    if (next) setTopicFilter(null);
-                    return next;
-                  });
-                }}
-              >
-                <Bookmark className="h-4 w-4" aria-hidden />
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="h-11 w-11 shrink-0 rounded-2xl"
-                aria-label="Search posts"
-                title="Search posts"
-                onClick={() => setFeedSearchExpanded(true)}
-              >
-                <SearchIcon className="h-4 w-4" aria-hidden />
-              </Button>
-            </div>
-          </>
+        {isMobile && !feedSearchExpanded && (savedOnly || topicFilter || feedSearch.trim()) ? (
+          <button
+            type="button"
+            className="flex h-8 max-w-full items-center truncate rounded-full bg-muted/50 px-3 text-left text-xs font-medium text-foreground"
+            onClick={() => setFeedSearchExpanded(true)}
+          >
+            {savedOnly ? "Saved" : orderedTopics.find((t) => t.id === topicFilter)?.label ?? "Posts"}
+            {feedSearch.trim() ? ` · ${feedSearch.trim()}` : ""}
+          </button>
         ) : null}
 
         {!isMobile ? (

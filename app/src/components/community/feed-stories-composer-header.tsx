@@ -65,7 +65,6 @@ function SelfStoryCell({
             state={storyRingStateForStories(selfStories)}
             label={selfStories.every((s) => s.viewed_by_me) ? "Rewatch your stories" : "Your stories"}
             onClick={() => onOpenStory(self.id, storyToOpen)}
-            compact
           >
             <CommunityAuthorAvatar
               displayName={self.name}
@@ -80,10 +79,10 @@ function SelfStoryCell({
               e.stopPropagation();
               onAddStory();
             }}
-            className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground ring-2 ring-background outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground ring-2 ring-background outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             aria-label="Add another story"
           >
-            <Plus className="h-2 w-2" strokeWidth={3} />
+            <Plus className="h-3 w-3" strokeWidth={2.5} />
           </button>
         </div>
       ) : (
@@ -93,7 +92,7 @@ function SelfStoryCell({
           className="relative shrink-0 rounded-full outline-none ring-offset-background transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           aria-label="Add your story"
         >
-          <span className="block rounded-full border border-dashed border-border/45 p-px">
+          <span className="block rounded-full bg-muted/50 p-[2px] ring-1 ring-border/70">
             <CommunityAuthorAvatar
               displayName={self.name}
               avatarPath={self.avatar_url}
@@ -101,8 +100,8 @@ function SelfStoryCell({
               className={AVATAR_CLASS}
             />
           </span>
-          <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground ring-2 ring-background">
-            <Plus className="h-2 w-2" strokeWidth={3} />
+          <span className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground ring-2 ring-background">
+            <Plus className="h-3 w-3" strokeWidth={2.5} />
           </span>
         </button>
       )}
@@ -200,8 +199,8 @@ export function FeedStoriesComposerHeader({
     <button
       type="button"
       className={cn(
-        "flex w-full min-h-[3rem] items-center gap-2.5 text-left outline-none ring-offset-background transition-colors hover:bg-muted/25 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60",
-        hideComposerAvatar ? "px-4 py-3" : "px-3.5 py-3",
+        "flex w-full min-h-11 items-center gap-2.5 text-left outline-none ring-offset-background transition-colors hover:bg-muted/25 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60",
+        hideComposerAvatar ? "px-4 py-2" : "px-3.5 py-2",
       )}
       onClick={isMobile ? onComposerClick : undefined}
       disabled={composerDisabled}
@@ -256,7 +255,6 @@ export function FeedStoriesComposerHeader({
                           state={storyRingStateForStories(stories)}
                           onClick={() => onOpenStory(person.id, story)}
                           label={`Watch ${person.name}'s story`}
-                          compact
                         >
                           <CommunityAuthorAvatar
                             displayName={person.name}

@@ -34,6 +34,7 @@ export function CommunityPostImageGrid({ paths, altTexts, className, variant = "
   const [urls, setUrls] = useState<(string | null)[]>(() =>
     paths.map((path) => getCachedPostMediaSignedUrl(path)),
   );
+  const [signing, setSigning] = useState(() => paths.some((path) => !getCachedPostMediaSignedUrl(path)));
   const [failedIndices, setFailedIndices] = useState<Set<number>>(() => new Set());
   const [openIdx, setOpenIdx] = useState<number | null>(null);
 
@@ -41,15 +42,25 @@ export function CommunityPostImageGrid({ paths, altTexts, className, variant = "
     if (paths.length === 0) {
       setUrls([]);
       setFailedIndices(new Set());
+      setSigning(false);
       return;
     }
+    const cached = paths.map((path) => getCachedPostMediaSignedUrl(path));
+    const allCached = cached.every(Boolean);
+    setUrls(cached);
+    setFailedIndices(new Set());
+    if (allCached) {
+      setSigning(false);
+      return;
+    }
+    setSigning(true);
     let cancelled = false;
     void (async () => {
       const next = await getPostImageSignedUrls(paths);
-      if (!cancelled) {
-        setUrls(next);
-        setFailedIndices(new Set());
-      }
+      if (cancelled) return;
+      setUrls(next);
+      setFailedIndices(new Set());
+      setSigning(false);
     })();
     return () => {
       cancelled = true;
@@ -96,7 +107,7 @@ export function CommunityPostImageGrid({ paths, altTexts, className, variant = "
 
   if (paths.length === 0) return null;
 
-  const loadFailed = paths.length > 0 && urls.length === paths.length && loadedIndices.length === 0;
+  const loadFailed = !signing && paths.length > 0 && urls.length === paths.length && loadedIndices.length === 0;
 
   if (variant === "event-banner") {
     const heroIdx = loadedIndices[0];
@@ -178,7 +189,8 @@ export function CommunityPostImageGrid({ paths, altTexts, className, variant = "
                   alt={altTexts?.[loadedIndices[0]!]?.trim() || "Photo attached to post"}
                   className="aspect-[4/5] max-h-[min(85vw,32rem)] w-full object-cover"
                   loading={imgLoading}
-                fetchPriority={imgFetchPriority}
+                  fetchPriority={imgFetchPriority}
+                  onError={() => setFailedIndices((prev) => new Set(prev).add(loadedIndices[0]!))}
                 />
               </button>
             ) : waitingForUrls ? (
@@ -188,8 +200,8 @@ export function CommunityPostImageGrid({ paths, altTexts, className, variant = "
             <div className="grid grid-cols-2 gap-px bg-border/50">
               {paths.map((path, i) => {
                 const src = urls[i];
-                if (!src) {
-                  if (waitingForUrls) {
+                if (!src || failedIndices.has(i)) {
+                  if (waitingForUrls && !failedIndices.has(i)) {
                     return <div key={`${path}-${i}`} className="aspect-square animate-pulse bg-muted/40" aria-hidden />;
                   }
                   return null;
@@ -211,7 +223,8 @@ export function CommunityPostImageGrid({ paths, altTexts, className, variant = "
                         paths.length === 3 && i === 0 ? "aspect-[2/1]" : "aspect-square max-h-56",
                       )}
                       loading={imgLoading}
-                fetchPriority={imgFetchPriority}
+                      fetchPriority={imgFetchPriority}
+                      onError={() => setFailedIndices((prev) => new Set(prev).add(i))}
                     />
                   </button>
                 );

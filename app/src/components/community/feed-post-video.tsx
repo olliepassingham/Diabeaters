@@ -30,7 +30,8 @@ export function FeedPostVideo({ path, className, priority = false, topicLabel = 
 
   useEffect(() => {
     let cancelled = false;
-    setSrc(null);
+    const cached = getCachedPostMediaSignedUrl(path);
+    setSrc(cached);
     setFailed(false);
     void getPostVideoSignedUrl(path).then((url) => {
       if (cancelled) return;

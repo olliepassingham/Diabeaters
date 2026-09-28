@@ -38,6 +38,7 @@ import { cn } from "@/lib/utils";
 const DISMISS_DRAG_PX = 72;
 const NAV_DRAG_PX = 56;
 const TAP_SLOP_PX = 12;
+const IMAGE_STORY_MS = 5000;
 
 export type StoryViewerEntry = {
   authorId: string;
@@ -163,6 +164,9 @@ export function StoryViewerDialog({
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const dragRef = useRef({ x: 0, y: 0 });
   const suppressClick = useRef(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const progressRef = useRef(0);
+  const [progress, setProgress] = useState(0);
   const [drag, setDrag] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
 
@@ -180,6 +184,8 @@ export function StoryViewerDialog({
       dragRef.current = { x: 0, y: 0 };
       setDrag({ x: 0, y: 0 });
       setDragging(false);
+      progressRef.current = 0;
+      setProgress(0);
       return;
     }
     setIndex(Math.min(Math.max(initialIndex, 0), Math.max(queue.length - 1, 0)));
@@ -261,6 +267,43 @@ export function StoryViewerDialog({
     if (replyOpen || viewersOpen || deleteOpen) return;
     if (index > 0) setIndex((i) => i - 1);
   }, [index, replyOpen, viewersOpen, deleteOpen]);
+
+  const isVideoStory = resolvedStory?.media_kind === "video" && !sourcePostId;
+  const playbackPaused = replyOpen || viewersOpen || deleteOpen || dragging;
+
+  useEffect(() => {
+    progressRef.current = 0;
+    setProgress(0);
+  }, [index, resolvedStory?.id]);
+
+  useEffect(() => {
+    if (!open || isVideoStory || !resolvedStory || failed || loading || playbackPaused) return;
+    if (!sourcePostId && !mediaUrl) return;
+    const startedAt = performance.now() - progressRef.current * IMAGE_STORY_MS;
+    let frame = 0;
+    const tick = (now: number) => {
+      const next = Math.min(1, (now - startedAt) / IMAGE_STORY_MS);
+      progressRef.current = next;
+      setProgress(next);
+      if (next >= 1) {
+        advance();
+        return;
+      }
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [open, isVideoStory, resolvedStory, failed, loading, playbackPaused, sourcePostId, mediaUrl, advance]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !isVideoStory) return;
+    if (playbackPaused) {
+      video.pause();
+      return;
+    }
+    void video.play().catch(() => {});
+  }, [isVideoStory, playbackPaused, mediaUrl]);
 
   useEffect(() => {
     if (!open) return;
@@ -442,10 +485,10 @@ export function StoryViewerDialog({
                   className="h-[2px] min-w-0 flex-1 overflow-hidden rounded-full bg-white/25"
                 >
                   <div
-                    className={cn(
-                      "h-full rounded-full bg-white transition-[width] duration-200",
-                      i < index || queue.length <= 1 ? "w-full" : i === index ? "w-full" : "w-0",
-                    )}
+                    className="h-full rounded-full bg-white"
+                    style={{
+                      width: i < index ? "100%" : i === index ? `${progress * 100}%` : "0%",
+                    }}
                   />
                 </div>
               ))}
@@ -569,13 +612,21 @@ export function StoryViewerDialog({
                     <img src={mediaUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
                   ) : (
                     <video
+                      ref={videoRef}
                       src={mediaUrl}
                       className="absolute inset-0 h-full w-full object-cover"
                       controls={false}
                       playsInline
                       autoPlay
                       muted
-                      loop
+                      onTimeUpdate={(e) => {
+                        const v = e.currentTarget;
+                        if (!v.duration || !Number.isFinite(v.duration)) return;
+                        const next = Math.min(1, v.currentTime / v.duration);
+                        progressRef.current = next;
+                        setProgress(next);
+                      }}
+                      onEnded={() => advance()}
                     />
                   )}
                   <StoryOverlayLayer overlays={resolvedStory.overlays} />
