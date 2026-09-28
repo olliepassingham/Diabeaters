@@ -4,11 +4,18 @@ import {
   bedtimeOvernightSummaryFromInsight,
   entriesToOvernightReadings,
   filterEntriesToSleepWindow,
+  insightFromStoredOvernightSummary,
+  overnightReadingsFromHistoryPoints,
   overnightSummariesDiffer,
   type BedtimeOvernightInsight,
 } from "@/lib/bedtime-overnight-analysis";
-import { resolveOvernightReviewTarget, type OvernightReviewTarget } from "@/lib/bedtime-overnight-window";
+import {
+  listOvernightReviewNights,
+  overnightNightTitle,
+  type OvernightReviewTarget,
+} from "@/lib/bedtime-overnight-window";
 import { withTimeout } from "@/lib/cgm/async-timeout";
+import { getCgmLocalHistory } from "@/lib/cgm/cgm-history-store";
 import { fetchLiveCgmHistory } from "@/lib/cgm/live-cgm-history";
 import { liveCgmOvernightMessage } from "@/lib/cgm/live-cgm-source";
 import { hasLiveCgmCredentials, readCgmPreferences } from "@/lib/cgm/preferences";
@@ -31,6 +38,14 @@ export function bedtimeLogsContentKey(logs: BedtimeLog[]): string {
   return logs.map((l) => `${l.id}:${l.date}:${l.hoursUntilSleep ?? ""}`).join("|");
 }
 
+export function bedtimeNightContext(log: BedtimeLog | null | undefined): string | null {
+  if (!log) return null;
+  const bits: string[] = [];
+  if (log.exercisedToday) bits.push("Exercise");
+  if (log.hadAlcohol) bits.push("Alcohol");
+  return bits.length > 0 ? bits.join(" · ") : null;
+}
+
 export function useBedtimeLastNight(logs: BedtimeLog[], units: BgUnits): {
   insight: BedtimeOvernightInsight | null;
   log: BedtimeLog | null;
@@ -39,17 +54,32 @@ export function useBedtimeLastNight(logs: BedtimeLog[], units: BgUnits): {
   message: string | null;
   connected: boolean;
   refresh: () => void;
+  nightIndex: number;
+  nightCount: number;
+  nightTitle: string;
+  nightContext: string | null;
+  canGoOlder: boolean;
+  canGoNewer: boolean;
+  goOlder: () => void;
+  goNewer: () => void;
 } {
   const connected = hasLiveCgmCredentials(readCgmPreferences());
   const logsRef = useRef(logs);
   logsRef.current = logs;
   const logsKey = bedtimeLogsContentKey(logs);
-  const reviewTarget = useMemo(
-    () => resolveOvernightReviewTarget(logsRef.current),
-    [logsKey],
-  );
+  const nights = useMemo(() => listOvernightReviewNights(logsRef.current), [logsKey]);
+  const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
+
+  const nightIndex = useMemo(() => {
+    if (!selectedLogId) return 0;
+    const found = nights.findIndex((night) => night.log?.id === selectedLogId);
+    return found >= 0 ? found : 0;
+  }, [nights, selectedLogId]);
+
+  const reviewTarget = nights[nightIndex] ?? null;
+  const isLatestNight = nightIndex === 0;
   const reviewKey = reviewTarget
-    ? `${reviewTarget.source}:${reviewTarget.window.startMs}:${reviewTarget.window.endMs}`
+    ? `${nightIndex}:${reviewTarget.source}:${reviewTarget.window.startMs}:${reviewTarget.window.endMs}`
     : "none";
 
   const [insight, setInsight] = useState<BedtimeOvernightInsight | null>(null);
@@ -65,7 +95,7 @@ export function useBedtimeLastNight(logs: BedtimeLog[], units: BgUnits): {
       fn();
     };
 
-    if (!connected) {
+    if (!connected && isLatestNight) {
       apply(() => {
         setInsight(null);
         setStatus("no_cgm");
@@ -84,15 +114,73 @@ export function useBedtimeLastNight(logs: BedtimeLog[], units: BgUnits): {
     }
 
     const { log, window } = reviewTarget;
-    const minutesBack = Math.min(1440, Math.ceil((Date.now() - window.startMs) / 60_000) + 60);
     const { low: targetLow, high: targetHigh } = resolveUserTargetBgRange(storage.getSettings(), units);
 
     apply(() => {
+      setInsight(null);
       setStatus("loading");
       setMessage(null);
     });
 
+    const publish = (next: BedtimeOvernightInsight) => {
+      if (log) {
+        const summary = bedtimeOvernightSummaryFromInsight(next);
+        if (overnightSummariesDiffer(log.overnightCgmSummary, summary) && summary) {
+          storage.updateBedtimeLog(log.id, { overnightCgmSummary: summary });
+        }
+      }
+      apply(() => {
+        setInsight(next);
+        setStatus("ready");
+        setMessage(null);
+      });
+    };
+
+    const publishStoredSummary = () => {
+      const summary = log?.overnightCgmSummary;
+      if (
+        !isLatestNight &&
+        summary &&
+        typeof summary.inRangePercent === "number" &&
+        summary.readingCount > 0
+      ) {
+        apply(() => {
+          setInsight(insightFromStoredOvernightSummary(window, summary, targetLow, targetHigh));
+          setStatus("ready");
+          setMessage(null);
+        });
+        return true;
+      }
+      return false;
+    };
+
     try {
+      if (!isLatestNight) {
+        const readings = overnightReadingsFromHistoryPoints(getCgmLocalHistory(), window, units);
+        if (readings.length === 0) {
+          if (publishStoredSummary()) return;
+          apply(() => {
+            setInsight(null);
+            setStatus("no_readings");
+            setMessage("No glucose points for this night are stored on this phone.");
+          });
+          return;
+        }
+        const next = analyzeBedtimeOvernight(log, readings, window, targetLow, targetHigh, units);
+        if (!next) {
+          if (publishStoredSummary()) return;
+          apply(() => {
+            setInsight(null);
+            setStatus("error");
+            setMessage("Could not summarise overnight readings.");
+          });
+          return;
+        }
+        publish(next);
+        return;
+      }
+
+      const minutesBack = Math.min(1440, Math.ceil((Date.now() - window.startMs) / 60_000) + 60);
       const result = await withTimeout(
         fetchLiveCgmHistory({ minutes: minutesBack, maxCount: 288 }),
         FETCH_TIMEOUT_MS,
@@ -130,29 +218,34 @@ export function useBedtimeLastNight(logs: BedtimeLog[], units: BgUnits): {
         });
         return;
       }
-      if (log) {
-        const summary = bedtimeOvernightSummaryFromInsight(next);
-        if (overnightSummariesDiffer(log.overnightCgmSummary, summary) && summary) {
-          storage.updateBedtimeLog(log.id, { overnightCgmSummary: summary });
-        }
-      }
-      apply(() => {
-        setInsight(next);
-        setStatus("ready");
-        setMessage(null);
-      });
+      publish(next);
     } catch (e) {
+      if (publishStoredSummary()) return;
       apply(() => {
         setInsight(null);
         setStatus("error");
         setMessage(e instanceof Error ? e.message : "Could not load overnight review.");
       });
     }
-  }, [connected, reviewTarget, reviewKey, units]);
+  }, [connected, isLatestNight, reviewTarget, reviewKey, units]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  const goOlder = useCallback(() => {
+    const next = nights[nightIndex + 1];
+    if (next?.log) setSelectedLogId(next.log.id);
+  }, [nights, nightIndex]);
+
+  const goNewer = useCallback(() => {
+    if (nightIndex <= 1) {
+      setSelectedLogId(null);
+      return;
+    }
+    const newer = nights[nightIndex - 1];
+    setSelectedLogId(newer?.log?.id ?? null);
+  }, [nights, nightIndex]);
 
   return {
     insight,
@@ -162,5 +255,13 @@ export function useBedtimeLastNight(logs: BedtimeLog[], units: BgUnits): {
     message,
     connected,
     refresh: () => void load(),
+    nightIndex,
+    nightCount: nights.length,
+    nightTitle: overnightNightTitle(nightIndex, reviewTarget?.window),
+    nightContext: bedtimeNightContext(reviewTarget?.log),
+    canGoOlder: nightIndex < nights.length - 1 && Boolean(nights[nightIndex + 1]?.log),
+    canGoNewer: nightIndex > 0,
+    goOlder,
+    goNewer,
   };
 }

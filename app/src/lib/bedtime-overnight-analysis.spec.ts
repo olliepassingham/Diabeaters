@@ -9,10 +9,11 @@ import {
   filterEntriesToSleepWindow,
   findPriorOvernightTirPercent,
   formatOvernightTirDelta,
+  insightFromStoredOvernightSummary,
   overnightTirTone,
   resolveOvernightTirCompare,
 } from "./bedtime-overnight-analysis";
-import { computeBedtimeSleepWindow, findReviewableBedtimeLog, resolveOvernightReviewTarget, findMorningHomeBedtimeLog, isBedtimeMorningHomeWindow, bedtimeReadinessLabel, toBedtimeStreakDayKey } from "./bedtime-overnight-window";
+import { computeBedtimeSleepWindow, findReviewableBedtimeLog, listOvernightReviewNights, overnightNightTitle, resolveOvernightReviewTarget, findMorningHomeBedtimeLog, isBedtimeMorningHomeWindow, bedtimeReadinessLabel, toBedtimeStreakDayKey } from "./bedtime-overnight-window";
 import type { BedtimeLog } from "@/lib/storage";
 
 function makeLog(overrides: Partial<BedtimeLog> = {}): BedtimeLog {
@@ -245,6 +246,9 @@ describe("bedtime overnight analysis", () => {
       tone: "down",
     });
     expect(formatOvernightTirDelta(compareOvernightTir(70, 71)).label).toBe("Similar to last night");
+    expect(formatOvernightTirDelta(compareOvernightTir(72, 64), "the night before").label).toBe(
+      "↑ 8 pts vs the night before",
+    );
   });
 
   it("finds prior overnight TIR from an earlier log with a valid summary", () => {
@@ -321,5 +325,49 @@ describe("bedtime overnight analysis", () => {
     expect(insight.explanations.length).toBeLessThanOrEqual(2);
     expect(insight.considerations.length).toBeLessThanOrEqual(1);
     expect(insight.explanations[0]!.length).toBeLessThan(120);
+  });
+});
+
+describe("listOvernightReviewNights", () => {
+  const now = new Date("2026-07-18T12:00:00.000Z").getTime();
+
+  it("puts the newest finished night first and keeps earlier checks inside 14 days", () => {
+    const nights = listOvernightReviewNights(
+      [
+        makeLog({ id: "older", date: "2026-07-16T21:00:00.000Z", hoursUntilSleep: 0 }),
+        makeLog({ id: "latest", date: "2026-07-17T21:00:00.000Z", hoursUntilSleep: 0 }),
+      ],
+      now,
+    );
+    expect(nights.map((n) => n.log?.id)).toEqual(["latest", "older"]);
+    expect(overnightNightTitle(0, nights[0]!.window)).toBe("Last night");
+    expect(overnightNightTitle(1, nights[1]!.window)).toMatch(/night$/);
+    expect(overnightNightTitle(1, nights[1]!.window)).not.toBe("Last night");
+  });
+
+  it("drops a second check on the same night and checks older than 14 days", () => {
+    const nights = listOvernightReviewNights(
+      [
+        makeLog({ id: "latest", date: "2026-07-17T23:00:00.000Z", hoursUntilSleep: 0 }),
+        makeLog({ id: "same-night", date: "2026-07-17T21:00:00.000Z", hoursUntilSleep: 0 }),
+        makeLog({ id: "ancient", date: "2026-06-01T21:00:00.000Z", hoursUntilSleep: 0 }),
+      ],
+      now,
+    );
+    expect(nights.map((n) => n.log?.id)).toEqual(["latest"]);
+  });
+
+  it("builds a percent-only insight when the graph is missing", () => {
+    const window = computeBedtimeSleepWindow(makeLog({ hoursUntilSleep: 0 }))!;
+    const insight = insightFromStoredOvernightSummary(
+      window,
+      { inRangePercent: 82, readingCount: 20, hadLow: false, hadHigh: true, computedAt: "2026-07-18T08:00:00.000Z" },
+      4,
+      10,
+    );
+    expect(insight.stats.inRangePercent).toBe(82);
+    expect(insight.readings).toEqual([]);
+    expect(insight.summary).toMatch(/not on this phone/);
+    expect(insight.headline).toBe("Ran high overnight");
   });
 });

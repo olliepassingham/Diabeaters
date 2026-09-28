@@ -365,14 +365,17 @@ export function compareOvernightTir(currentPercent: number, priorPercent: number
   return { currentPercent: current, priorPercent: prior, deltaPts, direction };
 }
 
-export function formatOvernightTirDelta(c: OvernightTirCompare): { label: string; tone: "up" | "down" | "flat" } {
+export function formatOvernightTirDelta(
+  c: OvernightTirCompare,
+  versus: "last night" | "the night before" = "last night",
+): { label: string; tone: "up" | "down" | "flat" } {
   if (c.direction === "flat") {
-    return { label: "Similar to last night", tone: "flat" };
+    return { label: `Similar to ${versus}`, tone: "flat" };
   }
   if (c.direction === "up") {
-    return { label: `↑ ${c.deltaPts} pts vs last night`, tone: "up" };
+    return { label: `↑ ${c.deltaPts} pts vs ${versus}`, tone: "up" };
   }
-  return { label: `↓ ${Math.abs(c.deltaPts)} pts vs last night`, tone: "down" };
+  return { label: `↓ ${Math.abs(c.deltaPts)} pts vs ${versus}`, tone: "down" };
 }
 
 /**
@@ -427,6 +430,68 @@ export function bedtimeOvernightSummaryFromInsight(
   computedAt = new Date().toISOString(),
 ): BedtimeOvernightCgmSummary | null {
   return bedtimeOvernightSummaryFromStats(insight.stats, computedAt);
+}
+
+/** Readings inside a sleep window from on-device CGM history. Oldest first. */
+export function overnightReadingsFromHistoryPoints(
+  points: CgmHistoryPoint[],
+  window: BedtimeSleepWindow,
+  units: BgUnits,
+): BedtimeOvernightReading[] {
+  return points
+    .filter((p) => p.recordedAtMs >= window.startMs && p.recordedAtMs <= window.endMs)
+    .map((p) => ({
+      timeMs: p.recordedAtMs,
+      recordedAt: new Date(p.recordedAtMs).toISOString(),
+      value: units === "mmol/L" ? convertGlucoseValue(p.valueMgDl, "mg/dL", "mmol/L") : Math.round(p.valueMgDl),
+      units,
+    }))
+    .sort((a, b) => a.timeMs - b.timeMs);
+}
+
+/**
+ * Percent-only review when the graph points for that night are not on this phone.
+ * `readings` is empty so the chart and min/max chips stay hidden.
+ */
+export function insightFromStoredOvernightSummary(
+  window: BedtimeSleepWindow,
+  summary: BedtimeOvernightCgmSummary,
+  targetLow: number,
+  targetHigh: number,
+): BedtimeOvernightInsight {
+  const headline =
+    summary.hadLow && summary.hadHigh
+      ? "A mixed night"
+      : summary.hadLow
+        ? "Overnight low detected"
+        : summary.hadHigh
+          ? "Ran high overnight"
+          : "In range overnight";
+  return {
+    headline,
+    summary: "The graph for this night is not on this phone.",
+    explanations: [],
+    considerations: [],
+    stats: {
+      readingCount: summary.readingCount,
+      min: targetLow,
+      max: targetHigh,
+      minAtMs: window.startMs,
+      maxAtMs: window.endMs,
+      startValue: targetLow,
+      endValue: targetHigh,
+      overnightDelta: 0,
+      firstHalfAvg: targetLow,
+      secondHalfAvg: targetHigh,
+      inRangePercent: Math.round(summary.inRangePercent),
+      hadLow: summary.hadLow,
+      hadHigh: summary.hadHigh,
+    },
+    sleepWindowLabel: formatSleepWindowLabel(window.startMs, window.endMs),
+    targetLow,
+    targetHigh,
+    readings: [],
+  };
 }
 
 /**

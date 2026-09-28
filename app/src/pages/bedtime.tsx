@@ -378,6 +378,13 @@ export default function Bedtime() {
     message: lastNightMessage,
     reviewTarget: lastNightReview,
     refresh: refreshLastNight,
+    nightTitle: lastNightTitle,
+    nightContext: lastNightContext,
+    nightIndex: lastNightIndex,
+    canGoOlder: canGoOlderNight,
+    canGoNewer: canGoNewerNight,
+    goOlder: goOlderNight,
+    goNewer: goNewerNight,
   } = useBedtimeLastNight(bedtimeLogs, bgUnits);
 
   const lastNightTirCompare =
@@ -1144,6 +1151,13 @@ export default function Bedtime() {
         targetLow={targetRange.low}
         targetHigh={targetRange.high}
         tirCompare={lastNightTirCompare}
+        tirVersus={lastNightIndex > 0 ? "the night before" : "last night"}
+        nightTitle={lastNightTitle}
+        nightContext={lastNightContext}
+        canGoOlder={canGoOlderNight}
+        canGoNewer={canGoNewerNight}
+        onGoOlder={goOlderNight}
+        onGoNewer={goNewerNight}
         onRefresh={refreshLastNight}
       />
 
