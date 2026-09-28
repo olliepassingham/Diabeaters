@@ -98,6 +98,13 @@ export function reminderKindsDueNow(
   return due;
 }
 
+function normalizeReminderClock(time: string | null | undefined): string {
+  const t = time?.trim() ?? "";
+  const m = /^(\d{1,2}):(\d{2})/.exec(t);
+  if (!m) return t;
+  return `${m[1]!.padStart(2, "0")}:${m[2]}`;
+}
+
 export function supporterReminderDedupeKey(
   patientId: string,
   appointmentKey: string,
@@ -105,7 +112,16 @@ export function supporterReminderDedupeKey(
   time: string | null | undefined,
   kind: AppointmentReminderKind,
 ): string {
-  return `${patientId}|${appointmentKey}|${date}|${time ?? ""}|${kind}`;
+  return `${patientId}|${appointmentKey}|${date}|${normalizeReminderClock(time)}|${kind}`;
+}
+
+/** Same id for one appointment and reminder kind, so a corrected time replaces the lock-screen alert. */
+export function supporterReminderCollapseId(
+  appointmentKey: string,
+  kind: AppointmentReminderKind,
+): string {
+  const suffix = kind === "evening_before" ? "eve" : "2h";
+  return `appt-${appointmentKey}-${suffix}`.slice(0, 64);
 }
 
 export function supporterReminderCopy(

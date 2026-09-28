@@ -95,8 +95,10 @@ async function sendViaApns(
   }
 
   const custom = opts.data && typeof opts.data === "object" && !Array.isArray(opts.data)
-    ? (opts.data as Record<string, unknown>)
+    ? { ...(opts.data as Record<string, unknown>) }
     : {};
+  const collapseId = typeof custom.apns_collapse_id === "string" ? custom.apns_collapse_id.trim().slice(0, 64) : "";
+  delete custom.apns_collapse_id;
 
   const aps: Record<string, unknown> = {
     alert: { title: opts.title, body: opts.body },
@@ -137,6 +139,7 @@ async function sendViaApns(
       "apns-priority": "10",
       "apns-interruption-level": "active",
       "content-type": "application/json",
+      ...(collapseId ? { "apns-collapse-id": collapseId } : {}),
     },
     body: JSON.stringify(payload),
   });

@@ -10,12 +10,22 @@ import { storage } from "@/lib/storage";
 
 const POLL_MS = 5 * 60 * 1000;
 
+let scanInflight: Promise<void> | null = null;
+
 async function runAppointmentReminderScan(userId: string): Promise<void> {
+  if (scanInflight) return scanInflight;
+  scanInflight = runAppointmentReminderScanOnce(userId).finally(() => {
+    scanInflight = null;
+  });
+  return scanInflight;
+}
+
+async function runAppointmentReminderScanOnce(userId: string): Promise<void> {
   const settings = storage.getNotificationSettings();
   await ensureAppointmentInAppRemindersForUser(userId);
   await rescheduleAppointmentReminders(storage.getAppointmentsForUser(userId));
   if (settings.enabled && settings.supporterAppointmentReminders !== false) {
-    void invokeNotifySupporterAppointmentReminders();
+    await invokeNotifySupporterAppointmentReminders();
   }
 }
 

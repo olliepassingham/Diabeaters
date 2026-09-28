@@ -398,7 +398,7 @@ export default function Appointments() {
     setAppointments(storage.getAppointmentsForUser(user.id));
     setIsFormOpen(false);
     resetForm();
-    await syncAppointments();
+    await syncAppointments({ throttleMs: 0 });
     await rescheduleAppointmentReminders(storage.getAppointmentsForUser(user.id));
   };
 
@@ -445,7 +445,7 @@ export default function Appointments() {
     // Mark done, then open edit so results can be added in the same flow.
     storage.updateAppointment(id, { isCompleted: true });
     setAppointments(storage.getAppointmentsForUser(user.id));
-    await syncAppointments();
+    await syncAppointments({ throttleMs: 0 });
     await rescheduleAppointmentReminders(storage.getAppointmentsForUser(user.id));
     openEditDialog({ ...appt, isCompleted: true }, { focusResults: true });
   };
@@ -460,7 +460,7 @@ export default function Appointments() {
     try {
       storage.deleteAppointment(pendingDeleteId);
       setAppointments(storage.getAppointmentsForUser(user.id));
-      await syncAppointments();
+      await syncAppointments({ throttleMs: 0 });
       await rescheduleAppointmentReminders(storage.getAppointmentsForUser(user.id));
     } finally {
       setDeleteBusy(false);

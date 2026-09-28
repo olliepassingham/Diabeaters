@@ -14,8 +14,18 @@ export type NotifySupporterAppointmentRemindersResult = {
   delivered_push?: number;
 };
 
+let notifyInflight: Promise<NotifySupporterAppointmentRemindersResult> | null = null;
+
 /** Ask the server to notify linked supporters for this patient's due appointment windows. */
 export async function invokeNotifySupporterAppointmentReminders(): Promise<NotifySupporterAppointmentRemindersResult> {
+  if (notifyInflight) return notifyInflight;
+  notifyInflight = invokeNotifySupporterAppointmentRemindersOnce().finally(() => {
+    notifyInflight = null;
+  });
+  return notifyInflight;
+}
+
+async function invokeNotifySupporterAppointmentRemindersOnce(): Promise<NotifySupporterAppointmentRemindersResult> {
   const supabase = getSupabase();
   const env = getSupabaseUrlAndAnonKey();
   if (!supabase || !env) return { success: false, error: "supabase_not_configured" };

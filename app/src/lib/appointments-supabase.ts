@@ -52,7 +52,7 @@ function parseLocalScheduledAt(date: string, time: string | null | undefined): s
 function toCloudUpsert(
   userId: string,
   a: Appointment,
-): Omit<CloudAppointmentRow, "id" | "created_at" | "updated_at"> {
+): Omit<CloudAppointmentRow, "id" | "created_at"> {
   return {
     user_id: userId,
     client_id: a.id,
@@ -66,7 +66,21 @@ function toCloudUpsert(
     outcome: parseAppointmentOutcome(a.outcome) ?? null,
     is_completed: a.isCompleted,
     deleted_at: a.deletedAt ?? null,
+    updated_at: a.updatedAt || a.createdAt || new Date().toISOString(),
   };
+}
+
+/** True when the device copy is newer than the row already stored for supporters. */
+export function appointmentCloudUpdateIsNewer(
+  serverUpdatedAt: string | null | undefined,
+  clientUpdatedAt: string,
+): boolean {
+  const clientT = new Date(clientUpdatedAt).getTime();
+  if (!Number.isFinite(clientT)) return false;
+  if (!serverUpdatedAt) return true;
+  const serverT = new Date(serverUpdatedAt).getTime();
+  if (!Number.isFinite(serverT)) return true;
+  return clientT > serverT;
 }
 
 function fromCloudRow(r: CloudAppointmentRow): Appointment {
@@ -134,14 +148,34 @@ export async function pushLocalAppointmentsToCloud(): Promise<void> {
 
   if (allRaw.length === 0) return;
 
-  const payload = allRaw.map((a) => toCloudUpsert(userId, a));
-  const { error } = await supabase
-    .from("appointments")
-    .upsert(payload, { onConflict: "user_id,client_id" });
+  for (const a of allRaw) {
+    const payload = toCloudUpsert(userId, a);
+    const { data: existing, error: selErr } = await supabase
+      .from("appointments")
+      .select("updated_at")
+      .eq("user_id", userId)
+      .eq("client_id", a.id)
+      .maybeSingle();
+    if (selErr) {
+      if (import.meta.env.DEV) console.warn("appointments: push lookup failed", selErr);
+      continue;
+    }
 
-  if (error) {
-    // Best-effort sync; keep local UX working.
-    if (import.meta.env.DEV) console.warn("appointments: push failed", error);
+    if (!existing) {
+      const { error } = await supabase.from("appointments").insert(payload);
+      if (error && import.meta.env.DEV) console.warn("appointments: push insert failed", error);
+      continue;
+    }
+
+    if (!appointmentCloudUpdateIsNewer(existing.updated_at as string | null, payload.updated_at)) continue;
+
+    const { error } = await supabase
+      .from("appointments")
+      .update(payload)
+      .eq("user_id", userId)
+      .eq("client_id", a.id)
+      .lt("updated_at", payload.updated_at);
+    if (error && import.meta.env.DEV) console.warn("appointments: push update failed", error);
   }
 }
 
@@ -173,13 +207,24 @@ export async function pullCloudAppointmentsToLocal(): Promise<void> {
 
 let lastSyncAt = 0;
 let inflight: Promise<void> | null = null;
+let followUp: Promise<void> | null = null;
 
 /** Best-effort local-first sync (push then pull). Safe to call often. */
 export function syncAppointments(opts?: { throttleMs?: number }): Promise<void> {
   const throttleMs = opts?.throttleMs ?? 10_000;
+  const force = throttleMs === 0;
+  if (inflight) {
+    if (!force) return inflight;
+    if (!followUp) {
+      followUp = inflight.then(() => {
+        followUp = null;
+        return syncAppointments({ throttleMs: 0 });
+      });
+    }
+    return followUp;
+  }
   const now = Date.now();
-  if (inflight) return inflight;
-  if (now - lastSyncAt < throttleMs) return Promise.resolve();
+  if (!force && now - lastSyncAt < throttleMs) return Promise.resolve();
 
   inflight = (async () => {
     try {

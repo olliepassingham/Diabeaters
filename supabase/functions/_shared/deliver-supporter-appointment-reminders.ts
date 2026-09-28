@@ -5,6 +5,7 @@ import {
   appointmentReminderTimes,
   prefsAllowAppointmentAlerts,
   reminderKindsDueNow,
+  supporterReminderCollapseId,
   supporterReminderCopy,
   supporterReminderDedupeKey,
   type AppointmentReminderKind,
@@ -33,18 +34,36 @@ function appointmentsScopeOn(scopes: unknown): boolean {
   return s.appointments === true || s.appointments === "true";
 }
 
+function isUniqueViolation(err: { code?: string; message?: string } | null): boolean {
+  if (!err) return false;
+  const code = String(err.code ?? "");
+  const msg = (err.message ?? "").toLowerCase();
+  return code === "23505" || msg.includes("duplicate key") || msg.includes("unique constraint");
+}
+
+/** True when this reminder was already stored, or we cannot tell (fail closed). */
 async function alreadySent(
   admin: SupabaseClient,
   carerId: string,
   dedupeKey: string,
 ): Promise<boolean> {
-  const { data } = await admin
+  const byColumn = await admin
+    .from("notifications")
+    .select("id")
+    .eq("user_id", carerId)
+    .eq("dedupe_key", dedupeKey)
+    .limit(1);
+  if (byColumn.error) return true;
+  if ((byColumn.data?.length ?? 0) > 0) return true;
+
+  const byJson = await admin
     .from("notifications")
     .select("id")
     .eq("user_id", carerId)
     .eq("data->>dedupe_key", dedupeKey)
     .limit(1);
-  return (data?.length ?? 0) > 0;
+  if (byJson.error) return true;
+  return (byJson.data?.length ?? 0) > 0;
 }
 
 export async function deliverSupporterAppointmentRemindersForPatient(
@@ -126,9 +145,15 @@ export async function deliverSupporterAppointmentRemindersForPatient(
           title: copy.title,
           body: copy.body,
           data,
+          dedupe_key: dedupeKey,
           read: false,
         });
-        if (insErr) continue;
+        if (insErr) {
+          if (!isUniqueViolation(insErr)) {
+            console.error("[supporter-appointment-reminders] notification insert", insErr);
+          }
+          continue;
+        }
         inappDelivered += 1;
 
         if (gate.push && mobilePushDeliveryConfigured()) {
@@ -137,7 +162,7 @@ export async function deliverSupporterAppointmentRemindersForPatient(
             tokenRows,
             copy.title,
             copy.body,
-            data,
+            { ...data, apns_collapse_id: supporterReminderCollapseId(appointmentKey, kind) },
             { recipientUserId: carer.carer_id, admin },
           );
           pushDelivered += delivered;
