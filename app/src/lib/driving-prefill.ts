@@ -14,9 +14,10 @@ export function getDrivingBgPrefill(): DrivingBgPrefill | null {
   const units = normalizeBgUnits(profile?.bgUnits);
 
   const active = storage.getActiveExercise();
-  if (active?.preBg != null && Number.isFinite(active.preBg) && !active.preBgSkipped) {
+  const latestExerciseBg = latestLoggedExerciseBg(active);
+  if (latestExerciseBg != null) {
     return {
-      value: formatTargetBgInput(active.preBg, units),
+      value: formatTargetBgInput(latestExerciseBg, units),
       source: "From your active exercise session",
     };
   }
@@ -45,6 +46,24 @@ export function getDrivingBgPrefill(): DrivingBgPrefill | null {
   }
 
   return null;
+}
+
+/** Newest logged check in the open workout, so recovery does not offer the starting reading. */
+function latestLoggedExerciseBg(
+  active: ReturnType<typeof storage.getActiveExercise>,
+): number | null {
+  if (!active) return null;
+  const points: { value: number; atMs: number }[] = [];
+  const push = (value: number | undefined, at: string | undefined, skipped?: boolean) => {
+    if (skipped || value == null || !Number.isFinite(value)) return;
+    const atMs = at ? new Date(at).getTime() : 0;
+    points.push({ value, atMs: Number.isFinite(atMs) ? atMs : 0 });
+  };
+  push(active.preBg, active.preBgAt, active.preBgSkipped);
+  push(active.midBg, active.midBgAt, active.midBgSkipped);
+  push(active.recoveryBg, active.recoveryBgAt);
+  points.sort((a, b) => b.atMs - a.atMs);
+  return points[0]?.value ?? null;
 }
 
 export function formatDrivingTargetRange(settings: UserSettings | undefined, bgUnits: "mmol/L" | "mg/dL"): string | null {

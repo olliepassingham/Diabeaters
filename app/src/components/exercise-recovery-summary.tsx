@@ -72,9 +72,12 @@ function Sparkline({
 export function ExerciseRecoverySummary({
   session,
   units,
+  showSessionHeading = true,
 }: {
   session: ActiveExerciseSession;
   units: BgUnits;
+  /** The workout card already names the session on the recovery page. */
+  showSessionHeading?: boolean;
 }) {
   const series = useMemo(() => {
     const history = getCgmLocalHistory(2);
@@ -89,12 +92,14 @@ export function ExerciseRecoverySummary({
 
   return (
     <div className="space-y-4" data-testid="exercise-recovery-summary">
-      <div>
-        <p className="text-base font-semibold tracking-tight text-foreground">{session.exerciseName}</p>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          {session.durationMinutes} min · {intensity}
-        </p>
-      </div>
+      {showSessionHeading ? (
+        <div>
+          <p className="text-base font-semibold tracking-tight text-foreground">{session.exerciseName}</p>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            {session.durationMinutes} min · {intensity}
+          </p>
+        </div>
+      ) : null}
 
       {glance && series.points.length > 0 ? (
         <div className="rounded-2xl border border-border/50 bg-muted/20 px-2 py-2">

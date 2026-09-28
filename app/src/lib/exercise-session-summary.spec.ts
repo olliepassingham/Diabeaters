@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildExerciseSessionBgSeries, exerciseSessionBgGlance } from "./exercise-session-summary";
+import { buildExerciseSessionBgSeries, exerciseSessionBgGlance, recentSessionBgForField } from "./exercise-session-summary";
 
 const session = {
   startedAt: "2026-09-28T08:00:00.000Z",
@@ -33,5 +33,27 @@ describe("buildExerciseSessionBgSeries", () => {
     const series = buildExerciseSessionBgSeries(session, [], "mmol/L", Date.parse("2026-09-28T09:00:00.000Z"));
     expect(series.source).toBe("checks");
     expect(exerciseSessionBgGlance(series.points)).toEqual({ start: 7.2, low: 5.4, now: 6.1 });
+  });
+
+  it("uses a recent session reading for the recovery field", () => {
+    const bare = {
+      startedAt: "2026-09-28T08:00:00.000Z",
+      exerciseStartedAt: "2026-09-28T08:05:00.000Z",
+    };
+    const now = Date.parse("2026-09-28T09:00:00.000Z");
+    const recent = recentSessionBgForField(
+      bare,
+      [{ recordedAtMs: Date.parse("2026-09-28T08:55:00.000Z"), valueMgDl: 216 }],
+      "mmol/L",
+      now,
+    );
+    expect(recent?.value).toBeCloseTo(12, 0);
+    const stale = recentSessionBgForField(
+      bare,
+      [{ recordedAtMs: Date.parse("2026-09-28T08:10:00.000Z"), valueMgDl: 216 }],
+      "mmol/L",
+      now,
+    );
+    expect(stale).toBeNull();
   });
 });

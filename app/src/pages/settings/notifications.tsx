@@ -345,7 +345,7 @@ export function NotificationsTab({
                 testId="switch-exercise-cgm-alerts"
               />
               {notifSettings.exerciseCgmAlerts !== false && cgmActive ? (
-                <div className="space-y-3 px-3.5 py-3 sm:px-4">
+                <div id="exercise-low-alerts" className="scroll-mt-28 space-y-3 px-3.5 py-3 sm:px-4">
                   <ExerciseAlertLevelControl
                     bgUnits={bgUnits}
                     settings={notifSettings}

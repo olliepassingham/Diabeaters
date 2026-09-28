@@ -186,7 +186,7 @@ function baseVerdict(input: ExerciseReadinessInput): ExerciseReadinessResult {
     return {
       verdict: "caution",
       title: "Caution (high BG)",
-      detail: "Consider ketone checks and a correction plan per your care team before intense activity.",
+      detail: "Check ketones if you feel unwell.",
     };
   }
 
@@ -216,15 +216,13 @@ function refineWithExerciseTypeAndTrend(
     if (t === "yoga" || t === "walking") {
       return {
         ...base,
-        detail:
-          "BG is on the high side — gentle movement often suits this activity type; confirm targets with your care team.",
+        detail: "A bit high. Easy movement is usually fine.",
       };
     }
     if (strengthLike || t === "hiit") {
       return {
         ...base,
-        detail:
-          "BG is elevated — intense effort can be harder on the body when high; consider a correction plan and ketone checks per your team.",
+        detail: "Check ketones if you feel unwell.",
       };
     }
   }
@@ -422,7 +420,7 @@ export function getRecoveryReadinessVerdict(input: ExerciseReadinessInput): Exer
       verdict: "caution",
       title: "Caution (high BG)",
       detail:
-        "BG is elevated after exercise — follow your team’s correction and ketone plan; delayed lows can still appear later.",
+        "Still high. Delayed lows can show up later.",
     };
   }
 
@@ -509,7 +507,7 @@ function refineWithPreRapidInsulin(result: ExerciseReadinessResult, input: Exerc
     };
   }
   if (r === "yes" && result.title.startsWith("Caution (high BG)")) {
-    return { ...result, detail: `${result.detail} If you have taken rapid insulin recently, follow your team’s high-BG and ketone plan before intense effort.` };
+    return result;
   }
   if (r === "yes" && (result.verdict === "ready" || result.verdict === "caution")) {
     const mergedDetail =

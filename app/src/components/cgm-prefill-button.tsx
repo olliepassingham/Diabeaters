@@ -46,7 +46,7 @@ export function CgmPrefillButton({
   allowSync,
   testId = "button-cgm-prefill",
 }: CgmPrefillButtonProps) {
-  if (loading) {
+  if (loading && !currentValue.trim()) {
     return (
       <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
         <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
@@ -90,7 +90,7 @@ export function CgmPrefillButton({
           onClick={() => applyPrefill(prefill, onApply, onApplyTrend)}
           data-testid={`${testId}-sync`}
         >
-          Update from CGM ({prefill.value} {bgUnits})
+          {prefill.fromCgm ? "Update from CGM" : "Use"} ({prefill.value} {bgUnits})
         </Button>
         <p className="text-[11px] leading-snug text-muted-foreground">{prefill.source}</p>
       </div>

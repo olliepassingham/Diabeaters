@@ -79,6 +79,23 @@ export function buildExerciseSessionBgSeries(
   return { points: checks, source: "checks" };
 }
 
+/** How long a session glucose point can stand in for the recovery field before a live fetch returns. */
+export const RECENT_SESSION_BG_MAX_AGE_MS = 20 * 60 * 1000;
+
+/** Latest glucose already stored for this workout, when it is recent enough to show immediately. */
+export function recentSessionBgForField(
+  session: Parameters<typeof buildExerciseSessionBgSeries>[0],
+  cgmMgDl: { recordedAtMs: number; valueMgDl: number }[],
+  units: BgUnits,
+  nowMs = Date.now(),
+): { value: number; atMs: number } | null {
+  const series = buildExerciseSessionBgSeries(session, cgmMgDl, units, nowMs);
+  const latest = series.points[series.points.length - 1];
+  if (!latest) return null;
+  if (nowMs - latest.timeMs > RECENT_SESSION_BG_MAX_AGE_MS) return null;
+  return { value: latest.value, atMs: latest.timeMs };
+}
+
 export function exerciseSessionBgGlance(points: ExerciseSessionBgPoint[]): {
   start: number;
   low: number;

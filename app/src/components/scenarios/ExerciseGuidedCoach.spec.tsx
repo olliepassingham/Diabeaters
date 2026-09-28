@@ -85,6 +85,20 @@ function makeSession(phase: ActiveExerciseSession["phase"]): ActiveExerciseSessi
 
 describe("ExerciseGuidedCoach", () => {
   beforeEach(() => {
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      configurable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
     mockSession = null;
     mockProfile = { bgUnits: "mmol/L", insulinDeliveryMethod: "pen" };
     mockSettings = {};
@@ -102,7 +116,6 @@ describe("ExerciseGuidedCoach", () => {
   it("renders the start screen when no active session", () => {
     const { queryByTestId } = renderWithRouter(<ExerciseGuidedCoach />);
     expect(queryByTestId("exercise-guided-coach-start")).not.toBeNull();
-    fireEvent.click(queryByTestId("coach-plan-workout-trigger")!);
     expect(queryByTestId("button-start-coach")).not.toBeNull();
   });
 
@@ -165,26 +178,15 @@ describe("ExerciseGuidedCoach", () => {
     vi.useRealTimers();
   });
 
-  it("shows tonight planning and Bedtime CTA in the evening after moderate/intense sessions", () => {
+  it("shows the session glucose graph in recovery and does not ask about bedtime", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-06T20:00:00"));
     mockSession = makeSession("recovery");
     const { queryByTestId } = renderWithRouter(<ExerciseGuidedCoach />);
-    expect(queryByTestId("button-coach-bedtime-2")).not.toBeNull();
-    expect(queryByTestId("button-coach-bedtime-custom")).not.toBeNull();
-    expect(queryByTestId("toggle-coach-alcohol-tonight")).not.toBeNull();
-    expect(queryByTestId("button-coach-recovery-bedtime")).not.toBeNull();
-    vi.useRealTimers();
-  });
-
-  it("recovery bedtime preset drives an urgent Bedtime tool prompt when bedtime is close", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-08-06T20:00:00"));
-    mockSession = makeSession("recovery");
-    const { queryByTestId, getByText } = renderWithRouter(<ExerciseGuidedCoach />);
-    fireEvent.click(queryByTestId("button-coach-bedtime-2")!);
-    expect(getByText(/Bedtime in about 2h/i)).toBeTruthy();
-    expect(queryByTestId("button-coach-recovery-bedtime")).not.toBeNull();
+    expect(queryByTestId("exercise-recovery-summary")).not.toBeNull();
+    expect(queryByTestId("button-coach-bedtime-2")).toBeNull();
+    expect(queryByTestId("toggle-coach-alcohol-tonight")).toBeNull();
+    expect(queryByTestId("button-coach-recovery-bedtime")).toBeNull();
     vi.useRealTimers();
   });
 });

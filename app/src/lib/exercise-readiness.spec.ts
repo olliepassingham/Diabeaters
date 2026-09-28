@@ -201,6 +201,31 @@ describe("getExerciseReadinessVerdict deeper context modifiers", () => {
   });
 });
 
+describe("getExerciseReadinessVerdict high BG before start", () => {
+  it("stays a short ketone check instead of a care-team paragraph", () => {
+    const highPlan = calculateExercisePlan({
+      exerciseType: "strength",
+      durationMinutes: 45,
+      intensity: "moderate",
+      minutesUntilStart: 0,
+      bgUnits: "mmol/L",
+      currentBg: 17.2,
+    });
+    const r = getExerciseReadinessVerdict({
+      exercisePlanResult: highPlan,
+      currentBg: 17.2,
+      bgUnits: "mmol/L",
+      exerciseType: "strength",
+      intensity: "moderate",
+      phase: "pre",
+      preRapidInsulin2h: "yes",
+    });
+    expect(r.title).toBe("Caution (high BG)");
+    expect(r.detail).toBe("Check ketones if you feel unwell.");
+    expect(r.detail.length).toBeLessThan(80);
+  });
+});
+
 describe("getExerciseReadinessVerdict rapid insulin (pre strip)", () => {
   it("shifts ready to caution when rapid insulin in last 2h is yes", () => {
     const r = getExerciseReadinessVerdict({

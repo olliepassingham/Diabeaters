@@ -23,7 +23,6 @@ import {
   Flower2,
   Footprints,
   Maximize2,
-  Moon,
   Pause,
   Pill,
   Play,
@@ -36,7 +35,6 @@ import {
   Thermometer,
   Waves,
   Wind,
-  Wine,
   X,
   Zap,
 } from "lucide-react";
@@ -66,6 +64,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ExerciseRecoverySummary } from "@/components/exercise-recovery-summary";
+import { getCgmLocalHistory } from "@/lib/cgm/cgm-history-store";
+import { recentSessionBgForField } from "@/lib/exercise-session-summary";
+import { formatTargetBgInput } from "@/lib/hypo-context";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
@@ -83,8 +84,7 @@ import {
   ExerciseRoutineAdjustTrigger,
   type ExerciseRoutineAdjustValues,
 } from "@/components/exercise-routine-adjust-sheet";
-import { ExerciseAlertLevelControl } from "@/components/exercise-alert-level-control";
-import { syncNotificationPreferences } from "@/lib/notification-preferences";
+import { ExerciseAlertLevelsLink } from "@/components/exercise-alert-level-control";
 import {
   storage,
   DIABEATER_EXERCISE_OUTCOMES_CHANGED_EVENT,
@@ -99,7 +99,6 @@ import {
   type ExerciseSymptomFlag,
   type ExerciseType,
   type PreRapidInsulin2h,
-  type NotificationSettings,
   type UserProfile,
   type UserSettings,
 } from "@/lib/storage";
@@ -470,13 +469,25 @@ export function ExerciseGuidedCoach() {
     const key = `${activeSession.id}-${activeSession.phase}`;
     if (lastSyncedSessionId.current === key) return;
     lastSyncedSessionId.current = key;
-    const v =
+    const stored =
       activeSession.phase === "pre"
         ? activeSession.preBg
         : activeSession.phase === "active"
           ? activeSession.midBg ?? activeSession.preBg
           : activeSession.recoveryBg ?? activeSession.midBg ?? activeSession.preBg;
-    setBgInput(typeof v === "number" && Number.isFinite(v) ? String(v) : "");
+    const recent =
+      activeSession.phase === "recovery"
+        ? recentSessionBgForField(activeSession, getCgmLocalHistory(1), bgUnits)
+        : null;
+    const v = recent?.value ?? stored;
+    if (recent && activeSession.phase === "recovery" && activeSession.recoveryBg == null) {
+      const next = storage.updateActiveExercise({
+        recoveryBg: recent.value,
+        recoveryBgAt: new Date(recent.atMs).toISOString(),
+      });
+      if (next) setActiveSession(next);
+    }
+    setBgInput(typeof v === "number" && Number.isFinite(v) ? formatTargetBgInput(v, bgUnits) : "");
   }, [activeSession]);
 
   // ----- Deep-link: /scenarios/exercise?phase=pre|active|recovery&type=...&duration=...&intensity=... -----
@@ -586,12 +597,6 @@ export function ExerciseGuidedCoach() {
     }
   }, [activeSession, bgInput, bgUnits, historyBias, trendForReadiness, settings]);
 
-  const recoveryEveningContext = isExerciseRecoveryEveningContext(new Date(now));
-  const recoveryBedtimeCtaInfo = useMemo(
-    () =>
-      activeSession && recoveryEveningContext ? recoveryBedtimeCta(activeSession) : null,
-    [activeSession, recoveryEveningContext],
-  );
 
   const phasePumpTips = useMemo(() => {
     if (!exercisePlan || !isPump || !activeSession) return [];
@@ -1258,15 +1263,18 @@ export function ExerciseGuidedCoach() {
           </div>
 
           {phase === "pre" ? (
-            <Button
-              size="lg"
-              onClick={onStartWorkout}
-              className="h-12 w-full rounded-2xl text-base font-semibold"
-              data-testid="button-coach-start-workout"
-            >
-              <Play className="mr-2 h-5 w-5" aria-hidden />
-              Start workout
-            </Button>
+            <div className="space-y-2">
+              <ExerciseAlertLevelsLink />
+              <Button
+                size="lg"
+                onClick={onStartWorkout}
+                className="h-12 w-full rounded-2xl text-base font-semibold"
+                data-testid="button-coach-start-workout"
+              >
+                <Play className="mr-2 h-5 w-5" aria-hidden />
+                Start workout
+              </Button>
+            </div>
           ) : phase === "active" ? (
             <div className="grid grid-cols-2 gap-2.5">
               {workoutPaused ? (
@@ -1380,6 +1388,10 @@ export function ExerciseGuidedCoach() {
               </div>
             ) : null}
 
+            {phase === "recovery" && activeSession ? (
+              <ExerciseRecoverySummary session={activeSession} units={bgUnits} showSessionHeading={false} />
+            ) : null}
+
             {readiness ? (
               <div className="space-y-3" data-testid="coach-readiness-card">
                 <div
@@ -1484,47 +1496,15 @@ export function ExerciseGuidedCoach() {
                     bgInput={bgInput}
                     onTrendChange={onTrendChange}
                     update={update}
-                    showTonightPlanning={recoveryEveningContext}
                     {...cgmPhaseProps}
                   />
-                  {exercisePlan || recoveryBedtimeCtaInfo ? (
-                    <div className="space-y-3 border-t border-border/50 pt-3.5">
-                      {exercisePlan ? (
-                        <p
-                          className="text-xs leading-snug text-muted-foreground"
-                          data-testid="coach-recovery-window-note"
-                        >
-                          ~{exercisePlan.recovery.monitorHours}h recovery · watch for delayed lows
-                        </p>
-                      ) : null}
-                      {recoveryBedtimeCtaInfo ? (
-                        <div
-                          className={cn(
-                            "space-y-2 rounded-xl border px-3.5 py-3",
-                            recoveryBedtimeCtaInfo.urgent
-                              ? "border-primary/40 bg-primary/5"
-                              : "border-border/50 bg-muted/10",
-                          )}
-                          data-testid="coach-recovery-bedtime-cta"
-                        >
-                          <p className="flex items-center gap-2 text-sm font-medium text-foreground">
-                            <Moon className="h-4 w-4 shrink-0" aria-hidden />
-                            {recoveryBedtimeCtaInfo.title}
-                          </p>
-                          <Link href="/scenarios/bedtime">
-                            <Button
-                              variant={recoveryBedtimeCtaInfo.urgent ? "default" : "outline"}
-                              size="sm"
-                              className="w-full"
-                              data-testid="button-coach-recovery-bedtime"
-                            >
-                              Open Bedtime tool
-                              <ArrowRight className="ml-auto h-3.5 w-3.5" />
-                            </Button>
-                          </Link>
-                        </div>
-                      ) : null}
-                    </div>
+                  {exercisePlan ? (
+                    <p
+                      className="text-sm leading-snug text-muted-foreground"
+                      data-testid="coach-recovery-window-note"
+                    >
+                      Delayed lows can show up for about {exercisePlan.recovery.monitorHours} hours.
+                    </p>
                   ) : null}
                 </TabsContent>
               </Tabs>
@@ -1837,7 +1817,6 @@ function DuringQuestions({
   onBgFieldChange,
 }: PhaseProps) {
   const bgRef = useRef<HTMLInputElement | null>(null);
-  const [notifSettings, setNotifSettings] = useState(() => storage.getNotificationSettings());
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [hypoRecheckEndsAt, setHypoRecheckEndsAt] = useState<number | null>(null);
 
@@ -1850,21 +1829,6 @@ function DuringQuestions({
   useEffect(() => {
     setHypoRecheckEndsAt(null);
   }, [session.id]);
-
-  useEffect(() => {
-    const sync = () => setNotifSettings(storage.getNotificationSettings());
-    window.addEventListener(DIABEATER_SETTINGS_CHANGED_EVENT, sync);
-    return () => window.removeEventListener(DIABEATER_SETTINGS_CHANGED_EVENT, sync);
-  }, []);
-
-  const saveAlertLevels = (
-    patch: Pick<NotificationSettings, "exerciseCgmAlertThreshold" | "exerciseCgmAlertAimBg">,
-  ) => {
-    const updated = { ...storage.getNotificationSettings(), ...patch };
-    storage.saveNotificationSettings(updated);
-    setNotifSettings(updated);
-    void syncNotificationPreferences(updated);
-  };
 
   const trend =
     session.phase === "active"
@@ -1894,11 +1858,7 @@ function DuringQuestions({
       {/* Mid-workout check-in: BG + trend + feel-low — sits in the light sheet below the dark stage. */}
       <div className="space-y-3" data-testid="coach-during-checkin">
         <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">BG check-in</p>
-        <ExerciseAlertLevelControl
-          bgUnits={bgUnits}
-          settings={notifSettings}
-          onChange={saveAlertLevels}
-        />
+        <ExerciseAlertLevelsLink />
         <ExerciseCgmBgField
           bgUnits={bgUnits}
           bgValue={bgInput}
@@ -2098,24 +2058,17 @@ function countDuringLogSelections(session: ActiveExerciseSession): number {
   return n;
 }
 
-const BEDTIME_PRESET_HOURS = [1, 2, 4, 8] as const;
-
 function RecoveryQuestions({
   session,
   bgUnits,
   bgInput,
   onTrendChange,
-  update,
   cgmPrefill,
   cgmLoading,
   cgmEmptyHint,
   onCgmRefresh,
   onBgFieldChange,
-  showTonightPlanning,
-}: PhaseProps & { showTonightPlanning: boolean }) {
-  const bedtimeIsPreset =
-    session.bedtimeInHours != null && BEDTIME_PRESET_HOURS.includes(session.bedtimeInHours as (typeof BEDTIME_PRESET_HOURS)[number]);
-
+}: PhaseProps) {
   return (
     <div className="space-y-4">
       <ExerciseCgmBgField
@@ -2131,109 +2084,8 @@ function RecoveryQuestions({
         inputTestId="input-coach-bg"
         trendTestIdPrefix="button-coach-trend"
       />
-
-      {/* Bedtime / alcohol only matter closer to night — daytime recovery stays BG-focused. */}
-      {showTonightPlanning ? (
-        <>
-          <FieldRow icon={Moon} label="Bedtime tonight">
-            <div className="flex flex-wrap items-center gap-2">
-              {BEDTIME_PRESET_HOURS.map((h) => (
-                <Button
-                  key={h}
-                  type="button"
-                  size="sm"
-                  variant={session.bedtimeInHours === h ? "default" : "outline"}
-                  className="h-8 px-2.5 text-xs"
-                  onClick={() => update({ bedtimeInHours: session.bedtimeInHours === h ? undefined : h })}
-                  data-testid={`button-coach-bedtime-${h}`}
-                >
-                  {h >= 8 ? `${h}h+` : `${h}h`}
-                </Button>
-              ))}
-              <Button
-                type="button"
-                size="sm"
-                variant={session.bedtimeInHours != null && !bedtimeIsPreset ? "default" : "outline"}
-                className="h-8 px-2.5 text-xs"
-                onClick={() => {
-                  if (session.bedtimeInHours != null && !bedtimeIsPreset) {
-                    update({ bedtimeInHours: undefined });
-                  } else {
-                    update({ bedtimeInHours: 3 });
-                  }
-                }}
-                data-testid="button-coach-bedtime-custom"
-              >
-                Custom
-              </Button>
-            </div>
-            {session.bedtimeInHours != null && !bedtimeIsPreset ? (
-              <div className="pt-2">
-                <Input
-                  inputMode="decimal"
-                  value={String(session.bedtimeInHours)}
-                  onChange={(e) => {
-                    const n = parseFloat(e.target.value.replace(",", "."));
-                    update({ bedtimeInHours: Number.isFinite(n) && n >= 0 ? Math.min(24, n) : undefined });
-                  }}
-                  className="h-9"
-                  data-testid="input-coach-bedtime-hours"
-                />
-              </div>
-            ) : null}
-          </FieldRow>
-
-          <div className="flex flex-wrap gap-2">
-            <PillToggle
-              label="Alcohol planned tonight"
-              icon={Wine}
-              checked={!!session.alcoholTonight}
-              onChange={(v) => update({ alcoholTonight: v })}
-              testId="toggle-coach-alcohol-tonight"
-            />
-          </div>
-        </>
-      ) : null}
     </div>
   );
-}
-
-/**
- * Evening / overnight local hours — when the Bedtime tool and "tonight" prompts are useful.
- * Matches the overnight window used by post-exercise educational copy (from 5pm).
- */
-function isExerciseRecoveryEveningContext(now: Date = new Date()): boolean {
-  const h = now.getHours();
-  return h >= 17 || h < 5;
-}
-
-/**
- * Drives the "Open Bedtime tool" prompt in the recovery panel — urgency and copy respond to
- * how close bedtime actually is. Caller must already gate to evening context.
- */
-function recoveryBedtimeCta(
-  session: ActiveExerciseSession,
-): { urgent: boolean; title: string } | null {
-  const hours = session.bedtimeInHours;
-  if (hours != null && Number.isFinite(hours)) {
-    if (hours <= 4) {
-      return {
-        urgent: true,
-        title: hours <= 1 ? "Bedtime is close" : `Bedtime in about ${Math.round(hours)}h`,
-      };
-    }
-    return {
-      urgent: false,
-      title: `Bedtime in about ${Math.round(hours)}h`,
-    };
-  }
-  if (session.intensity === "intense" || session.intensity === "moderate") {
-    return {
-      urgent: false,
-      title: "Planning for tonight",
-    };
-  }
-  return null;
 }
 
 // ----- Tiny presentational helpers -----
