@@ -455,13 +455,14 @@ export function StoryViewerDialog({
     <>
       <Dialog open={open} onOpenChange={onOpenChange} mobileSheet={false}>
         <DialogContent
-          className="inset-0 flex h-[100dvh] max-h-[100dvh] w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-0 bg-gradient-to-b from-teal-950 via-slate-950 to-slate-950 p-0 left-0 top-0 sm:inset-auto sm:left-[50%] sm:top-[50%] sm:h-[min(100dvh,820px)] sm:w-full sm:max-w-md sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-[1.75rem] [&>button]:hidden"
+          className="inset-0 left-0 top-0 flex h-dvh max-h-dvh w-screen max-w-none translate-x-0 translate-y-0 animate-none flex-col gap-0 overflow-hidden rounded-none border-0 bg-black p-0 shadow-none [&>button]:hidden"
+          style={{ animation: "none", transform: "none" }}
           aria-describedby={undefined}
         >
           <DialogTitle className="sr-only">{displayName}'s story</DialogTitle>
           <div
             className={cn(
-              "relative flex min-h-0 flex-1 flex-col overflow-hidden",
+              "relative min-h-0 flex-1 overflow-hidden",
               dragging ? "transition-none" : "transition-transform duration-200 ease-out",
             )}
             style={{
@@ -473,12 +474,8 @@ export function StoryViewerDialog({
             onTouchEnd={onTouchEnd}
             onTouchCancel={onTouchEnd}
           >
-            <div className="relative z-30 shrink-0 px-3 pt-[max(0.45rem,env(safe-area-inset-top))] sm:pt-3">
-              <div
-                className="mx-auto mb-2 h-1 w-10 rounded-full bg-white/35 sm:hidden"
-                aria-hidden
-              />
-              <div className="mb-2 flex gap-1" aria-hidden>
+            <div className="pointer-events-none absolute inset-x-0 top-0 z-30 bg-gradient-to-b from-black/45 to-transparent px-3 pb-8 pt-[max(0.45rem,env(safe-area-inset-top))]">
+              <div className="pointer-events-auto mb-2 flex gap-1" aria-hidden>
               {(queue.length > 0 ? queue : [{ authorId: "story" }]).map((entry, i) => (
                 <div
                   key={`${entry.authorId}-${i}`}
@@ -493,7 +490,7 @@ export function StoryViewerDialog({
                 </div>
               ))}
               </div>
-            <div className="flex items-center justify-between gap-2 pb-2">
+            <div className="pointer-events-auto flex items-center justify-between gap-2 pb-2">
               {current ? (
                 <Link
                   href={profileHref}
@@ -580,7 +577,7 @@ export function StoryViewerDialog({
             </div>
             </div>
 
-            <div className="relative min-h-0 flex-1 overflow-hidden">
+            <div className="absolute inset-0 overflow-hidden bg-black">
               {loading ? (
                 <div className="absolute inset-0 flex items-center justify-center">
                   <Loader2 className="h-8 w-8 animate-spin text-white/70" aria-hidden />
@@ -683,7 +680,7 @@ export function StoryViewerDialog({
             </div>
 
             <div
-              className="relative z-30 shrink-0 px-4 pb-[max(1.1rem,env(safe-area-inset-bottom))] pt-2"
+              className="absolute inset-x-0 bottom-0 z-30 bg-gradient-to-t from-black/50 to-transparent px-4 pb-[max(1.1rem,env(safe-area-inset-bottom))] pt-10"
               onClick={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
             >

@@ -1,11 +1,42 @@
-import type { PointerEvent } from "react";
+import type { CSSProperties, PointerEvent } from "react";
 import { cn } from "@/lib/utils";
-import type { StoryOverlay, StoryOverlayStyle } from "@/lib/community/stories-supabase";
+import {
+  STORY_TEXT_COLORS,
+  STORY_TEXT_FONTS,
+  type StoryOverlay,
+  type StoryOverlayStyle,
+  type StoryTextColor,
+  type StoryTextFont,
+} from "@/lib/community/stories-supabase";
 
-export function storyOverlayClassName(style: StoryOverlayStyle): string {
-  return style === "pill"
-    ? "rounded-full bg-black/55 px-3.5 py-2 text-xl font-semibold text-white backdrop-blur-md"
-    : "text-[1.65rem] font-bold leading-tight tracking-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]";
+export function storyOverlayClassName(
+  style: StoryOverlayStyle,
+  color: StoryTextColor = "white",
+  font: StoryTextFont = "classic",
+): string {
+  const face =
+    font === "serif" ? "italic" : font === "mono" ? "text-[1.2rem] font-medium tracking-tight" : "font-bold";
+  if (style === "pill") {
+    return cn(
+      "rounded-full px-3.5 py-2 text-xl font-semibold backdrop-blur-md",
+      color === "black" ? "bg-white/90" : "bg-black/55",
+      face,
+    );
+  }
+  return cn(
+    "text-[1.65rem] leading-tight tracking-tight",
+    face,
+    color === "black"
+      ? "drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]"
+      : "drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]",
+  );
+}
+
+export function storyOverlayInlineStyle(color: StoryTextColor, font: StoryTextFont): CSSProperties {
+  return {
+    color: STORY_TEXT_COLORS.find((c) => c.id === color)?.hex ?? "#FFFFFF",
+    fontFamily: STORY_TEXT_FONTS.find((f) => f.id === font)?.family,
+  };
 }
 
 type StoryOverlayLayerProps = {
@@ -55,7 +86,12 @@ export function StoryOverlayLayer({
               : undefined
           }
         >
-          <span className={storyOverlayClassName(overlay.style)}>{overlay.text}</span>
+          <span
+            className={storyOverlayClassName(overlay.style, overlay.color, overlay.font)}
+            style={storyOverlayInlineStyle(overlay.color, overlay.font)}
+          >
+            {overlay.text}
+          </span>
         </div>
       ))}
     </div>

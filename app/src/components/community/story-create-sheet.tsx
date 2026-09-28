@@ -141,7 +141,7 @@ export function StoryCreateSheet({
     const credit = prefillOverlayText?.trim().slice(0, MAX_STORY_OVERLAY_TEXT_LENGTH);
     setOverlays(
       credit
-        ? [{ id: crypto.randomUUID(), text: credit, x: 0.5, y: 0.72, style: "pill" }]
+        ? [{ id: crypto.randomUUID(), text: credit, x: 0.5, y: 0.72, style: "pill", color: "white", font: "classic" }]
         : [],
     );
     setPreview((prev) => {

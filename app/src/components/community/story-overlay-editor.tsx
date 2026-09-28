@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { Check } from "lucide-react";
-import { StoryOverlayLayer, storyOverlayClassName } from "@/components/community/story-overlay-layer";
+import { StoryOverlayLayer, storyOverlayClassName, storyOverlayInlineStyle } from "@/components/community/story-overlay-layer";
 import {
   MAX_STORY_OVERLAY_TEXT_LENGTH,
+  STORY_TEXT_COLORS,
+  STORY_TEXT_FONTS,
   type StoryOverlay,
   type StoryOverlayStyle,
+  type StoryTextColor,
+  type StoryTextFont,
 } from "@/lib/community/stories-supabase";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +31,8 @@ export function StoryOverlayEditor({ overlays, onChange, children, className, on
   );
   const dragMoved = useRef(false);
   const editingIdRef = useRef<string | null>(null);
+  const overlaysRef = useRef(overlays);
+  overlaysRef.current = overlays;
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftText, setDraftText] = useState("");
@@ -72,9 +78,11 @@ export function StoryOverlayEditor({ overlays, onChange, children, className, on
 
   const updateOverlay = useCallback(
     (id: string, patch: Partial<StoryOverlay>) => {
-      onChange(overlays.map((o) => (o.id === id ? { ...o, ...patch } : o)));
+      const next = overlaysRef.current.map((o) => (o.id === id ? { ...o, ...patch } : o));
+      overlaysRef.current = next;
+      onChange(next);
     },
-    [onChange, overlays],
+    [onChange],
   );
 
   function startEdit(overlay: StoryOverlay) {
@@ -107,6 +115,16 @@ export function StoryOverlayEditor({ overlays, onChange, children, className, on
     updateOverlay(editing.id, { style: next });
   }
 
+  function setTextColor(color: StoryTextColor) {
+    if (!editing) return;
+    updateOverlay(editing.id, { color });
+  }
+
+  function setTextFont(font: StoryTextFont) {
+    if (!editing) return;
+    updateOverlay(editing.id, { font });
+  }
+
   function pointInStage(clientX: number, clientY: number): { x: number; y: number } | null {
     const container = containerRef.current;
     if (!container) return null;
@@ -127,6 +145,8 @@ export function StoryOverlayEditor({ overlays, onChange, children, className, on
       x: 0.5,
       y: point.y,
       style: "shadow",
+      color: "white",
+      font: "classic",
     };
     flushSync(() => {
       onChange([...overlays, overlay]);
@@ -242,9 +262,12 @@ export function StoryOverlayEditor({ overlays, onChange, children, className, on
             onClick={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
           >
-            <div className={cn("relative text-center", storyOverlayClassName(editing.style))}>
+            <div
+              className={cn("relative text-center", storyOverlayClassName(editing.style, editing.color, editing.font))}
+              style={storyOverlayInlineStyle(editing.color, editing.font)}
+            >
               {!draftText ? (
-                <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-white/50" aria-hidden>
+                <span className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-50" aria-hidden>
                   Type something
                 </span>
               ) : null}
@@ -280,24 +303,61 @@ export function StoryOverlayEditor({ overlays, onChange, children, className, on
               />
             </div>
           </div>
-          <div className="absolute inset-x-0 top-[max(0.75rem,env(safe-area-inset-top))] z-[5] flex items-center justify-center gap-2 px-3">
-            <button
-              type="button"
-              className="h-11 rounded-full bg-white/15 px-4 text-sm font-semibold text-white backdrop-blur-md active:scale-95"
-              onPointerDown={(e) => e.preventDefault()}
-              onClick={toggleStyle}
-            >
-              {editing.style === "pill" ? "Plain" : "Highlight"}
-            </button>
-            <button
-              type="button"
-              className="inline-flex h-11 items-center gap-1 rounded-full bg-white px-4 text-sm font-semibold text-black active:scale-95"
-              onPointerDown={(e) => e.preventDefault()}
-              onClick={commitEdit}
-            >
-              <Check className="h-4 w-4" aria-hidden />
-              Done
-            </button>
+          <div className="absolute inset-x-0 top-[max(0.75rem,env(safe-area-inset-top))] z-[5] flex flex-col items-center gap-2 px-3">
+            <div className="flex items-center justify-center gap-2">
+              <button
+                type="button"
+                className="h-11 rounded-full bg-white/15 px-4 text-sm font-semibold text-white backdrop-blur-md active:scale-95"
+                onPointerDown={(e) => e.preventDefault()}
+                onClick={toggleStyle}
+              >
+                {editing.style === "pill" ? "Plain" : "Highlight"}
+              </button>
+              <button
+                type="button"
+                className="inline-flex h-11 items-center gap-1 rounded-full bg-white px-4 text-sm font-semibold text-black active:scale-95"
+                onPointerDown={(e) => e.preventDefault()}
+                onClick={commitEdit}
+              >
+                <Check className="h-4 w-4" aria-hidden />
+                Done
+              </button>
+            </div>
+            <div className="flex max-w-full gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {STORY_TEXT_FONTS.map((font) => (
+                <button
+                  key={font.id}
+                  type="button"
+                  className={cn(
+                    "h-10 shrink-0 rounded-full px-3 text-sm active:scale-95",
+                    editing.font === font.id ? "bg-white text-black" : "bg-black/40 text-white backdrop-blur-md",
+                  )}
+                  style={{ fontFamily: font.family }}
+                  aria-pressed={editing.font === font.id}
+                  onPointerDown={(e) => e.preventDefault()}
+                  onClick={() => setTextFont(font.id)}
+                >
+                  {font.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              {STORY_TEXT_COLORS.map((color) => (
+                <button
+                  key={color.id}
+                  type="button"
+                  className={cn(
+                    "h-8 w-8 shrink-0 rounded-full border border-white/30 active:scale-95",
+                    editing.color === color.id && "ring-2 ring-white ring-offset-2 ring-offset-black/40",
+                  )}
+                  style={{ backgroundColor: color.hex }}
+                  aria-label={color.label}
+                  aria-pressed={editing.color === color.id}
+                  onPointerDown={(e) => e.preventDefault()}
+                  onClick={() => setTextColor(color.id)}
+                />
+              ))}
+            </div>
           </div>
         </>
       ) : null}

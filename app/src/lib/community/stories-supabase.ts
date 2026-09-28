@@ -14,7 +14,26 @@ export const MAX_STORY_OVERLAYS = 1;
 
 export type CommunityStoryMediaKind = "video" | "image";
 export type StoryOverlayStyle = "shadow" | "pill";
+export type StoryTextColor = "white" | "black" | "yellow" | "orange" | "pink" | "sky" | "green";
+export type StoryTextFont = "classic" | "modern" | "serif" | "mono";
 export type StoryReactionKind = "heart" | "support" | "celebrate";
+
+export const STORY_TEXT_COLORS: { id: StoryTextColor; label: string; hex: string }[] = [
+  { id: "white", label: "White", hex: "#FFFFFF" },
+  { id: "black", label: "Black", hex: "#141414" },
+  { id: "yellow", label: "Yellow", hex: "#FFE14A" },
+  { id: "orange", label: "Orange", hex: "#FF8A3D" },
+  { id: "pink", label: "Pink", hex: "#FF5C8A" },
+  { id: "sky", label: "Blue", hex: "#7EC8FF" },
+  { id: "green", label: "Green", hex: "#3DDC84" },
+];
+
+export const STORY_TEXT_FONTS: { id: StoryTextFont; label: string; family: string }[] = [
+  { id: "classic", label: "Classic", family: '"Inter Variable", Inter, system-ui, sans-serif' },
+  { id: "modern", label: "Modern", family: "Outfit, system-ui, sans-serif" },
+  { id: "serif", label: "Serif", family: "Georgia, 'Times New Roman', serif" },
+  { id: "mono", label: "Mono", family: "ui-monospace, SFMono-Regular, Menlo, monospace" },
+];
 
 export type StoryOverlay = {
   id: string;
@@ -24,7 +43,17 @@ export type StoryOverlay = {
   /** Normalized vertical position (0–1). */
   y: number;
   style: StoryOverlayStyle;
+  color: StoryTextColor;
+  font: StoryTextFont;
 };
+
+function storyTextColor(raw: unknown): StoryTextColor {
+  return STORY_TEXT_COLORS.some((c) => c.id === raw) ? (raw as StoryTextColor) : "white";
+}
+
+function storyTextFont(raw: unknown): StoryTextFont {
+  return STORY_TEXT_FONTS.some((f) => f.id === raw) ? (raw as StoryTextFont) : "classic";
+}
 
 export type CommunityStoryRow = {
   id: string;
@@ -98,6 +127,8 @@ export function parseStoryOverlays(raw: unknown): StoryOverlay[] {
       x: clamp01(Number(o.x ?? 0.5)),
       y: clamp01(Number(o.y ?? 0.5)),
       style,
+      color: storyTextColor(o.color),
+      font: storyTextFont(o.font),
     });
     if (out.length >= MAX_STORY_OVERLAYS) break;
   }
