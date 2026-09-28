@@ -42,6 +42,68 @@ const NOT_CONFIGURED = new Error(
 );
 
 const CACHE_KEY = "supplies_cache_v1";
+const DELETED_SUPPLY_IDS_KEY = "diabeater_deleted_supply_ids_v1";
+
+type DeletedSupplyIds = { local: string[]; cloud: string[] };
+
+function readDeletedSupplyIds(): DeletedSupplyIds {
+  if (typeof localStorage === "undefined") return { local: [], cloud: [] };
+  try {
+    const raw = localStorage.getItem(DELETED_SUPPLY_IDS_KEY);
+    if (!raw) return { local: [], cloud: [] };
+    const parsed = JSON.parse(raw) as Partial<DeletedSupplyIds>;
+    const local = Array.isArray(parsed.local) ? parsed.local.filter((id) => typeof id === "string" && id) : [];
+    const cloud = Array.isArray(parsed.cloud) ? parsed.cloud.filter((id) => typeof id === "string" && id) : [];
+    return { local: local.slice(-200), cloud: cloud.slice(-200) };
+  } catch {
+    return { local: [], cloud: [] };
+  }
+}
+
+function writeDeletedSupplyIds(next: DeletedSupplyIds): void {
+  if (typeof localStorage === "undefined") return;
+  localStorage.setItem(
+    DELETED_SUPPLY_IDS_KEY,
+    JSON.stringify({ local: next.local.slice(-200), cloud: next.cloud.slice(-200) }),
+  );
+}
+
+function rememberDeletedSupply(localId: string, cloudId: string | null): void {
+  const cur = readDeletedSupplyIds();
+  const local = cur.local.includes(localId) ? cur.local : [...cur.local, localId];
+  const cloud = cloudId && !cur.cloud.includes(cloudId) ? [...cur.cloud, cloudId] : cur.cloud;
+  writeDeletedSupplyIds({ local, cloud });
+}
+
+function forgetDeletedSupply(localId: string, cloudId: string | null): void {
+  const cur = readDeletedSupplyIds();
+  writeDeletedSupplyIds({
+    local: cur.local.filter((id) => id !== localId),
+    cloud: cloudId ? cur.cloud.filter((id) => id !== cloudId) : cur.cloud,
+  });
+}
+
+/** True when this local row was deleted and has not been restored (for example by Undo). */
+function deletionStillStands(local: Pick<LocalSupply, "id" | "cloud_id">): boolean {
+  const present = storage.getSupplies().some((s) => s.id === local.id);
+  if (present) {
+    forgetDeletedSupply(local.id, local.cloud_id ?? null);
+    return false;
+  }
+  return readDeletedSupplyIds().local.includes(local.id);
+}
+
+async function deleteCloudSupplyRow(cloudId: string): Promise<boolean> {
+  const trimmed = cloudId.trim();
+  if (!trimmed) return true;
+  const supabase = getSupabase();
+  if (!supabase) return false;
+  const { data: userData } = await supabase.auth.getUser();
+  const userId = userData?.user?.id;
+  if (!userId) return false;
+  const { error } = await supabase.from("supplies").delete().eq("id", trimmed).eq("user_id", userId);
+  return !error;
+}
 
 function emitSupplySyncToast(kind: "queued" | "retry"): void {
   try {
@@ -221,6 +283,11 @@ export async function syncToCloud(local: LocalSupply): Promise<void> {
   const userId = userData?.user?.id;
   if (!userId) return;
 
+  if (deletionStillStands(local)) {
+    if (local.cloud_id) await deleteCloudSupplyRow(local.cloud_id);
+    return;
+  }
+
   const cloudId = local.cloud_id ?? null;
   const payload = localSupplyToSyncPayload({ ...local, cloud_id: cloudId }, cloudId);
   const clientTs = payload.updated_at;
@@ -289,6 +356,12 @@ export async function syncToCloud(local: LocalSupply): Promise<void> {
         return;
       }
 
+      if (deletionStillStands(local)) {
+        rememberDeletedSupply(local.id, data.id as string);
+        await deleteCloudSupplyRow(data.id as string);
+        return;
+      }
+
       storage.updateSupply(local.id, {
         cloud_id: data.id as string,
         updated_at: (data.updated_at as string) || clientTs,
@@ -306,27 +379,21 @@ export async function deleteFromCloud(
   local: Pick<LocalSupply, "cloud_id" | "id">,
 ): Promise<void> {
   const cloudId = local.cloud_id ?? null;
-  if (!cloudId) return;
+  rememberDeletedSupply(local.id, cloudId);
+  enqueueLocalSupplyDelete({
+    kind: "supplies:local-delete",
+    localId: local.id,
+    cloudId: cloudId ?? "",
+    clientTs: new Date().toISOString(),
+  });
 
-  if (!isOnline()) {
-    enqueueLocalSupplyDelete({
-      kind: "supplies:local-delete",
-      localId: local.id,
-      cloudId,
-      clientTs: new Date().toISOString(),
-    });
-    emitSupplySyncToast("queued");
+  if (!cloudId || !isOnline()) {
+    if (!isOnline()) emitSupplySyncToast("queued");
     return;
   }
 
-  const supabase = getSupabase();
-  if (!supabase) return;
-
-  try {
-    await supabase.from("supplies").delete().eq("id", cloudId);
-  } catch {
-    // Ignore
-  }
+  const removed = await deleteCloudSupplyRow(cloudId);
+  if (!removed) emitSupplySyncToast("retry");
 }
 
 type CloudSupplyRow = {
@@ -444,7 +511,11 @@ export async function reconcileSupplies(): Promise<void> {
 
   if (error || !data) return;
 
-  const cloudRows = data as CloudSupplyRow[];
+  const cloudRows = (data as CloudSupplyRow[]).filter((row) => {
+    if (!readDeletedSupplyIds().cloud.includes(row.id)) return true;
+    void deleteCloudSupplyRow(row.id);
+    return false;
+  });
 
   let locals = storage.getSupplies();
   const cloudById = new Map(cloudRows.map((r) => [r.id, r]));
@@ -692,6 +763,14 @@ async function flushLocalSyncEntry(
 
   const p = entry.payload;
 
+  if (deletionStillStands({ id: entry.localId, cloud_id: p.cloudId })) {
+    if (p.cloudId) {
+      const removed = await deleteCloudSupplyRow(p.cloudId);
+      if (!removed) return { status: "failed", error: new Error("Could not delete supply") };
+    }
+    return { status: "ok" };
+  }
+
   try {
     if (p.cloudId) {
       const { error } = await supabase
@@ -731,6 +810,12 @@ async function flushLocalSyncEntry(
         if (isRlsOrAuthError(error)) return { status: "failed", error: new Error(String(error.message)) };
         return { status: "failed", error: new Error(String(error.message)) };
       }
+      if (deletionStillStands({ id: entry.localId, cloud_id: null })) {
+        rememberDeletedSupply(entry.localId, data.id as string);
+        const removed = await deleteCloudSupplyRow(data.id as string);
+        if (!removed) return { status: "failed", error: new Error("Could not delete supply") };
+        return { status: "ok" };
+      }
       storage.updateSupply(entry.localId, {
         cloud_id: data.id as string,
         updated_at: (data.updated_at as string) || p.updated_at,
@@ -746,13 +831,8 @@ async function flushLocalDeleteEntry(
   entry: Extract<OfflineQueueEntry, { kind: "supplies:local-delete" }>,
 ): Promise<{ status: "ok" } | { status: "failed"; error: Error }> {
   if (!entry.cloudId) return { status: "ok" };
-  const supabase = getSupabase();
-  if (!supabase) return { status: "failed", error: NOT_CONFIGURED };
-  try {
-    await supabase.from("supplies").delete().eq("id", entry.cloudId);
-  } catch {
-    // Ignore — same as deleteFromCloud online
-  }
+  const removed = await deleteCloudSupplyRow(entry.cloudId);
+  if (!removed) return { status: "failed", error: new Error("Could not delete supply") };
   return { status: "ok" };
 }
 

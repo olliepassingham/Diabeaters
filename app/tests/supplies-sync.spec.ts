@@ -2,7 +2,14 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import * as offline from "../src/lib/offline";
 import * as supabaseMod from "../src/lib/supabase";
 import { storage } from "../src/lib/storage";
-import { compareUpdatedAtForSync, flushSuppliesOfflineQueue, reconcilePairWinnerForTest, syncToCloud } from "../src/lib/supplies";
+import {
+  compareUpdatedAtForSync,
+  deleteFromCloud,
+  flushSuppliesOfflineQueue,
+  reconcilePairWinnerForTest,
+  reconcileSupplies,
+  syncToCloud,
+} from "../src/lib/supplies";
 
 vi.mock("../src/lib/supabase", () => ({
   getSupabase: vi.fn(),
@@ -191,6 +198,50 @@ describe("supplies sync", () => {
     expect(res.flushed).toBe(1);
     expect(offline.getQueue()).toHaveLength(0);
     expect(updateSpy).toHaveBeenCalled();
+  });
+
+  it("does not bring a deleted supply back from the cloud copy", async () => {
+    vi.spyOn(offline, "isOnline").mockReturnValue(true);
+    const added = storage.addSupply({
+      name: "Sensors",
+      type: "cgm",
+      currentQuantity: 2,
+      dailyUsage: 0,
+    });
+    storage.updateSupply(added.supply.id, { cloud_id: "cloud-sensor" });
+    storage.deleteSupply(added.supply.id);
+
+    const deleteEqUser = vi.fn().mockResolvedValue({ error: null });
+    const deleteEqId = vi.fn().mockReturnValue({ eq: deleteEqUser });
+
+    vi.spyOn(supabaseMod, "getSupabase").mockReturnValue({
+      auth: {
+        getUser: async () => ({ data: { user: { id: "user-1" } }, error: null }),
+      },
+      from: () => ({
+        delete: () => ({ eq: deleteEqId }),
+        select: () => ({
+          eq: async () => ({
+            data: [
+              {
+                id: "cloud-sensor",
+                name: "Sensors",
+                quantity: 2,
+                updated_at: "2026-09-01T00:00:00.000Z",
+                category: "cgm",
+              },
+            ],
+            error: null,
+          }),
+        }),
+      }),
+    } as never);
+
+    await deleteFromCloud({ id: added.supply.id, cloud_id: "cloud-sensor" });
+    await reconcileSupplies();
+
+    expect(storage.getSupplies()).toHaveLength(0);
+    expect(deleteEqId).toHaveBeenCalled();
   });
 
   it("importSupplyFromCloudReconcile keeps newer local stock instead of cloning", () => {
