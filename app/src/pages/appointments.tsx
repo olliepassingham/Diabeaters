@@ -648,12 +648,12 @@ export default function Appointments() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-[minmax(0,1fr)_8.25rem] gap-2">
                 <div className="min-w-0 space-y-1.5">
                   <Label htmlFor="date" className="text-xs font-medium text-muted-foreground">Date</Label>
                   <Input
                     id="date"
-                    className="h-11 w-full min-w-0 rounded-xl"
+                    className="native-datetime-input h-11 w-full min-w-0 rounded-xl px-2"
                     type="date"
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
@@ -664,7 +664,7 @@ export default function Appointments() {
                   <Label htmlFor="time" className="text-xs font-medium text-muted-foreground">Time</Label>
                   <Input
                     id="time"
-                    className="h-11 w-full min-w-0 rounded-xl"
+                    className="native-datetime-input h-11 w-full min-w-0 rounded-xl px-2"
                     type="time"
                     value={time}
                     onChange={(e) => setTime(e.target.value)}

@@ -527,10 +527,11 @@
   }
 
   /**
-   * Travel guide date fields: iOS Safari otherwise inflates native date controls
+   * Native date and time fields: iOS Safari otherwise inflates these controls
    * and blows past the phone viewport.
    */
-  .travel-date-input {
+  .travel-date-input,
+  .native-datetime-input {
     display: block;
     width: 100%;
     min-width: 0;
@@ -546,22 +547,26 @@
     appearance: none;
   }
 
-  .travel-date-input::-webkit-date-and-time-value {
+  .travel-date-input::-webkit-date-and-time-value,
+  .native-datetime-input::-webkit-date-and-time-value {
     min-width: 0;
     text-align: left;
   }
 
-  .travel-date-input::-webkit-calendar-picker-indicator {
+  .travel-date-input::-webkit-calendar-picker-indicator,
+  .native-datetime-input::-webkit-calendar-picker-indicator {
     margin-inline-start: 0.25rem;
     flex-shrink: 0;
   }
 
-  .travel-date-input::-webkit-datetime-edit {
+  .travel-date-input::-webkit-datetime-edit,
+  .native-datetime-input::-webkit-datetime-edit {
     min-width: 0;
     padding: 0;
   }
 
-  .travel-date-input::-webkit-datetime-edit-fields-wrapper {
+  .travel-date-input::-webkit-datetime-edit-fields-wrapper,
+  .native-datetime-input::-webkit-datetime-edit-fields-wrapper {
     padding: 0;
   }
 
