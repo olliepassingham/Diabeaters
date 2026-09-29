@@ -83,6 +83,15 @@ describe("seedMdiSuppliesIfNeeded", () => {
     expect(storageMock.addSupply).not.toHaveBeenCalledWith(expect.objectContaining({ type: "cgm" }));
   });
 
+  it("does not put the starter set back after it was deleted", () => {
+    localStorage.setItem(MDI_SUPPLIES_SEEDED_KEY, "1");
+    storageMock.getSupplies.mockReturnValue([]);
+    const r = seedMdiSuppliesIfNeeded();
+    expect(r.seeded).toBe(false);
+    expect(r.count).toBe(0);
+    expect(storageMock.addSupply).not.toHaveBeenCalled();
+  });
+
   it("skips when MDI core supplies already exist", () => {
     storageMock.getSupplies.mockReturnValue([{ id: "1", type: "needle", name: "Pen Needles" }]);
     const r = seedMdiSuppliesIfNeeded();

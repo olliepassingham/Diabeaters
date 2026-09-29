@@ -45,6 +45,14 @@ describe("seedPumpSuppliesIfNeeded", () => {
     expect(localStorage.getItem(PUMP_SUPPLIES_SEEDED_KEY)).toBe("1");
   });
 
+  it("does not put the starter set back after it was deleted", () => {
+    localStorage.setItem(PUMP_SUPPLIES_SEEDED_KEY, "1");
+    storageMock.getSupplies.mockReturnValue([]);
+    const r = seedPumpSuppliesIfNeeded({});
+    expect(r.seeded).toBe(false);
+    expect(storageMock.addSupply).not.toHaveBeenCalled();
+  });
+
   it("does not seed twice", () => {
     seedPumpSuppliesIfNeeded({});
     storageMock.getSupplies.mockReturnValue([

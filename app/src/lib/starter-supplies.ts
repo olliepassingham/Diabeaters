@@ -44,11 +44,15 @@ function markMdiSuppliesSeeded(): void {
 /**
  * Add default MDI supply rows once (CGM, needles, short + long insulin).
  * Safe to call multiple times — no-ops when MDI core rows already exist.
- * Ignores a stale seeded flag when those rows are missing (e.g. CGM-only accounts).
+ * Once this device has seeded them, deleting the set does not bring them back.
  */
 export function seedMdiSuppliesIfNeeded(): { seeded: boolean; count: number } {
   const profile = storage.getProfile();
   if (!isPenDeliveryMethod(profile?.insulinDeliveryMethod)) {
+    return { seeded: false, count: 0 };
+  }
+
+  if (!shouldSeedMdiSupplies()) {
     return { seeded: false, count: 0 };
   }
 

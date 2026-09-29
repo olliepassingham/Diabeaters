@@ -117,11 +117,14 @@ export function normalizeExamplePumpSupplies(opts: PumpSupplySeedOptions = {}): 
 /**
  * Add default pump supply rows once (CGM, infusion sets, reservoirs, insulin).
  * Safe to call multiple times — no-ops when pump types already exist.
- * Ignores a stale device-wide seeded flag when the account has no pump rows yet
- * (e.g. after unlocking User Mode on a browser that had seeded before).
+ * Once this device has seeded them, deleting the set does not bring them back.
  */
 export function seedPumpSuppliesIfNeeded(opts: PumpSupplySeedOptions = {}): { seeded: boolean; count: number } {
   normalizeExamplePumpSupplies(opts);
+
+  if (!shouldSeedPumpSupplies()) {
+    return { seeded: false, count: 0 };
+  }
 
   if (hasPumpSupplyTypes()) {
     markPumpSuppliesSeeded();

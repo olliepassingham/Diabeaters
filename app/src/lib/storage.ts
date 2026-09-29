@@ -253,6 +253,9 @@ export function clearLocalCacheForAccountSwitch(): void {
     localStorage.removeItem(STORAGE_KEYS.ONBOARDING);
     localStorage.removeItem("diabeater_onboarding_completed");
     localStorage.removeItem("diabeater_onboarding_struggle");
+    localStorage.removeItem("diabeaters_mdi_supplies_seeded_v1");
+    localStorage.removeItem("diabeaters_pump_supplies_seeded_v1");
+    localStorage.removeItem("diabeaters_starter_cgm_seeded_v1");
   } catch {
     /* ignore */
   }

@@ -44,12 +44,14 @@ describe("setActiveUserIdForLocalStorage", () => {
   it("wipes clinical data when a different user signs in after logout", () => {
     setActiveUserIdForLocalStorage("user-a");
     seedPatientProfile("Alex");
+    localStorage.setItem("diabeaters_mdi_supplies_seeded_v1", "1");
 
     setActiveUserIdForLocalStorage(null);
     setActiveUserIdForLocalStorage("user-b");
 
     expect(storage.getProfile()).toBeNull();
     expect(localStorage.getItem("diabeater_onboarding_completed")).toBeNull();
+    expect(localStorage.getItem("diabeaters_mdi_supplies_seeded_v1")).toBeNull();
     expect(localStorage.getItem(LAST_LOCAL_USER_ID_KEY)).toBe("user-b");
   });
 
