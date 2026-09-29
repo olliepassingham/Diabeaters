@@ -88,17 +88,27 @@ describe("resolveHomeNextBestAction", () => {
 });
 
 describe("pickNextUpcomingAppointment", () => {
-  it("skips completed visits and keeps the soonest upcoming one", () => {
+  const now = new Date(2026, 8, 29, 12, 0, 0);
+
+  it("uses a visit that is today", () => {
     const next = pickNextUpcomingAppointment(
       [
-        { title: "Done", date: "2026-09-01", isCompleted: true },
-        { title: "Later", date: "2026-10-20", time: "09:00", isCompleted: false },
-        { title: "Clinic review", date: "2026-10-01", time: "15:10", isCompleted: false },
+        { title: "Done", date: "2026-09-29", isCompleted: true },
+        { title: "Clinic review", date: "2026-09-29", time: "15:10", isCompleted: false },
+        { title: "Later", date: "2026-10-01", time: "09:00", isCompleted: false },
       ],
-      new Date(2026, 8, 29, 12, 0, 0),
+      now,
     );
     expect(next?.title).toBe("Clinic review");
     expect(next?.whenLabel).toMatch(/15:10/);
+  });
+
+  it("leaves a visit two days away off the home action", () => {
+    const next = pickNextUpcomingAppointment(
+      [{ title: "Flu jab", date: "2026-10-01", time: "15:10", isCompleted: false }],
+      now,
+    );
+    expect(next).toBeNull();
   });
 });
 

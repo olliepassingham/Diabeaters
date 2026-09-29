@@ -47,7 +47,7 @@ export type ResolveHomeNextBestActionInput = {
   travelDestination?: string;
   /** Evening bedtime window and not yet checked tonight. */
   bedtimeDue: boolean;
-  /** Next visit that has not started. Shown only when nothing more urgent leads. */
+  /** A visit happening today. Later visits stay off this button. */
   nextAppointment: HomeNextAppointment | null;
   mealMoment: HomeMealMoment | null;
   mealDismissed: boolean;
@@ -219,7 +219,7 @@ function parseAppointmentDay(dateStr: string | undefined): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-/** Soonest visit that is today or later and not marked done. */
+/** Today's visit, if one is still ahead and not marked done. Later visits stay in the appointments list. */
 export function pickNextUpcomingAppointment(
   appointments: Pick<Appointment, "title" | "date" | "time" | "isCompleted">[],
   now = new Date(),
@@ -231,7 +231,7 @@ export function pickNextUpcomingAppointment(
     .map((appointment) => ({ appointment, day: parseAppointmentDay(appointment.date) }))
     .filter(
       (row): row is { appointment: (typeof appointments)[number]; day: Date } =>
-        row.day != null && row.day.getTime() >= today.getTime(),
+        row.day != null && row.day.getTime() === today.getTime(),
     )
     .sort((a, b) => a.day.getTime() - b.day.getTime());
   const next = upcoming[0];
