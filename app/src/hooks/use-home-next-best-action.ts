@@ -8,6 +8,7 @@ import type { HealthStatus } from "@/lib/dashboard-health-status";
 import { getHomeMealMoment, homeMealDismissalKey } from "@/lib/home-meal-moment";
 import { useHomeBedtimePresence } from "@/components/home/HomeBedtimeMoment";
 import {
+  pickNextUpcomingAppointment,
   resolveHomeNextBestAction,
   type HomeNextBestAction,
 } from "@/lib/home-next-best-action";
@@ -56,6 +57,13 @@ export function useHomeNextBestAction(options: {
   }, []);
 
   const mealMoment = useMemo(() => getHomeMealMoment(now), [now]);
+  const nextAppointment = useMemo(() => {
+    try {
+      return pickNextUpcomingAppointment(storage.getAppointments(), now);
+    } catch {
+      return null;
+    }
+  }, [now]);
   const mealDismissed =
     mealMoment != null && homeMealDismissalKey(now, mealMoment.slot) === dismissedMealKey;
 
@@ -108,6 +116,7 @@ export function useHomeNextBestAction(options: {
         travelModeActive: scenarioState.travelModeActive,
         travelDestination: scenarioState.travelDestination,
         bedtimeDue,
+        nextAppointment,
         mealMoment,
         mealDismissed,
         hasCriticalSupply,
@@ -122,6 +131,7 @@ export function useHomeNextBestAction(options: {
       activeExercise,
       travelPromote,
       bedtimeDue,
+      nextAppointment,
       mealMoment,
       mealDismissed,
       hasCriticalSupply,

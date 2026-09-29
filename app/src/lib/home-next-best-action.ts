@@ -6,6 +6,7 @@
 import type { HealthStatus } from "@/lib/dashboard-health-status";
 import type { HomeMealMoment } from "@/lib/home-meal-moment";
 import type { TravelPromoteResult } from "@/lib/status-bar-model";
+import type { Appointment } from "@/lib/storage";
 
 export type HomeNextBestActionId =
   | "help_now"
@@ -14,10 +15,16 @@ export type HomeNextBestActionId =
   | "pump_failure"
   | "travel"
   | "bedtime"
+  | "appointment"
   | "meal"
   | "supplies"
   | "coach"
   | "adviser";
+
+export type HomeNextAppointment = {
+  title: string;
+  whenLabel: string;
+};
 
 export type HomeNextBestAction = {
   id: HomeNextBestActionId;
@@ -40,6 +47,8 @@ export type ResolveHomeNextBestActionInput = {
   travelDestination?: string;
   /** Evening bedtime window and not yet checked tonight. */
   bedtimeDue: boolean;
+  /** Next visit that has not started. Shown only when nothing more urgent leads. */
+  nextAppointment: HomeNextAppointment | null;
   mealMoment: HomeMealMoment | null;
   mealDismissed: boolean;
   hasCriticalSupply: boolean;
@@ -132,6 +141,16 @@ export function resolveHomeNextBestAction(input: ResolveHomeNextBestActionInput)
     };
   }
 
+  if (input.nextAppointment) {
+    return {
+      id: "appointment",
+      label: "Next appointment",
+      subline: `${input.nextAppointment.title} · ${input.nextAppointment.whenLabel}`,
+      href: "/appointments",
+      kind: "link",
+    };
+  }
+
   if (input.mealMoment && !input.mealDismissed) {
     return {
       id: "meal",
@@ -188,6 +207,41 @@ export type HomeHeroNarrative = {
   primarySuffix?: string;
   supporting: string;
 };
+
+function parseAppointmentDay(dateStr: string | undefined): Date | null {
+  if (!dateStr) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr.trim());
+  if (match) {
+    const day = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+    return Number.isNaN(day.getTime()) ? null : day;
+  }
+  const parsed = new Date(dateStr);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+/** Soonest visit that is today or later and not marked done. */
+export function pickNextUpcomingAppointment(
+  appointments: Pick<Appointment, "title" | "date" | "time" | "isCompleted">[],
+  now = new Date(),
+): HomeNextAppointment | null {
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+  const upcoming = appointments
+    .filter((appointment) => !appointment.isCompleted)
+    .map((appointment) => ({ appointment, day: parseAppointmentDay(appointment.date) }))
+    .filter(
+      (row): row is { appointment: (typeof appointments)[number]; day: Date } =>
+        row.day != null && row.day.getTime() >= today.getTime(),
+    )
+    .sort((a, b) => a.day.getTime() - b.day.getTime());
+  const next = upcoming[0];
+  if (!next) return null;
+  const when = next.day.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+  return {
+    title: next.appointment.title.trim() || "Appointment",
+    whenLabel: next.appointment.time ? `${when} · ${next.appointment.time}` : when,
+  };
+}
 
 /** Ultrahuman-style: one big number + one calm sentence. */
 export function buildHomeHeroNarrative(input: HomeHeroNarrativeInput): HomeHeroNarrative {

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildHomeHeroNarrative,
+  pickNextUpcomingAppointment,
   resolveHomeNextBestAction,
 } from "./home-next-best-action";
 
@@ -20,6 +21,7 @@ describe("resolveHomeNextBestAction", () => {
     travelPromote: quietTravel,
     travelModeActive: false,
     bedtimeDue: false,
+    nextAppointment: null,
     mealMoment: null,
     mealDismissed: false,
     hasCriticalSupply: false,
@@ -51,6 +53,26 @@ describe("resolveHomeNextBestAction", () => {
     expect(a.label.toLowerCase()).toMatch(/insulin/);
   });
 
+  it("uses the next appointment before a meal", () => {
+    const a = resolveHomeNextBestAction({
+      ...base,
+      nextAppointment: { title: "Clinic review", whenLabel: "Thu 1 Oct · 15:10" },
+      mealMoment: { slot: "dinner", title: "Planning dinner?", timeLabel: "Evening" },
+    });
+    expect(a.id).toBe("appointment");
+    expect(a.href).toBe("/appointments");
+    expect(a.subline).toMatch(/Clinic review/);
+  });
+
+  it("keeps bedtime ahead of the next appointment", () => {
+    const a = resolveHomeNextBestAction({
+      ...base,
+      bedtimeDue: true,
+      nextAppointment: { title: "Clinic review", whenLabel: "Thu 1 Oct" },
+    });
+    expect(a.id).toBe("bedtime");
+  });
+
   it("uses meal moment when calm", () => {
     const a = resolveHomeNextBestAction({
       ...base,
@@ -62,6 +84,21 @@ describe("resolveHomeNextBestAction", () => {
 
   it("falls back to coach when calm and no meal", () => {
     expect(resolveHomeNextBestAction(base).id).toBe("coach");
+  });
+});
+
+describe("pickNextUpcomingAppointment", () => {
+  it("skips completed visits and keeps the soonest upcoming one", () => {
+    const next = pickNextUpcomingAppointment(
+      [
+        { title: "Done", date: "2026-09-01", isCompleted: true },
+        { title: "Later", date: "2026-10-20", time: "09:00", isCompleted: false },
+        { title: "Clinic review", date: "2026-10-01", time: "15:10", isCompleted: false },
+      ],
+      new Date(2026, 8, 29, 12, 0, 0),
+    );
+    expect(next?.title).toBe("Clinic review");
+    expect(next?.whenLabel).toMatch(/15:10/);
   });
 });
 

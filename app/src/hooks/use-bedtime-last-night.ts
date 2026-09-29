@@ -12,6 +12,7 @@ import {
 import {
   listOvernightReviewNights,
   overnightNightTitle,
+  toBedtimeStreakDayKey,
   type OvernightReviewTarget,
 } from "@/lib/bedtime-overnight-window";
 import { withTimeout } from "@/lib/cgm/async-timeout";
@@ -21,6 +22,10 @@ import { liveCgmOvernightMessage } from "@/lib/cgm/live-cgm-source";
 import { hasLiveCgmCredentials, readCgmPreferences } from "@/lib/cgm/preferences";
 import type { BgUnits } from "@/lib/cgm/types";
 import { resolveUserTargetBgRange } from "@/lib/target-bg-range";
+import {
+  isCloudOnlyBedtimeLog,
+  rememberBedtimeNightOnAccount,
+} from "@/lib/bedtime-night-summaries";
 import { storage, type BedtimeLog } from "@/lib/storage";
 
 const FETCH_TIMEOUT_MS = 18_000;
@@ -95,15 +100,6 @@ export function useBedtimeLastNight(logs: BedtimeLog[], units: BgUnits): {
       fn();
     };
 
-    if (!connected && isLatestNight) {
-      apply(() => {
-        setInsight(null);
-        setStatus("no_cgm");
-        setMessage(liveCgmOvernightMessage());
-      });
-      return;
-    }
-
     if (!reviewTarget) {
       apply(() => {
         setInsight(null);
@@ -125,8 +121,24 @@ export function useBedtimeLastNight(logs: BedtimeLog[], units: BgUnits): {
     const publish = (next: BedtimeOvernightInsight) => {
       if (log) {
         const summary = bedtimeOvernightSummaryFromInsight(next);
-        if (overnightSummariesDiffer(log.overnightCgmSummary, summary) && summary) {
+        if (summary && !isCloudOnlyBedtimeLog(log.id) && overnightSummariesDiffer(log.overnightCgmSummary, summary)) {
           storage.updateBedtimeLog(log.id, { overnightCgmSummary: summary });
+        }
+        if (summary) {
+          const streakDay = toBedtimeStreakDayKey(log.date, log.hoursUntilSleep);
+          if (streakDay) {
+            void rememberBedtimeNightOnAccount({
+              streakDay,
+              inRangePercent: summary.inRangePercent,
+              hadLow: summary.hadLow,
+              hadHigh: summary.hadHigh,
+              readingCount: summary.readingCount,
+              windowStart: window.startIso,
+              windowEnd: window.endIso,
+              headline: next.headline,
+              computedAt: summary.computedAt,
+            });
+          }
         }
       }
       apply(() => {
@@ -139,7 +151,6 @@ export function useBedtimeLastNight(logs: BedtimeLog[], units: BgUnits): {
     const publishStoredSummary = () => {
       const summary = log?.overnightCgmSummary;
       if (
-        !isLatestNight &&
         summary &&
         typeof summary.inRangePercent === "number" &&
         summary.readingCount > 0
@@ -153,6 +164,26 @@ export function useBedtimeLastNight(logs: BedtimeLog[], units: BgUnits): {
       }
       return false;
     };
+
+    const publishLocalHistory = () => {
+      const readings = overnightReadingsFromHistoryPoints(getCgmLocalHistory(), window, units);
+      if (readings.length === 0) return false;
+      const next = analyzeBedtimeOvernight(log, readings, window, targetLow, targetHigh, units);
+      if (!next) return false;
+      publish(next);
+      return true;
+    };
+
+    if (!connected && isLatestNight) {
+      if (publishLocalHistory()) return;
+      if (publishStoredSummary()) return;
+      apply(() => {
+        setInsight(null);
+        setStatus("no_cgm");
+        setMessage(liveCgmOvernightMessage());
+      });
+      return;
+    }
 
     try {
       if (!isLatestNight) {
@@ -187,6 +218,8 @@ export function useBedtimeLastNight(logs: BedtimeLog[], units: BgUnits): {
         "Could not load overnight glucose history.",
       );
       if (!result) {
+        if (publishLocalHistory()) return;
+        if (publishStoredSummary()) return;
         apply(() => {
           setInsight(null);
           setStatus("no_cgm");
@@ -198,6 +231,8 @@ export function useBedtimeLastNight(logs: BedtimeLog[], units: BgUnits): {
       const inWindow = filterEntriesToSleepWindow(result.entries, window);
       const readings = entriesToOvernightReadings(inWindow, units);
       if (readings.length === 0) {
+        if (publishLocalHistory()) return;
+        if (publishStoredSummary()) return;
         apply(() => {
           setInsight(null);
           setStatus("no_readings");
@@ -211,6 +246,8 @@ export function useBedtimeLastNight(logs: BedtimeLog[], units: BgUnits): {
       }
       const next = analyzeBedtimeOvernight(log, readings, window, targetLow, targetHigh, units);
       if (!next) {
+        if (publishLocalHistory()) return;
+        if (publishStoredSummary()) return;
         apply(() => {
           setInsight(null);
           setStatus("error");
@@ -220,6 +257,7 @@ export function useBedtimeLastNight(logs: BedtimeLog[], units: BgUnits): {
       }
       publish(next);
     } catch (e) {
+      if (isLatestNight && publishLocalHistory()) return;
       if (publishStoredSummary()) return;
       apply(() => {
         setInsight(null);

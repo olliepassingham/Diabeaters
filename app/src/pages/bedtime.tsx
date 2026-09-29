@@ -1,4 +1,4 @@
-import { useState, useEffect, type ReactNode } from "react";
+import { useState, useEffect, useMemo, type ReactNode } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,13 @@ import {
   overnightSummariesDiffer,
   resolveOvernightTirCompare,
 } from "@/lib/bedtime-overnight-analysis";
+import {
+  listBedtimeNightSummaries,
+  mergeCloudNightSummaries,
+  rememberBedtimeNightOnAccount,
+  type BedtimeNightSummaryRecord,
+} from "@/lib/bedtime-night-summaries";
+import { computeBedtimeSleepWindow, toBedtimeStreakDayKey } from "@/lib/bedtime-overnight-window";
 import { getCgmLocalHistory } from "@/lib/cgm/cgm-history-store";
 import {
   storage,
@@ -293,10 +300,22 @@ export default function Bedtime() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [bedtimeLogs, setBedtimeLogs] = useState<BedtimeLog[]>([]);
+  const [cloudNights, setCloudNights] = useState<BedtimeNightSummaryRecord[]>([]);
   const [quickCheckOpen, setQuickCheckOpen] = useState(true);
+  const [detailOpen, setDetailOpen] = useState(false);
   const [extrasOpen, setExtrasOpen] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
+
+  useEffect(() => {
+    let cancelled = false;
+    void listBedtimeNightSummaries().then((rows) => {
+      if (!cancelled) setCloudNights(rows);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
   const { data: linkedPatient } = useLinkedPatient();
   const hasCarerLink = !!linkedPatient;
   const [secondChancePromptOpen, setSecondChancePromptOpen] = useState(false);
@@ -347,6 +366,33 @@ export default function Bedtime() {
         storage.updateBedtimeLog(log.id, { overnightCgmSummary: summary });
         changed = true;
       }
+      if (summary) {
+        const sleepWindow = computeBedtimeSleepWindow(log);
+        const streakDay = toBedtimeStreakDayKey(log.date, log.hoursUntilSleep);
+        if (sleepWindow && streakDay) {
+          const hadLow = summary.hadLow;
+          const hadHigh = summary.hadHigh;
+          const headline =
+            hadLow && hadHigh
+              ? "A mixed night"
+              : hadLow
+                ? "Overnight low detected"
+                : hadHigh
+                  ? "Ran high overnight"
+                  : "In range overnight";
+          void rememberBedtimeNightOnAccount({
+            streakDay,
+            inRangePercent: summary.inRangePercent,
+            hadLow,
+            hadHigh,
+            readingCount: summary.readingCount,
+            windowStart: sleepWindow.startIso,
+            windowEnd: sleepWindow.endIso,
+            headline,
+            computedAt: summary.computedAt,
+          });
+        }
+      }
     }
     if (changed) setBedtimeLogs(storage.getBedtimeLogs());
   }, [bgUnits, userSettings]);
@@ -372,6 +418,10 @@ export default function Bedtime() {
   const getTargetRange = () => resolveUserTargetBgRange(userSettings, bgUnits);
 
   const targetRange = getTargetRange();
+  const reviewLogs = useMemo(
+    () => mergeCloudNightSummaries(bedtimeLogs, cloudNights),
+    [bedtimeLogs, cloudNights],
+  );
   const {
     insight: lastNightInsight,
     status: lastNightStatus,
@@ -385,12 +435,12 @@ export default function Bedtime() {
     canGoNewer: canGoNewerNight,
     goOlder: goOlderNight,
     goNewer: goNewerNight,
-  } = useBedtimeLastNight(bedtimeLogs, bgUnits);
+  } = useBedtimeLastNight(reviewLogs, bgUnits);
 
   const lastNightTirCompare =
     lastNightInsight && lastNightReview?.log
       ? resolveOvernightTirCompare(
-          bedtimeLogs,
+          reviewLogs,
           lastNightReview.log.id,
           lastNightInsight.stats.inRangePercent,
         )
@@ -1300,6 +1350,22 @@ export default function Bedtime() {
                 </div>
               </section>
 
+              <Collapsible open={detailOpen} onOpenChange={setDetailOpen}>
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between gap-2 rounded-2xl border border-border/50 bg-background/50 px-3.5 py-3 text-left text-sm font-medium hover:bg-muted/25"
+                    data-testid="button-bedtime-add-detail"
+                    aria-expanded={detailOpen}
+                  >
+                    <span>Add detail</span>
+                    <ChevronDown
+                      className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", detailOpen && "rotate-180")}
+                      aria-hidden
+                    />
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-4 pt-3">
               <section className="space-y-3" aria-labelledby="bedtime-section-fuel">
                 <BedtimeSectionTitle id="bedtime-section-fuel" title="Food & insulin" info={BEDTIME_SECTION_INFO.foodInsulin} />
                 <div className="grid grid-cols-1 gap-2.5 rounded-2xl border border-border/50 bg-background/70 p-3 shadow-sm backdrop-blur-sm dark:bg-background/40 sm:grid-cols-2">
@@ -1537,6 +1603,8 @@ export default function Bedtime() {
                       </span>
                     </div>
                   </div>
+                </CollapsibleContent>
+              </Collapsible>
                 </CollapsibleContent>
               </Collapsible>
 

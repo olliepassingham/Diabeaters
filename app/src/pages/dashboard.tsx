@@ -413,19 +413,6 @@ export default function Dashboard() {
 
         {!isCommunityDash ? <HomeNextUp suppressActionId={homeNextAction.id} /> : null}
 
-        {!isCommunityDash ? (
-          <HomeMealMoment
-            healthStatus={healthStatus}
-            suppressed={homeNextAction.id === "meal"}
-          />
-        ) : null}
-
-        {!isCommunityDash ? (
-          <HomeTodayPulse healthStatus={healthStatus} suppressRunwayDuplicate />
-        ) : null}
-
-        {!isCommunityDash ? <HomeSupplyGraph supplies={supplies} /> : null}
-
         {showWelcomeWidget ? (
           <section className="py-4" style={{ animationDelay: "50ms" }}>
             <WelcomeWidget />
@@ -468,6 +455,16 @@ export default function Dashboard() {
       />
 
       <section className="home-widget-flow" data-testid="dashboard-widgets">
+        {!isCommunityDash ? (
+          <HomeMealMoment
+            healthStatus={healthStatus}
+            suppressed={homeNextAction.id === "meal"}
+          />
+        ) : null}
+        {!isCommunityDash ? (
+          <HomeTodayPulse healthStatus={healthStatus} suppressRunwayDuplicate />
+        ) : null}
+        {!isCommunityDash ? <HomeSupplyGraph supplies={supplies} /> : null}
         <div
           className={cn(
             "animate-stagger grid grid-cols-1 items-start",
