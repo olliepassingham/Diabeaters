@@ -24,12 +24,19 @@ export function resolveAppGateReady(params: {
   skipProfileForGate: boolean;
   /** When true, do not wait for the carer-link query (patient/community accounts). */
   skipLinkForGate?: boolean;
+  /**
+   * This device already finished onboarding for the signed-in account.
+   * Home can paint from local data while the profile request is still in flight.
+   * A new signup has this flag cleared, so it still waits for the cloud profile.
+   */
+  localOnboardingComplete?: boolean;
 }): boolean {
   if (params.authLoading) return false;
   if (!params.userId) return true;
   if (!params.online) return true;
   if (!params.skipLinkForGate && !params.linkQueryFetched) return false;
   if (params.skipProfileForGate) return true;
+  if (params.localOnboardingComplete) return true;
   return params.profileQueryFetched;
 }
 

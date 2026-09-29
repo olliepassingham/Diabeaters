@@ -1727,6 +1727,7 @@ function AppContent() {
         profileQueryFetched: profileQuery.isFetched,
         skipProfileForGate,
         skipLinkForGate,
+        localOnboardingComplete: readOnboardingCompleteFromLocalStorage(),
       }),
     [
       authLoading,

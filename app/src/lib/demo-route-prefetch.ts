@@ -60,11 +60,15 @@ export function scheduleCommunityRoutePrefetch(): void {
   });
 }
 
-/** Warm remaining demo/community chunks soon after login (offline-critical routes start in main.tsx). */
+/** Warm remaining demo/community chunks after home has had a chance to paint and fetch glucose. */
 export function scheduleDemoRoutePrefetch(): void {
   if (typeof window === "undefined") return;
-  prefetchDemoCriticalRoutes();
-  window.requestAnimationFrame(() => {
+  const run = () => {
     prefetchDemoCriticalRoutes();
-  });
+  };
+  if (typeof window.requestIdleCallback === "function") {
+    window.requestIdleCallback(run, { timeout: 4000 });
+  } else {
+    window.setTimeout(run, 2500);
+  }
 }

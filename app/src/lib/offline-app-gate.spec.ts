@@ -70,6 +70,51 @@ describe("resolveAppGateReady", () => {
     ).toBe(true);
   });
 
+  it("paints home before the profile returns when this phone already finished onboarding", () => {
+    expect(
+      resolveAppGateReady({
+        authLoading: false,
+        userId: "u1",
+        online: true,
+        linkQueryFetched: false,
+        profileQueryFetched: false,
+        skipProfileForGate: false,
+        skipLinkForGate: true,
+        localOnboardingComplete: true,
+      }),
+    ).toBe(true);
+  });
+
+  it("still waits for the profile on a new signup", () => {
+    expect(
+      resolveAppGateReady({
+        authLoading: false,
+        userId: "u1",
+        online: true,
+        linkQueryFetched: true,
+        profileQueryFetched: false,
+        skipProfileForGate: false,
+        skipLinkForGate: true,
+        localOnboardingComplete: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("still waits for the supporter link before using the local onboarding flag", () => {
+    expect(
+      resolveAppGateReady({
+        authLoading: false,
+        userId: "u1",
+        online: true,
+        linkQueryFetched: false,
+        profileQueryFetched: false,
+        skipProfileForGate: false,
+        skipLinkForGate: false,
+        localOnboardingComplete: true,
+      }),
+    ).toBe(false);
+  });
+
   it("can skip waiting for the carer-link query", () => {
     expect(
       resolveAppGateReady({

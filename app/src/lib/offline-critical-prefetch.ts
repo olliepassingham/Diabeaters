@@ -11,9 +11,16 @@ let started = false;
 export function prefetchOfflineCriticalRoutes(): void {
   if (started || typeof window === "undefined") return;
   started = true;
-  prefetchScenariosHubAndRoutes();
-  prefetchToolsHubLinkedChunks();
-  void import("@/pages/help-now");
-  void import("@/pages/emergency-card");
-  void import("@/pages/tools/cgm-live");
+  const run = () => {
+    prefetchScenariosHubAndRoutes();
+    prefetchToolsHubLinkedChunks();
+    void import("@/pages/help-now");
+    void import("@/pages/emergency-card");
+    void import("@/pages/tools/cgm-live");
+  };
+  if (typeof window.requestIdleCallback === "function") {
+    window.requestIdleCallback(run, { timeout: 4000 });
+  } else {
+    window.setTimeout(run, 2500);
+  }
 }
