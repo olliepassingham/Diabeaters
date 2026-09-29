@@ -3,6 +3,7 @@ import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Loader2, Moon, Refre
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { InlineInfoHint } from "@/components/ui/field-label-with-info";
 import { CgmGlucoseChart } from "@/components/cgm-glucose-chart";
 import type { BedtimeLastNightStatus } from "@/hooks/use-bedtime-last-night";
 import {
@@ -140,6 +141,10 @@ function HeaderActions({
   );
 }
 
+function cgmSourceNote(usedCalendarFallback?: boolean): string {
+  return `Based on your connected CGM${usedCalendarFallback ? "" : " and your bedtime check inputs"} — educational only. Confirm on your CGM or receiver before changing treatment.`;
+}
+
 function InsightBody({
   insight,
   usedCalendarFallback,
@@ -161,9 +166,16 @@ function InsightBody({
     <>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1 space-y-1">
-          <p className="text-sm font-semibold text-foreground" data-testid="text-bedtime-last-night-headline">
-            {insight.headline}
-          </p>
+          <div className="flex items-start gap-0.5">
+            <p className="min-w-0 text-sm font-semibold text-foreground" data-testid="text-bedtime-last-night-headline">
+              {insight.headline}
+            </p>
+            <InlineInfoHint
+              className="h-8 w-8"
+              ariaLabel="About this overnight review"
+              content={cgmSourceNote(usedCalendarFallback)}
+            />
+          </div>
           <p className="text-sm leading-snug text-foreground/90">{insight.summary}</p>
         </div>
         <div className="shrink-0 text-right" data-testid="text-bedtime-last-night-tir">
@@ -226,11 +238,6 @@ function InsightBody({
           </ul>
         </div>
       ) : null}
-
-      <p className="text-[11px] leading-snug text-muted-foreground">
-        Based on your connected CGM{usedCalendarFallback ? "" : " and your bedtime check inputs"} — educational only.
-        Confirm on your CGM or receiver before changing treatment.
-      </p>
     </>
   );
 }
@@ -238,9 +245,11 @@ function InsightBody({
 function NightStepButton({
   direction,
   onClick,
+  disabled,
 }: {
   direction: "older" | "newer";
-  onClick: () => void;
+  onClick?: () => void;
+  disabled?: boolean;
 }) {
   const older = direction === "older";
   return (
@@ -249,9 +258,10 @@ function NightStepButton({
       variant="ghost"
       size="icon"
       className="h-11 w-11 shrink-0"
+      disabled={disabled || !onClick}
       onClick={(e) => {
         e.stopPropagation();
-        onClick();
+        onClick?.();
       }}
       aria-label={older ? "Previous night" : "Next night"}
       data-testid={older ? "button-bedtime-night-older" : "button-bedtime-night-newer"}
@@ -304,7 +314,7 @@ export function BedtimeLastNightCard({
         <Moon className="h-4 w-4" />
       </div>
       <div className="min-w-0 flex-1">
-        <span className="block text-base font-semibold tracking-tight text-foreground">{nightTitle}</span>
+        <span className="block truncate text-base font-semibold tracking-tight text-foreground">{nightTitle}</span>
         {insight && open ? (
           <span className="mt-0.5 block text-sm text-muted-foreground">
             {usedCalendarFallback ? "Estimated overnight · " : "From your bedtime check · "}
@@ -313,7 +323,7 @@ export function BedtimeLastNightCard({
           </span>
         ) : (
           <span
-            className="mt-0.5 block line-clamp-2 text-sm text-muted-foreground"
+            className="mt-0.5 block truncate text-sm text-muted-foreground"
             data-testid="text-bedtime-last-night-preview"
           >
             {preview}
@@ -329,24 +339,18 @@ export function BedtimeLastNightCard({
             {insight.stats.inRangePercent}%
           </span>
           <span className="block text-[10px] font-medium text-muted-foreground">in target</span>
-          {tirCompare ? <TirDeltaChip compare={tirCompare} versus={tirVersus} /> : null}
         </div>
       ) : null}
     </>
   );
 
-  const olderButton = canGoOlder && onGoOlder ? <NightStepButton direction="older" onClick={onGoOlder} /> : null;
-  const newerButton = canGoNewer && onGoNewer ? <NightStepButton direction="newer" onClick={onGoNewer} /> : null;
+  const showNightNav = open && (canGoOlder || canGoNewer);
 
   if (!canExpand) {
     return (
       <Card className={cardClassName} data-testid="card-bedtime-last-night">
-        <div className="flex items-center gap-1 px-2 py-2 sm:px-3">
-          {olderButton}
-          <div className="flex min-w-0 flex-1 items-center gap-3 px-2">
-            {titleBlock}
-          </div>
-          {newerButton}
+        <div className="flex items-center gap-3 px-3 py-2 sm:px-4">
+          {titleBlock}
           <HeaderActions
             showRefresh={showRefresh}
             showChevron={false}
@@ -362,30 +366,35 @@ export function BedtimeLastNightCard({
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <Card className={cardClassName} data-testid="card-bedtime-last-night">
-        <div className="flex items-center gap-1 px-2 py-2 sm:px-3">
-          {olderButton}
-          <CollapsibleTrigger asChild>
-            <button
-              type="button"
-              className="flex min-w-0 flex-1 items-center gap-3 rounded-xl px-2 py-1 text-left transition-colors hover:bg-muted/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label={open ? `Collapse ${nightTitle} review` : `Expand ${nightTitle} review`}
-              data-testid="button-bedtime-last-night-toggle"
-            >
-              {titleBlock}
-              <HeaderActions
-                showRefresh={showRefresh}
-                showChevron
-                open={open}
-                loading={loading}
-                onRefresh={onRefresh}
-              />
-            </button>
-          </CollapsibleTrigger>
-          {newerButton}
-        </div>
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="flex w-full min-w-0 items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-muted/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-4"
+            aria-label={open ? `Collapse ${nightTitle} review` : `Expand ${nightTitle} review`}
+            data-testid="button-bedtime-last-night-toggle"
+          >
+            {titleBlock}
+            <HeaderActions
+              showRefresh={showRefresh}
+              showChevron
+              open={open}
+              loading={loading}
+              onRefresh={onRefresh}
+            />
+          </button>
+        </CollapsibleTrigger>
 
         <CollapsibleContent>
           <CardContent className="space-y-3 border-t border-border/50 px-4 pb-4 pt-3 sm:px-5">
+            {showNightNav ? (
+              <div className="flex items-center justify-between gap-2" data-testid="bedtime-night-nav">
+                <NightStepButton direction="older" onClick={onGoOlder} disabled={!canGoOlder} />
+                <p className="min-w-0 flex-1 truncate text-center text-sm font-medium text-foreground" aria-live="polite">
+                  {nightTitle}
+                </p>
+                <NightStepButton direction="newer" onClick={onGoNewer} disabled={!canGoNewer} />
+              </div>
+            ) : null}
             {loading ? (
               <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground" role="status">
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
