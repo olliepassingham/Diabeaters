@@ -156,7 +156,7 @@ export function buildAlcoholSituationOutcome(
     };
   }
 
-  if (input.situation === "before_out") {
+  if (input.situation === "before_out" && (input.carbsG == null || input.carbsG <= 0)) {
     return {
       kind: "prep_only",
       headline: "Before you go out",
@@ -173,7 +173,7 @@ export function buildAlcoholSituationOutcome(
     };
   }
 
-  if (input.situation === "meal_with_drinks" || input.situation === "late_snack") {
+  if (input.situation === "meal_with_drinks" || input.situation === "late_snack" || input.situation === "before_out") {
     const carbs = input.carbsG;
     if (carbs == null || carbs <= 0) {
       return { kind: "needs_carbs", message: "Enter total carbs (grams) for this food or snack to get an estimate." };

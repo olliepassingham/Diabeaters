@@ -17,6 +17,8 @@ import {
   ChevronRight,
   Sparkles,
   CheckCircle2,
+  Minus,
+  Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +27,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
 import { Disclaimer } from "@/components/disclaimer";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
@@ -63,6 +66,12 @@ import {
   saveAlcoholLastRecommendation,
 } from "@/lib/alcohol-last-recommendation";
 import { cgmTrendForAlcohol } from "@/lib/cgm/apply-cgm-trend";
+import {
+  ALCOHOL_DRINKS,
+  summarizeAlcoholDrinks,
+  type AlcoholDrinkPatternId,
+  type AlcoholDrinkSummary,
+} from "@/lib/alcohol-drinks";
 
 const FROM_SCENARIOS = "from=/scenarios";
 
@@ -116,7 +125,7 @@ function ChoiceGroup<T extends string>({ label, value, onChange, options, name }
   const compact = options.every((opt) => opt.title.length <= 18);
   return (
     <div className="space-y-2">
-      <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
+      <Label className="text-base font-semibold text-foreground">{label}</Label>
       <div
         className={cn("grid gap-2", compact ? "grid-cols-3" : "grid-cols-1")}
         role="radiogroup"
@@ -132,7 +141,7 @@ function ChoiceGroup<T extends string>({ label, value, onChange, options, name }
               aria-checked={selected}
               name={name}
               className={cn(
-                "min-h-12 rounded-xl border px-3 py-3 text-sm font-medium leading-snug transition-colors",
+                "min-h-12 rounded-xl border px-3 py-3 text-base font-medium leading-snug transition-colors",
                 compact ? "text-center" : "text-left",
                 selected
                   ? "border-primary bg-primary/10 text-foreground shadow-sm"
@@ -150,11 +159,184 @@ function ChoiceGroup<T extends string>({ label, value, onChange, options, name }
 }
 
 
+const DRINK_PATTERN_ORDER: AlcoholDrinkPatternId[] = [
+  "carb_then_low",
+  "low_carb_later_low",
+  "later_low",
+  "low_alcohol",
+];
+
+const DRINK_PATTERN_TITLE: Record<AlcoholDrinkPatternId, string> = {
+  carb_then_low: "Raises you first, then a later low",
+  low_carb_later_low: "Small rise. A later low still matters",
+  later_low: "Little rise. Watch for a later low",
+  low_alcohol: "Carbs still count. The later low is smaller",
+};
+
+const DRINK_SHORT_NAME: Record<string, string> = {
+  "pint-lager": "Lager",
+  "half-lager": "Half lager",
+  "pint-cider": "Cider",
+  "wine-small": "Small wine",
+  "wine-large": "Large wine",
+  prosecco: "Prosecco",
+  "spirit-diet": "Spirit, diet",
+  "spirit-sugar": "Spirit, sugary",
+  alcopop: "Alcopop",
+  cocktail: "Cocktail",
+  "low-alcohol-beer": "Low-alcohol",
+};
+
+function AlcoholDrinkRows({
+  interactive,
+  counts,
+  onCount,
+}: {
+  interactive: boolean;
+  counts: Record<string, number>;
+  onCount?: (id: string, delta: number) => void;
+}) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const chosen = ALCOHOL_DRINKS.filter((drink) => (counts[drink.id] ?? 0) > 0);
+
+  if (!interactive) {
+    return (
+      <div className="space-y-4" data-testid="alcohol-drink-lookup">
+        {DRINK_PATTERN_ORDER.map((patternId) => {
+          const drinks = ALCOHOL_DRINKS.filter((drink) => drink.patternId === patternId);
+          if (drinks.length === 0) return null;
+          return (
+            <section key={patternId} className="space-y-2">
+              <h3 className="text-base font-semibold text-foreground">{DRINK_PATTERN_TITLE[patternId]}</h3>
+              <ul className="space-y-1">
+                {drinks.map((drink) => (
+                  <li key={drink.id} className="text-base text-foreground">
+                    {drink.name}
+                    <span className="text-muted-foreground"> · {drink.carbsGrams}g</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          );
+        })}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2" data-testid="alcohol-drink-picker">
+      {chosen.length > 0 ? (
+        <ul className="space-y-2">
+          {chosen.map((drink) => {
+            const count = counts[drink.id] ?? 0;
+            return (
+              <li
+                key={drink.id}
+                className="flex items-center justify-between gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2"
+              >
+                <div className="min-w-0">
+                  <p className="text-base font-medium leading-snug text-foreground">{drink.name}</p>
+                  <p className="text-base text-muted-foreground">{count * drink.carbsGrams}g</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-11 w-11 rounded-xl bg-background"
+                    aria-label={`Remove one ${drink.name}`}
+                    data-testid={`alcohol-drink-remove-${drink.id}`}
+                    onClick={() => onCount?.(drink.id, -1)}
+                  >
+                    <Minus className="h-4 w-4" />
+                  </Button>
+                  <span className="w-6 text-center text-base font-semibold tabular-nums">{count}</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-11 w-11 rounded-xl bg-background"
+                    aria-label={`Add one ${drink.name}`}
+                    data-testid={`alcohol-drink-add-${drink.id}`}
+                    onClick={() => onCount?.(drink.id, 1)}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+      <Button
+        type="button"
+        variant="outline"
+        className="h-12 w-full rounded-xl bg-background text-base"
+        data-testid="button-alcohol-add-drink"
+        onClick={() => setPickerOpen(true)}
+      >
+        <Plus className="h-4 w-4" />
+        {chosen.length > 0 ? "Add another drink" : "Add a drink"}
+      </Button>
+      <BottomSheet open={pickerOpen} onOpenChange={setPickerOpen} title="Add a drink" bodyClassName="flex flex-col">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-2">
+          <ul className="grid grid-cols-2 gap-2">
+            {ALCOHOL_DRINKS.map((drink) => {
+              const count = counts[drink.id] ?? 0;
+              const selected = count > 0;
+              return (
+                <li key={drink.id}>
+                  <div
+                    className={cn(
+                      "flex min-h-[4.5rem] items-stretch gap-1 rounded-2xl border px-3 py-2",
+                      selected ? "border-primary bg-primary/10" : "border-border/70 bg-background",
+                    )}
+                  >
+                    <button
+                      type="button"
+                      className="min-w-0 flex-1 text-left"
+                      aria-label={`Add one ${drink.name}`}
+                      data-testid={`alcohol-drink-pick-${drink.id}`}
+                      onClick={() => onCount?.(drink.id, 1)}
+                    >
+                      <span className="block text-base font-medium leading-snug text-foreground">
+                        {DRINK_SHORT_NAME[drink.id] ?? drink.name}
+                      </span>
+                      <span className="block text-base text-muted-foreground">
+                        {drink.carbsGrams}g{selected ? ` · ${count}` : ""}
+                      </span>
+                    </button>
+                    {selected ? (
+                      <button
+                        type="button"
+                        className="flex w-10 shrink-0 items-center justify-center rounded-xl text-foreground"
+                        aria-label={`Remove one ${drink.name}`}
+                        onClick={() => onCount?.(drink.id, -1)}
+                      >
+                        <Minus className="h-4 w-4" />
+                      </button>
+                    ) : null}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+        <div className="shrink-0 border-t border-border/60 px-4 py-3">
+          <Button type="button" className="h-12 w-full rounded-xl text-base" onClick={() => setPickerOpen(false)}>
+            Done
+          </Button>
+        </div>
+      </BottomSheet>
+    </div>
+  );
+}
+
 function AlcoholActionLinks({ links }: { links: AlcoholSituationLinks }) {
   return (
     <div className="flex flex-wrap gap-2">
       {links.hypoHelp ? (
-        <Button variant="secondary" size="sm" className="gap-1.5" asChild>
+        <Button variant="secondary" className="h-11 gap-1.5 text-base" asChild>
           <Link href={linkWithFrom("/tools/hypo-help")}>
             <Droplet className="h-4 w-4" />
             Hypo help
@@ -162,12 +344,12 @@ function AlcoholActionLinks({ links }: { links: AlcoholSituationLinks }) {
         </Button>
       ) : null}
       {links.sickDay ? (
-        <Button variant="secondary" size="sm" asChild>
+        <Button variant="secondary" className="h-11 text-base" asChild>
           <Link href={linkWithFrom("/sick-day")}>Sick day</Link>
         </Button>
       ) : null}
       {links.helpNow ? (
-        <Button variant="secondary" size="sm" className="gap-1.5" asChild>
+        <Button variant="secondary" className="h-11 gap-1.5 text-base" asChild>
           <Link href={linkWithFrom("/help-now")}>
             <Phone className="h-4 w-4" />
             Help now
@@ -213,9 +395,12 @@ function riskAccent(level: AlcoholDoseGuidance["riskLevel"]) {
 function AlcoholNightModeCard({
   intensity,
   situationLabel,
+  activeOnly = false,
 }: {
   intensity: AlcoholIntensity;
   situationLabel?: string | null;
+  /** Situation step: show the on-state only, so the home chip lands on the checks and the off switch. */
+  activeOnly?: boolean;
 }) {
   const { toast } = useToast();
   const [bedtimeLocal, setBedtimeLocal] = useState(defaultBedtimeLocal);
@@ -256,6 +441,8 @@ function AlcoholNightModeCard({
     }
   };
 
+  if (activeOnly && !active) return null;
+
   if (active) {
     const session = storage.getAlcoholSession();
     const schedule = session
@@ -271,15 +458,15 @@ function AlcoholNightModeCard({
             <Moon className="h-4 w-4" aria-hidden />
           </span>
           <div className="min-w-0 space-y-1">
-            <p className="text-sm font-semibold text-foreground">Night mode is on</p>
-            <p className="text-xs leading-relaxed text-muted-foreground">
+            <p className="text-base font-semibold text-foreground">Night mode is on</p>
+            <p className="text-base leading-relaxed text-muted-foreground">
               Reminders on until your morning review.
             </p>
           </div>
         </div>
         <ul className="space-y-1.5 border-t border-border/40 pt-3">
           {schedule.map((item) => (
-            <li key={item.kind} className="flex items-center justify-between gap-2 text-xs">
+            <li key={item.kind} className="flex items-center justify-between gap-2 text-base">
               <span className="text-foreground/90">{item.label}</span>
               <span className="shrink-0 tabular-nums text-muted-foreground">{formatNightModeTime(item.atIso)}</span>
             </li>
@@ -287,7 +474,7 @@ function AlcoholNightModeCard({
         </ul>
         <Button
           variant="outline"
-          className="w-full min-h-11"
+          className="w-full min-h-11 text-base"
           onClick={() => void deactivate()}
           disabled={busy}
           data-testid="button-alcohol-night-mode-off"
@@ -346,12 +533,12 @@ function AlcoholNightModeCard({
           <Moon className="h-4 w-4" aria-hidden />
         </span>
         <div className="min-w-0 space-y-1">
-          <p className="text-sm font-semibold text-foreground">Tonight&apos;s checks</p>
-          <p className="text-xs text-muted-foreground">Bedtime and overnight reminders on this device.</p>
+          <p className="text-base font-semibold text-foreground">Tonight&apos;s checks</p>
+          <p className="text-base text-muted-foreground">Bedtime and overnight reminders on this device.</p>
         </div>
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="alcohol-bedtime" className="text-xs text-muted-foreground">
+        <Label htmlFor="alcohol-bedtime" className="text-base font-semibold text-foreground">
           Planned bedtime
         </Label>
         <Input
@@ -365,7 +552,7 @@ function AlcoholNightModeCard({
       </div>
       <ul className="space-y-1.5 rounded-xl border border-border/40 bg-muted/20 px-3 py-2.5">
         {previewSchedule.map((item) => (
-          <li key={item.kind} className="flex items-center justify-between gap-2 text-xs">
+          <li key={item.kind} className="flex items-center justify-between gap-2 text-base">
             <span className="text-foreground/90">{item.label}</span>
             <span className="shrink-0 tabular-nums text-muted-foreground">{formatNightModeTime(item.atIso)}</span>
           </li>
@@ -383,14 +570,14 @@ function AlcoholNightModeCard({
             className="mt-0.5"
             data-testid="checkbox-alcohol-notify-supporters"
           />
-          <span className="min-w-0 text-xs text-foreground/90">
+          <span className="min-w-0 text-base text-foreground">
             Let supporters know
           </span>
         </label>
       ) : null}
       <Button
         type="button"
-        className="w-full min-h-10 rounded-xl"
+        className="w-full min-h-11 rounded-xl text-base"
         disabled={busy}
         onClick={() => void activate()}
         data-testid="button-alcohol-night-mode"
@@ -407,6 +594,8 @@ function AlcoholEstimateResult({
   bgUnits,
   mealType,
   situationLabel,
+  drinkSummary,
+  foodCarbsGrams,
   onEdit,
   onReset,
 }: {
@@ -415,6 +604,8 @@ function AlcoholEstimateResult({
   bgUnits: string;
   mealType: string;
   situationLabel: string | null;
+  drinkSummary: AlcoholDrinkSummary | null;
+  foodCarbsGrams: number;
   onEdit: () => void;
   onReset: () => void;
 }) {
@@ -433,24 +624,29 @@ function AlcoholEstimateResult({
             type="button"
             variant="ghost"
             size="sm"
-            className="absolute right-2 top-2 h-8 gap-1 px-2 text-xs text-muted-foreground"
+            className="absolute right-2 top-2 h-10 gap-1 px-2 text-base text-muted-foreground"
             onClick={onReset}
             data-testid="button-alcohol-edit-answers"
           >
             <RotateCcw className="h-3.5 w-3.5" />
             Reset
           </Button>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-primary/90">Your range tonight</p>
+          <p className="text-base font-semibold text-primary/90">Your range tonight</p>
           <p
             className="mt-1 font-display text-5xl font-bold tabular-nums tracking-tight text-foreground"
             data-testid="alcohol-dose-range"
           >
             {showRange ? rangeLabel : "Discuss with team"}
           </p>
-          <p className="mt-2 text-sm text-muted-foreground">{guidance.contextLabel}</p>
+          <p className="mt-2 text-base text-foreground" data-testid="alcohol-carb-split">
+            {drinkSummary && drinkSummary.carbsGrams > 0 ? `${drinkSummary.carbsGrams}g drinks` : "No drink carbs"}
+            {" · "}
+            {foodCarbsGrams > 0 ? `${foodCarbsGrams}g food` : "No food carbs"}
+          </p>
           {guidance.standardDose > 0 ? (
-            <p className="mt-1 text-xs text-muted-foreground">
-              vs <span className="font-medium tabular-nums text-foreground/85">{guidance.standardDose}u</span> food alone
+            <p className="mt-2 text-base text-muted-foreground">
+              Usual dose for these carbs is{" "}
+              <span className="font-medium tabular-nums text-foreground">{guidance.standardDose}u</span>
               {rounding ? (
                 <>
                   {" "}
@@ -460,7 +656,7 @@ function AlcoholEstimateResult({
             </p>
           ) : null}
           {leanLine ? (
-            <p className="mt-2 text-xs font-medium text-foreground/90" data-testid="alcohol-bg-note">
+            <p className="mt-2 text-base font-medium text-foreground" data-testid="alcohol-bg-note">
               {leanLine}
             </p>
           ) : null}
@@ -474,23 +670,40 @@ function AlcoholEstimateResult({
               <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
             </span>
             <div className="min-w-0 space-y-0.5">
-              <p className="text-sm font-semibold text-foreground">{guidance.riskHeadline}</p>
-              <p className="text-xs text-foreground/80">{overnightNote}</p>
+              <p className="text-base font-semibold text-foreground">{guidance.riskHeadline}</p>
+              <p className="text-base text-foreground/80">{overnightNote}</p>
             </div>
           </div>
+        </div>
+      ) : null}
+
+      {drinkSummary && drinkSummary.drinkCount > 0 ? (
+        <div className="space-y-2 rounded-2xl border border-border/70 px-4 py-3" data-testid="alcohol-drink-patterns">
+          <p className="text-base font-semibold text-foreground">{drinkSummary.labels.join(", ")}</p>
+          {DRINK_PATTERN_ORDER.filter((patternId) =>
+            ALCOHOL_DRINKS.some(
+              (drink) =>
+                drink.patternId === patternId &&
+                drinkSummary.labels.some((label) => label.toLowerCase().includes(drink.name.toLowerCase())),
+            ),
+          ).map((patternId) => (
+            <p key={patternId} className="text-base leading-snug text-foreground">
+              {DRINK_PATTERN_TITLE[patternId]}
+            </p>
+          ))}
         </div>
       ) : null}
 
       <AlcoholNightModeCard intensity={guidance.drinkingIntensity} situationLabel={situationLabel} />
 
       <div className="flex gap-2">
-        <Button asChild className="min-h-11 flex-1 gap-2 rounded-xl">
+        <Button asChild className="min-h-11 flex-1 gap-2 rounded-xl text-base">
           <Link href={linkWithFrom(adviserLinkFromAlcohol(meal.carbs, mealType))}>
             <Calculator className="h-4 w-4" />
             Open Meal Adviser
           </Link>
         </Button>
-        <Button type="button" variant="outline" className="min-h-11 shrink-0 rounded-xl" onClick={onEdit}>
+        <Button type="button" variant="outline" className="min-h-11 shrink-0 rounded-xl text-base" onClick={onEdit}>
           Edit
         </Button>
       </div>
@@ -528,7 +741,7 @@ function AlcoholSafetyResult({
             type="button"
             variant="ghost"
             size="sm"
-            className="absolute right-2 top-2 h-8 gap-1 px-2 text-xs text-muted-foreground"
+            className="absolute right-2 top-2 h-10 gap-1 px-2 text-base text-muted-foreground"
             onClick={onReset}
             data-testid="button-alcohol-edit-answers"
           >
@@ -536,15 +749,15 @@ function AlcoholSafetyResult({
             Reset
           </Button>
           <h2 className="text-lg font-semibold leading-snug text-foreground">{outcome.headline}</h2>
-          <p className="text-sm leading-relaxed text-foreground/85">{outcome.lead}</p>
+          <p className="text-base leading-relaxed text-foreground/85">{outcome.lead}</p>
         </div>
       </div>
       <ol className="space-y-2 px-4 pb-4" aria-label="Safety steps">
         {outcome.bullets.map((b, i) => (
-          <li key={b} className="flex gap-3 text-sm leading-relaxed text-foreground/90">
+          <li key={b} className="flex gap-3 text-base leading-relaxed text-foreground/90">
             <span
               className={cn(
-                "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
+                "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-base font-semibold",
                 isUrgent ? "bg-destructive/15 text-destructive" : "bg-amber-500/15 text-amber-800 dark:text-amber-200",
               )}
               aria-hidden
@@ -591,7 +804,7 @@ function AlcoholPrepResult({
               type="button"
               variant="ghost"
               size="sm"
-              className="float-right -mt-1 h-8 gap-1 px-2 text-xs text-muted-foreground"
+              className="float-right -mt-1 h-10 gap-1 px-2 text-base text-muted-foreground"
               onClick={onReset}
               data-testid="button-alcohol-edit-answers"
             >
@@ -604,7 +817,7 @@ function AlcoholPrepResult({
         {outcome.checklist.length > 0 ? (
           <ul className="space-y-2 border-t border-border/40 px-4 py-3">
             {outcome.checklist.map((item) => (
-              <li key={item} className="flex items-start gap-2.5 text-sm leading-snug text-foreground/90">
+              <li key={item} className="flex items-start gap-2.5 text-base leading-snug text-foreground/90">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary/80" aria-hidden />
                 {item}
               </li>
@@ -615,17 +828,17 @@ function AlcoholPrepResult({
 
       {outcome.tips.length > 0 ? (
         <Collapsible open={tipsOpen} onOpenChange={onTipsOpenChange}>
-          <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 rounded-xl border border-border/60 bg-card/50 px-3.5 py-2.5 text-left text-sm font-medium outline-none hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring">
+          <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 rounded-xl border border-border/60 bg-card/50 px-3.5 py-3 text-left text-base font-medium outline-none hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring">
             <span className="flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-muted-foreground" aria-hidden />
               Tips
-              <span className="text-xs font-normal text-muted-foreground">({outcome.tips.length})</span>
+              <span className="font-normal text-muted-foreground">({outcome.tips.length})</span>
             </span>
             <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" aria-hidden />
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-2 space-y-2">
             {outcome.tips.map((tip) => (
-              <p key={tip} className="rounded-xl border border-border/50 bg-muted/20 px-3 py-2.5 text-sm leading-relaxed text-foreground/90">
+              <p key={tip} className="rounded-xl border border-border/50 bg-muted/20 px-3 py-2.5 text-base leading-relaxed text-foreground/90">
                 {tip}
               </p>
             ))}
@@ -635,7 +848,7 @@ function AlcoholPrepResult({
 
       <AlcoholNightModeCard intensity={intensity} situationLabel={situationLabel} />
 
-      <Button type="button" variant="outline" className="w-full gap-1.5 rounded-xl" onClick={onEdit}>
+      <Button type="button" variant="outline" className="h-11 w-full gap-1.5 rounded-xl text-base" onClick={onEdit}>
         <ArrowLeft className="h-4 w-4" />
         Edit details
       </Button>
@@ -665,13 +878,13 @@ function AlcoholSimpleResult({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 space-y-1">
           <h2 className="text-lg font-semibold leading-snug text-foreground">{title}</h2>
-          {body ? <p className="text-sm leading-relaxed text-foreground/85">{body}</p> : null}
+          {body ? <p className="text-base leading-relaxed text-foreground/85">{body}</p> : null}
         </div>
         <Button
           type="button"
           variant="ghost"
           size="sm"
-          className="h-8 shrink-0 gap-1 px-2 text-xs text-muted-foreground"
+          className="h-10 shrink-0 gap-1 px-2 text-base text-muted-foreground"
           onClick={onReset}
           data-testid="button-alcohol-edit-answers"
         >
@@ -681,16 +894,16 @@ function AlcoholSimpleResult({
       </div>
       {(outcome.kind === "needs_ratios" || outcome.kind === "needs_carbs") && (
         <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" asChild>
+          <Button variant="secondary" className="h-11 text-base" asChild>
             <Link href={linkWithFrom("/adviser?tab=ratios")}>Ratio Adviser</Link>
           </Button>
-          <Button variant="outline" asChild>
+          <Button variant="outline" className="h-11 text-base" asChild>
             <Link href="/settings">Settings</Link>
           </Button>
         </div>
       )}
       {outcome.kind === "feels_ok" ? <AlcoholActionLinks links={outcome.links} /> : null}
-      <Button type="button" variant="outline" className="w-full gap-1.5" onClick={onEdit}>
+      <Button type="button" variant="outline" className="h-11 w-full gap-1.5 text-base" onClick={onEdit}>
         <ArrowLeft className="h-4 w-4" />
         Edit details
       </Button>
@@ -718,7 +931,9 @@ export default function AlcoholScenarioPage() {
   const [bgInput, setBgInput] = useState("");
   const [bgTrend, setBgTrend] = useState<AlcoholTrend>("unknown");
   const [intensity, setIntensity] = useState<AlcoholIntensity>("light");
-  const [carbsInput, setCarbsInput] = useState("");
+  const [foodCarbsInput, setFoodCarbsInput] = useState("");
+  const [drinkCounts, setDrinkCounts] = useState<Record<string, number>>({});
+  const [drinkLookupOpen, setDrinkLookupOpen] = useState(false);
   const [mealType, setMealType] = useState<string>("snack");
   const [redFlags, setRedFlags] = useState<AlcoholRedFlags>({
     vomiting: false,
@@ -777,13 +992,34 @@ export default function AlcoholScenarioPage() {
     return { ok: true, value: n, skipped: false };
   };
 
-  const parseCarbsGrams = (): number | null => {
-    const t = carbsInput.trim().replace(",", ".");
-    if (!t) return null;
-    const n = carbUnit === "cp" ? parseInt(t, 10) * 10 : parseInt(t, 10);
-    if (Number.isNaN(n) || n <= 0) return null;
-    return n;
+  const drinkSummary = summarizeAlcoholDrinks(
+    Object.entries(drinkCounts).map(([id, count]) => ({ id, count })),
+  );
+
+  const applyDrinkCount = (id: string, delta: number) => {
+    setDrinkCounts((prev) => {
+      const nextCount = Math.max(0, (prev[id] ?? 0) + delta);
+      const next = { ...prev };
+      if (nextCount === 0) delete next[id];
+      else next[id] = nextCount;
+      return next;
+    });
   };
+
+  useEffect(() => {
+    if (drinkSummary.suggestedIntensity) setIntensity(drinkSummary.suggestedIntensity);
+  }, [drinkSummary.suggestedIntensity, drinkSummary.drinkCount]);
+
+  const parseFoodCarbsGrams = (): number | null => {
+    const t = foodCarbsInput.trim().replace(",", ".");
+    if (!t) return 0;
+    const n = carbUnit === "cp" ? parseFloat(t) * 10 : parseFloat(t);
+    if (Number.isNaN(n) || n < 0) return null;
+    return Math.round(n);
+  };
+
+  const foodCarbsGrams = parseFoodCarbsGrams() ?? 0;
+  const sessionCarbsGrams = foodCarbsGrams + drinkSummary.carbsGrams;
 
   const buildInput = (): { ok: false; message: string } | { ok: true; payload: Parameters<typeof buildAlcoholSituationOutcome>[0] } => {
     if (situation == null) return { ok: false, message: "Choose a situation." };
@@ -791,10 +1027,15 @@ export default function AlcoholScenarioPage() {
     if (!bg.ok) {
       return { ok: false, message: "Enter a valid blood glucose number, or choose to skip for now." };
     }
-    const carbsG =
-      situation === "meal_with_drinks" || situation === "late_snack" ? parseCarbsGrams() : null;
+    const dosing =
+      situation === "meal_with_drinks" || situation === "late_snack" || situation === "before_out";
+    const foodG = dosing ? parseFoodCarbsGrams() : 0;
+    if (dosing && foodG == null) {
+      return { ok: false, message: "Enter the food carbs as a number, or leave the box empty." };
+    }
+    const carbsG = dosing ? (foodG ?? 0) + drinkSummary.carbsGrams : null;
     if ((situation === "meal_with_drinks" || situation === "late_snack") && (carbsG == null || carbsG <= 0)) {
-      return { ok: false, message: `Enter carbs (${carbUnit === "cp" ? "CP" : "grams"}) for this food or snack.` };
+      return { ok: false, message: "Add the drinks, the food, or both." };
     }
     return {
       ok: true,
@@ -838,7 +1079,9 @@ export default function AlcoholScenarioPage() {
     setBgInput("");
     setBgTrend("unknown");
     setIntensity("light");
-    setCarbsInput("");
+    setFoodCarbsInput("");
+    setDrinkCounts({});
+    setDrinkLookupOpen(false);
     setMealType("snack");
     setRedFlags({
       vomiting: false,
@@ -926,7 +1169,7 @@ export default function AlcoholScenarioPage() {
 
         {phase !== "result" ? (
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            <div className="flex items-center justify-between text-base font-medium text-muted-foreground">
               <span>Step {stepIndex + 1} of 3</span>
             </div>
             <Progress value={progressPct} className="h-1" data-testid="alcohol-question-progress" />
@@ -935,18 +1178,22 @@ export default function AlcoholScenarioPage() {
 
         {isPumpDeliveryMethod(profile?.insulinDeliveryMethod) && phase !== "result" ? (
           <p
-            className="rounded-lg border border-amber-500/25 bg-amber-500/5 dark:bg-amber-950/25 px-3 py-2 text-xs leading-snug text-muted-foreground"
+            className="rounded-lg border border-amber-500/25 bg-amber-500/5 dark:bg-amber-950/25 px-3 py-2 text-base leading-snug text-muted-foreground"
             data-testid="alert-alcohol-pump"
           >
             <span className="font-medium text-foreground">Pump:</span> Check IOB before bolusing — hypos can linger for hours after drinking.
           </p>
         ) : null}
 
+        {phase === "situation" && storage.getScenarioState().alcoholModeActive ? (
+          <AlcoholNightModeCard intensity={intensity} activeOnly />
+        ) : null}
+
         {phase === "situation" ? <AlcoholLastRecommendationCard /> : null}
 
         {phase === "situation" ? (
           <section className="space-y-3">
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+            <h2 className="text-base font-semibold text-foreground">
               What&apos;s going on?
             </h2>
             <div className="grid gap-2">
@@ -967,7 +1214,7 @@ export default function AlcoholScenarioPage() {
                     <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-muted/60">
                       <Icon className={cn("h-5 w-5", c.iconClass)} aria-hidden />
                     </span>
-                    <span className="min-w-0 flex-1 text-sm font-semibold leading-snug text-foreground">{c.title}</span>
+                    <span className="min-w-0 flex-1 text-base font-semibold leading-snug text-foreground">{c.title}</span>
                     <ChevronRight
                       className="h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform group-hover:translate-x-0.5"
                       aria-hidden
@@ -976,6 +1223,17 @@ export default function AlcoholScenarioPage() {
                 );
               })}
             </div>
+            <button
+              type="button"
+              className="flex min-h-12 w-full items-center justify-between rounded-xl px-1 text-left text-base font-medium text-primary"
+              aria-expanded={drinkLookupOpen}
+              data-testid="button-alcohol-drink-lookup"
+              onClick={() => setDrinkLookupOpen((open) => !open)}
+            >
+              Look up a drink
+              <ChevronDown className={cn("h-4 w-4 transition-transform", drinkLookupOpen && "rotate-180")} />
+            </button>
+            {drinkLookupOpen ? <AlcoholDrinkRows interactive={false} counts={{}} /> : null}
           </section>
         ) : null}
 
@@ -992,7 +1250,7 @@ export default function AlcoholScenarioPage() {
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-9 shrink-0 rounded-xl px-2.5 text-xs text-muted-foreground"
+                className="h-10 shrink-0 rounded-xl px-2.5 text-base text-muted-foreground"
                 onClick={backToSituation}
                 data-testid="button-alcohol-change-situation"
               >
@@ -1004,7 +1262,7 @@ export default function AlcoholScenarioPage() {
                 <div className="space-y-3 rounded-2xl border border-destructive/25 bg-destructive/5 p-3.5">
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4 text-destructive shrink-0" aria-hidden />
-                    <p className="text-sm font-medium">Red flags — tick any that apply</p>
+                    <p className="text-base font-medium">Red flags — tick any that apply</p>
                   </div>
                   <div className="grid gap-2.5">
                     {RED_FLAG_ROWS.map(([key, text]) => (
@@ -1014,7 +1272,7 @@ export default function AlcoholScenarioPage() {
                           checked={redFlags[key]}
                           onCheckedChange={() => toggleRedFlag(key)}
                         />
-                        <Label htmlFor={`rf-${key}`} className="text-sm font-normal cursor-pointer leading-snug">
+                        <Label htmlFor={`rf-${key}`} className="text-base font-normal cursor-pointer leading-snug">
                           {text}
                         </Label>
                       </div>
@@ -1023,59 +1281,75 @@ export default function AlcoholScenarioPage() {
                 </div>
               ) : null}
 
-              {(situation === "meal_with_drinks" || situation === "late_snack") && (
+              {situation !== "feels_wrong" ? (
                 <div className="space-y-4">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="alcohol-carbs" className="text-xs font-medium text-muted-foreground">
-                      Carbs
+                  <div className="space-y-2">
+                    <h3 className="text-base font-semibold text-foreground">Drinks</h3>
+                    <AlcoholDrinkRows interactive counts={drinkCounts} onCount={applyDrinkCount} />
+                    {drinkSummary.drinkCount > 0 ? (
+                      <div className="space-y-1">
+                        {DRINK_PATTERN_ORDER.filter((patternId) =>
+                          ALCOHOL_DRINKS.some(
+                            (drink) =>
+                              drink.patternId === patternId && (drinkCounts[drink.id] ?? 0) > 0,
+                          ),
+                        ).map((patternId) => (
+                          <p key={patternId} className="text-base leading-snug text-foreground">
+                            {DRINK_PATTERN_TITLE[patternId]}
+                          </p>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="alcohol-carbs" className="text-base font-semibold text-foreground">
+                      Food
                     </Label>
                     <div className="flex items-stretch gap-2">
                       <Input
                         id="alcohol-carbs"
                         type="text"
-                        inputMode="numeric"
-                        placeholder={carbUnit === "cp" ? "6" : "60"}
-                        value={carbsInput}
-                        onChange={(e) => setCarbsInput(e.target.value)}
+                        inputMode={carbUnit === "cp" ? "decimal" : "numeric"}
+                        placeholder={carbUnit === "cp" ? "4" : "40"}
+                        value={foodCarbsInput}
+                        onChange={(e) => setFoodCarbsInput(e.target.value)}
                         autoComplete="off"
                         className="h-14 flex-1 rounded-xl border-border/60 bg-background text-2xl font-semibold tabular-nums tracking-tight shadow-none"
                         data-testid="input-alcohol-carbs"
                       />
-                      <span className="flex min-w-[4.5rem] items-center justify-center rounded-xl border border-border/60 bg-muted/40 px-3 text-sm font-semibold text-muted-foreground">
+                      <span className="flex min-w-[4.5rem] items-center justify-center rounded-xl border border-border/60 bg-muted/40 px-3 text-base font-semibold text-muted-foreground">
                         {carbUnit === "cp" ? "CP" : "g"}
                       </span>
                     </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-muted-foreground">Meal period</Label>
-                    <Select value={mealType} onValueChange={setMealType}>
-                      <SelectTrigger className="h-12 rounded-xl" data-testid="select-alcohol-meal-type">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="breakfast">Breakfast</SelectItem>
-                        <SelectItem value="lunch">Lunch</SelectItem>
-                        <SelectItem value="dinner">Dinner</SelectItem>
-                        <SelectItem value="snack">Snack</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {sessionCarbsGrams > 0 || foodCarbsInput.trim() ? (
+                    <p className="text-base font-semibold text-foreground" data-testid="alcohol-session-total">
+                      {sessionCarbsGrams}g to inject for
+                      <span className="mt-1 block font-normal text-muted-foreground">
+                        {drinkSummary.carbsGrams}g drinks · {foodCarbsGrams}g food
+                      </span>
+                    </p>
+                  ) : null}
+                  {situation !== "late_snack" ? (
+                    <div className="space-y-2">
+                      <Label className="text-base font-semibold text-foreground">Which meal</Label>
+                      <Select value={mealType} onValueChange={setMealType}>
+                        <SelectTrigger className="h-12 rounded-xl text-base" data-testid="select-alcohol-meal-type">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="breakfast">Breakfast</SelectItem>
+                          <SelectItem value="lunch">Lunch</SelectItem>
+                          <SelectItem value="dinner">Dinner</SelectItem>
+                          <SelectItem value="snack">Snack</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : null}
                 </div>
-              )}
+              ) : null}
 
-              {situation === "before_out" ? (
-                <ChoiceGroup
-                  name="intensity-before"
-                  label="Expected drinking"
-                  value={intensity}
-                  onChange={setIntensity}
-                  options={[
-                    { value: "light", title: "Light — one drink with food" },
-                    { value: "moderate", title: "Moderate social drinking" },
-                    { value: "long_or_heavy", title: "Longer or heavier night" },
-                  ]}
-                />
-              ) : situation !== "feels_wrong" ? (
+              {situation !== "feels_wrong" ? (
                 <ChoiceGroup
                   name="intensity-meal"
                   label="Expected drinking"
@@ -1087,7 +1361,13 @@ export default function AlcoholScenarioPage() {
                     { value: "long_or_heavy", title: "Longer or heavier night" },
                   ]}
                 />
-              ) : (
+              ) : null}
+              {situation !== "feels_wrong" && drinkSummary.drinkCount > 0 ? (
+                <p className="text-base leading-snug text-muted-foreground">
+                  Suggested from {drinkSummary.drinkCount} {drinkSummary.drinkCount === 1 ? "drink" : "drinks"}. You can change this.
+                </p>
+              ) : null}
+              {situation === "before_out" ? null : situation !== "feels_wrong" ? null : (
                 <ChoiceGroup
                   name="intensity-feels"
                   label="Drinking level"
@@ -1103,7 +1383,7 @@ export default function AlcoholScenarioPage() {
 
               <div className="space-y-2.5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-xs font-medium text-muted-foreground">Glucose (optional)</span>
+                  <span className="text-base font-semibold text-foreground">Glucose (optional)</span>
                   <div className="flex items-center gap-2">
                     <Checkbox
                       id="bg-skip"
@@ -1114,7 +1394,7 @@ export default function AlcoholScenarioPage() {
                         if (on) setBgTrend("unknown");
                       }}
                     />
-                    <Label htmlFor="bg-skip" className="text-xs font-normal cursor-pointer text-muted-foreground">
+                    <Label htmlFor="bg-skip" className="text-base font-normal cursor-pointer text-muted-foreground">
                       Skip
                     </Label>
                   </div>
@@ -1136,7 +1416,7 @@ export default function AlcoholScenarioPage() {
                         className="h-14 flex-1 rounded-xl border-border/60 bg-background text-2xl font-semibold tabular-nums tracking-tight shadow-none"
                         data-testid="input-alcohol-bg"
                       />
-                      <span className="flex min-w-[4.5rem] items-center justify-center rounded-xl border border-border/60 bg-muted/40 px-3 text-sm font-semibold text-muted-foreground">
+                      <span className="flex min-w-[4.5rem] items-center justify-center rounded-xl border border-border/60 bg-muted/40 px-3 text-base font-semibold text-muted-foreground">
                         {bgUnits}
                       </span>
                     </div>
@@ -1157,19 +1437,19 @@ export default function AlcoholScenarioPage() {
                     />
                     <BgTrendThreeButtons
                       label="Trend"
-                      labelClassName="text-xs font-medium text-muted-foreground"
+                      labelClassName="text-base font-semibold text-foreground"
                       value={bgTrend}
                       onChange={(v) => setBgTrend(v as AlcoholTrend)}
                       unsetValue="unknown"
                       flatLabel="Stable"
-                      buttonClassName="h-11 rounded-xl"
+                      buttonClassName="h-11 rounded-xl text-base"
                     />
                   </div>
                 ) : null}
               </div>
 
               {carbsError ? (
-                <p className="text-sm text-destructive" role="alert">
+                <p className="text-base text-destructive" role="alert">
                   {carbsError}
                 </p>
               ) : null}
@@ -1185,6 +1465,8 @@ export default function AlcoholScenarioPage() {
                 bgUnits={bgUnits}
                 mealType={mealType}
                 situationLabel={activeSituation?.title ?? null}
+                drinkSummary={drinkSummary}
+                foodCarbsGrams={foodCarbsGrams}
                 onEdit={backToInputs}
                 onReset={resetFlow}
               />
@@ -1206,7 +1488,7 @@ export default function AlcoholScenarioPage() {
           </div>
         ) : null}
 
-        <Disclaimer className="text-center text-[11px] leading-relaxed opacity-80" />
+        <Disclaimer className="text-center text-base leading-relaxed" />
       </PageShell>
 
       {showSticky ? (
@@ -1218,7 +1500,7 @@ export default function AlcoholScenarioPage() {
             <Button
               type="button"
               variant="outline"
-              className="h-12 shrink-0 gap-1.5 rounded-xl px-4"
+              className="h-12 shrink-0 gap-1.5 rounded-xl px-4 text-base"
               onClick={backToSituation}
               data-testid="button-alcohol-back-step"
             >
@@ -1227,7 +1509,7 @@ export default function AlcoholScenarioPage() {
             </Button>
             <Button
               type="button"
-              className="h-12 min-w-0 flex-1 gap-1.5 rounded-xl text-sm font-semibold"
+              className="h-12 min-w-0 flex-1 gap-1.5 rounded-xl text-base font-semibold"
               onClick={runGuidance}
               data-testid="button-alcohol-show-plan"
             >

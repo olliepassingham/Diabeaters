@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import { LayoutGrid, AlertCircle, Dumbbell, Minus, TrendingDown, TrendingUp } from "lucide-react";
+import { LayoutGrid, AlertCircle, Dumbbell, Minus, Moon, TrendingDown, TrendingUp } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import {
@@ -210,7 +210,7 @@ export function HomeCommandHero({
           </div>
         </div>
 
-        {(scenarioState.sickDayActive || Boolean(activeExercise) || pumpFailureActive) && (
+        {(scenarioState.sickDayActive || Boolean(activeExercise) || pumpFailureActive || scenarioState.alcoholModeActive) && (
           <div
             className="mt-3 flex flex-wrap items-center gap-2 px-1"
             data-testid="home-active-scenario-chips"
@@ -239,10 +239,18 @@ export function HomeCommandHero({
                 </Link>
               </Button>
             ) : null}
+            {scenarioState.alcoholModeActive ? (
+              <Button asChild variant="secondary" size="sm" className="h-8 rounded-full px-3 text-xs font-semibold shadow-none">
+                <Link href="/scenarios/alcohol" data-testid="chip-active-alcohol">
+                  <Moon className="mr-1.5 h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
+                  Night mode
+                </Link>
+              </Button>
+            ) : null}
           </div>
         )}
 
-        <div className={cn("mt-3.5", !(scenarioState.sickDayActive || activeExercise || pumpFailureActive) && "mt-4")}>
+        <div className={cn("mt-3.5", !(scenarioState.sickDayActive || activeExercise || pumpFailureActive || scenarioState.alcoholModeActive) && "mt-4")}>
           <HomeActionDock
             isUrgent={isUrgent}
             showCoach={showCoach}
