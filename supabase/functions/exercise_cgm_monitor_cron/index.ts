@@ -11,6 +11,8 @@ import {
   buildExerciseCgmAlertCopy,
   carbsGramsForExerciseAim,
   evaluateExerciseCgmAlert,
+  exerciseAlertCarbText,
+  exerciseCarbFavoriteFromPrefs,
   isExerciseCgmReadingStale,
   parseExerciseAlertFuel,
   mapDexcomShareTrend,
@@ -113,13 +115,33 @@ async function processMonitorRow(
   }
 
   const fuel = parseExerciseAlertFuel(row.carb_line);
+  let carbsPerServing = fuel?.carbsPerServing;
+  let carbLabel = fuel?.carbLabel;
+  if (fuel && !carbLabel) {
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("carb_source_prefs")
+      .eq("id", row.user_id)
+      .maybeSingle();
+    const saved = exerciseCarbFavoriteFromPrefs(
+      (profile as { carb_source_prefs?: unknown } | null)?.carb_source_prefs,
+    );
+    if (saved) {
+      carbsPerServing = saved.carbsPerServing;
+      carbLabel = saved.carbLabel;
+    }
+  }
   const liveCarbLine = fuel
-    ? `${carbsGramsForExerciseAim({
-        bg,
-        aim: fuel.aim,
-        weightKg: fuel.kg,
-        bgUnits: row.bg_units,
-      })}g`
+    ? exerciseAlertCarbText({
+        grams: carbsGramsForExerciseAim({
+          bg,
+          aim: fuel.aim,
+          weightKg: fuel.kg,
+          bgUnits: row.bg_units,
+        }),
+        carbsPerServing,
+        carbLabel,
+      })
     : row.carb_line;
 
   const evaluation = evaluateExerciseCgmAlert({

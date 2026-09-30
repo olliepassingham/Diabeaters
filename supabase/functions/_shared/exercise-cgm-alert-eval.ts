@@ -106,13 +106,6 @@ export function shouldSkipExerciseCgmAlertDueToCooldown(input: {
   return true;
 }
 
-function trendArrow(trend: ExerciseBgTrend | null | undefined): string {
-  if (trend === "rising") return "↑";
-  if (trend === "falling") return "↓";
-  if (trend === "flat") return "→";
-  return "";
-}
-
 function formatBg(value: number, bgUnits: "mmol/L" | "mg/dL"): string {
   if (bgUnits === "mg/dL") return String(Math.round(value));
   return (Math.round(value * 10) / 10).toFixed(1);
@@ -136,23 +129,85 @@ export function carbsGramsForExerciseAim(input: {
 
 export function parseExerciseAlertFuel(
   line: string | null | undefined,
-): { aim: number; kg: number } | null {
+): { aim: number; kg: number; carbsPerServing?: number; carbLabel?: string } | null {
   if (!line) return null;
-  const match = /^aim=([0-9.]+);kg=([0-9.]+)$/.exec(line.trim());
+  const [token, ...nameParts] = line.split("|");
+  const match = /^aim=([0-9.]+);kg=([0-9.]+)(?:;per=([0-9.]+))?$/.exec((token ?? "").trim());
   if (!match) return null;
   const aim = Number(match[1]);
   const kg = Number(match[2]);
   if (!(aim > 0) || !(kg > 0)) return null;
-  return { aim, kg };
+  const per = match[3] != null ? Number(match[3]) : undefined;
+  const carbLabel = nameParts.join("|").trim();
+  return {
+    aim,
+    kg,
+    ...(per != null && per > 0 ? { carbsPerServing: per } : {}),
+    ...(carbLabel ? { carbLabel } : {}),
+  };
 }
 
-function shortCarbLine(line: string | undefined): string {
-  if (!line) return "Carbs";
-  const trimmed = line.trim();
-  if (/^aim=/.test(trimmed)) return "Carbs";
-  const one = trimmed.replace(/^about\s+/i, "").split("\n")[0]?.trim() ?? "";
-  if (!one) return "Carbs";
-  return one.length > 22 ? `${one.slice(0, 20)}…` : one;
+function formatServingCount(count: number): string {
+  const halves = Math.round(count * 2) / 2;
+  const whole = Math.floor(halves);
+  const frac = halves - whole;
+  if (frac === 0.5) return whole === 0 ? "½" : `${whole}½`;
+  return String(whole);
+}
+
+/** Serving phrase for a saved carb favourite, e.g. "½ Running gel". Null when a whole serving dwarfs the grams. */
+export function formatExerciseCarbServing(
+  grams: number,
+  carbsPerServing: number,
+  label: string,
+): string | null {
+  const name = label.trim();
+  if (!(grams > 0) || !(carbsPerServing > 0) || !name) return null;
+  const halves = Math.round((grams / carbsPerServing) * 2) / 2;
+  const count = halves < 0.5 ? 0.5 : halves;
+  if (count * carbsPerServing > grams * 1.5) return null;
+  return `${formatServingCount(count)} ${name}`;
+}
+
+/** Notification carb line. Never returns the internal aim/weight token. */
+export function exerciseAlertCarbText(input: {
+  grams?: number | null;
+  carbLine?: string | null;
+  carbsPerServing?: number;
+  carbLabel?: string;
+}): string | null {
+  const raw = input.carbLine?.trim() ?? "";
+  if (raw && !raw.startsWith("aim=")) {
+    return raw.replace(/^about\s+/i, "");
+  }
+  const grams = input.grams != null && input.grams > 0 ? Math.round(input.grams) : null;
+  if (grams == null) return null;
+  const serving =
+    input.carbsPerServing != null && input.carbLabel
+      ? formatExerciseCarbServing(grams, input.carbsPerServing, input.carbLabel)
+      : null;
+  return serving ? `${grams}g · ${serving}` : `${grams}g`;
+}
+
+/** Saved exercise carb favourite from the profile, when the alert token has no label yet. */
+export function exerciseCarbFavoriteFromPrefs(
+  raw: unknown,
+): { carbsPerServing: number; carbLabel: string } | null {
+  if (!raw || typeof raw !== "object") return null;
+  const prefs = raw as { favorites?: unknown; defaultByScenario?: unknown };
+  const favorites = Array.isArray(prefs.favorites) ? prefs.favorites : [];
+  const defaults =
+    prefs.defaultByScenario && typeof prefs.defaultByScenario === "object"
+      ? (prefs.defaultByScenario as Record<string, unknown>)
+      : {};
+  const id = defaults.exercise_during ?? defaults.exercise_on_hand;
+  if (typeof id !== "string") return null;
+  const fav = favorites.find((item) => {
+    return !!item && typeof item === "object" && (item as { id?: unknown }).id === id;
+  }) as { label?: unknown; carbsPerServing?: unknown } | undefined;
+  if (!fav || typeof fav.label !== "string" || !fav.label.trim()) return null;
+  if (typeof fav.carbsPerServing !== "number" || !(fav.carbsPerServing > 0)) return null;
+  return { carbsPerServing: fav.carbsPerServing, carbLabel: fav.label.trim() };
 }
 
 export function buildExerciseCgmAlertCopy(input: {
@@ -163,10 +218,11 @@ export function buildExerciseCgmAlertCopy(input: {
   exerciseName?: string;
 }): { title: string; body: string } {
   const bgLabel = formatBg(input.bg, input.bgUnits);
-  const arrow = trendArrow(input.trend);
+  const name = input.exerciseName?.trim() || "Exercise";
+  const carbs = exerciseAlertCarbText({ carbLine: input.evaluation.carbLine });
   return {
-    title: `${bgLabel}${arrow ? ` ${arrow}` : ""}`,
-    body: shortCarbLine(input.evaluation.carbLine),
+    title: `${bgLabel} · ${name}`,
+    body: carbs ?? "Fast carbs",
   };
 }
 

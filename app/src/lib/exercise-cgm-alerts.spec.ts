@@ -140,7 +140,7 @@ describe("exercise CGM alert cooldown", () => {
 });
 
 describe("buildExerciseCgmAlertCopy", () => {
-  it("keeps the watch alert to the reading and grams", () => {
+  it("shows glucose, the workout, and the carb amount", () => {
     const copy = buildExerciseCgmAlertCopy({
       bg: 5.4,
       bgUnits: "mmol/L",
@@ -153,7 +153,26 @@ describe("buildExerciseCgmAlertCopy", () => {
         carbLine: "about ½ Running gel",
       },
     });
-    expect(copy.title).toBe("5.4 ↓");
-    expect(copy.body).toBe("11g");
+    expect(copy.title).toBe("5.4 · Tennis");
+    expect(copy.body).toBe("11g · ½ Running gel");
+    expect(copy.body).not.toMatch(/kg=/);
+    expect(copy.body).not.toMatch(/guide/i);
+  });
+
+  it("shows grams only when no carb type is saved", () => {
+    const copy = buildExerciseCgmAlertCopy({
+      bg: 5.2,
+      bgUnits: "mmol/L",
+      trend: "flat",
+      exerciseName: "Gym",
+      evaluation: {
+        shouldAlert: true,
+        reason: "below_threshold",
+        carbsGrams: 10,
+        carbLine: "about 10g fast carbs",
+      },
+    });
+    expect(copy.title).toBe("5.2 · Gym");
+    expect(copy.body).toBe("10g");
   });
 });

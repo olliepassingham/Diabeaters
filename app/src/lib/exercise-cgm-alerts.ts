@@ -82,11 +82,12 @@ function parsePlanNumber(value: string | number | null | undefined): number | nu
   return Number.isFinite(n) ? n : null;
 }
 
-function trendArrow(trend: ExerciseBgTrend | null | undefined): string {
-  if (trend === "rising") return "↑";
-  if (trend === "falling") return "↓";
-  if (trend === "flat") return "→";
-  return "";
+function carbNotificationLabel(line: string | undefined): string | null {
+  if (!line) return null;
+  const trimmed = line.trim().replace(/^about\s+/i, "");
+  if (!trimmed || /^aim=/.test(trimmed)) return null;
+  if (/^\d+(\.\d+)?\s*g\b/i.test(trimmed)) return null;
+  return trimmed;
 }
 
 function exercisePlanForSession(session: ActiveExerciseSession, bgUnits: string) {
@@ -197,11 +198,17 @@ export function buildExerciseCgmAlertCopy(input: {
   exerciseName?: string;
 }): { title: string; body: string } {
   const bgLabel = formatTargetBgInput(input.bg, input.bgUnits);
-  const arrow = trendArrow(input.trend);
+  const name = input.exerciseName?.trim() || "Exercise";
   const grams = input.evaluation.carbsGrams;
-  const title = `${bgLabel}${arrow ? ` ${arrow}` : ""}`;
-  const body = grams != null ? `${grams}g` : "Carbs";
-  return { title, body };
+  const label = carbNotificationLabel(input.evaluation.carbLine);
+  const rounded = grams != null && grams > 0 ? Math.round(grams) : null;
+  const body =
+    rounded != null && label
+      ? `${rounded}g · ${label}`
+      : rounded != null
+        ? `${rounded}g`
+        : (label ?? "Fast carbs");
+  return { title: `${bgLabel} · ${name}`, body };
 }
 
 function notificationsAllowed(settings: NotificationSettings): boolean {

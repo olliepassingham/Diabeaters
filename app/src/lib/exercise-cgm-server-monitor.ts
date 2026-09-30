@@ -5,6 +5,8 @@ import {
   resolveExerciseCgmAlertThreshold,
 } from "@/lib/exercise-cgm-alert-thresholds";
 import { getBodyWeightKgFromProfile } from "@/lib/body-weight";
+import { resolveCarbSource } from "@/lib/carb-source-preferences";
+import type { ExerciseAlertFuelCarb } from "@/lib/exercise-cgm-alert-thresholds";
 import { hypoRangeThreshold } from "@/lib/exercise-hypo-auto";
 import { bgForPlannerFromActiveSession } from "@/lib/exercise-planner-href";
 import { hasDexcomShareCredentials, readCgmPreferences } from "@/lib/cgm/preferences";
@@ -16,6 +18,22 @@ const REGISTER_REFRESH_MS = 15 * 60_000;
 
 let lastRegistered: { sessionId: string; at: number; fingerprint: string } | null = null;
 let unregisterInFlight: string | null = null;
+
+function savedExerciseCarb(
+  profile: Parameters<typeof resolveCarbSource>[0],
+): ExerciseAlertFuelCarb | null {
+  const resolved =
+    resolveCarbSource(profile, "exercise_during") ?? resolveCarbSource(profile, "exercise_on_hand");
+  if (!resolved) return null;
+  if (resolved.kind === "favorite") {
+    return { carbsPerServing: resolved.favorite.carbsPerServing, label: resolved.favorite.label };
+  }
+  if (resolved.treatment === "glucose_tablets") return { carbsPerServing: 4, label: "glucose tablets" };
+  if (resolved.treatment === "jelly_babies") return { carbsPerServing: 5, label: "jelly babies" };
+  if (resolved.treatment === "sweets") return { carbsPerServing: 5, label: "sweets" };
+  if (resolved.treatment === "glucose_gel") return { carbsPerServing: 15, label: "glucose gel" };
+  return null;
+}
 
 function parsePlanNumber(value: string | number | null | undefined): number | null {
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
@@ -57,13 +75,13 @@ export async function registerExerciseCgmServerMonitor(session: ActiveExerciseSe
   const threshold = resolveExerciseCgmAlertThreshold(notif, bgUnits);
   const aim = resolveExerciseCgmAlertAim(notif, bgUnits);
   const weightKg = getBodyWeightKgFromProfile(profile) ?? 70;
-  const fingerprint = `${threshold}|${aim}|${notif.exerciseCgmAlertTrendAware !== false}|${weightKg}`;
+  const carbLine = encodeExerciseAlertFuel(aim, weightKg, savedExerciseCarb(profile));
+  const fingerprint = `${threshold}|${aim}|${notif.exerciseCgmAlertTrendAware !== false}|${carbLine}`;
   const clinicalHypoThreshold = hypoRangeThreshold(userSettings, bgUnits);
 
   if (!shouldRegisterAgain(session.id, fingerprint)) return;
 
   let carbsIfLow: number | undefined;
-  const carbLine = encodeExerciseAlertFuel(aim, weightKg);
   try {
     const bg = bgForPlannerFromActiveSession(session) ?? threshold;
     const planCtx: ExercisePlanContext = {

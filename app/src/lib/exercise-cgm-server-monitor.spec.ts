@@ -4,6 +4,8 @@ import {
   buildExerciseCgmAlertCopy,
   carbsGramsForExerciseAim,
   evaluateExerciseCgmAlert,
+  exerciseAlertCarbText,
+  exerciseCarbFavoriteFromPrefs,
   parseExerciseAlertFuel,
   shouldSkipExerciseCgmAlertDueToCooldown,
 } from "../../../supabase/functions/_shared/exercise-cgm-alert-eval.ts";
@@ -38,16 +40,17 @@ describe("evaluateExerciseCgmAlert (server)", () => {
 });
 
 describe("buildExerciseCgmAlertCopy (server)", () => {
-  it("uses a short reading and carb line", () => {
+  it("shows glucose, the workout, and the carb amount", () => {
     const copy = buildExerciseCgmAlertCopy({
       bg: 5.2,
       bgUnits: "mmol/L",
       trend: "falling",
-      evaluation: { shouldAlert: true, reason: "below_threshold", carbLine: "15g" },
-      exerciseName: "Tennis",
+      evaluation: { shouldAlert: true, reason: "below_threshold", carbLine: "10g · ½ Running gel" },
+      exerciseName: "Gym",
     });
-    expect(copy.title).toBe("5.2 ↓");
-    expect(copy.body).toBe("15g");
+    expect(copy.title).toBe("5.2 · Gym");
+    expect(copy.body).toBe("10g · ½ Running gel");
+    expect(`${copy.title} ${copy.body}`).not.toMatch(/kg=|guide/i);
   });
 });
 
@@ -57,5 +60,28 @@ describe("exercise alert fuel", () => {
     expect(
       carbsGramsForExerciseAim({ bg: 5.2, aim: 7, weightKg: 70, bgUnits: "mmol/L" }),
     ).toBe(8);
+  });
+
+  it("keeps weight inside the token and shows a saved carb type", () => {
+    expect(parseExerciseAlertFuel("aim=7;kg=95;per=20|Running gel")).toEqual({
+      aim: 7,
+      kg: 95,
+      carbsPerServing: 20,
+      carbLabel: "Running gel",
+    });
+    expect(
+      exerciseAlertCarbText({ grams: 10, carbsPerServing: 20, carbLabel: "Running gel" }),
+    ).toBe("10g · ½ Running gel");
+    expect(exerciseAlertCarbText({ carbLine: "aim=7;kg=95" })).toBeNull();
+  });
+
+  it("reads a saved exercise carb favourite from the profile", () => {
+    expect(
+      exerciseCarbFavoriteFromPrefs({
+        favorites: [{ id: "g1", label: "Running gel", carbsPerServing: 20 }],
+        defaultByScenario: { exercise_during: "g1" },
+      }),
+    ).toEqual({ carbsPerServing: 20, carbLabel: "Running gel" });
+    expect(exerciseCarbFavoriteFromPrefs({ favorites: [], defaultByScenario: {} })).toBeNull();
   });
 });

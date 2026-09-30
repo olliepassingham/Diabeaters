@@ -48,10 +48,27 @@ export function resolveExerciseCgmAlertAim(
   return roundAim(threshold + bump, bgUnits);
 }
 
-/** Compact token stored for background alerts so grams are calculated from the live reading. */
-export function encodeExerciseAlertFuel(aim: number, weightKg: number): string {
+export type ExerciseAlertFuelCarb = {
+  carbsPerServing: number;
+  label: string;
+};
+
+/**
+ * Compact token stored for background alerts so grams are calculated from the live reading.
+ * Weight stays in this token for the calculation. It is not shown on the notification.
+ * An optional carb favourite is `per` plus a label after `|`.
+ */
+export function encodeExerciseAlertFuel(
+  aim: number,
+  weightKg: number,
+  carb?: ExerciseAlertFuelCarb | null,
+): string {
   const kg = Math.round(Math.max(weightKg, 20) * 10) / 10;
-  return `aim=${aim};kg=${kg}`;
+  const base = `aim=${aim};kg=${kg}`;
+  if (!carb || !(carb.carbsPerServing > 0) || !carb.label.trim()) return base;
+  const per = Math.round(carb.carbsPerServing * 10) / 10;
+  const name = carb.label.trim().replace(/[|;]/g, " ");
+  return `${base};per=${per}|${name}`;
 }
 
 export function formatExerciseCgmAlertThresholdOption(value: number, bgUnits: "mmol/L" | "mg/dL"): string {
