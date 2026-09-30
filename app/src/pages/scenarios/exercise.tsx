@@ -24,13 +24,13 @@ export default function ScenarioExercisePage() {
   useEffect(() => {
     const onSessionChange = () => setTick((n) => n + 1);
     window.addEventListener(DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT, onSessionChange);
-    return () => window.removeEventListener(DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT, onSessionChange);
-  }, []);
-
-  useEffect(() => {
-    if (!storage.getActiveExercise()) return;
-    const t = window.setInterval(() => setTick((n) => n + 1), 15_000);
-    return () => window.clearInterval(t);
+    // Child effects may have cleared a leftover session before this listener existed.
+    onSessionChange();
+    const t = window.setInterval(onSessionChange, 15_000);
+    return () => {
+      window.removeEventListener(DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT, onSessionChange);
+      window.clearInterval(t);
+    };
   }, []);
 
   const headerActionBtn =

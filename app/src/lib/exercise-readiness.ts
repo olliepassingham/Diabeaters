@@ -7,6 +7,7 @@ import { formatCarbsForScenario, formatFastCarbsForScenario } from "@/lib/carb-s
 import type { ExercisePlanResult } from "@/lib/exercise-plan";
 import { exerciseApproachLowCeiling } from "@/lib/exercise-hypo-auto";
 import {
+  defaultHypoThreshold,
   exerciseApproachLowCeilingForPhase,
   exerciseHighThreshold,
   exerciseIdealStartMinimum as centralExerciseIdealStartMinimum,
@@ -124,6 +125,41 @@ export interface ExerciseReadinessInput {
   competitive?: boolean;
   /** Active only: subjective symptom severity logged mid-session — can escalate the verdict. */
   symptomSeverity?: ExerciseSymptomSeverity | null;
+  /**
+   * Clinical hypo line from settings. Under the exercise floor but at or above this
+   * is an alert/top-up, not a “BG is low” stop. Defaults to 3.9 mmol/L (70 mg/dL).
+   */
+  hypoThreshold?: number | null;
+}
+
+function isClinicalHypo(bg: number, input: ExerciseReadinessInput): boolean {
+  const custom = input.hypoThreshold;
+  const line =
+    custom != null && Number.isFinite(custom) && custom > 0 ? custom : defaultHypoThreshold(input.bgUnits);
+  return bg < line;
+}
+
+/** Under the exercise floor, still above a hypo. Amber top-up, not the red low stop. */
+function exerciseAlertBufferVerdict(phase: "pre" | "active" | "recovery"): ExerciseReadinessResult {
+  if (phase === "active") {
+    return {
+      verdict: "caution",
+      title: "Under your exercise alert",
+      detail: "A few fast carbs would bring you up. You'd get a notification under this line.",
+    };
+  }
+  if (phase === "recovery") {
+    return {
+      verdict: "caution",
+      title: "Under your exercise alert",
+      detail: "A few fast carbs would bring you up. Dips are common after activity.",
+    };
+  }
+  return {
+    verdict: "caution",
+    title: "Under your exercise alert",
+    detail: "A few fast carbs would bring you up before you start.",
+  };
 }
 
 function baseVerdict(input: ExerciseReadinessInput): ExerciseReadinessResult {
@@ -159,6 +195,9 @@ function baseVerdict(input: ExerciseReadinessInput): ExerciseReadinessResult {
   const highThreshold = exerciseHighThreshold(bgUnits);
   if (bg < lowThreshold) {
     const phase = input.phase ?? "pre";
+    if (!isClinicalHypo(bg, input)) {
+      return exerciseAlertBufferVerdict(phase);
+    }
     if (phase === "active") {
       return {
         verdict: "not_recommended",
@@ -387,6 +426,9 @@ export function getRecoveryReadinessVerdict(input: ExerciseReadinessInput): Exer
   const approachLowCeiling = exerciseApproachLowCeilingForPhase(lowThreshold, bgUnits, "recovery");
 
   if (bg < lowThreshold) {
+    if (!isClinicalHypo(bg, input)) {
+      return exerciseAlertBufferVerdict("recovery");
+    }
     return {
       verdict: "not_recommended",
       title: "BG is low after exercise",

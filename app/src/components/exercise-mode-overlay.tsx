@@ -286,7 +286,7 @@ function ExerciseModeContent({
               <div className="flex items-center justify-center gap-1.5 text-amber-200">
                 <Droplet className="h-4 w-4" aria-hidden />
                 <p className="text-sm font-semibold">
-                  {hypoSuggestion.clinicalHypo ? "Reading looks low" : "Treat now"}
+                  {hypoSuggestion.clinicalHypo ? "Reading looks low" : "Top up"}
                 </p>
               </div>
               <p className="mt-2 text-4xl font-bold tabular-nums tracking-tight text-white">

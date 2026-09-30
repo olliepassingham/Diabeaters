@@ -77,7 +77,12 @@ import {
 } from "@/lib/exercise-closed-loop";
 import { listRecentRepeatableExerciseSessions, type RecentRepeatableExerciseSession } from "@/lib/exercise-session-repeat";
 import { normalizePlannerExerciseTypeQueryParam } from "@/lib/exercise-planner-href";
-import { applyCoachDefaultsFromLastExercise, startGuidedExerciseSession, type GuidedExerciseStartParams } from "@/lib/exercise-guided-start";
+import {
+  applyCoachDefaultsFromLastExercise,
+  releaseStaleActiveExerciseSession,
+  startGuidedExerciseSession,
+  type GuidedExerciseStartParams,
+} from "@/lib/exercise-guided-start";
 import { ExercisePumpTipsCard } from "@/components/scenarios/ExercisePumpTipsCard";
 import {
   ExerciseRoutineAdjustSheet,
@@ -87,6 +92,7 @@ import {
 import { ExerciseAlertLevelsLink } from "@/components/exercise-alert-level-control";
 import {
   storage,
+  DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT,
   DIABEATER_EXERCISE_OUTCOMES_CHANGED_EVENT,
   DIABEATER_PROFILE_CHANGED_EVENT,
   DIABEATER_SETTINGS_CHANGED_EVENT,
@@ -116,7 +122,7 @@ import {
 import { reconcileExerciseFuelLines } from "@/lib/exercise-recommendation";
 import { useExerciseSessionActions } from "@/hooks/use-exercise-session-actions";
 import { requestOpenExerciseMode } from "@/lib/exercise-mode-deep-link";
-import { computeExerciseHypoSuggestion, resolveExerciseBgForHypo } from "@/lib/exercise-hypo-auto";
+import { computeExerciseHypoSuggestion, hypoRangeThreshold, resolveExerciseBgForHypo } from "@/lib/exercise-hypo-auto";
 import { format } from "date-fns";
 import {
   ExerciseFuelPlanSummary,
@@ -490,6 +496,16 @@ export function ExerciseGuidedCoach() {
     setBgInput(typeof v === "number" && Number.isFinite(v) ? formatTargetBgInput(v, bgUnits) : "");
   }, [activeSession]);
 
+  // Keep this screen on the same session storage uses. A write the coach missed used to
+  // leave the start screen up while Restart was blocked by a hidden session.
+  useEffect(() => {
+    const sync = () => setActiveSession(storage.getActiveExercise());
+    window.addEventListener(DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT, sync);
+    releaseStaleActiveExerciseSession();
+    sync();
+    return () => window.removeEventListener(DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT, sync);
+  }, []);
+
   // ----- Deep-link: /scenarios/exercise?phase=pre|active|recovery&type=...&duration=...&intensity=... -----
   useEffect(() => {
     const q = search.startsWith("?") ? search.slice(1) : search;
@@ -548,9 +564,10 @@ export function ExerciseGuidedCoach() {
           variant: "destructive",
         });
       } else if (result.reason === "active_session") {
+        setActiveSession(result.session);
         toast({
           title: "Exercise already active",
-          description: "Finish your current session first.",
+          description: `Finish ${result.session.exerciseName} before starting another.`,
           variant: "destructive",
         });
       }
@@ -635,8 +652,9 @@ export function ExerciseGuidedCoach() {
       betaBlockerToday: activeSession.preBetaBlockerToday,
       competitive: activeSession.preCompetitive,
       symptomSeverity: activeSymptomSeverity,
+      hypoThreshold: hypoRangeThreshold(settings, bgUnits),
     });
-  }, [activeSession, bgInput, bgUnits, exercisePlan, historyBias, trendForReadiness]);
+  }, [activeSession, bgInput, bgUnits, exercisePlan, historyBias, settings, trendForReadiness]);
 
   const hypoCoachSuggestion = useMemo(() => {
     if (!activeSession) return null;
@@ -753,9 +771,10 @@ export function ExerciseGuidedCoach() {
     const result = startGuidedExerciseSession(params);
     if (!result.ok) {
       if (result.reason === "active_session") {
+        setActiveSession(result.session);
         toast({
           title: "Exercise already active",
-          description: "Finish your current session first.",
+          description: `Finish ${result.session.exerciseName} before starting another.`,
           variant: "destructive",
         });
       } else if (result.reason === "severe_sick_day") {

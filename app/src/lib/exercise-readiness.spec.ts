@@ -185,11 +185,11 @@ describe("getExerciseReadinessVerdict deeper context modifiers", () => {
       intensity: "moderate",
       minutesUntilStart: 0,
       bgUnits: "mmol/L",
-      currentBg: 4,
+      currentBg: 3.5,
     });
     const r = getExerciseReadinessVerdict({
       exercisePlanResult: lowPlan,
-      currentBg: 4,
+      currentBg: 3.5,
       bgUnits: "mmol/L",
       exerciseType: "cardio",
       intensity: "moderate",
@@ -249,11 +249,11 @@ describe("getExerciseReadinessVerdict rapid insulin (pre strip)", () => {
       intensity: "moderate",
       minutesUntilStart: 0,
       bgUnits: "mmol/L",
-      currentBg: 4,
+      currentBg: 3.5,
     });
     const r = getExerciseReadinessVerdict({
       exercisePlanResult: lowPlan,
-      currentBg: 4,
+      currentBg: 3.5,
       bgUnits: "mmol/L",
       exerciseType: "cardio",
       intensity: "moderate",
@@ -261,6 +261,54 @@ describe("getExerciseReadinessVerdict rapid insulin (pre strip)", () => {
       preRapidInsulin2h: "yes",
     });
     expect(r.verdict).toBe("not_recommended");
+  });
+});
+
+describe("getExerciseReadinessVerdict exercise alert vs hypo", () => {
+  it("treats a reading under the exercise floor as a top-up, not a low", () => {
+    const alertPlan = calculateExercisePlan({
+      exerciseType: "strength",
+      durationMinutes: 45,
+      intensity: "moderate",
+      minutesUntilStart: 0,
+      bgUnits: "mmol/L",
+      currentBg: 5.2,
+    });
+    const r = getExerciseReadinessVerdict({
+      exercisePlanResult: alertPlan,
+      currentBg: 5.2,
+      bgUnits: "mmol/L",
+      exerciseType: "strength",
+      intensity: "moderate",
+      phase: "pre",
+      hypoThreshold: 3.9,
+    });
+    expect(r.verdict).toBe("caution");
+    expect(r.title).toBe("Under your exercise alert");
+    expect(r.detail.toLowerCase()).toContain("before you start");
+    expect(r.title.toLowerCase()).not.toContain("low");
+  });
+
+  it("keeps the red stop when BG is under the hypo line", () => {
+    const hypoPlan = calculateExercisePlan({
+      exerciseType: "strength",
+      durationMinutes: 45,
+      intensity: "moderate",
+      minutesUntilStart: 0,
+      bgUnits: "mmol/L",
+      currentBg: 3.5,
+    });
+    const r = getExerciseReadinessVerdict({
+      exercisePlanResult: hypoPlan,
+      currentBg: 3.5,
+      bgUnits: "mmol/L",
+      exerciseType: "strength",
+      intensity: "moderate",
+      phase: "pre",
+      hypoThreshold: 3.9,
+    });
+    expect(r.verdict).toBe("not_recommended");
+    expect(r.title).toBe("Don't start yet — BG is low");
   });
 });
 
@@ -714,11 +762,11 @@ describe("getExerciseReadinessVerdict active-phase symptom escalation", () => {
       intensity: "moderate",
       minutesUntilStart: 0,
       bgUnits: "mmol/L",
-      currentBg: 4,
+      currentBg: 3.5,
     });
     const r = getExerciseReadinessVerdict({
       exercisePlanResult: lowPlan,
-      currentBg: 4,
+      currentBg: 3.5,
       bgUnits: "mmol/L",
       exerciseType: "cardio",
       intensity: "moderate",

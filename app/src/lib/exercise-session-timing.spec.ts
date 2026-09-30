@@ -3,6 +3,8 @@ import {
   getWorkoutElapsedMs,
   getWorkoutRemainingMs,
   isExercisePaused,
+  isStaleActiveExerciseSession,
+  STALE_ACTIVE_EXERCISE_MS,
 } from "./exercise-session-timing";
 
 describe("getWorkoutElapsedMs", () => {
@@ -63,5 +65,56 @@ describe("isExercisePaused / remaining", () => {
         t0 + 15 * 60_000,
       ),
     ).toBe(30 * 60_000);
+  });
+});
+
+describe("isStaleActiveExerciseSession", () => {
+  const now = Date.parse("2026-09-30T18:37:00.000Z");
+
+  it("treats a finished recovery window as stale", () => {
+    expect(
+      isStaleActiveExerciseSession(
+        {
+          phase: "recovery",
+          startedAt: "2026-09-28T17:00:00.000Z",
+          exerciseStartedAt: "2026-09-28T17:05:00.000Z",
+          durationMinutes: 45,
+          recoveryEndsAt: "2026-09-28T19:00:00.000Z",
+        },
+        now,
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps a workout that is still inside its recovery window", () => {
+    expect(
+      isStaleActiveExerciseSession(
+        {
+          phase: "recovery",
+          startedAt: "2026-09-30T17:00:00.000Z",
+          exerciseStartedAt: "2026-09-30T17:05:00.000Z",
+          durationMinutes: 45,
+          recoveryEndsAt: "2026-09-30T19:30:00.000Z",
+        },
+        now,
+      ),
+    ).toBe(false);
+  });
+
+  it("keeps a paused workout until 12 hours after the pause", () => {
+    const pausedAt = new Date(now - STALE_ACTIVE_EXERCISE_MS + 60_000).toISOString();
+    expect(
+      isStaleActiveExerciseSession(
+        {
+          phase: "active",
+          startedAt: "2026-09-29T08:00:00.000Z",
+          exerciseStartedAt: "2026-09-29T08:00:00.000Z",
+          pausedAt,
+          durationMinutes: 45,
+          recoveryEndsAt: undefined,
+        },
+        now,
+      ),
+    ).toBe(false);
   });
 });

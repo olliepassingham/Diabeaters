@@ -1,3 +1,6 @@
+import { resetExerciseCgmAlertCooldown } from "@/lib/exercise-cgm-alerts";
+import { cancelExerciseReminders } from "@/lib/exercise-reminders";
+import { isStaleActiveExerciseSession, plannedWorkoutEndMs } from "@/lib/exercise-session-timing";
 import type { ActiveExerciseSession, ExerciseIntensity, ExerciseType } from "@/lib/storage";
 import { storage } from "@/lib/storage";
 
@@ -13,7 +16,33 @@ export type GuidedExerciseStartBlockReason = "active_session" | "severe_sick_day
 
 export type GuidedExerciseStartResult =
   | { ok: true; session: ActiveExerciseSession }
-  | { ok: false; reason: GuidedExerciseStartBlockReason };
+  | { ok: false; reason: Exclude<GuidedExerciseStartBlockReason, "active_session"> }
+  | { ok: false; reason: "active_session"; session: ActiveExerciseSession };
+
+/**
+ * Drop a stored session that is no longer a live workout (finished recovery,
+ * or a plan / workout left open for more than 12 hours). Returns true when
+ * storage was cleared.
+ */
+export function releaseStaleActiveExerciseSession(now = Date.now()): boolean {
+  const session = storage.getActiveExercise();
+  if (!session || !isStaleActiveExerciseSession(session, now)) return false;
+
+  if (session.phase === "active" && session.exerciseStartedAt && !session.exerciseEndedAt) {
+    const plannedEnd = plannedWorkoutEndMs(session);
+    if (plannedEnd != null) {
+      storage.updateActiveExercise({ exerciseEndedAt: new Date(plannedEnd).toISOString() });
+    }
+  }
+
+  const latest = storage.getActiveExercise() ?? session;
+  void cancelExerciseReminders(latest.id);
+  resetExerciseCgmAlertCooldown(latest.id);
+  storage.endExerciseSession({
+    abandon: latest.phase === "pre" || !latest.exerciseStartedAt,
+  });
+  return true;
+}
 
 const EXERCISE_TYPE_LABELS: Record<string, string> = {
   cardio: "Cardio",
@@ -63,8 +92,10 @@ export function applyCoachDefaultsFromLastExercise(session: ActiveExerciseSessio
 }
 
 export function startGuidedExerciseSession(params: GuidedExerciseStartParams): GuidedExerciseStartResult {
-  if (storage.getActiveExercise()) {
-    return { ok: false, reason: "active_session" };
+  releaseStaleActiveExerciseSession();
+  const existing = storage.getActiveExercise();
+  if (existing) {
+    return { ok: false, reason: "active_session", session: existing };
   }
 
   const sc = storage.getScenarioState();

@@ -264,7 +264,7 @@ export function ExerciseHypoTreatmentHint(props: {
   const { suggestion, className, variant = "default" } = props;
   if (!suggestion) return null;
 
-  const title = suggestion.clinicalHypo ? "Reading looks low" : "Treat now";
+  const title = suggestion.clinicalHypo ? "Reading looks low" : "Top up";
   const support = hypoSupportLine(suggestion);
 
   if (variant === "immersive") {
