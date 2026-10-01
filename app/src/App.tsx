@@ -606,7 +606,8 @@ function PatientRouteGuard({ children }: { children: React.ReactNode }) {
       return;
     }
     if (!isCarerMode && !isCommunityMode && (hasCarerIntent() || hasPendingCarer())) {
-      setLocation("/carer-setup");
+      if (isCommunityPath(pathOnly)) return;
+      setLocation("/community/setup");
     }
   }, [loading, isCarerMode, isCommunityMode, pathOnly, setLocation, user?.id]);
 
@@ -617,7 +618,7 @@ function PatientRouteGuard({ children }: { children: React.ReactNode }) {
   }
   if (isCommunityMode && !isCommunityMemberAllowedPath(pathOnly)) return null;
   if (isCarerMode && !isCommunityPath(pathOnly) && !isCoachPath(pathOnly)) return null;
-  if (!isCommunityMode && (hasCarerIntent() || hasPendingCarer())) return null;
+  if (!isCommunityMode && (hasCarerIntent() || hasPendingCarer()) && !isCommunityPath(pathOnly)) return null;
   return <>{children}</>;
 }
 

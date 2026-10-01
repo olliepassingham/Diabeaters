@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import {
+  getActiveAppMode,
   getOnboardingAccountPath,
   getPrimaryAppRole,
   hasPendingCarer,
@@ -42,9 +43,18 @@ describe("CarerSetupPage", () => {
 
   it("shows invite empty-state guidance and switch to Type 1", () => {
     render(<CarerSetupPage />);
-    expect(screen.getByText(/you'll need an invite code/i)).not.toBeNull();
+    expect(screen.getByText(/when you have their invite code/i)).not.toBeNull();
+    expect(screen.getByTestId("carer-setup-skip-code")).not.toBeNull();
     expect(screen.getByTestId("carer-setup-empty-hint")).not.toBeNull();
     expect(screen.getByTestId("carer-setup-switch-type1")).not.toBeNull();
+  });
+
+  it("opens the feed when they do not have a code yet", () => {
+    render(<CarerSetupPage />);
+    fireEvent.click(screen.getByTestId("carer-setup-skip-code"));
+    expect(getActiveAppMode()).toBe("community");
+    expect(hasPendingCarer()).toBe(true);
+    expect(setLocation).toHaveBeenCalledWith("/community");
   });
 
   it("switches to Type 1 essentials without stranding supporter markers", () => {

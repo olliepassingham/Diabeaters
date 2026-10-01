@@ -20,7 +20,7 @@ import {
 } from "@/lib/profile";
 import { applyDisplayNameToLocalProfile } from "@/lib/user-display-name";
 import { cn } from "@/lib/utils";
-import { getActiveAppMode, isCommunitySessionMode } from "@/lib/carer-session";
+import { getActiveAppMode, getOnboardingAccountPath, hasPendingCarer, isCommunitySessionMode } from "@/lib/carer-session";
 import { isCommunityAccountProfile, storage } from "@/lib/storage";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 
@@ -39,6 +39,8 @@ export default function CommunitySetupPage() {
     localCommunityProfile: isCommunityAccountProfile(storage.getProfile()),
     cloudCommunityProfile: profile?.account_type === "community",
   });
+  const supporterFirstRun = !hasCarerLink && (hasPendingCarer() || getOnboardingAccountPath() === "supporter");
+  const afterProfilePath = supporterFirstRun ? "/carer-setup" : "/community";
 
   const [fullName, setFullName] = useState("");
   const [handleInput, setHandleInput] = useState("");
@@ -61,9 +63,9 @@ export default function CommunitySetupPage() {
   useEffect(() => {
     if (!profile) return;
     if (isPublicCommunityProfileComplete(profile)) {
-      setLocation("/community");
+      setLocation(afterProfilePath);
     }
-  }, [profile, setLocation]);
+  }, [profile, setLocation, afterProfilePath]);
 
   useEffect(() => {
     if (!profile) return;
@@ -223,10 +225,12 @@ export default function CommunitySetupPage() {
     applyDisplayNameToLocalProfile(nameVal);
     void refresh();
     toast({
-      title: "You're in",
-      description: "Your public profile is ready — welcome to the Feed.",
+      title: supporterFirstRun ? "Profile saved" : "You're in",
+      description: supporterFirstRun
+        ? "Your public profile is ready. Next, link the person you support."
+        : "Your public profile is ready — welcome to the Feed.",
     });
-    setLocation("/community");
+    setLocation(afterProfilePath);
   }
 
   if (loading && !profile) {
@@ -249,12 +253,16 @@ export default function CommunitySetupPage() {
           </div>
         </div>
         <div className="space-y-2">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-primary/90">Community Member</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-primary/90">
+            {supporterFirstRun ? "Supporter" : "Community Member"}
+          </p>
           <h1 className="font-display text-2xl font-bold tracking-tight text-balance sm:text-3xl">
             Set up your public profile
           </h1>
-          <p className="mx-auto max-w-sm text-pretty text-sm leading-relaxed text-muted-foreground">
-            Choose how you appear on the Feed. You can change this anytime in Account.
+          <p className="mx-auto max-w-sm text-pretty text-base leading-relaxed text-muted-foreground">
+            {supporterFirstRun
+              ? "Choose how you appear on the Feed. Next you can link the person you support."
+              : "Choose how you appear on the Feed. You can change this anytime in Account."}
           </p>
         </div>
       </div>
@@ -388,7 +396,7 @@ export default function CommunitySetupPage() {
                 "Saving…"
               ) : (
                 <>
-                  Join the Feed
+                  {supporterFirstRun ? "Continue" : "Join the Feed"}
                   <ArrowRight className="ml-2 h-4 w-4" aria-hidden />
                 </>
               )}
@@ -401,12 +409,14 @@ export default function CommunitySetupPage() {
           </div>
 
           <div className="flex flex-col items-center gap-2 pt-1">
-            <Button asChild type="button" variant="ghost" size="sm" className="text-muted-foreground">
-              <Link href="/tools">
-                <Sparkles className="mr-1.5 h-3.5 w-3.5" aria-hidden />
-                Browse tools first
-              </Link>
-            </Button>
+            {supporterFirstRun ? null : (
+              <Button asChild type="button" variant="ghost" size="sm" className="text-muted-foreground">
+                <Link href="/tools">
+                  <Sparkles className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                  Browse tools first
+                </Link>
+              </Button>
+            )}
             <p className="text-center text-[11px] text-muted-foreground">
               Photo and other account details are in{" "}
               <Link href="/account" className="font-medium text-primary underline-offset-2 hover:underline">

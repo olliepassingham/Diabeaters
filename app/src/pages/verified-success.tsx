@@ -12,7 +12,8 @@ import {
   onboardingAccountPathFromUserMetadata,
   setActiveAppMode,
 } from "@/lib/carer-session";
-import { resolveCommunityMemberLandingPath } from "@/lib/community-landing";
+import { resolveCommunityMemberLandingPath, supporterFirstRunPath } from "@/lib/community-landing";
+import { getProfile } from "@/lib/profile";
 import { PageShell } from "@/components/layout";
 
 const VERIFIED_WELCOME_PENDING_KEY = "diabeater_verified_welcome_pending";
@@ -47,9 +48,17 @@ export default function VerifiedSuccess() {
           // Ignore
         }
         if (!cancelled) {
-          setPrimaryHref(storedNext);
+          const href =
+            storedNext === "/carer-setup" && (hasCarerIntent() || hasPendingCarer())
+              ? "/community/setup"
+              : storedNext;
+          setPrimaryHref(href);
           setPrimaryLabel(
-            storedNext === "/carer-setup" ? "Enter invite code" : "Continue",
+            href === "/community/setup"
+              ? "Set up your profile"
+              : href === "/carer-setup"
+                ? "Enter invite code"
+                : "Continue",
           );
         }
         return;
@@ -62,8 +71,11 @@ export default function VerifiedSuccess() {
         return;
       }
       if (hasCarerIntent() || hasPendingCarer()) {
-        setPrimaryHref("/carer-setup");
-        setPrimaryLabel("Enter invite code");
+        const { profile } = await getProfile(user.id);
+        if (cancelled) return;
+        const href = supporterFirstRunPath(profile);
+        setPrimaryHref(href);
+        setPrimaryLabel(href === "/community/setup" ? "Set up your profile" : "Enter invite code");
         return;
       }
       const metadataPath = onboardingAccountPathFromUserMetadata(user);

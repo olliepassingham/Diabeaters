@@ -137,7 +137,7 @@ export default function Signup() {
 
     if (hasCarerIntent() || hasPendingCarer()) {
       try {
-        sessionStorage.setItem("diabeater_post_verify_next", "/carer-setup");
+        sessionStorage.setItem("diabeater_post_verify_next", "/community/setup");
       } catch {
         // Ignore
       }

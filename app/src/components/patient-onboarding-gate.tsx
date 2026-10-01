@@ -12,7 +12,7 @@ import {
 } from "@/lib/carer-session";
 import Onboarding from "@/pages/onboarding";
 import { getPostOnboardingPath } from "@/lib/onboarding-routes";
-import { getCommunityMemberLandingPath } from "@/lib/community-landing";
+import { getCommunityMemberLandingPath, supporterFirstRunPath } from "@/lib/community-landing";
 import {
   ensureCommunityMemberSessionReady,
   resolvesAsCommunityMemberAccount,
@@ -56,7 +56,9 @@ export function PatientOnboardingGate({ onPatientComplete }: PatientOnboardingGa
         accountPath !== "both" && (isCarer || hasCarerIntent() || hasPendingCarer());
 
       if (shouldSkipPatientOnboardingForCarerFlow) {
-        setLocation("/carer-setup");
+        const { profile: supporterProfile } = await getProfile(user.id);
+        if (cancelled) return;
+        setLocation(supporterFirstRunPath(supporterProfile));
         return;
       }
 

@@ -40,6 +40,19 @@ export function getCommunityMemberOnboardingCompletePath(): string {
   return COMMUNITY_PROFILE_SETUP_PATH;
 }
 
+/** Invite-code step. Comes after the public profile for a new supporter. */
+export const SUPPORTER_LINK_PATH = "/carer-setup";
+
+/**
+ * New supporters set up the feed profile first, then enter an invite code.
+ * A finished public profile skips straight to the code.
+ */
+export function supporterFirstRunPath(
+  profile: CommunityLandingProfile | null | undefined,
+): string {
+  return needsCommunityProfileSetup(profile) ? COMMUNITY_PROFILE_SETUP_PATH : SUPPORTER_LINK_PATH;
+}
+
 /**
  * Resolve landing from the signed-in cloud profile.
  * Incomplete public profiles (name + handle) go to community setup first.

@@ -12,7 +12,7 @@ import {
   cacheCloudPrimaryAppRoleFromProfile,
   type OnboardingAccountPath,
 } from "@/lib/carer-session";
-import { resolveCommunityMemberLandingPath } from "@/lib/community-landing";
+import { resolveCommunityMemberLandingPath, supporterFirstRunPath } from "@/lib/community-landing";
 import { ensureCommunityMemberSessionReady } from "@/lib/community-member-session";
 import { restoreAccountSessionFromCloud } from "@/lib/account-session-restore";
 import { getProfile } from "@/lib/profile";
@@ -92,7 +92,8 @@ export async function navigateAfterLoginSuccess(
     return;
   }
   if (hasCarerIntent() || hasPendingCarer()) {
-    setLocation("/carer-setup");
+    const profile = userId ? (await getProfile(userId)).profile : null;
+    setLocation(supporterFirstRunPath(profile));
     return;
   }
   const next = new URLSearchParams(window.location.search).get("next");

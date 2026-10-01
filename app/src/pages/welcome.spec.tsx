@@ -37,7 +37,7 @@ describe("Welcome path picker", () => {
     expect(screen.getByTestId("welcome-both")).not.toBeNull();
     expect(screen.getByTestId("welcome-not-sure").textContent).toMatch(/not sure/i);
     expect(screen.getByTestId("welcome-patient").textContent).toMatch(/dashboard, meals, travel, hypos/i);
-    expect(screen.getByTestId("welcome-supporter").textContent).toMatch(/invite code/i);
+    expect(screen.getByTestId("welcome-supporter").textContent).toMatch(/see what they choose to share/i);
     expect(screen.getByTestId("welcome-community").textContent).toMatch(/not full clinical tools/i);
   });
 

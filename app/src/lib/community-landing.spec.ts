@@ -46,6 +46,18 @@ describe("community-landing", () => {
     ).toBe("/community/setup");
   });
 
+  it("sends a new supporter to their profile first, then the invite code", async () => {
+    const { supporterFirstRunPath } = await import("@/lib/community-landing");
+    expect(supporterFirstRunPath(null)).toBe("/community/setup");
+    expect(
+      supporterFirstRunPath({
+        full_name: "Sam Example",
+        public_handle: "sam_ex",
+        is_public: true,
+      }),
+    ).toBe("/carer-setup");
+  });
+
   it("sends complete public profiles to the feed", async () => {
     const { getCommunityMemberLandingPath } = await import("@/lib/community-landing");
     expect(

@@ -68,7 +68,7 @@ export default function Welcome() {
     setOnboardingAccountPath("supporter");
     setPrimaryAppRole("carer");
     setPendingCarer();
-    setLocation(alreadySignedIn ? "/carer-setup" : "/signup");
+    setLocation(alreadySignedIn ? "/community/setup" : "/signup");
   };
 
   const onCommunityMember = () => {
@@ -139,8 +139,8 @@ export default function Welcome() {
             </span>
             <span className="min-w-0 flex-1">
               <span className="block text-sm font-semibold text-foreground">For someone I support</span>
-              <span className="mt-0.5 block text-xs text-muted-foreground">
-                You&apos;ll need their invite code
+              <span className="mt-0.5 block text-sm text-muted-foreground">
+                See what they choose to share, and use the feed
               </span>
             </span>
             <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform group-hover:translate-x-0.5" aria-hidden />

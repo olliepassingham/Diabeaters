@@ -595,7 +595,7 @@ export default function ToolsPage() {
   useEffect(() => {
     if (loading) return;
     if (!isCarerMode && !isCommunityMode && (hasCarerIntent() || hasPendingCarer())) {
-      setLocation("/carer-setup");
+      setLocation("/community/setup");
     }
   }, [loading, isCarerMode, isCommunityMode, setLocation]);
 

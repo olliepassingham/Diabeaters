@@ -301,10 +301,10 @@ export default function CarerSetupPage() {
                 <HeartHandshake className="h-5 w-5" aria-hidden />
               </div>
               <div className="space-y-1.5">
-                <CardTitle className="text-xl tracking-tight">Become a supporter</CardTitle>
-                <CardDescription className="text-sm leading-relaxed">
-                  You&apos;ll need an invite code from the person you support. Ask them to send one from{" "}
-                  <span className="font-medium text-foreground">Account → Family &amp; supporters</span>.
+                <CardTitle className="text-xl tracking-tight">Link someone you support</CardTitle>
+                <CardDescription className="text-base leading-relaxed">
+                  When you have their invite code, enter it here. You can use the feed first if you are still waiting
+                  for it.
                 </CardDescription>
               </div>
             </CardHeader>
@@ -332,6 +332,19 @@ export default function CarerSetupPage() {
                   {busy ? "Redeeming…" : "Redeem invite"}
                 </Button>
               </form>
+
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 w-full text-base"
+                data-testid="carer-setup-skip-code"
+                onClick={() => {
+                  setActiveAppMode("community");
+                  setLocation("/community");
+                }}
+              >
+                I don&apos;t have a code yet
+              </Button>
 
               <Collapsible open={howToOpen} onOpenChange={setHowToOpen}>
                 <CollapsibleTrigger asChild>
