@@ -169,9 +169,9 @@ export function MentionTextarea({
         placeholder={placeholder}
         rows={rows}
         disabled={disabled}
-        autoCapitalize="off"
-        autoCorrect="off"
-        spellCheck={false}
+        autoCapitalize="sentences"
+        autoCorrect="on"
+        spellCheck
         className={cn(
           "w-full rounded-xl text-base leading-relaxed",
           bare ? "surface-field-bare px-0 py-2.5" : "surface-field",
