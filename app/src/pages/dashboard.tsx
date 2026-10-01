@@ -305,11 +305,12 @@ export default function Dashboard() {
 
   const healthStatus = getHealthStatus(supplies, scenarioState);
   const showCoach = isAiCoachEnabled && !isOffline;
-  const homeNextAction = useHomeNextBestAction({
+  const homeNext = useHomeNextBestAction({
     status: healthStatus,
     scenarioState,
     showCoach,
   });
+  const homeNextAction = homeNext.action;
 
   const mode = getActiveAppMode();
   const isCommunityDash =
@@ -399,12 +400,13 @@ export default function Dashboard() {
         {!isCommunityDash ? (
           <div style={{ animationDelay: "30ms" }}>
             <HomeCommandHero
-              status={healthStatus}
               profile={profile}
               scenarioState={scenarioState}
               onEditWidgets={() => setWidgetsDialogOpen(true)}
               showCoach={showCoach}
               nextAction={homeNextAction}
+              pill={homeNext.pill}
+              liveGlucose={homeNext.glucose}
             />
           </div>
         ) : null}

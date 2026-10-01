@@ -32,10 +32,14 @@ type StatusPillProps = {
   status: HealthStatus;
   /** default = compact; large = command hero. */
   size?: "default" | "large";
+  /** Replaces the supplies label when a live reading owns the pill. */
+  label?: string;
 };
 
-export function StatusPill({ status, size = "default" }: StatusPillProps) {
-  const { text, textColor, stroke, trackStroke, fill, arc } = STATUS_CONFIG[status];
+export function StatusPill({ status, size = "default", label }: StatusPillProps) {
+  const config = STATUS_CONFIG[status];
+  const text = label ?? config.text;
+  const { textColor, stroke, trackStroke, fill, arc } = config;
   const pillRef = useRef<HTMLDivElement>(null);
   const [dims, setDims] = useState({ w: 0, h: 0 });
   const isLarge = size === "large";

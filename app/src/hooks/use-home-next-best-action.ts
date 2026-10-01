@@ -13,6 +13,14 @@ import {
   type HomeNextBestAction,
 } from "@/lib/home-next-best-action";
 import {
+  resolveHomeGlucoseAttention,
+  resolveHomeStatusPill,
+} from "@/lib/home-glucose-attention";
+import { hypoRangeThreshold } from "@/lib/exercise-hypo-auto";
+import { useBgPrefill } from "@/hooks/use-bg-prefill";
+import { isCgmPrefillActive } from "@/lib/cgm/preferences";
+import { normalizeBgUnits } from "@/lib/alcohol-night-tool";
+import {
   isTravelPackingIncomplete,
   resolveTravelPromote,
 } from "@/lib/status-bar-model";
@@ -20,12 +28,22 @@ import { timezoneChangeFromHours } from "@/lib/travel-insulin-clock";
 
 const DISMISSED_MEAL_MOMENT_KEY = "diabeater_home_meal_moment_dismissed";
 
+export type HomeLiveGlucose = {
+  value: number;
+  units: string;
+  trend: "rising" | "falling" | "flat" | null;
+};
+
 /** Shared next-action resolution for hero + home sections (dedupe). */
 export function useHomeNextBestAction(options: {
   status: HealthStatus;
   scenarioState: ScenarioState;
   showCoach: boolean;
-}): HomeNextBestAction {
+}): {
+  action: HomeNextBestAction;
+  pill: { status: HealthStatus; label: string };
+  glucose: HomeLiveGlucose | null;
+} {
   const { status, scenarioState, showCoach } = options;
   const [now, setNow] = useState(() => new Date());
   const [dismissedMealKey, setDismissedMealKey] = useState(() => {
@@ -36,6 +54,10 @@ export function useHomeNextBestAction(options: {
     }
   });
   const bedtime = useHomeBedtimePresence();
+  const cgmActive = isCgmPrefillActive();
+  const { prefill: bgPrefill } = useBgPrefill({
+    pollIntervalMs: cgmActive ? 5 * 60_000 : undefined,
+  });
 
   useEffect(() => {
     const refresh = () => {
@@ -105,7 +127,37 @@ export function useHomeNextBestAction(options: {
 
   const activeExercise = storage.getActiveExercise();
 
-  return useMemo(
+  const bgUnits = normalizeBgUnits(storage.getProfile()?.bgUnits);
+  const reading = bgPrefill?.fromCgm ? bgPrefill.reading : null;
+  const parsedPrefill = bgPrefill?.fromCgm && bgPrefill.value != null ? Number(bgPrefill.value) : null;
+  const liveValue = reading?.value ?? (parsedPrefill != null && Number.isFinite(parsedPrefill) ? parsedPrefill : null);
+  const trend =
+    reading?.trend === "rising" || reading?.trend === "falling" || reading?.trend === "flat"
+      ? reading.trend
+      : null;
+  const settings = storage.getSettings();
+  const lowLine = hypoRangeThreshold(settings, bgUnits);
+  const highLine =
+    typeof settings.targetBgHigh === "number" && settings.targetBgHigh > lowLine
+      ? settings.targetBgHigh
+      : null;
+  const attention =
+    liveValue != null && Number.isFinite(liveValue)
+      ? resolveHomeGlucoseAttention({
+          bg: liveValue,
+          trend,
+          bgUnits,
+          lowLine,
+          highLine,
+        })
+      : null;
+  const pill = resolveHomeStatusPill(status, attention);
+  const glucose: HomeLiveGlucose | null =
+    liveValue != null && Number.isFinite(liveValue)
+      ? { value: liveValue, units: reading?.units ?? bgUnits, trend }
+      : null;
+
+  const action = useMemo(
     () =>
       resolveHomeNextBestAction({
         healthStatus: status,
@@ -121,6 +173,8 @@ export function useHomeNextBestAction(options: {
         mealDismissed,
         hasCriticalSupply,
         showCoach,
+        glucoseNeedsHypoHelp: attention === "low" || attention === "dropping",
+        glucoseIsLow: attention === "low",
       }),
     [
       status,
@@ -136,6 +190,9 @@ export function useHomeNextBestAction(options: {
       mealDismissed,
       hasCriticalSupply,
       showCoach,
+      attention,
     ],
   );
+
+  return { action, pill, glucose };
 }

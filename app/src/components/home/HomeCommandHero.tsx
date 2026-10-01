@@ -31,9 +31,9 @@ import { getSupabase } from "@/lib/supabase";
 import { listCarerLinksForPatient } from "@/lib/carers";
 import { useToast } from "@/hooks/use-toast";
 import { runHypoTreatmentPipeline } from "@/lib/dashboard-hypo-pipeline";
-import { useBgPrefill } from "@/hooks/use-bg-prefill";
-import { isCgmPrefillActive } from "@/lib/cgm/preferences";
-import { useHomeNextBestAction } from "@/hooks/use-home-next-best-action";
+import { formatTargetBgInput } from "@/lib/hypo-context";
+import { normalizeBgUnits } from "@/lib/alcohol-night-tool";
+import type { HomeLiveGlucose } from "@/hooks/use-home-next-best-action";
 import type { HomeNextBestAction } from "@/lib/home-next-best-action";
 import { cn } from "@/lib/utils";
 
@@ -44,10 +44,12 @@ function DashboardInfoDialog() {
         <p>Tap the layout button to edit widgets. You can show or hide cards and drag them into the order you prefer. Your layout is saved on this device.</p>
       </InfoSection>
       <InfoSection title="Status">
-        <p>The status pill shows overall situation. When CGM is connected, your live reading appears beside it.</p>
+        <p>
+          With a live reading, the pill follows glucose: Low, Dropping, or High. In range, it goes back to supplies and guides — Stable, Watch, or Action needed.
+        </p>
       </InfoSection>
       <InfoSection title="Next action">
-        <p>One primary next step sits under status. Help Now and Treated a hypo stay visible for urgent moments.</p>
+        <p>One primary next step sits under status. When glucose is low or falling toward your low line, that step is Hypo help. Help Now and Treated a hypo stay visible.</p>
       </InfoSection>
       <InfoSection title="Quick Navigation">
         <p>Click the Diabeaters logo in the navigation bar to return to the dashboard from any page.</p>
@@ -57,35 +59,30 @@ function DashboardInfoDialog() {
 }
 
 export function HomeCommandHero({
-  status,
   profile,
   scenarioState,
   onEditWidgets,
   showCoach,
-  nextAction: nextActionProp,
+  nextAction,
+  pill,
+  liveGlucose,
 }: {
-  status: HealthStatus;
   profile: UserProfile | null;
   scenarioState: ScenarioState;
   onEditWidgets: () => void;
   showCoach: boolean;
-  /** When provided (from dashboard), keeps Next Up / meal deduped with the same action. */
-  nextAction?: HomeNextBestAction;
+  nextAction: HomeNextBestAction;
+  pill: { status: HealthStatus; label: string };
+  liveGlucose: HomeLiveGlucose | null;
 }) {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
-  const isUrgent = status === "action";
   const { toast } = useToast();
   const [hypoDialogOpen, setHypoDialogOpen] = useState(false);
   const [quickHypoConfirmOpen, setQuickHypoConfirmOpen] = useState(false);
   const [hasLinkedSupporters, setHasLinkedSupporters] = useState<boolean | null>(null);
 
-  const cgmActive = isCgmPrefillActive();
-  const { prefill: bgPrefill } = useBgPrefill({
-    pollIntervalMs: cgmActive ? 5 * 60_000 : undefined,
-  });
-  const resolvedNext = useHomeNextBestAction({ status, scenarioState, showCoach });
-  const nextAction = nextActionProp ?? resolvedNext;
+  const isUrgent = pill.status === "action" || nextAction.id === "hypo_help";
 
   const openFamilySupporters = () => setLocation("/family-carers");
 
@@ -154,12 +151,9 @@ export function HomeCommandHero({
   const activeExercise = storage.getActiveExercise();
   const pumpFailureActive = scenarioState.pumpFailureActive === true;
 
-  const reading = bgPrefill?.fromCgm ? bgPrefill.reading : null;
-  const hasLiveBg = Boolean(bgPrefill?.fromCgm && bgPrefill.value != null);
-  const trendLabel =
-    reading?.trend === "rising" || reading?.trend === "falling" || reading?.trend === "flat"
-      ? reading.trend
-      : null;
+  const glucose = liveGlucose;
+  const hasLiveBg = glucose != null;
+  const trendLabel = glucose?.trend ?? null;
   const TrendIcon =
     trendLabel === "rising" ? TrendingUp : trendLabel === "falling" ? TrendingDown : trendLabel === "flat" ? Minus : null;
 
@@ -175,18 +169,18 @@ export function HomeCommandHero({
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-2.5" data-testid="home-hero-status-row">
               <div data-testid="wrap-dashboard-status-pill">
-                <StatusPill status={status} />
+                <StatusPill status={pill.status} label={pill.label} />
               </div>
-              {hasLiveBg ? (
+              {hasLiveBg && glucose ? (
                 <div
                   className="flex items-baseline gap-1.5"
                   data-testid="home-hero-bg"
                 >
                   <span className="font-display text-2xl font-bold tabular-nums tracking-tight text-foreground sm:text-[1.75rem]">
-                    {String(bgPrefill!.value)}
+                    {formatTargetBgInput(glucose.value, normalizeBgUnits(glucose.units))}
                   </span>
                   <span className="text-xs font-medium text-muted-foreground">
-                    {reading?.units ?? profile?.bgUnits ?? ""}
+                    {glucose.units || profile?.bgUnits || ""}
                   </span>
                   {TrendIcon ? (
                     <TrendIcon className="h-4 w-4 text-muted-foreground" aria-label={trendLabel ?? undefined} />

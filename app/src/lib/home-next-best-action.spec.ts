@@ -33,6 +33,29 @@ describe("resolveHomeNextBestAction", () => {
     expect(a.id).toBe("help_now");
   });
 
+  it("puts hypo help ahead of an appointment when glucose is low", () => {
+    const a = resolveHomeNextBestAction({
+      ...base,
+      glucoseNeedsHypoHelp: true,
+      glucoseIsLow: true,
+      nextAppointment: { title: "Clinic review", whenLabel: "Thu 1 Oct · 15:10" },
+    });
+    expect(a.id).toBe("hypo_help");
+    expect(a.href).toBe("/tools/hypo-help");
+    expect(a.label).toBe("Hypo help");
+  });
+
+  it("puts hypo help ahead of a supply crisis when glucose is falling toward the line", () => {
+    const a = resolveHomeNextBestAction({
+      ...base,
+      healthStatus: "action",
+      glucoseNeedsHypoHelp: true,
+      glucoseIsLow: false,
+    });
+    expect(a.id).toBe("hypo_help");
+    expect(a.subline).toMatch(/falling/i);
+  });
+
   it("prioritises exercise over meal", () => {
     const a = resolveHomeNextBestAction({
       ...base,

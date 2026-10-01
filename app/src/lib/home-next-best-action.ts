@@ -9,6 +9,7 @@ import type { TravelPromoteResult } from "@/lib/status-bar-model";
 import type { Appointment } from "@/lib/storage";
 
 export type HomeNextBestActionId =
+  | "hypo_help"
   | "help_now"
   | "exercise"
   | "sick_day"
@@ -53,6 +54,10 @@ export type ResolveHomeNextBestActionInput = {
   mealDismissed: boolean;
   hasCriticalSupply: boolean;
   showCoach: boolean;
+  /** Live reading is on or under the low line, or falling just above it. */
+  glucoseNeedsHypoHelp?: boolean;
+  /** True when the live reading is already on or under the low line. */
+  glucoseIsLow?: boolean;
 };
 
 const MEAL_LABELS: Record<HomeMealMoment["slot"], string> = {
@@ -62,6 +67,18 @@ const MEAL_LABELS: Record<HomeMealMoment["slot"], string> = {
 };
 
 export function resolveHomeNextBestAction(input: ResolveHomeNextBestActionInput): HomeNextBestAction {
+  if (input.glucoseNeedsHypoHelp) {
+    return {
+      id: "hypo_help",
+      label: "Hypo help",
+      subline: input.glucoseIsLow
+        ? "Glucose is under your low line. Fast carbs come first."
+        : "Glucose is falling toward your low line.",
+      href: "/tools/hypo-help",
+      kind: "link",
+    };
+  }
+
   if (input.healthStatus === "action") {
     return {
       id: "help_now",

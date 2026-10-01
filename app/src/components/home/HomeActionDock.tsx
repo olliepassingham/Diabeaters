@@ -12,7 +12,7 @@ function primaryToneClasses(action: HomeNextBestAction, isUrgent: boolean): {
   shell: string;
   chevron: string;
 } {
-  if (action.kind === "help" || action.id === "help_now" || isUrgent) {
+  if (action.id === "hypo_help" || action.kind === "help" || action.id === "help_now" || isUrgent) {
     return {
       shell: "bg-red-600 text-white shadow-sm shadow-red-600/25 hover:bg-red-600/95",
       chevron: "text-white/80",
