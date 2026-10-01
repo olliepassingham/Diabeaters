@@ -51,6 +51,9 @@ describe("CarbEstimatorSheet", () => {
         hasProtein: false,
         hasFibre: true,
       },
+      selections: [
+        expect.objectContaining({ foodId: "banana", portionId: "regular", quantity: 1 }),
+      ],
     });
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
@@ -114,7 +117,7 @@ describe("CarbEstimatorSheet", () => {
     expect(screen.getByText(/Lunch · 48g carbs/)).not.toBeNull();
 
     fireEvent.click(screen.getByTestId(`button-use-carb-routine-${routine.id}`));
-    expect(onConfirm).toHaveBeenCalledWith({ grams: 48, compositionHint: null });
+    expect(onConfirm).toHaveBeenCalledWith({ grams: 48, compositionHint: null, selections: [] });
     expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(storage.getRoutine(routine.id)?.timesUsed).toBe(1);
   });
@@ -128,5 +131,30 @@ describe("CarbEstimatorSheet", () => {
     expect(screen.getByTestId("carb-estimator-routines-empty")).not.toBeNull();
     fireEvent.click(screen.getByTestId("button-carb-estimator-manage-routines"));
     expect(setLocation).toHaveBeenCalledWith("/routines");
+  });
+
+  it("reopens a routine's foods and saves them without the dose action", () => {
+    const onConfirm = vi.fn();
+    render(
+      <CarbEstimatorSheet
+        open
+        onOpenChange={() => {}}
+        onConfirm={onConfirm}
+        includeSavedRoutines={false}
+        confirmLabel="Use these foods"
+        initialSelections={[{ id: "saved-banana", foodId: "banana", portionId: "regular", quantity: 1 }]}
+      />,
+    );
+
+    expect(screen.queryByTestId("button-carb-category-routines")).toBeNull();
+    expect(screen.getByText("Your meal · 1 item")).not.toBeNull();
+    expect(screen.getByTestId("button-use-carb-estimate").textContent).toBe("Use these foods");
+    fireEvent.click(screen.getByTestId("button-use-carb-estimate"));
+    expect(onConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        grams: 27,
+        selections: [expect.objectContaining({ foodId: "banana", portionId: "regular", quantity: 1 })],
+      }),
+    );
   });
 });

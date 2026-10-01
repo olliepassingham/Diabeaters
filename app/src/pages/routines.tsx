@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link, useLocation } from "wouter";
 import { Repeat, Plus, Utensils, Coffee, Sun, Moon, Cookie, Check, Trash2, Pencil, TrendingUp, History, Tag, Dumbbell, Play, RotateCcw, BookmarkPlus, X } from "lucide-react";
-import { storage, Routine, RoutineMealType, RoutineOutcome, UserSettings, ExerciseRoutine, ExerciseType, ExerciseIntensity, DIABEATER_EXERCISE_OUTCOMES_CHANGED_EVENT } from "@/lib/storage";
+import { CarbEstimatorSheet } from "@/components/carb-estimator-sheet";
+import { routineCarbFoodLines, routineFoodsFromSelections, selectionsFromRoutineFoods } from "@/lib/carb-estimator";
+import { storage, Routine, RoutineCarbFood, RoutineMealType, RoutineOutcome, UserSettings, ExerciseRoutine, ExerciseType, ExerciseIntensity, DIABEATER_EXERCISE_OUTCOMES_CHANGED_EVENT } from "@/lib/storage";
 import { listRecentRepeatableExerciseSessions, type RecentRepeatableExerciseSession, filterRecentSessionsWithoutSavedRoutine } from "@/lib/exercise-session-repeat";
 import { EXERCISE_TYPE_OPTIONS, EXERCISE_INTENSITY_OPTIONS } from "@/lib/exercise-catalog";
 import { buildExerciseScenarioRepeatHref } from "@/lib/exercise-planner-href";
@@ -119,6 +121,9 @@ export function RoutinesContent() {
   const [mealType, setMealType] = useState<RoutineMealType>("lunch");
   const [mealDescription, setMealDescription] = useState("");
   const [carbEstimate, setCarbEstimate] = useState("");
+  const [carbFoods, setCarbFoods] = useState<RoutineCarbFood[]>([]);
+  const [carbEstimatorOpen, setCarbEstimatorOpen] = useState(false);
+  const holdRoutineForm = useRef(false);
   const [insulinDose, setInsulinDose] = useState("");
   const [insulinTiming, setInsulinTiming] = useState<"before" | "with" | "after">("before");
   const [timingMinutes, setTimingMinutes] = useState("");
@@ -166,6 +171,7 @@ export function RoutinesContent() {
     setMealType("lunch");
     setMealDescription("");
     setCarbEstimate("");
+    setCarbFoods([]);
     setInsulinDose("");
     setInsulinTiming("before");
     setTimingMinutes("");
@@ -182,6 +188,7 @@ export function RoutinesContent() {
     setMealType(routine.mealType);
     setMealDescription(routine.mealDescription);
     setCarbEstimate(routine.carbEstimate?.toString() || "");
+    setCarbFoods(routineFoodsFromSelections(selectionsFromRoutineFoods(routine.carbFoods)));
     setInsulinDose(routine.insulinDose?.toString() || "");
     setInsulinTiming(routine.insulinTiming);
     setTimingMinutes(routine.timingMinutes?.toString() || "");
@@ -200,6 +207,7 @@ export function RoutinesContent() {
       mealType,
       mealDescription,
       carbEstimate: carbEstimate ? parseFloat(carbEstimate) : undefined,
+      carbFoods: carbFoods.length ? carbFoods : undefined,
       insulinDose: insulinDose ? parseFloat(insulinDose) : undefined,
       insulinTiming,
       timingMinutes: timingMinutes ? parseInt(timingMinutes) : undefined,
@@ -219,6 +227,18 @@ export function RoutinesContent() {
     setIsAddOpen(false);
     resetForm();
   };
+
+  const foodLines = useMemo(() => routineCarbFoodLines(carbFoods), [carbFoods]);
+
+  const openFoodBuilder = () => {
+    holdRoutineForm.current = true;
+    setIsAddOpen(false);
+    setCarbEstimatorOpen(true);
+  };
+
+  useEffect(() => {
+    if (isAddOpen) holdRoutineForm.current = false;
+  }, [isAddOpen]);
 
   const handleDelete = (id: string) => {
     storage.deleteRoutine(id);
@@ -486,7 +506,7 @@ export function RoutinesContent() {
         ) : null}
 
         <div className="flex items-center justify-between flex-wrap gap-3">
-          <Dialog open={isAddOpen} onOpenChange={(open) => { setIsAddOpen(open); if (!open) resetForm(); }}>
+          <Dialog open={isAddOpen} onOpenChange={(open) => { setIsAddOpen(open); if (!open && !holdRoutineForm.current) resetForm(); }}>
             <DialogTrigger asChild>
               <Button data-testid="button-add-routine">
                 <Plus className="h-4 w-4 mr-2" />
@@ -556,7 +576,17 @@ export function RoutinesContent() {
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="carbs">Carbs (approx)</Label>
+                    <div className="flex items-center justify-between gap-2">
+                      <Label htmlFor="carbs">Carbs (approx)</Label>
+                      <button
+                        type="button"
+                        className="text-xs font-medium text-primary"
+                        onClick={openFoodBuilder}
+                        data-testid="button-routine-build-foods"
+                      >
+                        {carbFoods.length ? "Edit foods" : "Build from foods"}
+                      </button>
+                    </div>
                     <Input
                       id="carbs"
                       type="number"
@@ -565,6 +595,29 @@ export function RoutinesContent() {
                       onChange={(e) => setCarbEstimate(e.target.value)}
                       data-testid="input-carbs"
                     />
+                    {foodLines.length ? (
+                      <div className="space-y-1" data-testid="routine-carb-foods">
+                        <ul className="space-y-0.5">
+                          {foodLines.map((line) => (
+                            <li key={line.key} className="text-[11px] leading-snug text-muted-foreground">
+                              {line.label}
+                            </li>
+                          ))}
+                        </ul>
+                        <button
+                          type="button"
+                          className="text-[11px] font-medium text-muted-foreground underline-offset-2 hover:underline"
+                          onClick={() => setCarbFoods([])}
+                          data-testid="button-routine-clear-foods"
+                        >
+                          Clear foods
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="text-[11px] leading-snug text-muted-foreground">
+                        Search foods for a closer estimate, or type a number. This does not change the insulin dose.
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="dose">Insulin dose</Label>
@@ -659,6 +712,25 @@ export function RoutinesContent() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          <CarbEstimatorSheet
+            open={carbEstimatorOpen}
+            includeSavedRoutines={false}
+            confirmLabel="Use these foods"
+            initialSelections={selectionsFromRoutineFoods(carbFoods)}
+            onOpenChange={(open) => {
+              setCarbEstimatorOpen(open);
+              if (!open) setIsAddOpen(true);
+            }}
+            onConfirm={({ grams, selections }) => {
+              const foods = routineFoodsFromSelections(selections);
+              setCarbFoods(foods);
+              setCarbEstimate(String(grams));
+              if (!mealDescription.trim() && foods.length) {
+                const names = routineCarbFoodLines(foods).map((line) => line.name);
+                if (names.length) setMealDescription(names.join(", "));
+              }
+            }}
+          />
 
           <div className="flex items-center gap-2">
             <Select value={filterMealType} onValueChange={(v: RoutineMealType | "all") => setFilterMealType(v)}>
@@ -740,6 +812,11 @@ export function RoutinesContent() {
                           {metaParts.length > 0 ? (
                             <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground truncate">
                               {metaParts.join(" · ")}
+                            </p>
+                          ) : null}
+                          {routine.carbFoods?.length ? (
+                            <p className="mt-1 text-[11px] leading-snug text-muted-foreground line-clamp-1">
+                              {routineCarbFoodLines(routine.carbFoods).map((line) => line.name).join(", ")}
                             </p>
                           ) : null}
                           {routine.mealDescription ? (

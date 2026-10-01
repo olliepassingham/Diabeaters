@@ -1357,12 +1357,21 @@ export interface QuickActionConfig {
 export type RoutineMealType = "breakfast" | "lunch" | "dinner" | "snack" | "other";
 export type RoutineOutcome = "great" | "good" | "okay" | "not_ideal";
 
+/** One searched food on a meal routine. Carbs are still an estimate from typical portions. */
+export interface RoutineCarbFood {
+  foodId: string;
+  portionId: string;
+  quantity: number;
+}
+
 export interface Routine {
   id: string;
   name: string;
   mealType: RoutineMealType;
   mealDescription: string;
   carbEstimate?: number;
+  /** Foods used to build carbEstimate. Absent when the carbs were typed only. */
+  carbFoods?: RoutineCarbFood[];
   insulinDose?: number;
   insulinTiming: "before" | "with" | "after";
   timingMinutes?: number;

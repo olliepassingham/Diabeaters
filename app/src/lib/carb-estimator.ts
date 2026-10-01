@@ -7,6 +7,7 @@ import {
   type CarbFoodCategory,
   type CarbPortion,
 } from "@/lib/carb-estimator-data";
+import type { RoutineCarbFood } from "@/lib/storage";
 
 export type CarbEstimateSelection = {
   id: string;
@@ -118,6 +119,51 @@ function combineCompositionHints(items: CarbEstimatedItem[]): CarbCompositionHin
     hasProtein: hints.some((item) => item.hasProtein),
     hasFibre: hints.some((item) => item.hasFibre),
   };
+}
+
+export function routineFoodsFromSelections(selections: CarbEstimateSelection[]): RoutineCarbFood[] {
+  return selections.flatMap((selection) => {
+    if (!estimateCarbSelection(selection)) return [];
+    return [
+      {
+        foodId: selection.foodId,
+        portionId: selection.portionId,
+        quantity: selection.quantity,
+      },
+    ];
+  });
+}
+
+export function selectionsFromRoutineFoods(foods: RoutineCarbFood[] | undefined): CarbEstimateSelection[] {
+  return (foods ?? []).flatMap((food, index) => {
+    const selection: CarbEstimateSelection = {
+      id: `routine-food-${index}-${food.foodId}`,
+      foodId: food.foodId,
+      portionId: food.portionId,
+      quantity: food.quantity,
+    };
+    return estimateCarbSelection(selection) ? [selection] : [];
+  });
+}
+
+export function routineCarbFoodLines(foods: RoutineCarbFood[] | undefined): { key: string; label: string; name: string }[] {
+  return (foods ?? []).flatMap((food, index) => {
+    const item = estimateCarbSelection({
+      id: `line-${index}`,
+      foodId: food.foodId,
+      portionId: food.portionId,
+      quantity: food.quantity,
+    });
+    if (!item) return [];
+    const qty = item.quantity === 1 ? "" : `${item.quantity}× `;
+    return [
+      {
+        key: `${food.foodId}-${food.portionId}-${index}`,
+        name: item.food.name,
+        label: `${qty}${item.food.name} · ${item.portion.label} · ${Math.round(item.estimatedGrams)}g`,
+      },
+    ];
+  });
 }
 
 export function estimateCarbMeal(selections: CarbEstimateSelection[]): CarbMealEstimate {

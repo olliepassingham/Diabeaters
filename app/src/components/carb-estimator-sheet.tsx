@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { ArrowLeft, Calculator, ChevronRight, Minus, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import {
 } from "@/lib/carb-estimator-data";
 import {
   estimateCarbMeal,
+  estimateCarbSelection,
   getCarbFood,
   searchCarbFoods,
   type CarbEstimateSelection,
@@ -36,7 +37,17 @@ import { cn } from "@/lib/utils";
 type CarbEstimatorSheetProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (result: { grams: number; compositionHint: CarbCompositionHint | null }) => void;
+  onConfirm: (result: {
+    grams: number;
+    compositionHint: CarbCompositionHint | null;
+    selections: CarbEstimateSelection[];
+  }) => void;
+  /** Foods already on a routine, so Edit foods reopens the same meal. */
+  initialSelections?: CarbEstimateSelection[];
+  /** Defaults to the meal-adviser action. Routine builder uses a save label instead. */
+  confirmLabel?: string;
+  /** Hide "My routines" when this sheet is building a routine. */
+  includeSavedRoutines?: boolean;
 };
 
 type BrowseCategory = CarbFoodCategory | "all" | "routines";
@@ -61,6 +72,9 @@ export function CarbEstimatorSheet({
   open,
   onOpenChange,
   onConfirm,
+  initialSelections,
+  confirmLabel = "Get dose suggestion",
+  includeSavedRoutines = true,
 }: CarbEstimatorSheetProps) {
   const [, setLocation] = useLocation();
   const [query, setQuery] = useState("");
@@ -69,6 +83,8 @@ export function CarbEstimatorSheet({
   const [view, setView] = useState<"browse" | "meal">("browse");
   const estimate = useMemo(() => estimateCarbMeal(selections), [selections]);
   const [confirmedGrams, setConfirmedGrams] = useState("");
+  const initialSelectionsRef = useRef(initialSelections);
+  initialSelectionsRef.current = initialSelections;
 
   const savedRoutines = useMemo(
     () => listMealRoutinesForCarbEstimator({ query: category === "routines" ? query : "", limit: 24 }),
@@ -83,11 +99,16 @@ export function CarbEstimatorSheet({
 
   useEffect(() => {
     if (!open) return;
+    const seeded = (initialSelectionsRef.current ?? []).filter((selection) => estimateCarbSelection(selection));
     setQuery("");
-    setSelections([]);
-    setView("browse");
-    setCategory(listMealRoutinesForCarbEstimator({ limit: 1 }).length > 0 ? "routines" : "meals");
-  }, [open]);
+    setSelections(seeded);
+    setView(seeded.length ? "meal" : "browse");
+    const routinesFirst =
+      includeSavedRoutines &&
+      seeded.length === 0 &&
+      listMealRoutinesForCarbEstimator({ limit: 1 }).length > 0;
+    setCategory(routinesFirst ? "routines" : "meals");
+  }, [open, includeSavedRoutines]);
 
   useEffect(() => {
     setConfirmedGrams(estimate.suggestedGrams > 0 ? String(estimate.suggestedGrams) : "");
@@ -127,7 +148,7 @@ export function CarbEstimatorSheet({
     } catch {
       // Confirming carbs should still work if usage tracking fails.
     }
-    onConfirm({ grams, compositionHint: null });
+    onConfirm({ grams, compositionHint: null, selections: [] });
     onOpenChange(false);
   };
 
@@ -140,7 +161,7 @@ export function CarbEstimatorSheet({
   const useEstimate = () => {
     const grams = Math.round(Number(confirmedGrams));
     if (!Number.isFinite(grams) || grams <= 0 || grams > 1000) return;
-    onConfirm({ grams, compositionHint: estimate.compositionHint });
+    onConfirm({ grams, compositionHint: estimate.compositionHint, selections });
     onOpenChange(false);
   };
 
@@ -186,6 +207,7 @@ export function CarbEstimatorSheet({
               </div>
 
               <div className="-mx-1 mt-2 flex gap-1.5 overflow-x-auto px-1 pb-1" aria-label="Food categories">
+            {includeSavedRoutines ? (
             <Button
               type="button"
               variant={category === "routines" ? "default" : "ghost"}
@@ -196,6 +218,7 @@ export function CarbEstimatorSheet({
             >
               My routines
             </Button>
+            ) : null}
             <Button
               type="button"
               variant={category === "all" ? "default" : "ghost"}
@@ -552,7 +575,7 @@ export function CarbEstimatorSheet({
                 disabled={!finalGramsValid}
                 data-testid="button-use-carb-estimate"
               >
-                Get dose suggestion
+                {confirmLabel}
               </Button>
             </>
           ) : view === "browse" ? (

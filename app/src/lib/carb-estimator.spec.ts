@@ -3,7 +3,10 @@ import {
   estimateCarbMeal,
   estimateCarbSelection,
   normalizeCarbSearch,
+  routineCarbFoodLines,
+  routineFoodsFromSelections,
   searchCarbFoods,
+  selectionsFromRoutineFoods,
 } from "@/lib/carb-estimator";
 
 describe("carb estimator", () => {
@@ -51,6 +54,19 @@ describe("carb estimator", () => {
       hasProtein: true,
       hasFibre: false,
     });
+  });
+
+  it("keeps valid foods from a routine and drops ones the list no longer has", () => {
+    const foods = routineFoodsFromSelections([
+      { id: "ok", foodId: "banana", portionId: "regular", quantity: 2 },
+      { id: "bad", foodId: "not-a-food", portionId: "regular", quantity: 1 },
+    ]);
+    expect(foods).toEqual([{ foodId: "banana", portionId: "regular", quantity: 2 }]);
+    expect(selectionsFromRoutineFoods(foods)[0]).toEqual(
+      expect.objectContaining({ foodId: "banana", quantity: 2 }),
+    );
+    expect(routineCarbFoodLines(foods)[0]?.label).toBe("2× Banana · 1 medium banana · 54g");
+    expect(selectionsFromRoutineFoods([{ foodId: "gone", portionId: "regular", quantity: 1 }])).toEqual([]);
   });
 
   it("ignores invalid food, portion and quantity selections", () => {
