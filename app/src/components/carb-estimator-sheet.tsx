@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { MealImpactCard } from "@/components/meal-impact-card";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import {
   CARB_CATEGORY_LABELS,
@@ -23,9 +24,11 @@ import {
   estimateCarbMeal,
   estimateCarbSelection,
   getCarbFood,
+  mealCompositionFromFoods,
   searchCarbFoods,
   type CarbEstimateSelection,
 } from "@/lib/carb-estimator";
+import { computeMealImpact } from "@/lib/meal-impact";
 import {
   listMealRoutinesForCarbEstimator,
   ROUTINE_MEAL_TYPE_LABELS,
@@ -57,6 +60,8 @@ const CATEGORIES: CarbFoodCategory[] = [
   "breakfast",
   "bread",
   "staples",
+  "veg",
+  "protein",
   "fruit",
   "dairy",
   "snacks",
@@ -81,6 +86,7 @@ export function CarbEstimatorSheet({
   const [category, setCategory] = useState<BrowseCategory>("meals");
   const [selections, setSelections] = useState<CarbEstimateSelection[]>([]);
   const [view, setView] = useState<"browse" | "meal">("browse");
+  const [patternOpen, setPatternOpen] = useState(false);
   const estimate = useMemo(() => estimateCarbMeal(selections), [selections]);
   const [confirmedGrams, setConfirmedGrams] = useState("");
   const initialSelectionsRef = useRef(initialSelections);
@@ -102,6 +108,7 @@ export function CarbEstimatorSheet({
     const seeded = (initialSelectionsRef.current ?? []).filter((selection) => estimateCarbSelection(selection));
     setQuery("");
     setSelections(seeded);
+    setPatternOpen(false);
     setView(seeded.length ? "meal" : "browse");
     const routinesFirst =
       includeSavedRoutines &&
@@ -148,7 +155,11 @@ export function CarbEstimatorSheet({
     } catch {
       // Confirming carbs should still work if usage tracking fails.
     }
-    onConfirm({ grams, compositionHint: null, selections: [] });
+    onConfirm({
+      grams,
+      compositionHint: mealCompositionFromFoods(routine.carbFoods),
+      selections: [],
+    });
     onOpenChange(false);
   };
 
@@ -178,7 +189,7 @@ export function CarbEstimatorSheet({
     <BottomSheet
       open={open}
       onOpenChange={onOpenChange}
-      className="max-h-[94dvh] rounded-t-[1.75rem]"
+      className="h-[min(94dvh,calc(100dvh-var(--keyboard-inset-bottom,0px)-0.5rem))] rounded-t-[1.75rem]"
       title={
         <span className="flex items-center gap-2">
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -192,6 +203,7 @@ export function CarbEstimatorSheet({
         <div className="min-h-0 flex-1 overscroll-contain overflow-y-auto px-5 pb-5 touch-pan-y sm:px-6">
           {view === "browse" ? (
             <>
+              <div className="sticky top-0 z-10 -mx-5 bg-background px-5 pb-2 sm:-mx-6 sm:px-6">
               <div className="relative">
             <Search
               className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
@@ -202,6 +214,10 @@ export function CarbEstimatorSheet({
               onChange={(event) => setQuery(event.target.value)}
               placeholder={browsingRoutines ? "Search your routines" : "Search food or meal"}
               className="h-11 rounded-full pl-9"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              enterKeyHint="search"
               data-testid="input-carb-food-search"
             />
               </div>
@@ -240,6 +256,7 @@ export function CarbEstimatorSheet({
                 {CARB_CATEGORY_LABELS[item]}
               </Button>
             ))}
+              </div>
               </div>
 
               {browsingRoutines ? (
@@ -497,6 +514,23 @@ export function CarbEstimatorSheet({
               </div>
             )}
           </section>
+          {estimate.compositionHint ? (
+            <div className="mt-4">
+              <button
+                type="button"
+                className="text-sm font-medium text-primary"
+                onClick={() => setPatternOpen((open) => !open)}
+                data-testid="button-meal-typical-pattern"
+              >
+                {patternOpen ? "Hide typical pattern" : "See typical pattern"}
+              </button>
+              {patternOpen ? (
+                <div className="mt-3">
+                  <MealImpactCard impact={computeMealImpact(estimate.compositionHint)} />
+                </div>
+              ) : null}
+            </div>
+          ) : null}
             </>
           )}
         </div>

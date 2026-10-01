@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useId, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import type { MealImpactProfile } from "@/lib/meal-impact";
 
@@ -23,6 +23,7 @@ function gaussian(t: number, center: number, sigma: number, height: number): num
  * pattern only" caption.
  */
 export function MealGlucoseImpactChart({ profile, className, "data-testid": testId }: MealGlucoseImpactChartProps) {
+  const gradientId = useId().replace(/:/g, "");
   const { totalHours, peakTimeHours, peakSigma, peakHeight, tailTimeHours, tailSigma, tailHeight } = profile.chart;
   const innerWidth = WIDTH - PAD.left - PAD.right;
   const innerHeight = HEIGHT - PAD.top - PAD.bottom;
@@ -72,7 +73,7 @@ export function MealGlucoseImpactChart({ profile, className, "data-testid": test
         aria-label={`Illustrative glucose impact curve for a ${profile.patternLabel.toLowerCase()} meal`}
       >
         <defs>
-          <linearGradient id="meal-impact-fill" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="hsl(var(--chart-2))" stopOpacity="0.35" />
             <stop offset="100%" stopColor="hsl(var(--chart-2))" stopOpacity="0.02" />
           </linearGradient>
@@ -88,7 +89,7 @@ export function MealGlucoseImpactChart({ profile, className, "data-testid": test
           strokeDasharray="4 4"
         />
 
-        <path d={areaD} fill="url(#meal-impact-fill)" />
+        <path d={areaD} fill={`url(#${gradientId})`} />
         <path d={pathD} fill="none" stroke="hsl(var(--chart-2))" strokeWidth={2.25} strokeLinejoin="round" strokeLinecap="round" />
 
         <circle cx={peakPoint.x} cy={peakPoint.y} r={3.5} fill="hsl(var(--chart-2))" />

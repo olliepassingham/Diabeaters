@@ -44,7 +44,7 @@ export function KeyboardInsets() {
       if (!target) return;
       // The story composer is a fixed full-screen stage. Scrolling the focused
       // text into view shifts the photo under the keyboard.
-      if (target.closest("[data-story-stage]")) return;
+      if (target.closest("[data-story-stage], [data-keyboard-sheet]")) return;
 
       // Only help on iOS-style keyboard open; otherwise avoid annoying jumps.
       const insetPx = parseInt(

@@ -32,6 +32,10 @@ describe("CarbEstimatorSheet", () => {
     });
     fireEvent.click(screen.getByTestId("button-add-carb-food-banana"));
 
+    fireEvent.click(screen.getByTestId("button-meal-typical-pattern"));
+    expect(screen.getByTestId("meal-impact-pattern-label").textContent).toBe("Fast rise");
+    expect(screen.queryByText(/mmol/)).toBeNull();
+
     expect(screen.getByTestId("button-carb-estimator-add-more")).not.toBeNull();
     expect(screen.getByText("Likely range 22–32g")).not.toBeNull();
     const confirmedInput = screen.getByTestId("input-confirmed-carb-estimate");

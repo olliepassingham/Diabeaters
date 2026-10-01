@@ -11,7 +11,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link, useLocation } from "wouter";
 import { Repeat, Plus, Utensils, Coffee, Sun, Moon, Cookie, Check, Trash2, Pencil, TrendingUp, History, Tag, Dumbbell, Play, RotateCcw, BookmarkPlus, X } from "lucide-react";
 import { CarbEstimatorSheet } from "@/components/carb-estimator-sheet";
-import { routineCarbFoodLines, routineFoodsFromSelections, selectionsFromRoutineFoods } from "@/lib/carb-estimator";
+import { MealImpactCard } from "@/components/meal-impact-card";
+import { mealCompositionFromFoods, routineCarbFoodLines, routineFoodsFromSelections, selectionsFromRoutineFoods } from "@/lib/carb-estimator";
+import { computeMealImpact } from "@/lib/meal-impact";
 import { storage, Routine, RoutineCarbFood, RoutineMealType, RoutineOutcome, UserSettings, ExerciseRoutine, ExerciseType, ExerciseIntensity, DIABEATER_EXERCISE_OUTCOMES_CHANGED_EVENT } from "@/lib/storage";
 import { listRecentRepeatableExerciseSessions, type RecentRepeatableExerciseSession, filterRecentSessionsWithoutSavedRoutine } from "@/lib/exercise-session-repeat";
 import { EXERCISE_TYPE_OPTIONS, EXERCISE_INTENSITY_OPTIONS } from "@/lib/exercise-catalog";
@@ -115,6 +117,7 @@ export function RoutinesContent() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingRoutine, setEditingRoutine] = useState<Routine | null>(null);
   const [filterMealType, setFilterMealType] = useState<RoutineMealType | "all">("all");
+  const [patternRoutine, setPatternRoutine] = useState<Routine | null>(null);
   const [activeTab, setActiveTab] = useState("all");
 
   const [name, setName] = useState("");
@@ -229,6 +232,10 @@ export function RoutinesContent() {
   };
 
   const foodLines = useMemo(() => routineCarbFoodLines(carbFoods), [carbFoods]);
+  const patternImpact = useMemo(() => {
+    const composition = mealCompositionFromFoods(patternRoutine?.carbFoods);
+    return composition ? computeMealImpact(composition) : null;
+  }, [patternRoutine]);
 
   const openFoodBuilder = () => {
     holdRoutineForm.current = true;
@@ -712,6 +719,17 @@ export function RoutinesContent() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          <Dialog open={patternRoutine != null} onOpenChange={(open) => { if (!open) setPatternRoutine(null); }}>
+            <DialogContent className="max-w-lg max-h-[min(85vh,40rem)] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>{patternRoutine?.name}</DialogTitle>
+                <DialogDescription>
+                  A typical shape for these foods, not a forecast of your glucose.
+                </DialogDescription>
+              </DialogHeader>
+              {patternImpact ? <MealImpactCard impact={patternImpact} /> : null}
+            </DialogContent>
+          </Dialog>
           <CarbEstimatorSheet
             open={carbEstimatorOpen}
             includeSavedRoutines={false}
@@ -818,6 +836,16 @@ export function RoutinesContent() {
                             <p className="mt-1 text-[11px] leading-snug text-muted-foreground line-clamp-1">
                               {routineCarbFoodLines(routine.carbFoods).map((line) => line.name).join(", ")}
                             </p>
+                          ) : null}
+                          {mealCompositionFromFoods(routine.carbFoods) ? (
+                            <button
+                              type="button"
+                              className="mt-1.5 text-xs font-medium text-primary"
+                              onClick={() => setPatternRoutine(routine)}
+                              data-testid={`button-routine-pattern-${routine.id}`}
+                            >
+                              Typical pattern
+                            </button>
                           ) : null}
                           {routine.mealDescription ? (
                             <p

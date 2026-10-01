@@ -182,3 +182,9 @@ export function estimateCarbMeal(selections: CarbEstimateSelection[]): CarbMealE
     compositionHint: combineCompositionHints(items),
   };
 }
+
+/** Makeup of a saved routine's foods, used for the typical pattern. Null when the routine has no known foods. */
+export function mealCompositionFromFoods(foods: RoutineCarbFood[] | undefined): CarbCompositionHint | null {
+  if (!foods?.length) return null;
+  return estimateCarbMeal(selectionsFromRoutineFoods(foods)).compositionHint;
+}

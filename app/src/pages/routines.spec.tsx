@@ -52,5 +52,8 @@ describe("meal routine foods", () => {
     expect(saved?.carbFoods).toEqual([{ foodId: "banana", portionId: "regular", quantity: 1 }]);
     expect(saved?.insulinDose).toBe(5);
     expect(screen.getByTestId(`text-routine-name-${saved?.id}`).textContent).toBe("Morning banana");
+    fireEvent.click(screen.getByTestId(`button-routine-pattern-${saved?.id}`));
+    expect(screen.getByText("A typical shape for these foods, not a forecast of your glucose.")).not.toBeNull();
+    expect(screen.getByTestId("meal-impact-pattern-label").textContent).toBe("Fast rise");
   });
 });

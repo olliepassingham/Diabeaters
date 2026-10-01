@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { CARB_FOODS } from "@/lib/carb-estimator-data";
 import {
   estimateCarbMeal,
   estimateCarbSelection,
   normalizeCarbSearch,
+  mealCompositionFromFoods,
   routineCarbFoodLines,
   routineFoodsFromSelections,
   searchCarbFoods,
@@ -18,6 +20,19 @@ describe("carb estimator", () => {
     expect(searchCarbFoods("banana")[0]?.id).toBe("banana");
     expect(searchCarbFoods("oatmeal")[0]?.id).toBe("porridge");
     expect(searchCarbFoods("chippy")[0]?.id).toBe("fish-chips");
+    expect(searchCarbFoods("yogurt")[0]?.id).toBe("yogurt");
+    expect(searchCarbFoods("yoghurt")[0]?.id).toBe("yogurt");
+    expect(searchCarbFoods("weetabix")[0]?.id).toBe("weetabix");
+    expect(searchCarbFoods("cheese")[0]?.id).toBe("cheddar");
+    expect(searchCarbFoods("chicken")[0]?.id).toBe("chicken");
+    expect(searchCarbFoods("pitta")[0]?.id).toBe("pitta");
+    expect(searchCarbFoods("peas")[0]?.id).toBe("peas");
+  });
+
+  it("keeps one entry per food", () => {
+    const ids = CARB_FOODS.map((food) => food.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(CARB_FOODS.length).toBeGreaterThan(80);
   });
 
   it("can browse a category with no query", () => {
@@ -66,6 +81,13 @@ describe("carb estimator", () => {
       expect.objectContaining({ foodId: "banana", quantity: 2 }),
     );
     expect(routineCarbFoodLines(foods)[0]?.label).toBe("2× Banana · 1 medium banana · 54g");
+    expect(mealCompositionFromFoods(foods)).toEqual({
+      carbType: "fruit",
+      hasFat: false,
+      hasProtein: false,
+      hasFibre: true,
+    });
+    expect(mealCompositionFromFoods(undefined)).toBeNull();
     expect(selectionsFromRoutineFoods([{ foodId: "gone", portionId: "regular", quantity: 1 }])).toEqual([]);
   });
 

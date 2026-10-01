@@ -55,8 +55,9 @@ export function BottomSheet({
       <DrawerPrimitive.Portal>
         <DrawerPrimitive.Overlay className="fixed inset-0 z-[110] bg-black/80" />
         <DrawerPrimitive.Content
+          data-keyboard-sheet
           className={cn(
-            "fixed inset-x-0 bottom-0 z-[110] flex max-h-[min(92dvh,720px)] flex-col overflow-hidden rounded-t-[1.35rem] border-t border-border/60 bg-background p-0 pb-[env(safe-area-inset-bottom)] text-foreground outline-none",
+            "fixed inset-x-0 z-[110] flex max-h-[min(92dvh,720px,calc(100dvh-var(--keyboard-inset-bottom,0px)-0.5rem))] flex-col overflow-hidden rounded-t-[1.35rem] border-t border-border/60 bg-background p-0 pb-[env(safe-area-inset-bottom)] text-foreground outline-none bottom-[var(--keyboard-inset-bottom,0px)]",
             className,
           )}
           onOpenAutoFocus={onOpenAutoFocus}
