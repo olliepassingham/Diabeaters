@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   History,
   Info,
+  LayoutGrid,
   MessageCircle,
   Phone,
   Plane,
@@ -201,6 +202,8 @@ export function SupporterHero({
   travelLabel,
   linkedPeople,
   onPatientChange,
+  showCustomise = false,
+  onCustomise,
 }: {
   displayName: string;
   avatarUrl: string | null;
@@ -211,6 +214,8 @@ export function SupporterHero({
   travelLabel: string;
   linkedPeople: LinkedPerson[];
   onPatientChange: (patientId: string) => void;
+  showCustomise?: boolean;
+  onCustomise?: () => void;
 }) {
   const multiPerson = linkedPeople.length > 1;
   const calm = glance.type === "ok";
@@ -248,26 +253,43 @@ export function SupporterHero({
               {displayName}
             </p>
           </div>
-          {showEmergencyLink ? (
-            <a
-              href="#carer-emergency"
-              className={cn(
-                "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border",
-                "hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                "sm:h-9 sm:w-auto sm:gap-1.5 sm:rounded-full sm:px-2.5 sm:text-xs sm:font-semibold",
-                calm
-                  ? "border-border/60 bg-background/70 text-muted-foreground sm:text-foreground"
-                  : "border-destructive/25 bg-destructive/[0.06] text-destructive hover:bg-destructive/10 sm:text-foreground",
-              )}
-              aria-label="Jump to emergency details"
-              onClick={(e) => {
-                e.preventDefault();
-                scrollToCarerViewSection("carer-emergency");
-              }}
-            >
-              <Phone className="h-4 w-4" aria-hidden />
-              <span className="hidden sm:inline">Emergency</span>
-            </a>
+          {showCustomise || showEmergencyLink ? (
+            <div className="flex shrink-0 items-center gap-1.5">
+              {showCustomise ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9 rounded-xl border-border/60 bg-background/70 shadow-none"
+                  aria-label="Choose which cards to show"
+                  data-testid="button-supporter-customise"
+                  onClick={onCustomise}
+                >
+                  <LayoutGrid className="h-4 w-4" aria-hidden />
+                </Button>
+              ) : null}
+              {showEmergencyLink ? (
+                <a
+                  href="#carer-emergency"
+                  className={cn(
+                    "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border",
+                    "hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    "sm:h-9 sm:w-auto sm:gap-1.5 sm:rounded-full sm:px-2.5 sm:text-xs sm:font-semibold",
+                    calm
+                      ? "border-border/60 bg-background/70 text-muted-foreground sm:text-foreground"
+                      : "border-destructive/25 bg-destructive/[0.06] text-destructive hover:bg-destructive/10 sm:text-foreground",
+                  )}
+                  aria-label="Jump to emergency details"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    scrollToCarerViewSection("carer-emergency");
+                  }}
+                >
+                  <Phone className="h-4 w-4" aria-hidden />
+                  <span className="hidden sm:inline">Emergency</span>
+                </a>
+              ) : null}
+            </div>
           ) : null}
         </div>
 

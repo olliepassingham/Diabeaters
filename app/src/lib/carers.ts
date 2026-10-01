@@ -470,6 +470,28 @@ export async function updateScopes(
   return { data: normaliseScopes(updated?.scopes), error: null };
 }
 
+/** Supporter: end one link. Other people they support are unchanged. */
+export async function leaveCarerLink(linkId: string): Promise<{ error: Error | null }> {
+  const supabase = getSupabase();
+  if (!supabase) return { error: NOT_CONFIGURED };
+
+  const uid = await getSessionUserId();
+  if ("error" in uid) return { error: uid.error };
+
+  const { data, error } = await supabase
+    .from("carer_links")
+    .delete()
+    .eq("id", linkId)
+    .eq("carer_id", uid.id)
+    .select("id");
+
+  if (error) return { error: new Error(error.message) };
+  if (!data || data.length === 0) {
+    return { error: new Error("Could not stop supporting this person.") };
+  }
+  return { error: null };
+}
+
 /** Patient: remove a carer link. */
 export async function removeCarer(linkId: string): Promise<{ error: Error | null }> {
   const supabase = getSupabase();

@@ -50,8 +50,10 @@ import { getSupabase } from "@/lib/supabase";
 import {
   consumeCarerLinkedBannerMessage,
   canSwitchAppMode,
+  clearActiveCarerPatientId,
   clearCarerLinkJustCompleted,
   getActiveCarerPatientId,
+  setActiveAppMode,
   setActiveCarerPatientId,
 } from "@/lib/carer-session";
 import { localIndicatesPatientAccount } from "@/lib/community-path-patient-reconcile";
@@ -60,6 +62,7 @@ import { DevNote } from "@/components/dev/DevNote";
 import { SupporterPushPromptDialog } from "@/components/supporter-push-prompt-dialog";
 import { resolveSupporterPushPromptAfterLink } from "@/lib/supporter-push-prompt";
 import { SupporterProfileSetupCard } from "@/components/supporter-profile-setup-card";
+import { SupporterStopSupporting } from "@/components/supporter-stop-supporting";
 import { useAuth } from "@/lib/auth-context";
 import { needsCommunityProfileSetup, useProfile } from "@/lib/profile";
 import {
@@ -87,6 +90,9 @@ import {
   type CarerGlanceType,
 } from "@/pages/carer-view/supporter-home-ui";
 import { bedtimeSituationDetail } from "@/lib/carer-bedtime-situation";
+import { SupporterHomeCardsSheet, type SupporterHomeCardOption } from "@/components/supporter-home-cards-sheet";
+import { useSupporterHomeCards } from "@/hooks/use-supporter-home-cards";
+import { quietCardVisible, supporterAppointmentKey } from "@/lib/supporter-home-cards";
 import { PageShell } from "@/components/layout";
 import { formatDistanceToNowStrict } from "date-fns";
 import { Input } from "@/components/ui/input";
@@ -1404,6 +1410,7 @@ export default function CarerViewPage() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [supplies, setSupplies] = useState<CloudSupplyRow[]>([]);
   const [appointmentRows, setAppointmentRows] = useState<Record<string, unknown>[]>([]);
+  const [appointmentOwnerId, setAppointmentOwnerId] = useState<string | null>(null);
   const [scenarioRows, setScenarioRows] = useState<Record<string, unknown>[]>([]);
   const [hypoLogs, setHypoLogs] = useState<CloudHypoLogRow[]>([]);
   const [recentHyposExpanded, setRecentHyposExpanded] = useState(false);
@@ -1510,6 +1517,7 @@ export default function CarerViewPage() {
     setProfile(null);
     setSupplies([]);
     setAppointmentRows([]);
+    setAppointmentOwnerId(null);
     setScenarioRows([]);
     setHypoLogs([]);
     void (async () => {
@@ -1537,6 +1545,7 @@ export default function CarerViewPage() {
         setSupplies(sup.data ?? []);
         if (ap.error) setLoadError(ap.error.message);
         setAppointmentRows(ap.data ?? []);
+        setAppointmentOwnerId(patientId);
         if (sc.error) setLoadError(sc.error.message);
         setScenarioRows(sc.data ?? []);
         if (hl.error) setLoadError(hl.error.message);
@@ -1547,6 +1556,7 @@ export default function CarerViewPage() {
           setLoadError(e instanceof Error ? e.message : "Something went wrong");
           setSupplies([]);
           setAppointmentRows([]);
+          setAppointmentOwnerId(patientId);
           setScenarioRows([]);
           setHypoLogs([]);
         }
@@ -1578,10 +1588,15 @@ export default function CarerViewPage() {
   }, [profile?.avatar_url, activeLink?.patient_avatar_url]);
 
   useEffect(() => {
-    if (phase === "unlinked") {
-      setLocation("/carer-setup");
+    if (phase !== "unlinked") return;
+    if (linkResolvedEmpty && (canSwitchAppMode() || localIndicatesPatientAccount())) {
+      setActiveAppMode("patient");
+      clearActiveCarerPatientId();
+      setLocation("/");
+      return;
     }
-  }, [phase, setLocation]);
+    setLocation("/carer-setup");
+  }, [phase, linkResolvedEmpty, setLocation]);
 
   useEffect(() => {
     if (phase !== "ready" || !activeLink) return;
@@ -1614,13 +1629,27 @@ export default function CarerViewPage() {
     setShowProfileSetupCard(false);
   }, [phase, user?.id, supporterProfile, supporterProfileLoading]);
   const upcomingAppointments = useMemo(() => {
+    if (!activeLink?.patientId || appointmentOwnerId !== activeLink.patientId) return [];
     const now = Date.now();
     return (appointmentRows ?? [])
       .map((row) => ({ row, t: appointmentSortTime(row) }))
       .filter((x) => x.t > 0 && x.t >= now)
       .sort((a, b) => a.t - b.t)
       .map((x) => x.row);
-  }, [appointmentRows]);
+  }, [activeLink?.patientId, appointmentOwnerId, appointmentRows]);
+  const upcomingAppointmentKeys = useMemo(
+    () =>
+      upcomingAppointments
+        .map((row) => supporterAppointmentKey(row))
+        .filter((key): key is string => Boolean(key)),
+    [upcomingAppointments],
+  );
+  const [cardsOpen, setCardsOpen] = useState(false);
+  const { prefs: cardPrefs, setCardShown } = useSupporterHomeCards(
+    user?.id,
+    activeLink?.patientId,
+    upcomingAppointmentKeys,
+  );
   const scenarioLines = scenarioSituationLines(scenarioRows, {
     includeLiveBg: scopes.live_glucose === true,
   });
@@ -1780,6 +1809,74 @@ export default function CarerViewPage() {
     setActivePatientIdState(patientId);
   };
 
+  const suppliesForced = suppliesNeedAttention;
+  const travelForced = travelSummary.active;
+  const appointmentsReady = appointmentOwnerId === activeLink.patientId;
+  const showSuppliesCard =
+    (scopes.supplies ?? false) && quietCardVisible(cardPrefs, "supplies", { forceVisible: suppliesForced });
+  const showSituationsCard =
+    (scopes.scenarios ?? false) && quietCardVisible(cardPrefs, "situations", { forceVisible: travelForced });
+  const showActivityCard = showCarerActivityLog && quietCardVisible(cardPrefs, "activity");
+  const showAppointmentsCard =
+    (scopes.appointments ?? false) &&
+    quietCardVisible(cardPrefs, "appointments", { upcomingAppointmentKeys });
+  const showClinicalCard =
+    (scopes.clinical_settings ?? false) && quietCardVisible(cardPrefs, "clinical");
+
+  const cardOptions: SupporterHomeCardOption[] = [];
+  if (scopes.supplies) {
+    cardOptions.push({
+      id: "supplies",
+      label: "Supplies",
+      detail: suppliesForced
+        ? "Showing because stock is low."
+        : "Shared stock. This stays on screen if anything is low.",
+      shown: showSuppliesCard,
+      locked: suppliesForced,
+    });
+  }
+  if (scopes.scenarios) {
+    cardOptions.push({
+      id: "situations",
+      label: "Situations",
+      detail: travelForced
+        ? "Showing because travel is on."
+        : "Travel, sick day, and bedtime. This stays on screen during a trip.",
+      shown: showSituationsCard,
+      locked: travelForced,
+    });
+  }
+  if (showCarerActivityLog) {
+    cardOptions.push({
+      id: "activity",
+      label: "Activity log",
+      detail: "This week's shared activity. The Activity button stays.",
+      shown: showActivityCard,
+      locked: false,
+    });
+  }
+  if (scopes.appointments) {
+    cardOptions.push({
+      id: "appointments",
+      label: "Appointments",
+      detail: appointmentsReady
+        ? "A new appointment brings this back. Reminders stay on."
+        : "Loading appointments.",
+      shown: appointmentsReady ? showAppointmentsCard : !cardPrefs.hidden.includes("appointments"),
+      locked: !appointmentsReady,
+    });
+  }
+  if (scopes.clinical_settings) {
+    cardOptions.push({
+      id: "clinical",
+      label: "Clinical basics",
+      detail: "Delivery method, daily dose, and date of birth.",
+      shown: showClinicalCard,
+      locked: false,
+    });
+  }
+  const hiddenCardCount = cardOptions.filter((card) => !card.shown).length;
+
   return (
     <>
       {devOverlay}
@@ -1799,6 +1896,8 @@ export default function CarerViewPage() {
             travelLabel={travelChipLabel}
             linkedPeople={linkedPeopleForHero}
             onPatientChange={onPatientChange}
+            showCustomise={cardOptions.length > 0}
+            onCustomise={() => setCardsOpen(true)}
           />
 
           <SupporterQuickActions
@@ -1933,7 +2032,7 @@ export default function CarerViewPage() {
             />
           ) : null}
 
-          {(scopes.supplies ?? false) && (() => {
+          {showSuppliesCard && (() => {
             const SuppliesShell = suppliesNeedAttention ? CarerUrgentCard : CarerMutedCard;
             return (
               <SuppliesShell
@@ -2008,7 +2107,7 @@ export default function CarerViewPage() {
             );
           })()}
 
-          {(scopes.scenarios ?? false) && (
+          {showSituationsCard && (
             <CarerMutedCard id="carer-scenarios" testId="carer-view-scenarios">
               <CardHeader className={carerCardHeaderClass}>
                 <CardTitle className={carerCardTitleClass}>
@@ -2104,7 +2203,7 @@ export default function CarerViewPage() {
             </CarerMutedCard>
           )}
 
-          {showCarerActivityLog ? (
+          {showActivityCard ? (
               <CarerMutedCard testId="carer-view-activity">
                 <CardHeader className={carerCardHeaderClass}>
                   <CardTitle className={carerCardTitleClass}>
@@ -2140,7 +2239,7 @@ export default function CarerViewPage() {
               </CarerMutedCard>
           ) : null}
 
-          {(scopes.appointments ?? false) && (
+          {showAppointmentsCard && (
             <Card variant="glass-strong" className={cn(carerCardShellClass, "dashboard-card-hover")} data-testid="carer-view-appointments">
               <CardHeader className={carerCardHeaderClass}>
                 <CardTitle className={carerCardTitleClass}>
@@ -2246,11 +2345,39 @@ export default function CarerViewPage() {
           )}
         </div>
 
+      {hiddenCardCount > 0 ? (
+        <Button
+          type="button"
+          variant="ghost"
+          className="h-11 w-full text-base font-medium text-muted-foreground"
+          onClick={() => setCardsOpen(true)}
+          data-testid="button-supporter-show-hidden-cards"
+        >
+          Show hidden cards
+        </Button>
+      ) : null}
+
       {activeLink?.patientId ? (
-        <CarerClinicalPrefsCard patientId={activeLink.patientId} enabled={scopes.clinical_settings ?? false} />
+        <CarerClinicalPrefsCard patientId={activeLink.patientId} enabled={showClinicalCard} />
+      ) : null}
+
+      {user?.id && activeLink ? (
+        <SupporterStopSupporting
+          userId={user.id}
+          linkId={activeLink.linkId}
+          displayName={displayName}
+          people={linkedPatients}
+          onSwitched={setActivePatientIdState}
+        />
       ) : null}
 
       <SupporterPageFooter />
+      <SupporterHomeCardsSheet
+        open={cardsOpen}
+        onOpenChange={setCardsOpen}
+        cards={cardOptions}
+        onShownChange={setCardShown}
+      />
       </PageShell>
       <SupporterPushPromptDialog
         open={supporterPushPromptOpen}

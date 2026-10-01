@@ -98,7 +98,10 @@ CREATE POLICY carer_links_carer_select
   ON public.carer_links FOR SELECT
   USING (carer_id = auth.uid());
 
--- Carers do not insert/update/delete links directly (patient-driven); omit those policies.
+-- Supporter may end their own link. They cannot edit scopes or delete someone else's link.
+CREATE POLICY carer_links_carer_delete
+  ON public.carer_links FOR DELETE
+  USING (carer_id = auth.uid());
 
 -- ---------------------------------------------------------------------------
 -- Reading patient-owned rows (supplies, appointments, scenarios, emergency on profiles)
