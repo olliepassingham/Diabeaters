@@ -108,9 +108,11 @@ export type OvernightReviewTarget = {
 };
 
 /**
- * Newest finished night first. Index 0 matches `resolveOvernightReviewTarget`.
- * Later entries are earlier completed bedtime checks whose sleep window still
- * falls inside the on-device CGM history (14 days). One check per night.
+ * Newest finished night first. Index 0 is the night that just finished
+ * (`resolveOvernightReviewTarget`): that night's bedtime check when one exists,
+ * otherwise the calendar overnight window. Later entries are earlier completed
+ * bedtime checks whose sleep window still falls inside the on-device CGM history
+ * (14 days). One check per night.
  */
 export function listOvernightReviewNights(logs: BedtimeLog[], nowMs = Date.now()): OvernightReviewTarget[] {
   const latest = resolveOvernightReviewTarget(logs, nowMs);
@@ -119,10 +121,10 @@ export function listOvernightReviewNights(logs: BedtimeLog[], nowMs = Date.now()
   const cutoff = nowMs - CGM_HISTORY_RETENTION_DAYS * 24 * 60 * 60 * 1000;
   const nights: OvernightReviewTarget[] = [latest];
   const seenDays = new Set<string>();
-  if (latest.log) {
-    const latestDay = toBedtimeStreakDayKey(latest.log.date, latest.log.hoursUntilSleep);
-    if (latestDay) seenDays.add(latestDay);
-  }
+  const latestDay = latest.log
+    ? toBedtimeStreakDayKey(latest.log.date, latest.log.hoursUntilSleep)
+    : sleepWindowNightDayKey(latest.window);
+  if (latestDay) seenDays.add(latestDay);
 
   const sorted = [...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   for (const log of sorted) {
@@ -137,25 +139,63 @@ export function listOvernightReviewNights(logs: BedtimeLog[], nowMs = Date.now()
   return nights;
 }
 
-/** "Last night" for the newest review, otherwise a short weekday such as "Tue night". */
-export function overnightNightTitle(nightIndex: number, window: BedtimeSleepWindow | null | undefined): string {
-  if (nightIndex <= 0 || !window) return "Last night";
+/** Evening the sleep window belongs to, using the same after-midnight cutoff as streaks. */
+export function sleepWindowNightDayKey(window: BedtimeSleepWindow): string | null {
+  return toBedtimeStreakDayKey(new Date(window.startMs).toISOString(), 0);
+}
+
+/** Evening of the night that most recently finished (the block ending at the latest 7:00). */
+export function lastCompletedNightDayKey(nowMs = Date.now()): string | null {
+  return sleepWindowNightDayKey(inferCalendarSleepWindow(nowMs));
+}
+
+/** True when this sleep window is the night that just finished, not an earlier saved check. */
+export function isLastCompletedNightWindow(window: BedtimeSleepWindow, nowMs = Date.now()): boolean {
+  const nightKey = sleepWindowNightDayKey(window);
+  const lastKey = lastCompletedNightDayKey(nowMs);
+  return nightKey != null && nightKey === lastKey;
+}
+
+/**
+ * "Last night" only when the window is the night that just finished.
+ * An earlier check uses a short weekday such as "Tue night".
+ */
+export function overnightNightTitle(
+  window: BedtimeSleepWindow | null | undefined,
+  nowMs = Date.now(),
+): string {
+  if (!window || isLastCompletedNightWindow(window, nowMs)) return "Last night";
   const weekday = new Date(window.startMs).toLocaleDateString(undefined, { weekday: "short" });
   return `${weekday} night`;
 }
 
-/** Pick the best overnight window: prefer a completed bedtime check, else last calendar night. */
+/**
+ * The night that just finished. Use that night's completed bedtime check when one
+ * exists. A missed check stays on the calendar overnight window, so an older check
+ * is not relabelled as last night.
+ */
 export function resolveOvernightReviewTarget(logs: BedtimeLog[], nowMs = Date.now()): OvernightReviewTarget | null {
-  const log = findReviewableBedtimeLog(logs, nowMs);
+  const calendar = inferCalendarSleepWindow(nowMs);
+  if (calendar.endMs > nowMs) return null;
+  const nightKey = sleepWindowNightDayKey(calendar);
+  const log = nightKey ? findCompletedLogForNight(logs, nightKey, nowMs) : null;
   if (log) {
     const window = computeBedtimeSleepWindow(log);
     if (window && window.endMs <= nowMs) {
       return { log, window, source: "bedtime_log" };
     }
   }
-  const calendar = inferCalendarSleepWindow(nowMs);
-  if (calendar.endMs > nowMs) return null;
   return { log: null, window: calendar, source: "calendar_fallback" };
+}
+
+function findCompletedLogForNight(logs: BedtimeLog[], nightDayKey: string, nowMs: number): BedtimeLog | null {
+  const sorted = [...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  for (const log of sorted) {
+    const window = computeBedtimeSleepWindow(log);
+    if (!window || window.endMs > nowMs) continue;
+    if (sleepWindowNightDayKey(window) === nightDayKey) return log;
+  }
+  return null;
 }
 
 export function formatSleepWindowLabel(startMs: number, endMs: number): string {

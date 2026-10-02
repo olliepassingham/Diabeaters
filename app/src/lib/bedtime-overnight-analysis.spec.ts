@@ -340,9 +340,22 @@ describe("listOvernightReviewNights", () => {
       now,
     );
     expect(nights.map((n) => n.log?.id)).toEqual(["latest", "older"]);
-    expect(overnightNightTitle(0, nights[0]!.window)).toBe("Last night");
-    expect(overnightNightTitle(1, nights[1]!.window)).toMatch(/night$/);
-    expect(overnightNightTitle(1, nights[1]!.window)).not.toBe("Last night");
+    expect(overnightNightTitle(nights[0]!.window, now)).toBe("Last night");
+    expect(overnightNightTitle(nights[1]!.window, now)).toMatch(/night$/);
+    expect(overnightNightTitle(nights[1]!.window, now)).not.toBe("Last night");
+  });
+
+  it("keeps a skipped night as last night and labels the earlier check by its weekday", () => {
+    const nights = listOvernightReviewNights(
+      [makeLog({ id: "night-before", date: "2026-07-16T21:00:00.000Z", hoursUntilSleep: 0 })],
+      now,
+    );
+    expect(nights[0]?.source).toBe("calendar_fallback");
+    expect(nights[0]?.log).toBeNull();
+    expect(overnightNightTitle(nights[0]!.window, now)).toBe("Last night");
+    expect(nights[1]?.log?.id).toBe("night-before");
+    expect(overnightNightTitle(nights[1]!.window, now)).not.toBe("Last night");
+    expect(overnightNightTitle(nights[1]!.window, now)).toMatch(/night$/);
   });
 
   it("drops a second check on the same night and checks older than 14 days", () => {

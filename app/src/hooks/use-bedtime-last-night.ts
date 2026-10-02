@@ -295,7 +295,7 @@ export function useBedtimeLastNight(logs: BedtimeLog[], units: BgUnits): {
     refresh: () => void load(),
     nightIndex,
     nightCount: nights.length,
-    nightTitle: overnightNightTitle(nightIndex, reviewTarget?.window),
+    nightTitle: overnightNightTitle(reviewTarget?.window),
     nightContext: bedtimeNightContext(reviewTarget?.log),
     canGoOlder: nightIndex < nights.length - 1 && Boolean(nights[nightIndex + 1]?.log),
     canGoNewer: nightIndex > 0,

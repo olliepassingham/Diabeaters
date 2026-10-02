@@ -28,7 +28,11 @@ import {
   rememberBedtimeNightOnAccount,
   type BedtimeNightSummaryRecord,
 } from "@/lib/bedtime-night-summaries";
-import { computeBedtimeSleepWindow, toBedtimeStreakDayKey } from "@/lib/bedtime-overnight-window";
+import {
+  computeBedtimeSleepWindow,
+  isLastCompletedNightWindow,
+  toBedtimeStreakDayKey,
+} from "@/lib/bedtime-overnight-window";
 import { getCgmLocalHistory } from "@/lib/cgm/cgm-history-store";
 import {
   storage,
@@ -430,7 +434,6 @@ export default function Bedtime() {
     refresh: refreshLastNight,
     nightTitle: lastNightTitle,
     nightContext: lastNightContext,
-    nightIndex: lastNightIndex,
     canGoOlder: canGoOlderNight,
     canGoNewer: canGoNewerNight,
     goOlder: goOlderNight,
@@ -1201,7 +1204,11 @@ export default function Bedtime() {
         targetLow={targetRange.low}
         targetHigh={targetRange.high}
         tirCompare={lastNightTirCompare}
-        tirVersus={lastNightIndex > 0 ? "the night before" : "last night"}
+        tirVersus={
+          lastNightReview?.window && isLastCompletedNightWindow(lastNightReview.window)
+            ? "last night"
+            : "the night before"
+        }
         nightTitle={lastNightTitle}
         nightContext={lastNightContext}
         canGoOlder={canGoOlderNight}
