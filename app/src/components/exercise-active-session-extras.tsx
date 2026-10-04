@@ -54,16 +54,17 @@ export function ExerciseWorkoutProgressBar(props: {
     <div className={cn(compact ? "space-y-1" : "space-y-1.5", className)}>
       <div
         className={cn(
-          "flex items-center justify-between gap-2 text-[11px] font-medium tabular-nums",
+          "flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 text-[11px] font-medium tabular-nums",
           immersive ? "text-white/45" : "text-muted-foreground",
         )}
       >
-        <span className="inline-flex items-center gap-1">
+        <span className="inline-flex min-w-0 items-center gap-1">
           <Timer className={cn("h-3 w-3", immersive ? "opacity-60" : "opacity-70")} aria-hidden />
           {isPaused ? "Paused" : immersive ? "Progress" : "Workout progress"}
         </span>
         <span
           className={cn(
+            "min-w-0",
             isOvertime && (immersive ? "text-amber-300" : "text-amber-600 dark:text-amber-400"),
             isPaused && immersive && "text-amber-200/80",
           )}
@@ -120,6 +121,30 @@ function splitCarbLineText(text: string): { amount: string; detail: string | nul
   };
 }
 
+function FuelPlanExtra({
+  line,
+  tone = "default",
+}: {
+  line: ExerciseFuelPlanLine;
+  tone?: "default" | "immersive";
+}) {
+  const { amount, detail } = splitCarbLineText(line.text);
+  const immersive = tone === "immersive";
+  return (
+    <li className="min-w-0 space-y-0.5">
+      <p className={cn("text-sm font-medium leading-snug", immersive ? "text-white/70" : "text-foreground")}>
+        {line.label}
+      </p>
+      {line.text.trim() ? (
+        <p className={cn("text-sm leading-relaxed", immersive ? "text-white/55" : "text-muted-foreground")}>
+          <span className={cn("font-semibold", immersive ? "text-white/90" : "text-foreground")}>{amount}</span>
+          {detail ? <span> · {detail}</span> : null}
+        </p>
+      ) : null}
+    </li>
+  );
+}
+
 export function ExerciseFuelPlanSummary(props: {
   lines: ExerciseFuelPlanLine[];
   className?: string;
@@ -142,24 +167,13 @@ export function ExerciseFuelPlanSummary(props: {
         data-testid="exercise-fuel-plan"
       >
         <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-white/40">{primary.label}</p>
-        <p className="mt-1.5 text-2xl font-bold tabular-nums tracking-tight text-white">{amount}</p>
+        <p className="mt-1.5 text-2xl font-bold leading-snug text-white">{amount}</p>
         {detail ? <p className="mt-1 text-sm leading-snug text-white/50">{detail}</p> : null}
         {extras.length > 0 ? (
-          <ul className="mt-3 space-y-1.5 border-t border-white/10 pt-3">
-            {extras.map((line) => {
-              const extra = splitCarbLineText(line.text);
-              return (
-                <li key={line.id} className="flex items-baseline justify-between gap-3 text-sm">
-                  <span className="text-white/55">{line.label}</span>
-                  {line.text.trim() ? (
-                    <span className="min-w-0 text-right font-medium text-white/80">
-                      {extra.amount}
-                      {extra.detail ? <span className="font-normal text-white/40"> · {extra.detail}</span> : null}
-                    </span>
-                  ) : null}
-                </li>
-              );
-            })}
+          <ul className="mt-3 space-y-2.5 border-t border-white/10 pt-3">
+            {extras.map((line) => (
+              <FuelPlanExtra key={line.id} line={line} tone="immersive" />
+            ))}
           </ul>
         ) : null}
       </div>
@@ -187,26 +201,13 @@ export function ExerciseFuelPlanSummary(props: {
             <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               {primary.label}
             </p>
-            <p className="text-xl font-bold tabular-nums leading-none tracking-tight text-foreground">{amount}</p>
-            {detail ? <p className="text-sm leading-snug text-muted-foreground">{detail}</p> : null}
+            <p className="text-xl font-bold leading-snug text-foreground">{amount}</p>
+            {detail ? <p className="text-sm leading-relaxed text-muted-foreground">{detail}</p> : null}
             {extras.length > 0 ? (
-              <ul className="space-y-1.5 border-t border-border/50 pt-2.5">
-                {extras.map((line) => {
-                  const extra = splitCarbLineText(line.text);
-                  return (
-                    <li key={line.id} className="flex items-baseline justify-between gap-3 text-sm leading-snug">
-                      <span className="font-medium text-foreground">{line.label}</span>
-                      {line.text.trim() ? (
-                        <span className="min-w-0 text-right text-muted-foreground">
-                          {extra.amount}
-                          {extra.detail ? (
-                            <span className="text-muted-foreground/80"> · {extra.detail}</span>
-                          ) : null}
-                        </span>
-                      ) : null}
-                    </li>
-                  );
-                })}
+              <ul className="space-y-2.5 border-t border-border/50 pt-2.5">
+                {extras.map((line) => (
+                  <FuelPlanExtra key={line.id} line={line} />
+                ))}
               </ul>
             ) : null}
           </div>
@@ -231,7 +232,7 @@ export function ExerciseFuelPlanSummary(props: {
           <p className="text-xs font-semibold text-foreground">Fuel plan</p>
           <ul className="space-y-1">
             {lines.map((line) => (
-              <li key={line.id} className="text-[11px] leading-snug text-muted-foreground">
+              <li key={line.id} className="text-sm leading-relaxed text-muted-foreground">
                 <span className="font-medium text-foreground/90">{line.label}</span>
                 {line.text.trim() ? <span>: {line.text.trim()}</span> : null}
               </li>

@@ -102,7 +102,7 @@ function TreatmentHint({
   const line = formatCarbsForScenario(carbsGrams, profile, scenario);
   if (!line) return null;
   return (
-    <p className={cn("text-[11px] leading-snug text-muted-foreground", className)}>
+    <p className={cn("text-sm leading-relaxed text-muted-foreground", className)}>
       {line}
       {suffix ? ` ${suffix}` : null}
     </p>
@@ -171,29 +171,29 @@ function SessionFuelSection({
       {!compact ? (
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Session fuel</p>
       ) : null}
-      <div className="grid grid-cols-2 gap-2">
-        <div className="rounded-xl border border-border/50 bg-muted/15 px-3 py-3">
-          <p className="text-xs font-medium text-muted-foreground">Carry with you</p>
-          <p className={cn("font-bold tabular-nums text-foreground", compact ? "text-xl" : "text-2xl")}>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="rounded-xl border border-border/50 bg-muted/15 px-3.5 py-3">
+          <p className="text-sm font-medium text-muted-foreground">Carry with you</p>
+          <p className={cn("font-bold tabular-nums leading-tight text-foreground", compact ? "text-xl" : "text-2xl")}>
             ~{sessionFuel.carryGrams}g
           </p>
-          {carryHint ? <p className="mt-0.5 text-xs text-muted-foreground">{carryHint}</p> : null}
+          {carryHint ? <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{carryHint}</p> : null}
         </div>
-        <div className="rounded-xl border border-border/50 bg-muted/15 px-3 py-3">
-          <p className="text-xs font-medium text-muted-foreground">During session</p>
+        <div className="rounded-xl border border-border/50 bg-muted/15 px-3.5 py-3">
+          <p className="text-sm font-medium text-muted-foreground">During session</p>
           {showInterval ? (
             <>
               <p className={cn("font-bold tabular-nums text-foreground", compact ? "text-xl" : "text-2xl")}>
                 ~{sessionFuel.doseGrams}g
               </p>
-              <p className="text-xs text-muted-foreground">every {sessionFuel.intervalMinutes} min</p>
+              <p className="text-sm leading-snug text-muted-foreground">every {sessionFuel.intervalMinutes} min</p>
             </>
           ) : sessionFuel.duringTotalGrams > 0 ? (
             <>
               <p className={cn("font-bold tabular-nums text-foreground", compact ? "text-xl" : "text-2xl")}>
                 ~{sessionFuel.duringTotalGrams}g
               </p>
-              <p className="text-xs text-muted-foreground">if BG drops</p>
+              <p className="text-sm leading-snug text-muted-foreground">if BG drops</p>
             </>
           ) : (
             <p className="text-sm font-medium text-muted-foreground">Unlikely needed</p>
@@ -276,7 +276,7 @@ function KnownCarbsPlanHero({
         <div className="rounded-xl border border-primary/30 bg-primary/5 px-2 py-3">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Meal</p>
           <p className="mt-1 text-xl font-bold tabular-nums text-foreground">{result.mealCarbs}g</p>
-          <p className="text-[10px] text-muted-foreground truncate">{insulin.mealType}</p>
+          <p className="text-xs leading-snug text-muted-foreground">{insulin.mealType}</p>
         </div>
         <div className="rounded-xl border border-border/50 bg-background/80 px-2 py-3">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">At start</p>
@@ -625,7 +625,7 @@ export function ExerciseFuelCalculator() {
 
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium text-muted-foreground">Activity</Label>
-                  <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-1.5">
                     {EXERCISE_TYPE_OPTIONS.map((o) => {
                       const active = exerciseType === o.value;
                       return (
@@ -635,7 +635,7 @@ export function ExerciseFuelCalculator() {
                           size="sm"
                           variant="ghost"
                           className={cn(
-                            "h-10 justify-start rounded-xl px-2.5 text-xs font-medium",
+                            "h-auto min-h-10 justify-start whitespace-normal rounded-xl px-2.5 py-2 text-left text-xs font-medium leading-snug",
                             active
                               ? "bg-background text-foreground shadow-sm ring-1 ring-border/60"
                               : "bg-muted/30 text-muted-foreground hover:text-foreground",
@@ -643,7 +643,7 @@ export function ExerciseFuelCalculator() {
                           onClick={() => setExerciseType(o.value)}
                         >
                           <ExerciseTypeIcon type={o.value} className="mr-1.5 h-3.5 w-3.5 shrink-0 opacity-80" />
-                          <span className="truncate">{o.label}</span>
+                          <span className="min-w-0">{o.label}</span>
                         </Button>
                       );
                     })}
@@ -679,7 +679,7 @@ export function ExerciseFuelCalculator() {
                           size="sm"
                           variant="ghost"
                           className={cn(
-                            "h-10 rounded-xl px-1 text-xs font-medium",
+                            "h-auto min-h-10 whitespace-normal rounded-xl px-1 text-xs font-medium leading-snug",
                             intensity === o.value
                               ? "bg-background text-foreground shadow-sm"
                               : "text-muted-foreground hover:text-foreground",
@@ -1165,10 +1165,14 @@ export function ExerciseFuelCalculator() {
                   className="group flex w-full items-center justify-between gap-3 rounded-2xl border border-border/40 bg-muted/20 px-3.5 py-3 text-left"
                   data-testid="efc-details-toggle"
                 >
-                  <div className="flex min-w-0 items-center gap-2">
-                    <BookOpen className="h-4 w-4 shrink-0 text-primary" aria-hidden />
-                    <span className="text-sm font-medium">More detail</span>
-                    <span className="truncate text-xs text-muted-foreground">Why this plan + numbers</span>
+                  <div className="flex min-w-0 items-start gap-2">
+                    <BookOpen className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium">More detail</span>
+                      <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
+                        Why this plan and the numbers
+                      </span>
+                    </span>
                   </div>
                   <ChevronDown
                     className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180"

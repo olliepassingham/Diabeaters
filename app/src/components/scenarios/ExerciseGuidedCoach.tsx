@@ -953,7 +953,7 @@ export function ExerciseGuidedCoach() {
               <div className="space-y-5 border-t border-border/40 px-4 pb-5 pt-4 sm:px-5">
                 <div className="space-y-2">
                   <Label className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Type</Label>
-                  <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-1.5">
                     {EXERCISE_TYPE_OPTIONS.map((o) => {
                       const active = startType === o.value;
                       return (
@@ -963,7 +963,7 @@ export function ExerciseGuidedCoach() {
                           size="sm"
                           variant="ghost"
                           className={cn(
-                            "h-10 justify-start rounded-xl px-2.5 text-xs font-medium",
+                            "h-auto min-h-10 justify-start whitespace-normal rounded-xl px-2.5 py-2 text-left text-xs font-medium leading-snug",
                             active
                               ? "bg-background text-foreground shadow-sm ring-1 ring-border/60"
                               : "bg-muted/30 text-muted-foreground hover:text-foreground",
@@ -972,7 +972,7 @@ export function ExerciseGuidedCoach() {
                           data-testid={`button-start-type-${o.value}`}
                         >
                           <ExerciseTypeIcon type={o.value} className="mr-1.5 h-3.5 w-3.5 shrink-0 opacity-80" />
-                          <span className="truncate">{o.label}</span>
+                          <span className="min-w-0">{o.label}</span>
                         </Button>
                       );
                     })}
@@ -993,7 +993,7 @@ export function ExerciseGuidedCoach() {
                           size="sm"
                           variant="ghost"
                           className={cn(
-                            "h-10 rounded-xl text-sm font-medium capitalize",
+                            "h-auto min-h-10 whitespace-normal rounded-xl px-1 text-xs font-medium capitalize leading-snug",
                             active
                               ? "bg-background text-foreground shadow-sm"
                               : "text-muted-foreground hover:text-foreground",
@@ -1903,8 +1903,8 @@ function DuringQuestions({
               <p className="font-medium text-amber-900 dark:text-amber-100">Treat & re-check</p>
               <span className="text-xs tabular-nums text-amber-900/80 dark:text-amber-100/80">{hypoRemainingLabel}</span>
             </div>
-            <div className="flex items-center justify-between gap-2 pt-1">
-              <p className="text-xs text-amber-900/80 dark:text-amber-100/80 leading-snug">
+            <div className="flex items-start justify-between gap-2 pt-1">
+              <p className="min-w-0 flex-1 text-sm leading-relaxed text-amber-900/80 dark:text-amber-100/80">
                 Take fast carbs now if your plan uses this, then re-check when the timer ends.
               </p>
               <Button
@@ -1940,7 +1940,7 @@ function DuringQuestions({
         defaultOpen={hasSymptoms}
       >
         <Field label="How hard does it feel?">
-          <div className="grid grid-cols-4 rounded-xl border border-border/60 overflow-hidden">
+          <div className="grid grid-cols-2 gap-1.5 rounded-xl border border-border/60 p-1">
             {(
               [
                 { id: "easy", label: "Easy", value: 3 },
@@ -1954,7 +1954,7 @@ function DuringQuestions({
                 type="button"
                 size="sm"
                 variant={session.midRpe === o.value ? "default" : "ghost"}
-                className={cn("h-9 rounded-none px-2 text-xs", o.id !== "max" ? "border-r border-border/60" : null)}
+                className="h-auto min-h-9 whitespace-normal rounded-lg px-2 py-2 text-xs leading-snug"
                 onClick={() => update({ midRpe: session.midRpe === o.value ? undefined : o.value })}
                 data-testid={`button-coach-rpe-${o.id}`}
               >
@@ -2218,7 +2218,7 @@ function DeeperContextSection({
         data-testid={`button-coach-section-${title.toLowerCase().replace(/[^a-z]+/g, "-")}`}
         aria-expanded={open}
       >
-        <span className="text-sm font-medium flex items-center gap-2">
+        <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-sm font-medium">
           <span className="flex h-6 w-6 items-center justify-center rounded-full bg-background/80 ring-1 ring-border/50">
             <Icon className="h-3.5 w-3.5 text-muted-foreground" />
           </span>

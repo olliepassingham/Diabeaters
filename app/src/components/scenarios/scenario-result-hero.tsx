@@ -55,11 +55,14 @@ export function ScenarioResultHero({
     >
       <div className="relative px-5 pb-4 pt-5 text-center">
         {headerAction ? <div className="absolute right-3 top-3">{headerAction}</div> : null}
-        <p className={cn("text-[11px] font-semibold uppercase tracking-wider", toneEyebrow[tone], labelClassName)}>
+        <p className={cn("text-xs font-semibold uppercase leading-snug tracking-normal text-balance", toneEyebrow[tone], labelClassName)}>
           {label}
         </p>
         <div
-          className={cn("mt-1 font-display text-5xl font-bold tabular-nums tracking-tight text-foreground", valueClassName)}
+          className={cn(
+            "mt-1 text-balance break-words font-display text-5xl font-bold tabular-nums tracking-tight text-foreground",
+            valueClassName,
+          )}
           data-testid={valueTestId}
         >
           {value}

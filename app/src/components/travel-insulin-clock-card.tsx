@@ -109,8 +109,8 @@ export function TravelInsulinClockCard({
                         key={`${schedule.doseLabel}-${row.day}-${row.label}`}
                         className="flex items-baseline justify-between gap-3 rounded-xl bg-muted/30 px-3 py-2.5"
                       >
-                        <span className="text-sm font-medium text-foreground">{row.label}</span>
-                        <span className="text-sm font-semibold tabular-nums text-foreground">{row.localTime}</span>
+                        <span className="min-w-0 flex-1 text-sm font-medium leading-snug text-foreground">{row.label}</span>
+                        <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">{row.localTime}</span>
                       </li>
                     ))}
                   </ol>

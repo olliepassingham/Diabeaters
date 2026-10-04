@@ -1945,8 +1945,8 @@ export default function Travel() {
                 {!packingDone && uncheckedPacking.length > 0 ? (
                   <ul className="mt-3 space-y-2">
                     {uncheckedPacking.map((item) => (
-                      <li key={item.name} className="flex items-center justify-between gap-3 text-sm">
-                        <span className="min-w-0 truncate text-foreground/90">{item.name}</span>
+                      <li key={item.name} className="flex items-start justify-between gap-3 text-sm">
+                        <span className="min-w-0 flex-1 leading-snug text-foreground/90">{item.name}</span>
                         <span className="shrink-0 font-semibold tabular-nums">
                           {item.estimatedAmount} {item.unit}
                         </span>
@@ -2384,10 +2384,10 @@ export default function Travel() {
                         {takeAwayPreview.map((item) => (
                           <li
                             key={`${item.category}-${item.name}`}
-                            className="flex items-center justify-between gap-3 text-sm"
+                            className="flex items-start justify-between gap-3 text-sm"
                             data-testid={`takeaway-item-${item.name}`}
                           >
-                            <span className="min-w-0 truncate text-foreground/90">{item.name}</span>
+                            <span className="min-w-0 flex-1 leading-snug text-foreground/90">{item.name}</span>
                             <span className="shrink-0 font-semibold tabular-nums text-foreground">
                               {item.estimatedAmount} {item.unit}
                             </span>
