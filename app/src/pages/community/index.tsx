@@ -60,6 +60,7 @@ import {
   COMMUNITY_FEED_QUERY_ROOT,
   MAIN_FEED_PAGE_SIZE,
   prependPostedToCommunityFeed,
+  revokeOptimisticPostMedia,
 } from "@/lib/community-feed-cache";
 import { getAppScrollMain, getAppScrollTop, setAppScrollTop } from "@/lib/app-scroll";
 import { CommunityPushPromptDialog } from "@/components/community-push-prompt-dialog";
@@ -122,14 +123,29 @@ export default function CommunityHomePage() {
   const [feedSearch, setFeedSearch] = useState("");
 
   const [feedListRevision, setFeedListRevision] = useState(0);
+  const [pendingFeedPosts, setPendingFeedPosts] = useState<CommunityPostRow[]>([]);
   const [composerPanelOpen, setComposerPanelOpen] = useState(initialFeedComposerOpen);
   const isMobile = useIsMobile();
+  const dropPendingFeedPost = useCallback((pendingId: string) => {
+    setPendingFeedPosts((prev) => {
+      for (const post of prev) {
+        if (post.id === pendingId) revokeOptimisticPostMedia(post);
+      }
+      return prev.filter((post) => post.id !== pendingId);
+    });
+  }, []);
   const feedComposer = useFeedComposer({
     closeSheetOnPost: isMobile,
-    onPosted: (post) => {
+    onOptimisticPost: (post) => {
+      setPendingFeedPosts((prev) => [post, ...prev.filter((row) => row.id !== post.id)]);
+      getAppScrollMain()?.scrollTo({ top: 0, behavior: "smooth" });
+    },
+    onOptimisticFailed: dropPendingFeedPost,
+    onPosted: (post, pendingId) => {
+      if (pendingId) dropPendingFeedPost(pendingId);
       if (post) {
         prependPostedToCommunityFeed(queryClient, post);
-        getAppScrollMain()?.scrollTo({ top: 0, behavior: "smooth" });
+        if (!pendingId) getAppScrollMain()?.scrollTo({ top: 0, behavior: "smooth" });
       }
       void queryClient.invalidateQueries({ queryKey: [COMMUNITY_FEED_QUERY_ROOT] });
       setFeedListRevision((k) => k + 1);
@@ -993,6 +1009,7 @@ export default function CommunityHomePage() {
         searchMatchedAuthorIds={searchMatchedAuthorIds}
         savedOnly={savedOnly}
         feedListRevision={feedListRevision}
+        pendingPosts={pendingFeedPosts}
         onOpenFindPeople={() => setPeopleOpen(true)}
         onSwitchToEveryone={() => {
           setFeedTab("everyone");

@@ -17,6 +17,11 @@ function normalizePath(path: string): string {
   return String(path ?? "").trim();
 }
 
+/** Local preview URLs are already displayable. They are not storage paths. */
+function isDirectMediaUrl(path: string): boolean {
+  return path.startsWith("blob:") || path.startsWith("data:");
+}
+
 function readCache(path: string): string | null {
   const entry = urlCache.get(path);
   if (!entry) return null;
@@ -35,6 +40,7 @@ function writeCache(path: string, url: string): void {
 export function getCachedPostMediaSignedUrl(path: string): string | null {
   const trimmed = normalizePath(path);
   if (!trimmed) return null;
+  if (isDirectMediaUrl(trimmed)) return trimmed;
   return readCache(trimmed);
 }
 
@@ -108,7 +114,7 @@ async function signChunk(paths: string[]): Promise<Map<string, string | null>> {
 }
 
 async function signMissingPaths(paths: string[]): Promise<void> {
-  const unique = [...new Set(paths.map(normalizePath).filter(Boolean))];
+  const unique = [...new Set(paths.map(normalizePath).filter((path) => path && !isDirectMediaUrl(path)))];
   const missing = unique.filter((p) => !readCache(p) && !inflight.has(p));
 
   if (missing.length > 0) {
@@ -144,7 +150,11 @@ async function resolveSignedUrls(paths: string[]): Promise<(string | null)[]> {
   const unique = [...new Set(trimmed.filter(Boolean))];
   if (unique.length === 0) return paths.map(() => null);
   await signMissingPaths(unique);
-  return trimmed.map((path) => (path ? readCache(path) : null));
+  return trimmed.map((path) => {
+    if (!path) return null;
+    if (isDirectMediaUrl(path)) return path;
+    return readCache(path);
+  });
 }
 
 export async function getPostMediaSignedUrls(paths: string[]): Promise<(string | null)[]> {

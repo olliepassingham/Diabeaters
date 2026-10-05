@@ -254,7 +254,8 @@ export function FeedPostCard({
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { profile: viewerProfile } = useProfile();
-  const mayEngage = Boolean(viewerId && canEngageWithFeed);
+  const uploadPending = post.id.startsWith("pending:");
+  const mayEngage = Boolean(viewerId && canEngageWithFeed && !uploadPending);
   const canReportPost = viewerId && viewerId !== post.author_id;
   const onLikersLoadedRef = useRef(onLikersLoaded);
   onLikersLoadedRef.current = onLikersLoaded;
@@ -833,13 +834,21 @@ export function FeedPostCard({
                   </>
                 ) : null}
                 <span aria-hidden>·</span>
-                <time title={post.created_at}>
-                  {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-                </time>
+                {uploadPending ? (
+                  <span className="inline-flex items-center gap-1 font-medium text-foreground/80">
+                    <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+                    Uploading
+                  </span>
+                ) : (
+                  <time title={post.created_at}>
+                    {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                  </time>
+                )}
               </div>
             </div>
           )}
         </div>
+        {uploadPending ? null : (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -878,6 +887,7 @@ export function FeedPostCard({
             ) : null}
           </DropdownMenuContent>
         </DropdownMenu>
+        )}
       </div>
 
       {hasFeedVideo && post.video_url ? (

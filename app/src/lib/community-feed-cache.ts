@@ -88,6 +88,13 @@ export function buildCommunityFeedQueryKey(params: {
   ];
 }
 
+/** Drop blob previews created for a post that is still uploading. */
+export function revokeOptimisticPostMedia(post: CommunityPostRow) {
+  for (const url of [post.video_url, post.video_poster_url, ...post.image_urls]) {
+    if (url?.startsWith("blob:")) URL.revokeObjectURL(url);
+  }
+}
+
 /** Show a post you just published at the top of the open feed without waiting for a reload. */
 export function prependPostedToCommunityFeed(queryClient: QueryClient, post: CommunityPostRow) {
   const queries = queryClient.getQueriesData<InfiniteData<CommunityPostRow[], FeedCursor | null>>({

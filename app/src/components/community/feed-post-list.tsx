@@ -140,6 +140,8 @@ export function FeedPostList(props: {
   onSwitchToEveryone?: () => void;
   /** Refresh the stories strip after sharing a post to a story. */
   onStoryPosted?: () => void;
+  /** Posts still uploading. Shown above the loaded feed until the server row arrives. */
+  pendingPosts?: CommunityPostRow[];
 }) {
   const { toast } = useToast();
   const pageSize = props.pageSize ?? 20;
@@ -444,17 +446,28 @@ export function FeedPostList(props: {
     if (props.savedOnly) {
       list = list.filter((p) => p.saved_by_me);
     }
-    if (useServerSearch) return list;
-    const q = (props.searchQuery ?? "").trim().toLowerCase();
-    if (!q) return list;
-    return list.filter((p) => {
-      if (p.body.toLowerCase().includes(q)) return true;
-      const m = authorMeta[p.author_id];
-      const name = (m?.name ?? "").toLowerCase();
-      const handle = (m?.public_handle ?? "").toLowerCase();
-      return name.includes(q) || handle.includes(q);
+    if (!useServerSearch) {
+      const q = (props.searchQuery ?? "").trim().toLowerCase();
+      if (q) {
+        list = list.filter((p) => {
+          if (p.body.toLowerCase().includes(q)) return true;
+          const m = authorMeta[p.author_id];
+          const name = (m?.name ?? "").toLowerCase();
+          const handle = (m?.public_handle ?? "").toLowerCase();
+          return name.includes(q) || handle.includes(q);
+        });
+      }
+    }
+    const known = new Set(list.map((p) => p.id));
+    const pending = (props.pendingPosts ?? []).filter((p) => {
+      if (known.has(p.id)) return false;
+      if (props.savedOnly) return false;
+      if (useServerSearch) return false;
+      if (topicFilter && p.topic !== topicFilter) return false;
+      return true;
     });
-  }, [posts, props.searchQuery, props.savedOnly, authorMeta, useServerSearch]);
+    return pending.length > 0 ? [...pending, ...list] : list;
+  }, [posts, props.searchQuery, props.savedOnly, props.pendingPosts, authorMeta, useServerSearch, topicFilter]);
 
   useEffect(() => {
     if (displayPosts.length === 0) return;

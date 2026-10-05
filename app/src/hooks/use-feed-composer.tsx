@@ -35,8 +35,12 @@ import { canEngageWithCommunityFeed, COMMUNITY_FEED_ENGAGE_REQUIRED_MESSAGE, use
 import { MAX_POST_VIDEO_BYTES } from "@/lib/community/posts-supabase";
 
 export type UseFeedComposerOptions = {
-  /** Called after a successful post (e.g. refresh feed list). */
-  onPosted?: (post: CommunityPostRow | null) => void;
+  /** Called after a successful post (e.g. refresh feed list). `pendingId` matches an optimistic row when one was shown. */
+  onPosted?: (post: CommunityPostRow | null, pendingId?: string) => void;
+  /** Show a local post immediately, before photos or video finish uploading. */
+  onOptimisticPost?: (post: CommunityPostRow) => void;
+  /** Remove that local post if sending fails. */
+  onOptimisticFailed?: (pendingId: string) => void;
   /** Close the bottom sheet after posting (typical on phone). */
   closeSheetOnPost?: boolean;
   /** Custom toast title on success; defaults to "Posted". */
@@ -352,6 +356,65 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
     return false;
   }, [composer, composerFiles.length, composerVideoFile, composerPostKind]);
 
+  function buildOptimisticPost(
+    pendingId: string,
+    imageUrls: string[],
+    videoUrl: string | null,
+    mentions: { userIds: string[]; mentionMap: Record<string, string> },
+  ): CommunityPostRow {
+    const trimmed = composer.trim();
+    let body = trimmed;
+    let postExtra: CommunityPostRow["post_extra"] = null;
+    if (composerPostKind === "poll") {
+      const question = pollQuestion.trim();
+      body = trimmed || question;
+      postExtra = {
+        question,
+        options: pollOptions.map((option) => option.trim()).filter(Boolean),
+      };
+    } else if (composerPostKind === "event") {
+      const title = eventTitle.trim();
+      body = trimmed || title;
+      const extra: { title: string; starts_at: string; location?: string; details?: string } = {
+        title,
+        starts_at: new Date(eventStartsAt).toISOString(),
+      };
+      const location = eventLocation.trim();
+      const details = eventDetails.trim();
+      if (location) extra.location = location;
+      if (details) extra.details = details;
+      postExtra = extra;
+    }
+    return {
+      id: pendingId,
+      author_id: user?.id ?? "",
+      body,
+      topic: composerTopic,
+      image_urls: videoUrl ? [] : imageUrls,
+      image_alt_texts: composerImageAlts,
+      video_url: videoUrl,
+      video_poster_url: null,
+      content_note: composerVideoFile ? VIDEO_POST_DEFAULT_CONTENT_NOTE : null,
+      post_kind: composerPostKind,
+      post_extra: postExtra,
+      mention_map: mentions.mentionMap,
+      mentioned_user_ids: mentions.userIds,
+      is_reported: false,
+      comment_count: 0,
+      like_count: 0,
+      liked_by_me: false,
+      interested_count: 0,
+      interested_by_me: false,
+      saved_by_me: false,
+      created_at: new Date().toISOString(),
+      author_preview: {
+        full_name: profile?.full_name ?? null,
+        avatar_url: profile?.avatar_url ?? null,
+        public_handle: profile?.public_handle ?? null,
+      },
+    };
+  }
+
   async function handlePost(e: FormEvent) {
     e.preventDefault();
     if (!user || !composerCanSubmit) return;
@@ -363,11 +426,27 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
       });
       return;
     }
+    if (composerPostKind === "event") {
+      const startDate = new Date(eventStartsAt);
+      if (Number.isNaN(startDate.getTime())) {
+        toast({ title: "Invalid date", description: "Choose a valid start date and time.", variant: "destructive" });
+        return;
+      }
+      if (startDate.getTime() < Date.now() - 60_000) {
+        toast({
+          title: "Date is in the past",
+          description: "Choose a start time in the future so people know when to show up.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
     setSubmitting(true);
     setSubmitStatusLabel(
       composerFiles.length > 0 ? "Preparing…" : composerVideoFile ? "Uploading…" : "Posting…",
     );
 
+    let pendingId: string | null = null;
     try {
       const mentions = await buildMentionsForPost(composer, user.id);
 
@@ -394,6 +473,14 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
         composerVideoFile ? "Uploading…" : imageFiles.length > 0 ? "Uploading…" : "Posting…",
       );
 
+      if (options.onOptimisticPost) {
+        pendingId = `pending:${crypto.randomUUID()}`;
+        const localImageUrls = imageFiles.map((file) => URL.createObjectURL(file));
+        const localVideoUrl = composerVideoFile ? URL.createObjectURL(composerVideoFile) : null;
+        options.onOptimisticPost(buildOptimisticPost(pendingId, localImageUrls, localVideoUrl, mentions));
+        if (options.closeSheetOnPost !== false) setSheetOpen(false);
+      }
+
       let res: { data: CommunityPostRow | null; error: Error | null };
       if (composerPostKind === "standard") {
         res = await insertFeedPost({
@@ -419,25 +506,12 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
           mentions,
         });
       } else {
-        const startDate = new Date(eventStartsAt);
-        if (Number.isNaN(startDate.getTime())) {
-          toast({ title: "Invalid date", description: "Choose a valid start date and time.", variant: "destructive" });
-          return;
-        }
-        if (startDate.getTime() < Date.now() - 60_000) {
-          toast({
-            title: "Date is in the past",
-            description: "Choose a start time in the future so people know when to show up.",
-            variant: "destructive",
-          });
-          return;
-        }
         res = await insertFeedPost({
           kind: "event",
           topic: composerTopic,
           body: composer,
           title: eventTitle,
-          startsAt: startDate.toISOString(),
+          startsAt: new Date(eventStartsAt).toISOString(),
           location: eventLocation.trim() || undefined,
           details: eventDetails.trim() || undefined,
           imageFiles: imageFiles.length ? imageFiles : undefined,
@@ -447,13 +521,17 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
       }
 
       if (res.error) {
+        if (pendingId) {
+          options.onOptimisticFailed?.(pendingId);
+          if (options.closeSheetOnPost !== false) setSheetOpen(true);
+        }
         toast({ title: "Post failed", description: res.error.message, variant: "destructive" });
         return;
       }
       const postedKind = composerPostKind;
       resetComposerAfterPost();
-      if (options.closeSheetOnPost !== false) setSheetOpen(false);
-      options.onPosted?.(res.data);
+      if (!pendingId && options.closeSheetOnPost !== false) setSheetOpen(false);
+      options.onPosted?.(res.data, pendingId ?? undefined);
       if (!options.suppressPostedToast) {
         toast({
           title:
@@ -462,6 +540,16 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
           description: options.postedToastDescription,
         });
       }
+    } catch (err) {
+      if (pendingId) {
+        options.onOptimisticFailed?.(pendingId);
+        if (options.closeSheetOnPost !== false) setSheetOpen(true);
+      }
+      toast({
+        title: "Post failed",
+        description: err instanceof Error ? err.message : "Try again.",
+        variant: "destructive",
+      });
     } finally {
       setSubmitting(false);
       setSubmitStatusLabel(null);
