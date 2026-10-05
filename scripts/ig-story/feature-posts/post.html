@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1080px; height: 1350px; }
+  body {
+    font-family: -apple-system, "SF Pro Display", "Helvetica Neue", "Segoe UI", Arial, sans-serif;
+    background: #060d1d;
+    color: #fff;
+    overflow: hidden;
+  }
+  .bg {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 90% 50% at 70% 42%, rgba(43, 84, 165, 0.42) 0%, rgba(43, 84, 165, 0) 68%),
+      radial-gradient(ellipse 50% 30% at 18% 18%, rgba(245, 183, 61, 0.10) 0%, rgba(245, 183, 61, 0) 70%),
+      linear-gradient(180deg, #08101f 0%, #0a1428 40%, #07101c 100%);
+  }
+  .content {
+    position: relative;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 64px 72px 52px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+  }
+  .brand img { width: 52px; height: 52px; object-fit: contain; filter: invert(1); }
+  .brand span { font-size: 34px; font-weight: 650; letter-spacing: 0.2px; }
+  .kicker {
+    margin-top: 28px;
+    text-align: center;
+    font-size: 22px;
+    font-weight: 650;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #f5b73d;
+  }
+  h1 {
+    margin-top: 12px;
+    text-align: center;
+    font-size: 64px;
+    font-weight: 800;
+    letter-spacing: -1.4px;
+    line-height: 1.02;
+  }
+  h1 em { font-style: normal; color: #f5b73d; }
+  .sub {
+    margin-top: 16px;
+    text-align: center;
+    font-size: 28px;
+    line-height: 1.35;
+    color: rgba(214, 223, 240, 0.82);
+  }
+  .phone-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+    margin-top: 28px;
+  }
+  .phone {
+    height: 100%;
+    max-height: 860px;
+    aspect-ratio: 471 / 804;
+    border-radius: 54px;
+    padding: 12px;
+    background: linear-gradient(160deg, #2a3a58 0%, #101a2e 62%);
+    box-shadow:
+      0 36px 80px rgba(0,0,0,0.55),
+      0 0 70px rgba(43, 84, 165, 0.28),
+      inset 0 1px 0 rgba(255,255,255,0.16);
+  }
+  .screen {
+    height: 100%;
+    border-radius: 42px;
+    overflow: hidden;
+    background: #eef3fb;
+  }
+  .screen img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center top;
+  }
+  .footer {
+    margin-top: 26px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+  }
+  .cta-row { display: flex; align-items: center; gap: 22px; }
+  .cta {
+    background: linear-gradient(180deg, #f9cb5a 0%, #e8a52a 100%);
+    color: #0a1428;
+    font-weight: 750;
+    font-size: 28px;
+    padding: 16px 36px;
+    border-radius: 999px;
+  }
+  .note {
+    font-size: 22px;
+    letter-spacing: 2.4px;
+    text-transform: uppercase;
+    color: rgba(176, 188, 210, 0.72);
+    font-weight: 600;
+  }
+  .legal {
+    font-size: 18px;
+    color: rgba(176, 188, 210, 0.55);
+  }
+</style>
+</head>
+<body>
+  <div class="bg"></div>
+  <div class="content">
+    <div class="brand">
+      <img src="../../../branding/logo-300x300.png" alt="" />
+      <span>Diabeaters</span>
+    </div>
+    <div class="kicker" id="kicker"></div>
+    <h1 id="title"></h1>
+    <p class="sub" id="sub"></p>
+    <div class="phone-wrap">
+      <div class="phone">
+        <div class="screen">
+          <img id="shot" alt="" />
+        </div>
+      </div>
+    </div>
+    <div class="footer">
+      <div class="cta-row">
+        <div class="cta">Download free</div>
+        <div class="note">Link in bio</div>
+      </div>
+      <div class="legal">Lifestyle support, not medical advice.</div>
+    </div>
+  </div>
+</body>
+</html>
