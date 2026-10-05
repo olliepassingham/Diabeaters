@@ -27,7 +27,7 @@ type FeedComposerSheetProps = {
   pillTestId?: string;
   formTestId?: string;
   footer?: ReactNode;
-  /** e.g. video trim sheet from `useFeedComposer().videoTrimSheet`. */
+  /** e.g. stable file inputs + video trim sheet from `useFeedComposer().composerExtras`. */
   extras?: ReactNode;
   disabled?: boolean;
 };

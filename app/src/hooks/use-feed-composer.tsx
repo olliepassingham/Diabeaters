@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { Capacitor } from "@capacitor/core";
 import { useToast } from "@/hooks/use-toast";
 import { useCommunityTopicOrder } from "@/hooks/use-community-topic-order";
 import type { ComposerPostKind, FeedComposerFormBodyProps } from "@/components/community/feed-composer-form-body";
@@ -24,7 +26,11 @@ import { defaultEventStartsAtLocal } from "@/lib/community/event-display";
 import { isLikelyImageFile, pickPostImagesFromLibrary } from "@/lib/community/pick-post-images";
 import { preparePostImageFiles } from "@/lib/community/prepare-post-image";
 import type { PreparedPostVideo } from "@/lib/community/prepare-post-video";
-import { clickHiddenFileInput } from "@/lib/click-hidden-file-input";
+import {
+  beginFilePickerHold,
+  clickHiddenFileInput,
+  FILE_INPUT_HIDDEN_CLASS,
+} from "@/lib/click-hidden-file-input";
 import { canEngageWithCommunityFeed, COMMUNITY_FEED_ENGAGE_REQUIRED_MESSAGE, useProfile } from "@/lib/profile";
 import { MAX_POST_VIDEO_BYTES } from "@/lib/community/posts-supabase";
 
@@ -147,17 +153,18 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
 
   async function onPickImages(files: FileList | null) {
     if (!files?.length) return;
+    // Snapshot before any clears or awaits — FileList is live on some phones.
+    const list = Array.from(files);
     setComposerVideoFile(null);
+    setComposerVideoPosterFile(null);
     if (videoInputRef.current) videoInputRef.current.value = "";
     const raw: File[] = [];
-    for (let i = 0; i < files.length; i++) {
-      const f = files[i];
+    for (const f of list) {
       if (!f) continue;
       if (composerFiles.length + raw.length >= MAX_POST_IMAGES) break;
       if (!isLikelyImageFile(f)) continue;
       raw.push(f);
     }
-    // Snapshot first, then clear — FileList is live and dies if the input resets.
     const picked = raw.slice();
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (picked.length === 0) {
@@ -169,6 +176,8 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
       return;
     }
 
+    // Keep / reopen the composer so the attach is visible after the OS picker closes.
+    setSheetOpen(true);
     setComposerFiles((prev) => [...prev, ...picked].slice(0, MAX_POST_IMAGES));
 
     const prepared = await preparePostImageFiles(picked);
@@ -186,14 +195,16 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
   }
 
   async function onPickVideo(files: FileList | null) {
-    const f = files?.[0];
+    const f = files?.[0] ?? null;
     if (!f) return;
-    if (!isLikelyVideoFile(f)) {
+    // Keep a stable File reference before clearing the input.
+    const picked = f;
+    if (!isLikelyVideoFile(picked)) {
       toast({ title: "Unsupported file", description: "Choose an MP4, MOV, or WebM video.", variant: "destructive" });
       if (videoInputRef.current) videoInputRef.current.value = "";
       return;
     }
-    if (f.size > MAX_POST_VIDEO_BYTES) {
+    if (picked.size > MAX_POST_VIDEO_BYTES) {
       toast({
         title: "Video too large",
         description: "Keep the file to 50MB or smaller.",
@@ -202,8 +213,9 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
       if (videoInputRef.current) videoInputRef.current.value = "";
       return;
     }
-    // Open the trim sheet even for long clips — cutting happens before the hard duration check.
-    setTrimSourceFile(f);
+    // Keep the composer open under the trim sheet after the OS picker closes.
+    setSheetOpen(true);
+    setTrimSourceFile(picked);
     setTrimSheetOpen(true);
     if (videoInputRef.current) videoInputRef.current.value = "";
   }
@@ -218,6 +230,7 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
       setComposerTopic("tips-what-worked");
     }
     setTrimSourceFile(null);
+    setSheetOpen(true);
   }
 
   function removeComposerVideo() {
@@ -228,9 +241,12 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
   }
 
   async function pickImagesFromLibraryOnly() {
+    // Nested hold: keep the sheet open while Camera returns AND while we compress/apply.
+    const endHold = Capacitor.isNativePlatform() ? beginFilePickerHold() : () => {};
     try {
       const newFiles = await pickPostImagesFromLibrary(composerFiles.length, fileInputRef.current);
       if (newFiles.length > 0) {
+        setSheetOpen(true);
         const prepared = await preparePostImageFiles(newFiles);
         if (prepared.error) {
           toast({
@@ -254,6 +270,8 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
         description: e instanceof Error ? e.message : "Try selecting from your camera roll.",
         variant: "destructive",
       });
+    } finally {
+      endHold();
     }
   }
 
@@ -439,6 +457,56 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
     }
   }
 
+  const imagesDisabled =
+    submitting ||
+    !user ||
+    !canComposeToFeed ||
+    composerFiles.length >= MAX_POST_IMAGES ||
+    Boolean(composerVideoFile);
+  const videoDisabled =
+    submitting ||
+    !user ||
+    !canComposeToFeed ||
+    composerPostKind !== "standard" ||
+    Boolean(composerVideoFile) ||
+    composerFiles.length > 0;
+
+  // Keep file inputs mounted outside the drawer so a dismiss race cannot destroy
+  // them mid-picker (that used to drop the first photo/video selection on phones).
+  const mediaFileInputs: ReactNode =
+    typeof document !== "undefined"
+      ? createPortal(
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,.heic,.heif"
+              multiple
+              className={FILE_INPUT_HIDDEN_CLASS}
+              id="feed-composer-images"
+              disabled={imagesDisabled}
+              onChange={(e) => {
+                const list = e.target.files;
+                void onPickImages(list);
+              }}
+            />
+            <input
+              ref={videoInputRef}
+              type="file"
+              accept="video/*"
+              className={FILE_INPUT_HIDDEN_CLASS}
+              id="feed-composer-video"
+              disabled={videoDisabled}
+              onChange={(e) => {
+                const list = e.target.files;
+                void onPickVideo(list);
+              }}
+            />
+          </>,
+          document.body,
+        )
+      : null;
+
   const videoTrimSheet: ReactNode = (
     <FeedVideoTrimSheet
       open={trimSheetOpen}
@@ -449,6 +517,13 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
       }}
       onConfirm={onTrimConfirm}
     />
+  );
+
+  const composerExtras: ReactNode = (
+    <>
+      {mediaFileInputs}
+      {videoTrimSheet}
+    </>
   );
 
   const formBodyProps: FeedComposerFormBodyProps = {
@@ -482,10 +557,7 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
     removeComposerVideo,
     composerImageAlts,
     setComposerImageAlts,
-    fileInputRef,
     videoInputRef,
-    onPickImages,
-    onPickVideo,
     pickImagesFromLibraryOnly,
     onPollModeClick,
     onEventModeClick,
@@ -509,5 +581,6 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
     handlePost,
     composer,
     videoTrimSheet,
+    composerExtras,
   };
 }

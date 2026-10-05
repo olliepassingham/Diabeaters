@@ -730,7 +730,7 @@ export default function CommunityHomePage() {
         showPill={false}
         pillTestId="feed-composer-mobile-pill"
         formTestId="feed-composer-form-sheet"
-        extras={feedComposer.videoTrimSheet}
+        extras={feedComposer.composerExtras}
       />
 
       <div className="space-y-2.5">

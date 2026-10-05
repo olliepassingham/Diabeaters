@@ -14,7 +14,7 @@ type PointerSnapshot = {
 /**
  * Radix/Vaul set `pointer-events: none` on body while a sheet is open. iOS then
  * swallows the first tap inside the system photo picker. Unlock until the picker
- * is gone (native plugin await, or window focus after a file input).
+ * is gone (native plugin await, or a real return from the OS picker).
  */
 export function unlockSystemPickerPointerEvents(): () => void {
   if (typeof document === "undefined") return () => {};
@@ -44,19 +44,55 @@ export function unlockSystemPickerPointerEvents(): () => void {
   };
 }
 
-/** Unlock body pointer-events until the system picker is dismissed. */
-export function armSystemPickerPointerUnlock(): void {
+/**
+ * Unlock body pointer-events until the system picker is actually dismissed.
+ *
+ * Do not restore on the first `focus` event — phones often fire focus/blur while
+ * the picker is opening, which used to re-lock the page and swallow the first
+ * thumbnail tap (so attaching took two tries).
+ */
+export function armSystemPickerPointerUnlock(): () => void {
   const restore = unlockSystemPickerPointerEvents();
+  let closed = false;
+  let sawHide = false;
+  let focusTimer: number | null = null;
+  const openedAt = Date.now();
+
   const finish = () => {
-    window.removeEventListener("focus", finish);
+    if (closed) return;
+    closed = true;
+    window.removeEventListener("focus", onFocus);
     document.removeEventListener("visibilitychange", onVis);
+    if (focusTimer != null) window.clearTimeout(focusTimer);
     window.setTimeout(restore, 400);
   };
+
   const onVis = () => {
-    if (document.visibilityState === "visible") finish();
+    if (document.visibilityState === "hidden") {
+      sawHide = true;
+      return;
+    }
+    if (sawHide) finish();
   };
-  window.addEventListener("focus", finish);
+
+  const onFocus = () => {
+    // Ignore focus churn while the picker is still opening.
+    if (Date.now() - openedAt < 700) return;
+    if (focusTimer != null) window.clearTimeout(focusTimer);
+    // Give `change` a moment to win if the user selected a file.
+    focusTimer = window.setTimeout(() => {
+      if (document.visibilityState === "hidden") return;
+      finish();
+    }, 350);
+  };
+
   document.addEventListener("visibilitychange", onVis);
+  window.setTimeout(() => {
+    if (closed) return;
+    window.addEventListener("focus", onFocus);
+  }, 500);
+
+  return finish;
 }
 
 /**
@@ -92,7 +128,7 @@ function retainFilePicker(): () => void {
 }
 
 /** How long to keep the sheet from dismissing after the OS picker closes. */
-const PICKER_SETTLE_MS = 600;
+export const PICKER_SETTLE_MS = 1000;
 
 /**
  * Hold surrounding sheets open for a system picker, and for a short beat after it
@@ -112,26 +148,51 @@ export function beginFilePickerHold(): () => void {
 /** Arm pointer-events and keep the surrounding sheet open for this input's picker. */
 export function prepareFileInputForPicker(input: HTMLInputElement | null | undefined): void {
   if (!input || input.disabled) return;
-  armSystemPickerPointerUnlock();
-  const release = beginFilePickerHold();
+  const restorePointer = unlockSystemPickerPointerEvents();
+  const releaseHold = beginFilePickerHold();
   let closed = false;
+  let sawHide = false;
+  let focusTimer: number | null = null;
+  const openedAt = Date.now();
+
   const finish = () => {
     if (closed) return;
     closed = true;
     input.removeEventListener("change", onChange);
     input.removeEventListener("cancel", onCancel);
     window.removeEventListener("focus", onFocus);
-    release();
+    document.removeEventListener("visibilitychange", onVis);
+    if (focusTimer != null) window.clearTimeout(focusTimer);
+    window.setTimeout(restorePointer, 400);
+    releaseHold();
   };
+
   const onChange = () => finish();
   const onCancel = () => finish();
-  const onFocus = () => finish();
+  const onVis = () => {
+    if (document.visibilityState === "hidden") {
+      sawHide = true;
+      return;
+    }
+    if (sawHide) finish();
+  };
+  const onFocus = () => {
+    // Ignore the blur/focus noise phones fire while the picker is still opening.
+    if (Date.now() - openedAt < 700) return;
+    if (focusTimer != null) window.clearTimeout(focusTimer);
+    focusTimer = window.setTimeout(() => {
+      if (document.visibilityState === "hidden") return;
+      finish();
+    }, 350);
+  };
+
   input.addEventListener("change", onChange);
   input.addEventListener("cancel", onCancel);
+  document.addEventListener("visibilitychange", onVis);
   window.setTimeout(() => {
     if (closed) return;
     window.addEventListener("focus", onFocus);
-  }, 0);
+  }, 500);
 }
 
 /** Programmatic file-input click that keeps the first Photos tap working. */

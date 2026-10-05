@@ -55,7 +55,7 @@ export function CommunityQuickPostWidget(_props: DashboardWidgetLayoutProps) {
           disabled={!user}
           pillTestId="dashboard-feed-composer-pill"
           formTestId="dashboard-feed-composer-form"
-          extras={composer.videoTrimSheet}
+          extras={composer.composerExtras}
           footer={
             !composer.hasFeedHandle ? (
               <p className="mt-2 text-xs text-muted-foreground">

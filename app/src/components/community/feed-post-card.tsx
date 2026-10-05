@@ -1049,7 +1049,9 @@ export function FeedPostCard({
                   aria-label="Attach photo"
                   data-testid="input-comment-photo"
                   className="file-input-overlay"
-                  onClick={() => armSystemPickerPointerUnlock()}
+                  onClick={() => {
+                    armSystemPickerPointerUnlock();
+                  }}
                   onChange={(e) => {
                     const f = e.target.files?.[0];
                     if (f) applyCommentImage(f);
