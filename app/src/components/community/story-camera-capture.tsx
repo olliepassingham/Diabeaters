@@ -51,7 +51,6 @@ export function StoryCameraCapture({ active, onClose, onCapture, onLibrary }: Pr
   const [recording, setRecording] = useState(false);
   const [recordMs, setRecordMs] = useState(0);
   const [ready, setReady] = useState(false);
-  const [session, setSession] = useState(0);
   const mountedRef = useRef(true);
 
   function stopStream() {
@@ -73,18 +72,6 @@ export function StoryCameraCapture({ active, onClose, onCapture, onLibrary }: Pr
       mountedRef.current = false;
     };
   }, []);
-
-  useEffect(() => {
-    if (!active) return;
-    const resume = () => {
-      window.setTimeout(() => {
-        if (!mountedRef.current || streamRef.current) return;
-        setSession((current) => current + 1);
-      }, 250);
-    };
-    window.addEventListener("focus", resume);
-    return () => window.removeEventListener("focus", resume);
-  }, [active]);
 
   useEffect(() => {
     if (!active) {
@@ -129,7 +116,7 @@ export function StoryCameraCapture({ active, onClose, onCapture, onLibrary }: Pr
       }
       stopStream();
     };
-  }, [active, facing, session]);
+  }, [active, facing]);
 
   function switchMode(next: StoryCameraMode) {
     if (recording) return;
