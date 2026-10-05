@@ -418,7 +418,7 @@ export default function CommunityPostPage() {
   function replyFocus() {
     setExpanded(true);
     requestAnimationFrame(() => {
-      requestAnimationFrame(() => commentInputRef.current?.focus());
+      requestAnimationFrame(() => commentInputRef.current?.focus({ preventScroll: true }));
     });
   }
 

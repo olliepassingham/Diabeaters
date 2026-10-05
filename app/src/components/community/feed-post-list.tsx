@@ -912,7 +912,7 @@ export function FeedPostList(props: {
                 onReplyFocus={() => {
                   setExpanded((m) => ({ ...m, [post.id]: true }));
                   void ensureCommentsLoaded(post.id);
-                  window.setTimeout(() => commentInputRefs.current[post.id]?.focus(), 0);
+                  window.setTimeout(() => commentInputRefs.current[post.id]?.focus({ preventScroll: true }), 0);
                 }}
                 onLike={() => void onLike(post.id)}
                 onEventInterest={

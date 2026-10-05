@@ -38,6 +38,8 @@ type MentionTextareaProps = {
   bare?: boolean;
   /** Focus when the composer opens. Re-runs when this flips to true. */
   autoFocus?: boolean;
+  /** Open @mention results above the field (comment bar sits on the keyboard). */
+  suggestionsAbove?: boolean;
 };
 
 export function MentionTextarea({
@@ -56,6 +58,7 @@ export function MentionTextarea({
   maxGrowPx = 160,
   bare = false,
   autoFocus = false,
+  suggestionsAbove = false,
 }: MentionTextareaProps) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [suggestions, setSuggestions] = useState<MentionSuggestion[]>([]);
@@ -154,7 +157,7 @@ export function MentionTextarea({
   }, [mentionStart]);
 
   return (
-    <div className="relative space-y-1.5">
+    <div className={cn("relative", suggestionsAbove ? "flex flex-col-reverse gap-1.5" : "space-y-1.5")}>
       <Textarea
         ref={(el) => {
           textareaRef.current = el;
@@ -193,7 +196,10 @@ export function MentionTextarea({
       {mentionStart != null ? (
         <div
           id="mention-suggestions"
-          className="rounded-lg border border-border/50 bg-muted/20 p-2 dark:bg-muted/15"
+          className={cn(
+            "rounded-lg border border-border/50 bg-muted/20 p-2 dark:bg-muted/15",
+            suggestionsAbove && "max-h-40 overflow-y-auto",
+          )}
           role="listbox"
         >
           {suggestLoading ? <p className="px-1 text-xs text-muted-foreground">Searching handles…</p> : null}

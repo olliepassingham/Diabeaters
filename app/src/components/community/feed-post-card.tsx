@@ -1,4 +1,5 @@
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Link, useLocation } from "wouter";
 import {
   Bookmark,
@@ -258,6 +259,10 @@ export function FeedPostCard({
   const onLikersLoadedRef = useRef(onLikersLoaded);
   onLikersLoadedRef.current = onLikersLoaded;
 
+  const [commentFocused, setCommentFocused] = useState(false);
+  const [commentBarHeight, setCommentBarHeight] = useState(0);
+  const commentComposerRef = useRef<HTMLDivElement>(null);
+  const commentSlotRef = useRef<HTMLDivElement>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [shareHandle, setShareHandle] = useState("");
   const [shareNote, setShareNote] = useState("");
@@ -308,6 +313,65 @@ export function FeedPostCard({
     setCommentImagePreviewUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [commentImage]);
+
+  useEffect(() => {
+    if (!commentFocused) return;
+    document.documentElement.setAttribute("data-comment-keyboard", "");
+    return () => document.documentElement.removeAttribute("data-comment-keyboard");
+  }, [commentFocused]);
+
+  useLayoutEffect(() => {
+    const el = commentComposerRef.current;
+    if (!el) return;
+    const measure = () => setCommentBarHeight(el.offsetHeight);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [commentFocused, commentImagePreviewUrl, commentDraft, expanded]);
+
+  useLayoutEffect(() => {
+    const el = commentComposerRef.current;
+    const slot = commentSlotRef.current;
+    if (!el || !slot) return;
+
+    if (commentFocused) {
+      el.style.position = "";
+      el.style.top = "";
+      el.style.left = "";
+      el.style.width = "";
+      el.style.right = "";
+      el.style.transform = "";
+      el.style.zIndex = "";
+      return;
+    }
+
+    const place = () => {
+      if (el.classList.contains("comment-composer-pinned")) return;
+      const rect = slot.getBoundingClientRect();
+      el.style.position = "fixed";
+      el.style.top = `${rect.top}px`;
+      el.style.left = `${rect.left}px`;
+      el.style.width = `${rect.width}px`;
+      el.style.right = "auto";
+      el.style.transform = "none";
+      el.style.zIndex = "20";
+    };
+
+    place();
+    const scroller = document.getElementById("app-scroll-main");
+    scroller?.addEventListener("scroll", place, { passive: true });
+    window.addEventListener("resize", place);
+    const vv = window.visualViewport;
+    vv?.addEventListener("resize", place);
+    vv?.addEventListener("scroll", place);
+    return () => {
+      scroller?.removeEventListener("scroll", place);
+      window.removeEventListener("resize", place);
+      vv?.removeEventListener("resize", place);
+      vv?.removeEventListener("scroll", place);
+    };
+  }, [commentFocused, commentBarHeight, expanded]);
 
   const [likersOpen, setLikersOpen] = useState(false);
   const [likersLoading, setLikersLoading] = useState(false);
@@ -1019,7 +1083,35 @@ export function FeedPostCard({
               )}
             </div>
           )}
-          <div className="space-y-2">
+          <div ref={commentSlotRef} aria-hidden className="pointer-events-none" style={{ height: commentBarHeight || 56 }} />
+          {createPortal(
+            <div
+              ref={commentComposerRef}
+              data-comment-composer=""
+              onPointerDown={(event) => {
+                const target = event.target;
+                if (!(target instanceof Element) || !target.closest("textarea")) return;
+                event.currentTarget.classList.add("comment-composer-pinned");
+                document.documentElement.setAttribute("data-comment-keyboard", "");
+                setCommentFocused(true);
+              }}
+              onFocus={(event) => {
+                event.currentTarget.classList.add("comment-composer-pinned");
+                document.documentElement.setAttribute("data-comment-keyboard", "");
+                setCommentFocused(true);
+              }}
+              onBlur={(event) => {
+                const next = event.relatedTarget;
+                if (next instanceof Node && event.currentTarget.contains(next)) return;
+                window.setTimeout(() => {
+                  const root = commentComposerRef.current;
+                  if (root?.contains(document.activeElement)) return;
+                  root?.classList.remove("comment-composer-pinned");
+                  setCommentFocused(false);
+                }, 160);
+              }}
+              className={cn("space-y-2", commentFocused && "comment-composer-pinned")}
+            >
             {commentImagePreviewUrl ? (
               <div className="flex items-start gap-2 rounded-2xl border border-border/50 bg-muted/30 p-2">
                 <img src={commentImagePreviewUrl} alt="" className="max-h-28 rounded-xl object-cover" />
@@ -1072,6 +1164,7 @@ export function FeedPostCard({
                     autoGrow
                     maxGrowPx={148}
                     bare
+                    suggestionsAbove={commentFocused}
                     placeholder={mayEngage ? "Add a comment…" : "Set up your @handle to comment"}
                     disabled={!mayEngage}
                     className="min-h-10 resize-none px-0 py-2 text-[15px] leading-snug"
@@ -1088,7 +1181,9 @@ export function FeedPostCard({
                 </Button>
               </div>
             </div>
-          </div>
+            </div>,
+            document.body,
+          )}
         </div>
       ) : null}
     </article>
