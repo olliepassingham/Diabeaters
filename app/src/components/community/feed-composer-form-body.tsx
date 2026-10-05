@@ -3,13 +3,6 @@ import { BarChart2, Calendar, ImagePlus, Plus, Send, Video, X } from "lucide-rea
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { MentionTextarea } from "@/components/community/mention-textarea";
 import { Textarea } from "@/components/ui/textarea";
 import { InlineInfoHint } from "@/components/ui/field-label-with-info";
@@ -62,6 +55,10 @@ export type FeedComposerFormBodyProps = {
   composerCanSubmit: boolean;
   guidedVideoMaxSeconds: number;
   formatVideoDurationSeconds: (totalSeconds: number) => string;
+  /** Focus the main text field when the phone sheet opens. */
+  autoFocusComposer?: boolean;
+  /** Phone sheet puts Post in the header so the keyboard never covers it. */
+  hideInlineSubmit?: boolean;
 };
 
 export function FeedComposerFormBody({
@@ -102,6 +99,8 @@ export function FeedComposerFormBody({
   composerCanSubmit,
   guidedVideoMaxSeconds,
   formatVideoDurationSeconds,
+  autoFocusComposer = false,
+  hideInlineSubmit = false,
 }: FeedComposerFormBodyProps) {
   const audienceInfo =
     "Posts are shared to the Diabeaters community feed. Avoid personal identifiers. Be kind — report anything unsafe.";
@@ -112,31 +111,36 @@ export function FeedComposerFormBody({
   const videoDurationOverGuide =
     composerVideoDurationSeconds != null && composerVideoDurationSeconds > guidedVideoMaxSeconds;
 
+  const topicDisabled = submitting || !user || !canComposeToFeed;
+
   return (
     <>
-      <div className="space-y-1.5">
-        <Label htmlFor="feed-topic" className="text-xs font-medium text-muted-foreground">
-          Topic
-        </Label>
-        <Select
-          value={composerTopic}
-          onValueChange={(v) => setComposerTopic(v as CommunityTopicId)}
-          disabled={submitting || !user || !canComposeToFeed}
-        >
-          <SelectTrigger
-            id="feed-topic"
-            className="h-12 w-full rounded-xl border-border/60 bg-muted/25 text-foreground dark:bg-muted/30 dark:text-foreground [&>span]:text-foreground"
-          >
-            <SelectValue placeholder="Choose a topic" />
-          </SelectTrigger>
-          <SelectContent>
-            {orderedTopics.map((t) => (
-              <SelectItem key={t.id} value={t.id}>
-                {t.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div
+        className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        role="radiogroup"
+        aria-label="Topic"
+      >
+        {orderedTopics.map((t) => {
+          const selected = composerTopic === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              disabled={topicDisabled}
+              onClick={() => setComposerTopic(t.id)}
+              className={cn(
+                "shrink-0 rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors",
+                selected
+                  ? "bg-foreground text-background"
+                  : "bg-muted/80 text-muted-foreground active:bg-muted",
+              )}
+            >
+              {t.label}
+            </button>
+          );
+        })}
       </div>
       {composerPostKind === "poll" ? (
         <div className="min-w-0 space-y-3 overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-b from-primary/[0.05] to-muted/15 p-3.5 text-foreground dark:from-primary/[0.08]">
@@ -345,25 +349,31 @@ export function FeedComposerFormBody({
         </div>
       ) : null}
       {composerPostKind === "standard" ? (
-      <div className="min-w-0 space-y-1.5">
-        <div className="flex items-center justify-between gap-2">
-          <Label className="text-sm font-medium text-foreground">Post</Label>
-          <InlineInfoHint ariaLabel="Who can see this?" content={audienceInfo} />
-        </div>
+      <div className="min-w-0">
         <MentionTextarea
           value={composer}
           onChange={setComposer}
           currentUserId={user?.id}
-          hideHint={false}
+          hideHint
+          bare
+          autoGrow
+          maxGrowPx={320}
+          autoFocus={autoFocusComposer}
           placeholder={standardPlaceholder}
-          rows={3}
+          rows={6}
           maxLength={8000}
           disabled={submitting || !user || !canComposeToFeed}
+          className="min-h-[9.5rem] px-0.5 text-[17px] leading-snug"
         />
+        <div className="flex items-center justify-between gap-2 pt-0.5">
+          <p className="text-[11px] text-muted-foreground">Posts are shared with the community.</p>
+          {composer.length > 0 ? (
+            <p className="text-[11px] tabular-nums text-muted-foreground">{composer.length}/8000</p>
+          ) : (
+            <InlineInfoHint ariaLabel="Who can see this?" content={audienceInfo} />
+          )}
+        </div>
       </div>
-      ) : null}
-      {composerPostKind === "standard" ? (
-      <p className="text-right text-xs text-muted-foreground tabular-nums">{composer.length} / 8000</p>
       ) : null}
       {composerVideoPreview && composerPostKind === "standard" ? (
         <div className="space-y-2 rounded-xl border border-border/50 bg-muted/15 p-3 sm:p-3.5">
@@ -383,14 +393,11 @@ export function FeedComposerFormBody({
             <video src={composerVideoPreview} controls playsInline preload="metadata" className="max-h-64 w-full" />
           </div>
           <p className="text-[11px] leading-snug text-muted-foreground">
-            This clip shows in Watch and on the Feed. Aim for about {guidedVideoMaxSeconds}s. Marked as
-            experience only — not medical advice.
+            Aim for about {guidedVideoMaxSeconds}s. Shows in Watch and on the Feed.
             {composerVideoDurationSeconds != null
-              ? ` This clip is ${formatVideoDurationSeconds(composerVideoDurationSeconds)}.`
+              ? ` ${formatVideoDurationSeconds(composerVideoDurationSeconds)}.`
               : null}
-            {videoDurationOverGuide
-              ? ` Shorter is easier to watch (max ${MAX_POST_VIDEO_SECONDS}s).`
-              : null}
+            {videoDurationOverGuide ? ` Max ${MAX_POST_VIDEO_SECONDS}s.` : null}
           </p>
           {composerVideoFile?.name ? (
             <p className="truncate text-[11px] text-muted-foreground" title={composerVideoFile.name}>
@@ -442,36 +449,49 @@ export function FeedComposerFormBody({
         </div>
       ) : null}
       {composerPreviews.length > 0 ? (
-        <div className="space-y-2">
-          {composerPreviews.map((src, i) => (
-            <div key={src} className="space-y-1">
-              <Label htmlFor={`feed-composer-alt-${i}`} className="text-xs">
-                {composerPostKind === "event" && i === 0 ? "Cover photo description (optional)" : `Photo ${i + 1} description (optional)`}
-              </Label>
-              <Input
-                id={`feed-composer-alt-${i}`}
-                value={composerImageAlts[i] ?? ""}
-                onChange={(e) =>
-                  setComposerImageAlts((prev) => {
-                    const next = [...prev];
-                    next[i] = e.target.value.slice(0, 500);
-                    return next;
-                  })
-                }
-                placeholder="What’s in this image? Helps people using screen readers."
-                disabled={submitting || !user || !canComposeToFeed}
-                maxLength={500}
-              />
-            </div>
-          ))}
-        </div>
+        <details className="rounded-2xl border border-border/50 bg-muted/20">
+          <summary className="cursor-pointer list-none px-3 py-2.5 text-[13px] font-medium text-foreground [&::-webkit-details-marker]:hidden">
+            Add photo descriptions
+          </summary>
+          <div className="space-y-2 px-3 pb-3">
+            {composerPreviews.map((src, i) => (
+              <div key={src} className="space-y-1">
+                <Label htmlFor={`feed-composer-alt-${i}`} className="text-xs">
+                  {composerPostKind === "event" && i === 0 ? "Cover photo" : `Photo ${i + 1}`}
+                </Label>
+                <Input
+                  id={`feed-composer-alt-${i}`}
+                  value={composerImageAlts[i] ?? ""}
+                  onChange={(e) =>
+                    setComposerImageAlts((prev) => {
+                      const next = [...prev];
+                      next[i] = e.target.value.slice(0, 500);
+                      return next;
+                    })
+                  }
+                  placeholder="What’s in this image?"
+                  disabled={submitting || !user || !canComposeToFeed}
+                  maxLength={500}
+                  className="h-10"
+                />
+              </div>
+            ))}
+          </div>
+        </details>
       ) : null}
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div
+        className={cn(
+          "sticky bottom-0 z-10 mt-auto flex items-center gap-1 border-t border-border/40 bg-background/95 py-2 backdrop-blur-md",
+          hideInlineSubmit
+            ? "-mx-4 px-3 pb-[max(0.55rem,env(safe-area-inset-bottom,0px))]"
+            : "pt-3",
+        )}
+      >
         <Button
           type="button"
-          variant="outline"
-          size="sm"
-          className="h-11 rounded-full px-3.5"
+          variant="ghost"
+          size="icon"
+          className="h-11 w-11 rounded-full text-foreground"
           disabled={
             submitting ||
             !user ||
@@ -480,17 +500,16 @@ export function FeedComposerFormBody({
             Boolean(composerVideoFile)
           }
           onClick={() => void pickImagesFromLibraryOnly()}
-          aria-label="Add photos to post"
+          aria-label={composerPostKind === "event" ? "Add a cover photo" : "Add photos to post"}
         >
-          <ImagePlus className="h-4 w-4 mr-1.5" />
-          {composerPostKind === "event" ? "Cover photo" : "Photo"}
+          <ImagePlus className="h-5 w-5" />
         </Button>
         {composerPostKind === "standard" ? (
           <Button
             type="button"
-            variant="outline"
-            size="sm"
-            className="h-11 rounded-full px-3.5"
+            variant="ghost"
+            size="icon"
+            className="h-11 w-11 rounded-full text-foreground"
             disabled={
               submitting ||
               !user ||
@@ -501,55 +520,54 @@ export function FeedComposerFormBody({
             onClick={() => clickHiddenFileInput(videoInputRef.current)}
             aria-label="Add video to post"
           >
-            <Video className="h-4 w-4 mr-1.5" />
-            Video
+            <Video className="h-5 w-5" />
           </Button>
         ) : null}
         <Button
           type="button"
-          variant={composerPostKind === "poll" ? "default" : "outline"}
-          size="sm"
-          className="h-11 rounded-full px-3.5"
+          variant={composerPostKind === "poll" ? "secondary" : "ghost"}
+          size="icon"
+          className="h-11 w-11 rounded-full"
           disabled={submitting || !user}
           onClick={onPollModeClick}
           aria-pressed={composerPostKind === "poll"}
           aria-label={composerPostKind === "poll" ? "Switch to normal post" : "Add poll"}
         >
-          <BarChart2 className="h-4 w-4 mr-1.5" />
-          Poll
+          <BarChart2 className="h-5 w-5" />
         </Button>
         <Button
           type="button"
-          variant={composerPostKind === "event" ? "default" : "outline"}
-          size="sm"
-          className="h-11 rounded-full px-3.5"
+          variant={composerPostKind === "event" ? "secondary" : "ghost"}
+          size="icon"
+          className="h-11 w-11 rounded-full"
           disabled={submitting || !user}
           onClick={onEventModeClick}
           aria-pressed={composerPostKind === "event"}
           aria-label={composerPostKind === "event" ? "Switch to normal post" : "Add event"}
         >
-          <Calendar className="h-4 w-4 mr-1.5" />
-          Event
+          <Calendar className="h-5 w-5" />
         </Button>
         <InlineInfoHint
           ariaLabel="Media limits for posts"
-          content={`Up to ${MAX_POST_IMAGES} photos (5MB each) or one short video (~${guidedVideoMaxSeconds}s, max ${MAX_POST_VIDEO_SECONDS}s / ${videoMaxMb}MB, MP4/MOV/WebM). After you pick a video you can cut the length. Videos appear in Watch and on the Feed, and are labeled as peer experience only.`}
+          content={`Up to ${MAX_POST_IMAGES} photos (5MB each) or one short video (~${guidedVideoMaxSeconds}s, max ${MAX_POST_VIDEO_SECONDS}s / ${videoMaxMb}MB, MP4/MOV/WebM). After you pick a video you can cut the length.`}
         />
+        {hideInlineSubmit ? null : (
+          <Button
+            type="submit"
+            className="ml-auto h-10 rounded-full px-4 text-sm font-semibold"
+            disabled={submitting || !composerCanSubmit || !canComposeToFeed}
+          >
+            <Send className="mr-1.5 h-4 w-4" />
+            {submitting
+              ? "Posting…"
+              : composerPostKind === "event"
+                ? "Share event"
+                : composerPostKind === "poll"
+                  ? "Share poll"
+                  : "Post"}
+          </Button>
+        )}
       </div>
-      <Button
-        type="submit"
-        className="h-12 w-full rounded-xl text-base font-semibold"
-        disabled={submitting || !composerCanSubmit || !canComposeToFeed}
-      >
-        <Send className="h-4 w-4 mr-1.5" />
-        {submitting
-          ? "Posting…"
-          : composerPostKind === "event"
-            ? "Share event"
-            : composerPostKind === "poll"
-              ? "Share poll"
-              : "Post"}
-      </Button>
     </>
   );
 }

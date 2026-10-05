@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { ChevronDown, Plus } from "lucide-react";
+import { ChevronDown, PenLine, Plus } from "lucide-react";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { StoryAvatarRing } from "@/components/community/story-avatar-ring";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -217,6 +217,7 @@ export function FeedStoriesComposerHeader({
         />
       ) : null}
       <span className="min-w-0 flex-1 truncate text-[15px] text-muted-foreground">{composerPreview}</span>
+      {isMobile ? <PenLine className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden /> : null}
       {!isMobile ? (
         <ChevronDown
           className={cn(

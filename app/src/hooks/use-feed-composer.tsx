@@ -94,7 +94,7 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
     ? composer.trim()
     : composerVideoFile
       ? "Share a 30–60s tip from your day…"
-      : "Share something with the community…";
+      : "Write a post…";
   const avatarDisplayName = (profile?.full_name ?? user?.email ?? "You").trim() || "You";
   const avatarPath = profile?.avatar_url ?? null;
   const profileHref = user?.id ? `/community/profile/${encodeURIComponent(user.id)}` : undefined;
@@ -247,6 +247,7 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
       const newFiles = await pickPostImagesFromLibrary(composerFiles.length, fileInputRef.current);
       if (newFiles.length > 0) {
         setSheetOpen(true);
+        setComposerFiles((prev) => [...prev, ...newFiles].slice(0, MAX_POST_IMAGES));
         const prepared = await preparePostImageFiles(newFiles);
         if (prepared.error) {
           toast({
@@ -255,9 +256,10 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
             variant: "destructive",
           });
         }
-        if (prepared.files.length > 0) {
-          setComposerFiles((prev) => [...prev, ...prepared.files].slice(0, MAX_POST_IMAGES));
-        }
+        setComposerFiles((prev) => {
+          const kept = prev.filter((f) => !newFiles.includes(f));
+          return [...kept, ...prepared.files].slice(0, MAX_POST_IMAGES);
+        });
         // Native path returned files — safe to reset the fallback input.
         if (fileInputRef.current) fileInputRef.current.value = "";
       }

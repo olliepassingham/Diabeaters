@@ -12,10 +12,18 @@ export function CommunityFeedComposerDrawer({
   open,
   onOpenChange,
   children,
+  formId,
+  canSubmit,
+  submitting,
+  submitLabel = "Post",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   children: ReactNode;
+  formId: string;
+  canSubmit: boolean;
+  submitting: boolean;
+  submitLabel?: string;
 }) {
   const pickerActive = useSyncExternalStore(subscribeFilePickerActive, isFilePickerActive, () => false);
   return (
@@ -29,32 +37,38 @@ export function CommunityFeedComposerDrawer({
       }}
     >
       <Drawer.Portal>
-        <Drawer.Overlay className="fixed inset-0 z-[110] bg-black/80" />
+        <Drawer.Overlay className="fixed inset-0 z-[110] bg-black/55" />
         <Drawer.Content
           className={cn(
-            "fixed inset-x-0 bottom-0 z-[110] flex h-[min(92dvh,calc(100dvh-0.5rem))] max-h-[100dvh] flex-col overflow-hidden rounded-t-3xl border-t border-border/60 bg-background p-0 pt-2 text-foreground shadow-2xl outline-none",
+            "fixed inset-0 z-[110] flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-background p-0 text-foreground outline-none",
+            "pt-[env(safe-area-inset-top,0px)]",
           )}
         >
-          <div className="flex shrink-0 flex-col items-center px-4 pb-2 pt-1">
-            <Drawer.Handle
-              className="!h-1 !w-12 shrink-0 !rounded-full !bg-muted-foreground/40"
-              aria-label="Drag down to close"
-            />
-          </div>
-          <div className="relative shrink-0 space-y-1 px-4 pb-2 text-left">
+          <div className="flex shrink-0 items-center gap-1 border-b border-border/40 px-1.5 py-1.5" data-vaul-no-drag>
             <Drawer.Close
-              className="absolute right-1 top-0 rounded-sm p-2 text-foreground opacity-80 ring-offset-background transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="flex h-10 w-10 items-center justify-center rounded-full text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
               data-vaul-no-drag
             >
               <X className="h-5 w-5" aria-hidden />
               <span className="sr-only">Close</span>
             </Drawer.Close>
-            <Drawer.Title className="font-display pr-11 text-xl tracking-tight text-foreground">New post</Drawer.Title>
-            <Drawer.Description className="text-sm text-muted-foreground">
-              Text, photos, polls, or events.
+            <Drawer.Title className="min-w-0 flex-1 text-[17px] font-semibold tracking-tight text-foreground">
+              New post
+            </Drawer.Title>
+            <Drawer.Description className="sr-only">
+              Write a post, add a photo or video, or create a poll or event.
             </Drawer.Description>
+            <button
+              type="submit"
+              form={formId}
+              disabled={!canSubmit || submitting}
+              data-vaul-no-drag
+              className="mr-1.5 h-9 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground transition-opacity disabled:opacity-40"
+            >
+              {submitting ? "Posting…" : submitLabel}
+            </button>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[max(1.25rem,env(safe-area-inset-bottom,0px))]">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4">
             {children}
           </div>
         </Drawer.Content>

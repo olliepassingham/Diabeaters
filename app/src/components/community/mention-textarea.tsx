@@ -36,6 +36,8 @@ type MentionTextareaProps = {
    * (comment bar, reply strip) so you don't get a box-in-a-box.
    */
   bare?: boolean;
+  /** Focus when the composer opens. Re-runs when this flips to true. */
+  autoFocus?: boolean;
 };
 
 export function MentionTextarea({
@@ -53,6 +55,7 @@ export function MentionTextarea({
   autoGrow = false,
   maxGrowPx = 160,
   bare = false,
+  autoFocus = false,
 }: MentionTextareaProps) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [suggestions, setSuggestions] = useState<MentionSuggestion[]>([]);
@@ -72,6 +75,12 @@ export function MentionTextarea({
   useLayoutEffect(() => {
     syncAutoGrow();
   }, [value, syncAutoGrow]);
+
+  useEffect(() => {
+    if (!autoFocus || disabled) return;
+    const id = window.setTimeout(() => textareaRef.current?.focus(), 60);
+    return () => window.clearTimeout(id);
+  }, [autoFocus, disabled]);
 
   const refreshSuggestions = useCallback(
     (text: string, cursor: number) => {
@@ -169,6 +178,7 @@ export function MentionTextarea({
         placeholder={placeholder}
         rows={rows}
         disabled={disabled}
+        autoFocus={autoFocus}
         autoCapitalize="sentences"
         autoCorrect="on"
         spellCheck

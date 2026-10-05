@@ -75,13 +75,27 @@ export function FeedComposerSheet({
       ) : null}
 
       <Suspense fallback={null}>
-        <CommunityFeedComposerDrawerLazy open={open} onOpenChange={onOpenChange}>
+        <CommunityFeedComposerDrawerLazy
+          open={open}
+          onOpenChange={onOpenChange}
+          formId={formTestId}
+          canSubmit={formBodyProps.composerCanSubmit && formBodyProps.canComposeToFeed}
+          submitting={formBodyProps.submitting}
+          submitLabel={
+            formBodyProps.composerPostKind === "event"
+              ? "Share"
+              : formBodyProps.composerPostKind === "poll"
+                ? "Share"
+                : "Post"
+          }
+        >
           <form
+            id={formTestId}
             onSubmit={onSubmit}
-            className="min-w-0 space-y-3 pb-2 text-foreground"
+            className="flex min-h-full min-w-0 flex-col gap-3 pb-2 text-foreground"
             data-testid={formTestId}
           >
-            <FeedComposerFormBody {...formBodyProps} />
+            <FeedComposerFormBody {...formBodyProps} autoFocusComposer={open} hideInlineSubmit />
           </form>
         </CommunityFeedComposerDrawerLazy>
       </Suspense>

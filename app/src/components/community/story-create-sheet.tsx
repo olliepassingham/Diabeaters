@@ -4,6 +4,7 @@ import { Clock3, ImagePlus, Loader2, RefreshCw, Send, Video, X } from "lucide-re
 import heic2any from "heic2any";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Button } from "@/components/ui/button";
+import { StoryCameraCapture } from "@/components/community/story-camera-capture";
 import { StoryOverlayEditor } from "@/components/community/story-overlay-editor";
 import { useToast } from "@/hooks/use-toast";
 import { clickHiddenFileInput, FILE_INPUT_HIDDEN_CLASS, isFilePickerActive } from "@/lib/click-hidden-file-input";
@@ -311,6 +312,34 @@ export function StoryCreateSheet({
           </div>,
           document.body,
         )}
+      </>
+    );
+  }
+
+  if (open && !prefillFile) {
+    return (
+      <>
+        {fileInputs}
+        <StoryCameraCapture
+          active={open}
+          onClose={() => {
+            reset();
+            onOpenChange(false);
+          }}
+          onCapture={(picked) => {
+            void applyPickedFile(picked);
+          }}
+          onLibrary={(mode) => {
+            if (mode === "video") {
+              clickHiddenFileInput(videoInputRef.current);
+              return;
+            }
+            void (async () => {
+              const picked = await pickSingleImageFromLibrary(photoInputRef.current);
+              if (picked) await applyPickedFile(picked);
+            })();
+          }}
+        />
       </>
     );
   }
