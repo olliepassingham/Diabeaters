@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { CameraSource } from "@capacitor/camera";
 import { Capacitor } from "@capacitor/core";
-import { Clock3, ImagePlus, Loader2, RefreshCw, Send, Video, X } from "lucide-react";
+import { Camera, Clock3, ImagePlus, Loader2, RefreshCw, Send, Video, X } from "lucide-react";
 import heic2any from "heic2any";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,7 @@ import { StoryCameraCapture } from "@/components/community/story-camera-capture"
 import { StoryOverlayEditor } from "@/components/community/story-overlay-editor";
 import { useToast } from "@/hooks/use-toast";
 import { clickHiddenFileInput, FILE_INPUT_HIDDEN_CLASS, isFilePickerActive } from "@/lib/click-hidden-file-input";
-import { pickSingleImageFromLibrary } from "@/lib/community/pick-post-images";
+import { pickSinglePhoto } from "@/lib/community/pick-post-images";
 import {
   insertCommunityStory,
   MAX_STORY_BYTES,
@@ -29,6 +30,11 @@ type Props = {
   sourcePostId?: string | null;
 };
 
+function isIosDevice(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /iPad|iPhone|iPod/.test(navigator.userAgent);
+}
+
 function isHeicFile(file: File): boolean {
   const t = file.type.toLowerCase();
   const name = file.name.toLowerCase();
@@ -45,6 +51,43 @@ async function jpegFromHeic(file: File): Promise<File> {
   if (!blob) throw new Error("No image data returned");
   const base = file.name.replace(/\.(heic|heif)$/i, "") || "photo";
   return new File([blob], `${base}.jpg`, { type: "image/jpeg" });
+}
+
+function StoryDirectFileChoice({
+  icon,
+  title,
+  hint,
+  accept,
+  capture,
+  onFile,
+}: {
+  icon: ReactNode;
+  title: string;
+  hint: string;
+  accept: string;
+  capture?: "environment" | "user";
+  onFile: (file: File) => void;
+}) {
+  return (
+    <label className="relative flex h-14 w-full items-center gap-3 overflow-hidden rounded-2xl border border-border bg-card px-4 text-left active:bg-muted">
+      {icon}
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold">{title}</span>
+        <span className="block text-xs text-muted-foreground">{hint}</span>
+      </span>
+      <input
+        type="file"
+        accept={accept}
+        {...(capture ? { capture } : {})}
+        className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+        onChange={(event) => {
+          const picked = event.target.files?.[0] ?? null;
+          event.target.value = "";
+          if (picked) onFile(picked);
+        }}
+      />
+    </label>
+  );
 }
 
 function MediaPickCard({
@@ -86,10 +129,9 @@ export function StoryCreateSheet({
   const { toast } = useToast();
   const photoInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
-  const photoCaptureRef = useRef<HTMLInputElement>(null);
-  const videoCaptureRef = useRef<HTMLInputElement>(null);
-  const openedNativeCamera = useRef(false);
+  const pickingRef = useRef(false);
   const nativeApp = Capacitor.isNativePlatform();
+  const systemStoryPicker = nativeApp || isIosDevice();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [overlays, setOverlays] = useState<StoryOverlay[]>([]);
@@ -137,17 +179,6 @@ export function StoryCreateSheet({
 
   useEffect(() => {
     if (!open) {
-      openedNativeCamera.current = false;
-      return;
-    }
-    if (!nativeApp || prefillFile || openedNativeCamera.current) return;
-    openedNativeCamera.current = true;
-    const timer = window.setTimeout(() => clickHiddenFileInput(photoCaptureRef.current), 60);
-    return () => window.clearTimeout(timer);
-  }, [open, nativeApp, prefillFile]);
-
-  useEffect(() => {
-    if (!open) {
       appliedPrefill.current = null;
       return;
     }
@@ -166,6 +197,23 @@ export function StoryCreateSheet({
       return URL.createObjectURL(prefillFile);
     });
   }, [open, prefillFile, prefillOverlayText, sourcePostId]);
+
+  async function choosePhoto(source: CameraSource) {
+    if (pickingRef.current) return;
+    pickingRef.current = true;
+    try {
+      const picked = await pickSinglePhoto(source, nativeApp ? null : photoInputRef.current);
+      if (picked) await applyPickedFile(picked);
+    } catch (err) {
+      toast({
+        title: "Couldn't open that",
+        description: err instanceof Error ? err.message : "Try again.",
+        variant: "destructive",
+      });
+    } finally {
+      pickingRef.current = false;
+    }
+  }
 
   function onPick(files: FileList | null) {
     const picked = files?.[0] ?? null;
@@ -235,24 +283,6 @@ export function StoryCreateSheet({
               id="story-video-input"
               type="file"
               accept="video/*"
-              className={FILE_INPUT_HIDDEN_CLASS}
-              onChange={(e) => onPick(e.target.files)}
-            />
-            <input
-              ref={photoCaptureRef}
-              id="story-photo-capture"
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className={FILE_INPUT_HIDDEN_CLASS}
-              onChange={(e) => onPick(e.target.files)}
-            />
-            <input
-              ref={videoCaptureRef}
-              id="story-video-capture"
-              type="file"
-              accept="video/*"
-              capture="environment"
               className={FILE_INPUT_HIDDEN_CLASS}
               onChange={(e) => onPick(e.target.files)}
             />
@@ -350,15 +380,15 @@ export function StoryCreateSheet({
     );
   }
 
-  if (open && !prefillFile && nativeApp) {
+  if (open && !prefillFile && systemStoryPicker) {
     return (
       <>
         {fileInputs}
-        <div className="fixed inset-0 z-[140] flex flex-col bg-black text-white">
-          <div className="flex items-center justify-between px-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+        <div className="fixed inset-0 z-[140] flex flex-col bg-background text-foreground">
+          <div className="flex items-center gap-2 px-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
             <button
               type="button"
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-white/15"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-muted text-foreground"
               aria-label="Close story"
               onClick={() => {
                 reset();
@@ -367,36 +397,53 @@ export function StoryCreateSheet({
             >
               <X className="h-5 w-5" />
             </button>
-            <p className="text-sm text-white/80">Use the phone camera, or your library</p>
-            <span className="h-11 w-11" />
+            <div className="min-w-0 flex-1">
+              <p className="text-base font-semibold tracking-tight">New story</p>
+              <p className="text-xs text-muted-foreground">Visible for 24 hours</p>
+            </div>
           </div>
-          <div className="flex flex-1 flex-col items-center justify-end gap-3 px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+          <div className="flex flex-1 flex-col justify-center gap-3 px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
             <button
               type="button"
-              className="h-12 w-full rounded-full bg-white text-sm font-semibold text-black"
-              onClick={() => clickHiddenFileInput(photoCaptureRef.current)}
+              className="flex h-14 w-full items-center gap-3 rounded-2xl bg-primary px-4 text-left text-primary-foreground active:opacity-90"
+              onClick={() => void choosePhoto(CameraSource.Camera)}
             >
-              Take photo
+              <Camera className="h-5 w-5 shrink-0" aria-hidden />
+              <span>
+                <span className="block text-sm font-semibold">Take a photo</span>
+                <span className="block text-xs opacity-80">Opens the camera when you tap</span>
+              </span>
             </button>
+            <StoryDirectFileChoice
+              icon={<Video className="h-5 w-5 shrink-0" aria-hidden />}
+              title="Record a video"
+              hint="Opens the camera when you tap"
+              accept="video/*"
+              capture="environment"
+              onFile={(picked) => void applyPickedFile(picked)}
+            />
             <button
               type="button"
-              className="h-12 w-full rounded-full bg-white/15 text-sm font-semibold"
-              onClick={() => clickHiddenFileInput(videoCaptureRef.current)}
+              className="flex h-14 w-full items-center gap-3 rounded-2xl border border-border bg-card px-4 text-left active:bg-muted"
+              onClick={() => void choosePhoto(CameraSource.Photos)}
             >
-              Record video
+              <ImagePlus className="h-5 w-5 shrink-0" aria-hidden />
+              <span>
+                <span className="block text-sm font-semibold">Choose a photo</span>
+                <span className="block text-xs text-muted-foreground">From your library</span>
+              </span>
             </button>
-            <button
-              type="button"
-              className="h-12 w-full rounded-full bg-white/15 text-sm font-semibold"
-              onClick={() => {
-                void (async () => {
-                  const picked = await pickSingleImageFromLibrary(photoInputRef.current);
-                  if (picked) await applyPickedFile(picked);
-                })();
-              }}
-            >
-              Choose from library
-            </button>
+            <StoryDirectFileChoice
+              icon={<Video className="h-5 w-5 shrink-0" aria-hidden />}
+              title="Choose a video"
+              hint="From your library"
+              accept="video/*"
+              onFile={(picked) => void applyPickedFile(picked)}
+            />
+            <p className="flex items-center justify-center gap-2 pb-1 text-[11px] text-muted-foreground">
+              <Clock3 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              <span>Up to {maxMb} MB</span>
+            </p>
           </div>
         </div>
       </>
@@ -421,10 +468,7 @@ export function StoryCreateSheet({
               clickHiddenFileInput(videoInputRef.current);
               return;
             }
-            void (async () => {
-              const picked = await pickSingleImageFromLibrary(photoInputRef.current);
-              if (picked) await applyPickedFile(picked);
-            })();
+            void choosePhoto(CameraSource.Photos);
           }}
         />
       </>
@@ -454,12 +498,7 @@ export function StoryCreateSheet({
                 icon={<ImagePlus className="h-6 w-6" aria-hidden />}
                 title="Photo"
                 hint="JPG or PNG"
-                onClick={() => {
-                  void (async () => {
-                    const picked = await pickSingleImageFromLibrary(photoInputRef.current);
-                    if (picked) await applyPickedFile(picked);
-                  })();
-                }}
+                onClick={() => void choosePhoto(CameraSource.Photos)}
               />
               <MediaPickCard
                 icon={<Video className="h-6 w-6" aria-hidden />}

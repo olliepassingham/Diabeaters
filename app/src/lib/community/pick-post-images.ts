@@ -76,8 +76,9 @@ export async function pickPostImagesFromLibrary(
   }
 }
 
-/** One photo from the library. On web, clicks the fallback input and returns null. */
-export async function pickSingleImageFromLibrary(
+/** One photo from the camera or the library. On web, clicks the fallback input and returns null. */
+export async function pickSinglePhoto(
+  source: CameraSource,
   fallbackInput?: HTMLInputElement | null,
 ): Promise<File | null> {
   if (!Capacitor.isNativePlatform()) {
@@ -89,9 +90,10 @@ export async function pickSingleImageFromLibrary(
   const restore = unlockSystemPickerPointerEvents();
   try {
     const photo = await Camera.getPhoto({
-      source: CameraSource.Photos,
+      source,
       resultType: CameraResultType.Uri,
       quality: 90,
+      correctOrientation: true,
     });
     const webPath = photo.webPath?.trim();
     if (!webPath) return null;
@@ -100,10 +102,16 @@ export async function pickSingleImageFromLibrary(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error ?? "");
     if (/cancel/i.test(message)) return null;
-    clickHiddenFileInput(fallbackInput);
     return null;
   } finally {
     restore();
     endHold();
   }
+}
+
+/** One photo from the library. On web, clicks the fallback input and returns null. */
+export async function pickSingleImageFromLibrary(
+  fallbackInput?: HTMLInputElement | null,
+): Promise<File | null> {
+  return pickSinglePhoto(CameraSource.Photos, fallbackInput);
 }
