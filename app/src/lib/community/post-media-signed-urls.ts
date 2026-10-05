@@ -44,6 +44,24 @@ function preloadImage(url: string): void {
   img.src = url;
 }
 
+const warmedVideoUrls = new Set<string>();
+
+function preloadVideo(url: string): void {
+  if (warmedVideoUrls.has(url)) return;
+  warmedVideoUrls.add(url);
+  const video = document.createElement("video");
+  video.preload = "auto";
+  video.muted = true;
+  video.playsInline = true;
+  video.src = url;
+  video.load();
+}
+
+function isVideoPath(path: string, kind?: string | null): boolean {
+  if ((kind || "").toLowerCase() === "video") return true;
+  return /\.(mp4|mov|webm)$/i.test(path);
+}
+
 async function signChunk(paths: string[]): Promise<Map<string, string | null>> {
   const supabase = getSupabase();
   const out = new Map<string, string | null>();
@@ -160,6 +178,38 @@ export async function fileFromPostMediaPath(path: string): Promise<File | null> 
   if (blob.size <= 0) return null;
   const name = path.split("/").pop()?.trim() || "story.jpg";
   return new File([blob], name, { type: mimeFromPathAndBlob(path, blob) });
+}
+
+/** Sign story files and start downloading the first few so a tap can paint immediately. */
+export function prefetchStoryMedia(
+  items: { path: string; kind?: string | null }[],
+  options?: { preloadImages?: number; preloadVideos?: number },
+): void {
+  const entries = items
+    .map((item) => ({ path: normalizePath(item.path), kind: item.kind }))
+    .filter((item) => item.path);
+  if (entries.length === 0) return;
+
+  const preloadImages = options?.preloadImages ?? 8;
+  const preloadVideos = options?.preloadVideos ?? 1;
+
+  void (async () => {
+    await signMissingPaths(entries.map((entry) => entry.path));
+    let images = 0;
+    let videos = 0;
+    for (const entry of entries) {
+      const url = readCache(entry.path);
+      if (!url) continue;
+      if (isVideoPath(entry.path, entry.kind)) {
+        if (videos >= preloadVideos) continue;
+        preloadVideo(url);
+        videos += 1;
+      } else if (images < preloadImages) {
+        preloadImage(url);
+        images += 1;
+      }
+    }
+  })();
 }
 
 /** Warm the signed-URL cache (and optionally preload image bytes) for feed media. */

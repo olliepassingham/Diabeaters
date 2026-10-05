@@ -4,6 +4,7 @@
  */
 import { getSupabase } from "@/lib/supabase";
 import { getProfilesByIds } from "@/lib/profile";
+import { getPostMediaSignedUrl } from "./post-media-signed-urls";
 import { COMMUNITY_POST_IMAGES_BUCKET, MAX_POST_VIDEO_BYTES } from "./posts-supabase";
 
 export const STORY_TTL_MS = 24 * 60 * 60 * 1000;
@@ -211,11 +212,7 @@ function validateStoryFile(file: File): Error | null {
 }
 
 export async function getStoryMediaSignedUrl(path: string): Promise<string | null> {
-  const supabase = getSupabase();
-  const trimmed = String(path ?? "").trim();
-  if (!supabase || !trimmed) return null;
-  const { data, error } = await supabase.storage.from(COMMUNITY_POST_IMAGES_BUCKET).createSignedUrl(trimmed, 3600);
-  return !error && data?.signedUrl ? data.signedUrl : null;
+  return getPostMediaSignedUrl(path);
 }
 
 async function deleteStoryMediaPaths(supabase: NonNullable<ReturnType<typeof getSupabase>>, paths: string[]) {

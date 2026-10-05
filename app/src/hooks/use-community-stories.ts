@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { prefetchStoryMedia } from "@/lib/community/post-media-signed-urls";
 import {
   fetchActiveStoriesForAuthors,
   sortStoriesChronologically,
@@ -29,6 +30,10 @@ export function useCommunityStories(viewerId: string | undefined, authorIds: str
     const ids = authorKey.split(",").filter(Boolean);
     void fetchActiveStoriesForAuthors(ids).then((res) => {
       if (cancelled) return;
+      prefetchStoryMedia(
+        (res.data ?? []).map((row) => ({ path: row.media_path, kind: row.media_kind })),
+        { preloadImages: 12, preloadVideos: 2 },
+      );
       setLoading(false);
       setStoriesByAuthor((prev) => {
         const next = new Map(prev);

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type TouchEvent } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { Eye, Flag, Loader2, MessageCircle, Send, Trash2, X } from "lucide-react";
 import { Link, useLocation } from "wouter";
@@ -21,6 +21,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { sendStoryReplyToDmThread, submitContentReport } from "@/lib/community";
+import { getCachedPostMediaSignedUrl, prefetchStoryMedia } from "@/lib/community/post-media-signed-urls";
 import {
   deleteCommunityStory,
   fetchActiveStoryForAuthor,
@@ -220,10 +221,15 @@ export function StoryViewerDialog({
     };
   }, [open, current?.authorId, current?.story]);
 
-  useEffect(() => {
-    if (!open || !resolvedStory) return;
+  useLayoutEffect(() => {
+    if (!open || !resolvedStory?.media_path) {
+      setMediaUrl(null);
+      return;
+    }
+    const cached = getCachedPostMediaSignedUrl(resolvedStory.media_path);
+    setMediaUrl(cached);
+    if (cached) return;
     let cancelled = false;
-    setMediaUrl(null);
     void getStoryMediaSignedUrl(resolvedStory.media_path).then((url) => {
       if (cancelled) return;
       if (url) setMediaUrl(url);
@@ -232,7 +238,17 @@ export function StoryViewerDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, resolvedStory]);
+  }, [open, resolvedStory?.id, resolvedStory?.media_path]);
+
+  useEffect(() => {
+    if (!open) return;
+    prefetchStoryMedia(
+      queue.slice(index, index + 3).flatMap((entry) =>
+        entry.story?.media_path ? [{ path: entry.story.media_path, kind: entry.story.media_kind }] : [],
+      ),
+      { preloadImages: 2, preloadVideos: 1 },
+    );
+  }, [open, index, queue]);
 
   useEffect(() => {
     if (!open || !resolvedStory || !viewerId) return;
@@ -606,7 +622,13 @@ export function StoryViewerDialog({
               ) : (
                 <div className="absolute inset-0 overflow-hidden">
                   {resolvedStory.media_kind === "image" ? (
-                    <img src={mediaUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                    <img
+                      src={mediaUrl}
+                      alt=""
+                      decoding="async"
+                      fetchPriority="high"
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
                   ) : (
                     <video
                       ref={videoRef}
@@ -616,6 +638,7 @@ export function StoryViewerDialog({
                       playsInline
                       autoPlay
                       muted
+                      preload="auto"
                       onTimeUpdate={(e) => {
                         const v = e.currentTarget;
                         if (!v.duration || !Number.isFinite(v.duration)) return;
