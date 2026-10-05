@@ -425,6 +425,17 @@ export default function CommunityThreadPage() {
     void markDmThreadReadWhenOpened(threadId, userId, messages);
   }, [threadId, userId, loading, messages]);
 
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const onResize = () => {
+      if (document.activeElement !== composerRef.current) return;
+      scrollToBottom(scrollRef.current, "auto");
+    };
+    vv.addEventListener("resize", onResize);
+    return () => vv.removeEventListener("resize", onResize);
+  }, []);
+
   useLayoutEffect(() => {
     didInitialScrollRef.current = false;
     prevMessageCountRef.current = 0;
@@ -774,7 +785,8 @@ export default function CommunityThreadPage() {
 
       <form
         onSubmit={handleSend}
-        className="z-10 shrink-0 border-t border-border/50 bg-background/90 px-3 py-2.5 backdrop-blur-xl pb-[calc(max(0.5rem,env(safe-area-inset-bottom,0px))+var(--keyboard-inset-bottom,0px))]"
+        data-keyboard-sheet=""
+        className="z-10 shrink-0 border-t border-border/50 bg-background/90 px-3 pt-2.5 backdrop-blur-xl mb-[var(--keyboard-inset-bottom,0px)] pb-[max(0.5rem,calc(env(safe-area-inset-bottom,0px)-var(--keyboard-inset-bottom,0px)))]"
       >
         {messagingBlocked ? (
           <p className="mb-2 px-1 text-center text-sm text-muted-foreground" data-testid="dm-thread-blocked-notice">
@@ -823,6 +835,9 @@ export default function CommunityThreadPage() {
             ref={composerRef}
             rows={1}
             value={body}
+            onFocus={() => {
+              requestAnimationFrame(() => scrollToBottom(scrollRef.current, "auto"));
+            }}
             onChange={(e) => {
               setBody(e.target.value);
               notifyComposerTyping(Boolean(e.target.value.trim()));
