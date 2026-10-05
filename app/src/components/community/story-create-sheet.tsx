@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { CameraSource } from "@capacitor/camera";
 import { Capacitor } from "@capacitor/core";
-import { Camera, Clock3, ImagePlus, Loader2, RefreshCw, Send, Video, X } from "lucide-react";
+import { Camera, ChevronLeft, Clock3, ImagePlus, Loader2, RefreshCw, Send, Video, X } from "lucide-react";
 import heic2any from "heic2any";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Button } from "@/components/ui/button";
@@ -59,6 +59,7 @@ function StoryDirectFileChoice({
   hint,
   accept,
   capture,
+  prominent,
   onFile,
 }: {
   icon: ReactNode;
@@ -66,14 +67,21 @@ function StoryDirectFileChoice({
   hint: string;
   accept: string;
   capture?: "environment" | "user";
+  prominent?: boolean;
   onFile: (file: File) => void;
 }) {
   return (
-    <label className="relative flex h-14 w-full items-center gap-3 overflow-hidden rounded-2xl border border-border bg-card px-4 text-left active:bg-muted">
+    <label
+      className={
+        prominent
+          ? "relative flex h-14 w-full items-center gap-3 overflow-hidden rounded-2xl bg-primary px-4 text-left text-primary-foreground active:opacity-90"
+          : "relative flex h-14 w-full items-center gap-3 overflow-hidden rounded-2xl border border-border bg-card px-4 text-left active:bg-muted"
+      }
+    >
       {icon}
       <span className="min-w-0">
         <span className="block text-sm font-semibold">{title}</span>
-        <span className="block text-xs text-muted-foreground">{hint}</span>
+        <span className={prominent ? "block text-xs opacity-80" : "block text-xs text-muted-foreground"}>{hint}</span>
       </span>
       <input
         type="file"
@@ -388,14 +396,14 @@ export function StoryCreateSheet({
           <div className="flex items-center gap-2 px-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
             <button
               type="button"
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-muted text-foreground"
-              aria-label="Close story"
+              className="flex h-11 items-center gap-0.5 rounded-full pr-3 text-sm font-semibold"
               onClick={() => {
                 reset();
                 onOpenChange(false);
               }}
             >
-              <X className="h-5 w-5" />
+              <ChevronLeft className="h-5 w-5" aria-hidden />
+              Back
             </button>
             <div className="min-w-0 flex-1">
               <p className="text-base font-semibold tracking-tight">New story</p>
@@ -403,22 +411,12 @@ export function StoryCreateSheet({
             </div>
           </div>
           <div className="flex flex-1 flex-col justify-center gap-3 px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
-            <button
-              type="button"
-              className="flex h-14 w-full items-center gap-3 rounded-2xl bg-primary px-4 text-left text-primary-foreground active:opacity-90"
-              onClick={() => void choosePhoto(CameraSource.Camera)}
-            >
-              <Camera className="h-5 w-5 shrink-0" aria-hidden />
-              <span>
-                <span className="block text-sm font-semibold">Take a photo</span>
-                <span className="block text-xs opacity-80">Opens the camera when you tap</span>
-              </span>
-            </button>
             <StoryDirectFileChoice
-              icon={<Video className="h-5 w-5 shrink-0" aria-hidden />}
-              title="Record a video"
+              prominent
+              icon={<Camera className="h-5 w-5 shrink-0" aria-hidden />}
+              title="Take a photo"
               hint="Opens the camera when you tap"
-              accept="video/*"
+              accept="image/*"
               capture="environment"
               onFile={(picked) => void applyPickedFile(picked)}
             />
@@ -436,7 +434,7 @@ export function StoryCreateSheet({
             <StoryDirectFileChoice
               icon={<Video className="h-5 w-5 shrink-0" aria-hidden />}
               title="Choose a video"
-              hint="From your library"
+              hint="Record it in the Camera app, then pick it here"
               accept="video/*"
               onFile={(picked) => void applyPickedFile(picked)}
             />

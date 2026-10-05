@@ -31,6 +31,18 @@ export function filesFromImageInput(files: FileList | null, currentCount: number
   return next;
 }
 
+function fileFromCameraBase64(base64: string | undefined, format: string | undefined): File | null {
+  const data = base64?.trim();
+  if (!data) return null;
+  const binary = atob(data);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  const kind = (format || "jpeg").toLowerCase();
+  const type = kind === "png" ? "image/png" : kind === "gif" ? "image/gif" : "image/jpeg";
+  const ext = kind === "png" ? "png" : kind === "gif" ? "gif" : "jpg";
+  return new File([bytes], `photo-${Date.now()}.${ext}`, { type });
+}
+
 async function fileFromWebPath(webPath: string, name: string): Promise<File | null> {
   const r = await fetch(webPath);
   const blob = await r.blob();
@@ -91,18 +103,15 @@ export async function pickSinglePhoto(
   try {
     const photo = await Camera.getPhoto({
       source,
-      resultType: CameraResultType.Uri,
+      resultType: CameraResultType.Base64,
       quality: 90,
       correctOrientation: true,
     });
-    const webPath = photo.webPath?.trim();
-    if (!webPath) return null;
-    const ext = photo.format ? `.${photo.format}` : ".jpg";
-    return await fileFromWebPath(webPath, `photo-${Date.now()}${ext}`);
+    return fileFromCameraBase64(photo.base64String, photo.format);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error ?? "");
     if (/cancel/i.test(message)) return null;
-    return null;
+    throw error instanceof Error ? error : new Error(message || "Couldn't open that photo");
   } finally {
     restore();
     endHold();
