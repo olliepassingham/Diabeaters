@@ -55,7 +55,12 @@ import {
   dismissFeedSuggestions,
   isFeedSuggestionsDismissed,
 } from "@/lib/community/feed-suggestions-dismiss";
-import { buildMainFeedScopeKey, COMMUNITY_FEED_QUERY_ROOT, MAIN_FEED_PAGE_SIZE } from "@/lib/community-feed-cache";
+import {
+  buildMainFeedScopeKey,
+  COMMUNITY_FEED_QUERY_ROOT,
+  MAIN_FEED_PAGE_SIZE,
+  prependPostedToCommunityFeed,
+} from "@/lib/community-feed-cache";
 import { getAppScrollMain, getAppScrollTop, setAppScrollTop } from "@/lib/app-scroll";
 import { CommunityPushPromptDialog } from "@/components/community-push-prompt-dialog";
 import { useCommunityPushPromptAfterOnboarding } from "@/hooks/use-community-push-prompt-after-onboarding";
@@ -121,7 +126,11 @@ export default function CommunityHomePage() {
   const isMobile = useIsMobile();
   const feedComposer = useFeedComposer({
     closeSheetOnPost: isMobile,
-    onPosted: () => {
+    onPosted: (post) => {
+      if (post) {
+        prependPostedToCommunityFeed(queryClient, post);
+        getAppScrollMain()?.scrollTo({ top: 0, behavior: "smooth" });
+      }
       void queryClient.invalidateQueries({ queryKey: [COMMUNITY_FEED_QUERY_ROOT] });
       setFeedListRevision((k) => k + 1);
     },

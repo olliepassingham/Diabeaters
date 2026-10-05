@@ -88,6 +88,28 @@ export function buildCommunityFeedQueryKey(params: {
   ];
 }
 
+/** Show a post you just published at the top of the open feed without waiting for a reload. */
+export function prependPostedToCommunityFeed(queryClient: QueryClient, post: CommunityPostRow) {
+  const queries = queryClient.getQueriesData<InfiniteData<CommunityPostRow[], FeedCursor | null>>({
+    queryKey: [COMMUNITY_FEED_QUERY_ROOT],
+  });
+  for (const [key, data] of queries) {
+    const typed = key as unknown as CommunityFeedQueryKey;
+    if (!data?.pages?.length) continue;
+    if (typed[7] === "saved") continue;
+    if (typed[3] === "search") continue;
+    if (String(typed[5] ?? "").trim()) continue;
+    const topic = typed[4];
+    if (topic && topic !== post.topic) continue;
+    if (data.pages.some((page) => page.some((row) => row.id === post.id))) continue;
+    const [first, ...rest] = data.pages;
+    queryClient.setQueryData(key, {
+      ...data,
+      pages: [[post, ...(first ?? [])], ...rest],
+    });
+  }
+}
+
 export function getCommunityFeedNextPageParam(
   lastPage: CommunityPostRow[] | undefined,
   pageSize: number,
