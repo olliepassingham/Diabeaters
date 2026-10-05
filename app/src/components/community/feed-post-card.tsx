@@ -817,7 +817,12 @@ export function FeedPostCard({
       </div>
 
       {hasFeedVideo && post.video_url ? (
-        <FeedPostVideo path={post.video_url} priority={mediaPriority} topicLabel={topicLabel} />
+        <FeedPostVideo
+          path={post.video_url}
+          posterPath={post.video_poster_url}
+          priority={mediaPriority}
+          topicLabel={topicLabel}
+        />
       ) : null}
       {hasFeedVideo ? (
         <div

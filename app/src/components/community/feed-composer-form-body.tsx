@@ -579,7 +579,7 @@ export function FeedComposerFormBody({
         </Button>
         <InlineInfoHint
           ariaLabel="Media limits for posts"
-          content={`Up to ${MAX_POST_IMAGES} photos (5MB each) or one short video (~${guidedVideoMaxSeconds}s, max ${MAX_POST_VIDEO_SECONDS}s / ${videoMaxMb}MB, MP4/MOV/WebM). Videos appear in Watch and on the Feed, and are labeled as peer experience only.`}
+          content={`Up to ${MAX_POST_IMAGES} photos (5MB each) or one short video (~${guidedVideoMaxSeconds}s, max ${MAX_POST_VIDEO_SECONDS}s / ${videoMaxMb}MB, MP4/MOV/WebM). After you pick a video you can cut the length. Videos appear in Watch and on the Feed, and are labeled as peer experience only.`}
         />
       </div>
       <Button

@@ -10,7 +10,9 @@ import { cn } from "@/lib/utils";
 
 function ProfileGridThumb({ post }: { post: CommunityPostRow }) {
   const isVideo = Boolean(post.video_url);
-  const path = isVideo ? post.video_url! : post.image_urls[0];
+  const posterPath = post.video_poster_url?.trim() || null;
+  const path = isVideo ? (posterPath ?? post.video_url!) : post.image_urls[0];
+  const usePosterStill = isVideo && Boolean(posterPath);
   const [url, setUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -19,15 +21,16 @@ function ProfileGridThumb({ post }: { post: CommunityPostRow }) {
       return;
     }
     let cancelled = false;
-    void (isVideo ? getPostVideoSignedUrl(path) : getPostImageSignedUrls([path]).then((urls) => urls[0] ?? null)).then(
-      (next) => {
-        if (!cancelled) setUrl(next);
-      },
-    );
+    void (isVideo && !usePosterStill
+      ? getPostVideoSignedUrl(path)
+      : getPostImageSignedUrls([path]).then((urls) => urls[0] ?? null)
+    ).then((next) => {
+      if (!cancelled) setUrl(next);
+    });
     return () => {
       cancelled = true;
     };
-  }, [path, isVideo]);
+  }, [path, isVideo, usePosterStill]);
 
   const alt = post.image_alt_texts?.[0]?.trim() || (isVideo ? "Video from post" : "Photo from post");
 
@@ -38,7 +41,7 @@ function ProfileGridThumb({ post }: { post: CommunityPostRow }) {
       aria-label={isVideo ? "Open video post" : "Open post"}
     >
       {url ? (
-        isVideo ? (
+        isVideo && !usePosterStill ? (
           <video src={url} preload="metadata" muted playsInline className="h-full w-full object-cover" />
         ) : (
           <img

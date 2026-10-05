@@ -27,6 +27,8 @@ type FeedComposerSheetProps = {
   pillTestId?: string;
   formTestId?: string;
   footer?: ReactNode;
+  /** e.g. video trim sheet from `useFeedComposer().videoTrimSheet`. */
+  extras?: ReactNode;
   disabled?: boolean;
 };
 
@@ -47,6 +49,7 @@ export function FeedComposerSheet({
   pillTestId = "feed-composer-pill",
   formTestId = "feed-composer-form",
   footer,
+  extras,
   disabled,
 }: FeedComposerSheetProps) {
   return (
@@ -83,6 +86,7 @@ export function FeedComposerSheet({
         </CommunityFeedComposerDrawerLazy>
       </Suspense>
 
+      {extras}
       {footer}
     </>
   );

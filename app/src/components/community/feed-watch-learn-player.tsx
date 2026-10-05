@@ -13,6 +13,8 @@ import {
   type CommunityPostRow,
 } from "@/lib/community";
 import { claimActiveFeedVideo, releaseActiveFeedVideo } from "@/lib/feed-video-playback";
+import { getPostImageSignedUrls } from "@/lib/community/posts-supabase";
+import { readFeedVideoMuted, writeFeedVideoMuted } from "@/lib/community/feed-video-mute";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -44,7 +46,11 @@ function WatchLearnSlide({
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const path = post.video_url!;
+  const posterPath = post.video_poster_url?.trim() || null;
   const [src, setSrc] = useState<string | null>(() => getCachedPostMediaSignedUrl(path));
+  const [posterSrc, setPosterSrc] = useState<string | null>(() =>
+    posterPath ? getCachedPostMediaSignedUrl(posterPath) : null,
+  );
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -58,6 +64,20 @@ function WatchLearnSlide({
       cancelled = true;
     };
   }, [path]);
+
+  useEffect(() => {
+    if (!posterPath) {
+      setPosterSrc(null);
+      return;
+    }
+    let cancelled = false;
+    void getPostImageSignedUrls([posterPath]).then((urls) => {
+      if (!cancelled) setPosterSrc(urls[0] ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [posterPath]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -84,14 +104,21 @@ function WatchLearnSlide({
     );
   }
 
-  if (!src) {
+  if (!src && !posterSrc) {
     return <Loader2 className="h-7 w-7 animate-spin text-white/70" aria-hidden />;
+  }
+
+  if (!src) {
+    return (
+      <img src={posterSrc!} alt="" className="h-full w-full object-contain" />
+    );
   }
 
   return (
     <video
       ref={videoRef}
       src={src}
+      poster={posterSrc ?? undefined}
       loop
       playsInline
       muted={muted}
@@ -115,7 +142,7 @@ export function FeedWatchLearnPlayer({
   const touchStartRef = useRef<{ x: number; y: number; scrollTop: number } | null>(null);
   const dismissPullRef = useRef(0);
   const [activeIndex, setActiveIndex] = useState(initialIndex);
-  const [muted, setMuted] = useState(false);
+  const [muted, setMuted] = useState(() => readFeedVideoMuted());
   const [paused, setPaused] = useState(false);
   const [dismissPull, setDismissPull] = useState(0);
   const [likeState, setLikeState] = useState<Record<string, { liked: boolean; count: number }>>({});
@@ -149,7 +176,7 @@ export function FeedWatchLearnPlayer({
     if (!open) return;
     const paths = clips
       .slice(Math.max(0, activeIndex), activeIndex + 3)
-      .map((post) => post.video_url)
+      .flatMap((post) => [post.video_url, post.video_poster_url])
       .filter((path): path is string => Boolean(path));
     if (paths.length) prefetchPostMediaSignedUrls(paths);
   }, [open, activeIndex, clipKey]);
@@ -465,7 +492,13 @@ export function FeedWatchLearnPlayer({
             variant="ghost"
             size="icon"
             className="rounded-full border border-white/15 bg-black/45 text-white hover:bg-black/60"
-            onClick={() => setMuted((value) => !value)}
+            onClick={() =>
+              setMuted((value) => {
+                const next = !value;
+                writeFeedVideoMuted(next);
+                return next;
+              })
+            }
             aria-label={muted ? "Unmute" : "Mute"}
           >
             {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}

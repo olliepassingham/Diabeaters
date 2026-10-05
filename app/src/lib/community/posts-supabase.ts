@@ -147,6 +147,10 @@ function mapPost(r: Record<string, unknown>): CommunityPostRow {
     image_alt_texts: parseImageAltTexts(r.image_alt_texts, imgs.length),
     video_url:
       typeof r.video_url === "string" && r.video_url.trim().length > 0 ? r.video_url.trim() : null,
+    video_poster_url:
+      typeof r.video_poster_url === "string" && r.video_poster_url.trim().length > 0
+        ? r.video_poster_url.trim()
+        : null,
     content_note: mapContentNote(r.content_note),
     post_kind,
     post_extra,
@@ -811,6 +815,8 @@ export type InsertFeedPostInput =
       body: string;
       imageFiles?: File[];
       videoFile?: File;
+      /** Optional JPEG poster captured from the trimmed clip. */
+      videoPosterFile?: File;
       imageAlts?: string[];
       contentNote?: CommunityContentNoteId | null;
       mentions: FeedPostMentions;
@@ -881,12 +887,14 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
   mentioned_user_ids: string[];
   imageFiles: File[];
   videoFile?: File | null;
+  videoPosterFile?: File | null;
   imageAlts?: string[];
   contentNote?: CommunityContentNoteId | null;
 }): Promise<{ data: CommunityPostRow | null; error: Error | null }> {
   const { supabase, uid, mentioned_user_ids } = params;
   const files = params.imageFiles.filter(Boolean);
   const videoFile = params.videoFile ?? null;
+  const videoPosterFile = params.videoPosterFile ?? null;
   if (videoFile && files.length > 0) {
     return { data: null, error: new Error("Choose photos or a video, not both.") };
   }
@@ -935,6 +943,7 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
   const pendingId = crypto.randomUUID();
   const pendingPaths: string[] = [];
   let pendingVideoPath: string | null = null;
+  let pendingPosterPath: string | null = null;
   let postId: string | null = null;
   const movedDests: string[] = [];
 
@@ -950,6 +959,21 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
           contentType: videoFile.type || undefined,
         });
       if (upErr) throw new Error(upErr.message);
+
+      if (videoPosterFile && videoPosterFile.size > 0) {
+        pendingPosterPath = `${uid}/pending/${pendingId}/poster.jpg`;
+        const { error: posterErr } = await supabase.storage
+          .from(COMMUNITY_POST_IMAGES_BUCKET)
+          .upload(pendingPosterPath, videoPosterFile, {
+            cacheControl: "604800",
+            upsert: false,
+            contentType: "image/jpeg",
+          });
+        if (posterErr) {
+          // Poster is optional polish — continue without it if upload fails.
+          pendingPosterPath = null;
+        }
+      }
     }
 
     for (let i = 0; i < files.length; i++) {
@@ -995,6 +1019,7 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
     postId = String((data as Record<string, unknown>).id);
     const finalPaths: string[] = [];
     let finalVideoPath: string | null = null;
+    let finalPosterPath: string | null = null;
 
     if (pendingVideoPath && videoFile) {
       const ext = extFromVideoFile(videoFile);
@@ -1004,6 +1029,18 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
         .move(pendingVideoPath, finalVideoPath);
       if (mvErr) throw new Error(mvErr.message);
       movedDests.push(finalVideoPath);
+    }
+
+    if (pendingPosterPath) {
+      finalPosterPath = `${uid}/${postId}/poster.jpg`;
+      const { error: mvPosterErr } = await supabase.storage
+        .from(COMMUNITY_POST_IMAGES_BUCKET)
+        .move(pendingPosterPath, finalPosterPath);
+      if (mvPosterErr) {
+        finalPosterPath = null;
+      } else {
+        movedDests.push(finalPosterPath);
+      }
     }
 
     for (let i = 0; i < pendingPaths.length; i++) {
@@ -1019,16 +1056,27 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
     if (finalVideoPath) {
       updatePayload.video_url = finalVideoPath;
     }
+    if (finalPosterPath) {
+      updatePayload.video_poster_url = finalPosterPath;
+    }
     if (imageAltsForInsert.some((s) => s.trim().length > 0)) {
       updatePayload.image_alt_texts = imageAltsForInsert;
     }
 
-    const { data: updated, error: updErr } = await supabase
+    let { data: updated, error: updErr } = await supabase
       .from("community_posts")
       .update(updatePayload)
       .eq("id", postId)
       .select("*")
       .single();
+
+    // Older databases may not have video_poster_url yet — retry without it.
+    if (updErr && finalPosterPath && /video_poster_url/i.test(updErr.message)) {
+      delete updatePayload.video_poster_url;
+      const retry = await supabase.from("community_posts").update(updatePayload).eq("id", postId).select("*").single();
+      updated = retry.data;
+      updErr = retry.error;
+    }
 
     if (updErr) throw new Error(updErr.message);
     if (!updated) throw new Error("Update returned no row");
@@ -1039,7 +1087,14 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
     if (postId) {
       await supabase.from("community_posts").delete().eq("id", postId);
     }
-    const uniq = [...new Set([...pendingPaths, ...movedDests, ...(pendingVideoPath ? [pendingVideoPath] : [])])];
+    const uniq = [
+      ...new Set([
+        ...pendingPaths,
+        ...movedDests,
+        ...(pendingVideoPath ? [pendingVideoPath] : []),
+        ...(pendingPosterPath ? [pendingPosterPath] : []),
+      ]),
+    ];
     if (uniq.length > 0) {
       await supabase.storage.from(COMMUNITY_POST_IMAGES_BUCKET).remove(uniq);
     }
@@ -1135,6 +1190,7 @@ export async function insertFeedPost(
     mentioned_user_ids,
     imageFiles: files,
     videoFile,
+    videoPosterFile: input.videoPosterFile ?? null,
     imageAlts: input.imageAlts,
     contentNote: input.contentNote,
   });

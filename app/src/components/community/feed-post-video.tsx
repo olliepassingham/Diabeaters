@@ -4,10 +4,14 @@ import { FeedMediaLightbox } from "@/components/community/feed-media-lightbox";
 import { APP_SCROLL_MAIN_ID } from "@/lib/app-scroll";
 import { claimActiveFeedVideo, releaseActiveFeedVideo } from "@/lib/feed-video-playback";
 import { getCachedPostMediaSignedUrl, getPostVideoSignedUrl } from "@/lib/community";
+import { getPostImageSignedUrls } from "@/lib/community/posts-supabase";
+import { readFeedVideoMuted, writeFeedVideoMuted } from "@/lib/community/feed-video-mute";
 import { cn } from "@/lib/utils";
 
 type Props = {
   path: string;
+  /** Optional JPEG poster path — shows immediately while the video buffers. */
+  posterPath?: string | null;
   className?: string;
   /** Start buffering immediately (first visible feed posts). */
   priority?: boolean;
@@ -17,13 +21,16 @@ type Props = {
 
 const PLAY_THRESHOLD = 0.6;
 
-export function FeedPostVideo({ path, className, priority = false, topicLabel = null }: Props) {
+export function FeedPostVideo({ path, posterPath = null, className, priority = false, topicLabel = null }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const expandedVideoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [src, setSrc] = useState<string | null>(() => getCachedPostMediaSignedUrl(path));
+  const [posterSrc, setPosterSrc] = useState<string | null>(() =>
+    posterPath ? getCachedPostMediaSignedUrl(posterPath) : null,
+  );
   const [failed, setFailed] = useState(false);
-  const [muted, setMuted] = useState(true);
+  const [muted, setMuted] = useState(() => readFeedVideoMuted());
   const [playing, setPlaying] = useState(false);
   const [showMuteHint, setShowMuteHint] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -42,6 +49,23 @@ export function FeedPostVideo({ path, className, priority = false, topicLabel = 
       cancelled = true;
     };
   }, [path]);
+
+  useEffect(() => {
+    if (!posterPath) {
+      setPosterSrc(null);
+      return;
+    }
+    let cancelled = false;
+    const cached = getCachedPostMediaSignedUrl(posterPath);
+    setPosterSrc(cached);
+    void getPostImageSignedUrls([posterPath]).then((urls) => {
+      if (cancelled) return;
+      setPosterSrc(urls[0] ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [posterPath]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -120,7 +144,11 @@ export function FeedPostVideo({ path, className, priority = false, topicLabel = 
   }, [showMuteHint, muted]);
 
   const toggleMute = useCallback(() => {
-    setMuted((m) => !m);
+    setMuted((m) => {
+      const next = !m;
+      writeFeedVideoMuted(next);
+      return next;
+    });
     setShowMuteHint(true);
   }, []);
 
@@ -132,7 +160,7 @@ export function FeedPostVideo({ path, className, priority = false, topicLabel = 
     );
   }
 
-  if (!src) {
+  if (!src && !posterSrc) {
     return (
       <div
         className={cn(
@@ -159,17 +187,26 @@ export function FeedPostVideo({ path, className, priority = false, topicLabel = 
           onClick={() => setExpanded(true)}
           aria-label="Watch video fullscreen"
         >
-          <video
-            ref={videoRef}
-            src={src}
-            muted={muted}
-            loop
-            playsInline
-            preload={priority ? "auto" : "metadata"}
-            className="pointer-events-none aspect-[4/5] max-h-[min(85vw,32rem)] w-full object-cover"
-            onPlay={() => setPlaying(true)}
-            onPause={() => setPlaying(false)}
-          />
+          {src ? (
+            <video
+              ref={videoRef}
+              src={src}
+              poster={posterSrc ?? undefined}
+              muted={muted}
+              loop
+              playsInline
+              preload={priority ? "auto" : "metadata"}
+              className="pointer-events-none aspect-[4/5] max-h-[min(85vw,32rem)] w-full object-cover"
+              onPlay={() => setPlaying(true)}
+              onPause={() => setPlaying(false)}
+            />
+          ) : (
+            <img
+              src={posterSrc!}
+              alt=""
+              className="aspect-[4/5] max-h-[min(85vw,32rem)] w-full object-cover"
+            />
+          )}
           <div
             className={cn(
               "pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/55 to-transparent transition-opacity duration-300",
@@ -206,15 +243,18 @@ export function FeedPostVideo({ path, className, priority = false, topicLabel = 
       </div>
 
       <FeedMediaLightbox open={expanded} onOpenChange={setExpanded}>
-        <video
-          ref={expandedVideoRef}
-          src={src}
-          muted={muted}
-          loop
-          playsInline
-          controls
-          className="max-h-[85dvh] w-full object-contain"
-        />
+        {src ? (
+          <video
+            ref={expandedVideoRef}
+            src={src}
+            poster={posterSrc ?? undefined}
+            muted={muted}
+            loop
+            playsInline
+            controls
+            className="max-h-[85dvh] w-full object-contain"
+          />
+        ) : null}
       </FeedMediaLightbox>
     </>
   );

@@ -463,6 +463,7 @@ export function FeedPostList(props: {
     for (const post of displayPosts.slice(0, 20)) {
       mediaPaths.push(...post.image_urls);
       if (post.video_url) mediaPaths.push(post.video_url);
+      if (post.video_poster_url) mediaPaths.push(post.video_poster_url);
       const previewAvatar = post.author_preview?.avatar_url;
       if (previewAvatar) avatarPaths.push(previewAvatar);
       const metaAvatar = authorMeta[post.author_id]?.avatar_url;

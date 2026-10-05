@@ -32,6 +32,15 @@ export {
   isLikelyVideoFile,
   readVideoFileDurationSeconds,
 } from "./feed-video-limits";
+export { readFeedVideoMuted, writeFeedVideoMuted } from "./feed-video-mute";
+export {
+  captureVideoPosterJpeg,
+  defaultVideoTrimRange,
+  preparePostVideo,
+  trimVideoFile,
+  type PreparedPostVideo,
+  type VideoTrimRange,
+} from "./prepare-post-video";
 export { getFirstWhitelistedFeedLink } from "./link-whitelist";
 export {
   COMMUNITY_POST_KINDS,

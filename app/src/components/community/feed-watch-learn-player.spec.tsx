@@ -13,6 +13,7 @@ function videoPost(id: string, body: string): CommunityPostRow {
     image_urls: [],
     image_alt_texts: [],
     video_url: `author-1/${id}/video.mp4`,
+    video_poster_url: null,
     content_note: "experience-sharing",
     post_kind: "standard",
     post_extra: null,

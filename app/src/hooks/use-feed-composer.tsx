@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useCommunityTopicOrder } from "@/hooks/use-community-topic-order";
 import type { ComposerPostKind, FeedComposerFormBodyProps } from "@/components/community/feed-composer-form-body";
 import { MAX_POLL_OPTIONS } from "@/components/community/feed-composer-form-body";
+import { FeedVideoTrimSheet } from "@/components/community/feed-video-trim-sheet";
 import { useAuth } from "@/lib/auth-context";
 import {
   DEFAULT_COMMUNITY_TOPIC,
@@ -16,15 +17,16 @@ import {
   isLikelyVideoFile,
   readFeedComposerDraft,
   readVideoFileDurationSeconds,
-  validateFeedVideoFile,
   type CommunityPostRow,
   type CommunityTopicId,
 } from "@/lib/community";
 import { defaultEventStartsAtLocal } from "@/lib/community/event-display";
 import { isLikelyImageFile, pickPostImagesFromLibrary } from "@/lib/community/pick-post-images";
 import { preparePostImageFiles } from "@/lib/community/prepare-post-image";
+import type { PreparedPostVideo } from "@/lib/community/prepare-post-video";
 import { clickHiddenFileInput } from "@/lib/click-hidden-file-input";
 import { canEngageWithCommunityFeed, COMMUNITY_FEED_ENGAGE_REQUIRED_MESSAGE, useProfile } from "@/lib/profile";
+import { MAX_POST_VIDEO_BYTES } from "@/lib/community/posts-supabase";
 
 export type UseFeedComposerOptions = {
   /** Called after a successful post (e.g. refresh feed list). */
@@ -59,7 +61,10 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
   const [composer, setComposer] = useState(() => readFeedComposerDraft()?.body ?? "");
   const [composerFiles, setComposerFiles] = useState<File[]>([]);
   const [composerVideoFile, setComposerVideoFile] = useState<File | null>(null);
+  const [composerVideoPosterFile, setComposerVideoPosterFile] = useState<File | null>(null);
   const [composerVideoDurationSeconds, setComposerVideoDurationSeconds] = useState<number | null>(null);
+  const [trimSourceFile, setTrimSourceFile] = useState<File | null>(null);
+  const [trimSheetOpen, setTrimSheetOpen] = useState(false);
   const [composerImageAlts, setComposerImageAlts] = useState<string[]>([]);
   const [composerPreviews, setComposerPreviews] = useState<string[]>([]);
   const [composerVideoPreview, setComposerVideoPreview] = useState<string | null>(null);
@@ -188,28 +193,36 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
       if (videoInputRef.current) videoInputRef.current.value = "";
       return;
     }
-    const validationError = await validateFeedVideoFile(f);
-    if (validationError) {
+    if (f.size > MAX_POST_VIDEO_BYTES) {
       toast({
-        title: "Choose a shorter clip",
-        description: validationError.message,
+        title: "Video too large",
+        description: "Keep the file to 50MB or smaller.",
         variant: "destructive",
       });
       if (videoInputRef.current) videoInputRef.current.value = "";
       return;
     }
+    // Open the trim sheet even for long clips — cutting happens before the hard duration check.
+    setTrimSourceFile(f);
+    setTrimSheetOpen(true);
+    if (videoInputRef.current) videoInputRef.current.value = "";
+  }
+
+  function onTrimConfirm(prepared: PreparedPostVideo) {
     setComposerFiles([]);
     setComposerImageAlts([]);
     if (fileInputRef.current) fileInputRef.current.value = "";
-    setComposerVideoFile(f);
+    setComposerVideoFile(prepared.video);
+    setComposerVideoPosterFile(prepared.poster);
     if (composerTopic === DEFAULT_COMMUNITY_TOPIC) {
       setComposerTopic("tips-what-worked");
     }
-    if (videoInputRef.current) videoInputRef.current.value = "";
+    setTrimSourceFile(null);
   }
 
   function removeComposerVideo() {
     setComposerVideoFile(null);
+    setComposerVideoPosterFile(null);
     setComposerVideoDurationSeconds(null);
     if (videoInputRef.current) videoInputRef.current.value = "";
   }
@@ -252,6 +265,7 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
     setComposer("");
     setComposerFiles([]);
     setComposerVideoFile(null);
+    setComposerVideoPosterFile(null);
     setComposerVideoDurationSeconds(null);
     setComposerImageAlts([]);
     setComposerPostKind("standard");
@@ -360,6 +374,7 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
           body: composer,
           imageFiles: imageFiles.length ? imageFiles : undefined,
           videoFile: composerVideoFile ?? undefined,
+          videoPosterFile: composerVideoPosterFile ?? undefined,
           imageAlts: composerImageAlts,
           contentNote: composerVideoFile ? VIDEO_POST_DEFAULT_CONTENT_NOTE : null,
           mentions,
@@ -424,6 +439,18 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
     }
   }
 
+  const videoTrimSheet: ReactNode = (
+    <FeedVideoTrimSheet
+      open={trimSheetOpen}
+      file={trimSourceFile}
+      onOpenChange={(next) => {
+        setTrimSheetOpen(next);
+        if (!next) setTrimSourceFile(null);
+      }}
+      onConfirm={onTrimConfirm}
+    />
+  );
+
   const formBodyProps: FeedComposerFormBodyProps = {
     orderedTopics,
     composerTopic,
@@ -481,5 +508,6 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
     formBodyProps,
     handlePost,
     composer,
+    videoTrimSheet,
   };
 }
