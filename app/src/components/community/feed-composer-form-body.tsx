@@ -483,7 +483,7 @@ export function FeedComposerFormBody({
         className={cn(
           "sticky bottom-0 z-10 mt-auto flex items-center gap-1 border-t border-border/40 bg-background/95 py-2 backdrop-blur-md",
           hideInlineSubmit
-            ? "-mx-4 px-3 pb-[max(0.55rem,env(safe-area-inset-bottom,0px))]"
+            ? "-mx-4 px-3 pb-[max(0.55rem,calc(env(safe-area-inset-bottom,0px)-var(--keyboard-inset-bottom,0px)))]"
             : "pt-3",
         )}
       >

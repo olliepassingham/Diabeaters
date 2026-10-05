@@ -1,4 +1,4 @@
-import { useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useSyncExternalStore, type ReactNode } from "react";
 import { Drawer } from "vaul";
 import { X } from "lucide-react";
 import { isFilePickerActive, subscribeFilePickerActive } from "@/lib/click-hidden-file-input";
@@ -26,21 +26,41 @@ export function CommunityFeedComposerDrawer({
   submitLabel?: string;
 }) {
   const pickerActive = useSyncExternalStore(subscribeFilePickerActive, isFilePickerActive, () => false);
+
+  useEffect(() => {
+    if (!open) return;
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtml = html.style.overflow;
+    const prevBody = body.style.overflow;
+    const scrollY = window.scrollY;
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    return () => {
+      html.style.overflow = prevHtml;
+      body.style.overflow = prevBody;
+      window.scrollTo(0, scrollY);
+    };
+  }, [open]);
+
   return (
     <Drawer.Root
       open={open}
       dismissible={!pickerActive}
       shouldScaleBackground={false}
+      repositionInputs={false}
+      noBodyStyles
       onOpenChange={(next) => {
         if (!next && isFilePickerActive()) return;
         onOpenChange(next);
       }}
     >
       <Drawer.Portal>
-        <Drawer.Overlay className="fixed inset-0 z-[110] bg-black/55" />
+        <Drawer.Overlay className="fixed inset-x-0 top-[var(--vv-offset-top,0px)] z-[110] h-[var(--vv-height,100dvh)] bg-black/55" />
         <Drawer.Content
+          data-keyboard-sheet
           className={cn(
-            "fixed inset-0 z-[110] flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-background p-0 text-foreground outline-none",
+            "fixed inset-x-0 top-[var(--vv-offset-top,0px)] z-[110] flex h-[var(--vv-height,100dvh)] max-h-[var(--vv-height,100dvh)] flex-col overflow-hidden bg-background p-0 text-foreground outline-none",
             "pt-[env(safe-area-inset-top,0px)]",
           )}
         >

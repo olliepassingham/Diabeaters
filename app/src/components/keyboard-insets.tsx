@@ -28,10 +28,13 @@ export function KeyboardInsets() {
 
     const update = () => {
       // When the keyboard opens, visualViewport.height shrinks.
-      // `offsetTop` accounts for iOS “rubber band” / address-bar shifts.
+      // `offsetTop` is how far iOS has panned the page. Fixed sheets use both
+      // so they stay in the visible area instead of sliding off the top.
       const rawInset = window.innerHeight - vv.height - vv.offsetTop;
       const inset = Math.max(0, Math.round(rawInset));
       setCssVar("--keyboard-inset-bottom", `${inset}px`);
+      setCssVar("--vv-height", `${Math.max(0, Math.round(vv.height))}px`);
+      setCssVar("--vv-offset-top", `${Math.max(0, Math.round(vv.offsetTop))}px`);
     };
 
     update();
@@ -71,6 +74,8 @@ export function KeyboardInsets() {
       window.removeEventListener("orientationchange", update);
       document.removeEventListener("focusin", onFocusIn);
       setCssVar("--keyboard-inset-bottom", "0px");
+      setCssVar("--vv-height", "");
+      setCssVar("--vv-offset-top", "0px");
     };
   }, []);
 

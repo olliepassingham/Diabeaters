@@ -78,7 +78,7 @@ export function MentionTextarea({
 
   useEffect(() => {
     if (!autoFocus || disabled) return;
-    const id = window.setTimeout(() => textareaRef.current?.focus(), 60);
+    const id = window.setTimeout(() => textareaRef.current?.focus({ preventScroll: true }), 60);
     return () => window.clearTimeout(id);
   }, [autoFocus, disabled]);
 
@@ -178,7 +178,6 @@ export function MentionTextarea({
         placeholder={placeholder}
         rows={rows}
         disabled={disabled}
-        autoFocus={autoFocus}
         autoCapitalize="sentences"
         autoCorrect="on"
         spellCheck
