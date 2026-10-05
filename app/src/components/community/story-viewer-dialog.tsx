@@ -627,7 +627,7 @@ export function StoryViewerDialog({
                       alt=""
                       decoding="async"
                       fetchPriority="high"
-                      className="absolute inset-0 h-full w-full object-cover"
+                      className="absolute inset-0 h-full w-full bg-black object-contain"
                     />
                   ) : (
                     <video

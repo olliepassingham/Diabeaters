@@ -331,7 +331,7 @@ export function StoryCreateSheet({
                 <img
                   src={preview}
                   alt=""
-                  className={linkedPostId ? "h-full w-full object-contain" : "h-full w-full object-cover"}
+                  className="h-full w-full bg-black object-contain"
                 />
               )}
             </StoryOverlayEditor>

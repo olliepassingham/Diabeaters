@@ -95,7 +95,7 @@ export function DmSharedStoryPreview({ storyId, className }: Props) {
             {story.media_kind === "video" ? (
               <video src={mediaUrl} className="h-full w-full object-cover" muted playsInline />
             ) : (
-              <img src={mediaUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+              <img src={mediaUrl} alt="" className="h-full w-full bg-black object-contain" loading="lazy" />
             )}
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
             <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-black/45 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm">
