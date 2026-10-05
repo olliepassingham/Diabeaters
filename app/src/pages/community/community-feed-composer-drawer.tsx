@@ -16,6 +16,7 @@ export function CommunityFeedComposerDrawer({
   canSubmit,
   submitting,
   submitLabel = "Post",
+  busyLabel = null,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -24,6 +25,7 @@ export function CommunityFeedComposerDrawer({
   canSubmit: boolean;
   submitting: boolean;
   submitLabel?: string;
+  busyLabel?: string | null;
 }) {
   const pickerActive = useSyncExternalStore(subscribeFilePickerActive, isFilePickerActive, () => false);
 
@@ -85,9 +87,18 @@ export function CommunityFeedComposerDrawer({
               data-vaul-no-drag
               className="mr-1.5 h-9 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground transition-opacity disabled:opacity-40"
             >
-              {submitting ? "Posting…" : submitLabel}
+              {submitting ? busyLabel ?? "Posting…" : submitLabel}
             </button>
           </div>
+          {submitting && busyLabel ? (
+            <p className="shrink-0 border-b border-border/40 px-4 py-2 text-[13px] text-muted-foreground" data-vaul-no-drag>
+              {busyLabel === "Preparing…"
+                ? "Preparing your photos…"
+                : busyLabel === "Uploading…"
+                  ? "Uploading. This can take a moment."
+                  : "Sharing your post…"}
+            </p>
+          ) : null}
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4">
             {children}
           </div>

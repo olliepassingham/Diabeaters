@@ -75,6 +75,7 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
   const [composerPreviews, setComposerPreviews] = useState<string[]>([]);
   const [composerVideoPreview, setComposerVideoPreview] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [submitStatusLabel, setSubmitStatusLabel] = useState<string | null>(null);
   const [composerPostKind, setComposerPostKind] = useState<ComposerPostKind>("standard");
   const [pollQuestion, setPollQuestion] = useState("");
   const [pollOptions, setPollOptions] = useState<string[]>(["", ""]);
@@ -363,6 +364,9 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
       return;
     }
     setSubmitting(true);
+    setSubmitStatusLabel(
+      composerFiles.length > 0 ? "Preparing…" : composerVideoFile ? "Uploading…" : "Posting…",
+    );
 
     try {
       const mentions = await buildMentionsForPost(composer, user.id);
@@ -385,6 +389,10 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
           setComposerFiles(imageFiles);
         }
       }
+
+      setSubmitStatusLabel(
+        composerVideoFile ? "Uploading…" : imageFiles.length > 0 ? "Uploading…" : "Posting…",
+      );
 
       let res: { data: CommunityPostRow | null; error: Error | null };
       if (composerPostKind === "standard") {
@@ -456,6 +464,7 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
       }
     } finally {
       setSubmitting(false);
+      setSubmitStatusLabel(null);
     }
   }
 
@@ -566,6 +575,7 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
     composerCanSubmit,
     guidedVideoMaxSeconds: GUIDED_POST_VIDEO_MAX_SECONDS,
     formatVideoDurationSeconds,
+    submitStatusLabel,
   };
 
   return {

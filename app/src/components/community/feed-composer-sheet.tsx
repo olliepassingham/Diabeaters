@@ -81,6 +81,7 @@ export function FeedComposerSheet({
           formId={formTestId}
           canSubmit={formBodyProps.composerCanSubmit && formBodyProps.canComposeToFeed}
           submitting={formBodyProps.submitting}
+          busyLabel={formBodyProps.submitStatusLabel}
           submitLabel={
             formBodyProps.composerPostKind === "event"
               ? "Share"

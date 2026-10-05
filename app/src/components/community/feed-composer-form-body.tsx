@@ -59,6 +59,8 @@ export type FeedComposerFormBodyProps = {
   autoFocusComposer?: boolean;
   /** Phone sheet puts Post in the header so the keyboard never covers it. */
   hideInlineSubmit?: boolean;
+  /** What the send button should say while a post is being prepared or uploaded. */
+  submitStatusLabel?: string | null;
 };
 
 export function FeedComposerFormBody({
@@ -101,6 +103,7 @@ export function FeedComposerFormBody({
   formatVideoDurationSeconds,
   autoFocusComposer = false,
   hideInlineSubmit = false,
+  submitStatusLabel = null,
 }: FeedComposerFormBodyProps) {
   const audienceInfo =
     "Posts are shared to the Diabeaters community feed. Avoid personal identifiers. Be kind — report anything unsafe.";
@@ -559,7 +562,7 @@ export function FeedComposerFormBody({
           >
             <Send className="mr-1.5 h-4 w-4" />
             {submitting
-              ? "Posting…"
+              ? submitStatusLabel ?? "Posting…"
               : composerPostKind === "event"
                 ? "Share event"
                 : composerPostKind === "poll"
