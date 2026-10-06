@@ -49,12 +49,15 @@ import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { ScenarioResultHero } from "@/components/scenarios/scenario-result-hero";
 import { AppointmentResultsFields } from "@/components/appointments/appointment-results-fields";
+import { Hba1cHistoryChart } from "@/components/patterns/hba1c-history-chart";
 import { syncAppointments } from "@/lib/appointments-supabase";
 import { rescheduleAppointmentReminders } from "@/lib/appointment-reminders";
 import {
   appointmentHasOutcome,
+  buildHba1cHistory,
   clampHba1cInput,
   formatOutcomeSummary,
+  isHistoricHba1cLog,
   normalizeAppointmentOutcome,
   type AppointmentOutcome,
 } from "@/lib/appointment-outcomes";
@@ -341,6 +344,10 @@ export default function Appointments() {
   const [outcome, setOutcome] = useState<AppointmentOutcome>({});
   const [markCompleteOnSave, setMarkCompleteOnSave] = useState(false);
   const [resultsMode, setResultsMode] = useState(false);
+  const [hba1cOpen, setHba1cOpen] = useState(false);
+  const [editingHba1cId, setEditingHba1cId] = useState<string | null>(null);
+  const [hba1cValue, setHba1cValue] = useState("");
+  const [hba1cDate, setHba1cDate] = useState("");
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
 
@@ -430,6 +437,60 @@ export default function Appointments() {
     setIsFormOpen(true);
   };
 
+  const resetHba1cForm = () => {
+    setEditingHba1cId(null);
+    setHba1cValue("");
+    setHba1cDate("");
+  };
+
+  const openHba1cLog = (existing?: Appointment) => {
+    if (existing) {
+      setEditingHba1cId(existing.id);
+      setHba1cValue(existing.outcome?.hba1cPercent != null ? String(existing.outcome.hba1cPercent) : "");
+      setHba1cDate(existing.outcome?.resultDate || existing.date);
+    } else {
+      resetHba1cForm();
+      const todayIso = new Date();
+      const y = todayIso.getFullYear();
+      const m = String(todayIso.getMonth() + 1).padStart(2, "0");
+      const d = String(todayIso.getDate()).padStart(2, "0");
+      setHba1cDate(`${y}-${m}-${d}`);
+    }
+    setHba1cOpen(true);
+  };
+
+  const saveHba1cLog = async () => {
+    if (!user?.id) return;
+    const value = clampHba1cInput(hba1cValue);
+    if (value == null || !/^\d{4}-\d{2}-\d{2}$/.test(hba1cDate)) return;
+    const outcome: AppointmentOutcome = {
+      hba1cPercent: value,
+      resultDate: hba1cDate,
+      recordKind: "hba1c_log",
+    };
+    if (editingHba1cId) {
+      storage.updateAppointment(editingHba1cId, {
+        title: "HbA1c",
+        type: "blood_test",
+        date: hba1cDate,
+        outcome,
+        isCompleted: true,
+      });
+    } else {
+      storage.addAppointment({
+        title: "HbA1c",
+        type: "blood_test",
+        date: hba1cDate,
+        outcome,
+        isCompleted: true,
+      });
+    }
+    setAppointments(storage.getAppointmentsForUser(user.id));
+    setHba1cOpen(false);
+    resetHba1cForm();
+    await syncAppointments({ throttleMs: 0 });
+  };
+
   const openAddResults = (appointment: Appointment) => {
     const start = new Date();
     start.setHours(0, 0, 0, 0);
@@ -500,6 +561,7 @@ export default function Appointments() {
     () =>
       appointments
         .filter((a) => {
+          if (isHistoricHba1cLog(a)) return false;
           if (a.isCompleted) return true;
           const d = parseAppointmentDate(a.date);
           return d !== null && isBefore(d, today);
@@ -516,6 +578,15 @@ export default function Appointments() {
   const showResults =
     editingAppointment != null &&
     (resultsMode || markCompleteOnSave || editingAppointment.isCompleted || visitHasStarted);
+
+  const hba1cLogs = useMemo(
+    () =>
+      appointments
+        .filter(isHistoricHba1cLog)
+        .sort((a, b) => (b.outcome?.resultDate || b.date).localeCompare(a.outcome?.resultDate || a.date)),
+    [appointments],
+  );
+  const hba1cPoints = useMemo(() => buildHba1cHistory(appointments), [appointments]);
 
   const nextAppointment = upcomingAppointments[0] ?? null;
   const moreUpcoming = upcomingAppointments.slice(1);
@@ -549,8 +620,9 @@ export default function Appointments() {
               </InfoSection>
               <InfoSection title="Results">
                 <p>
-                  After a visit, add HbA1c, eye or foot screening outcomes. Logged HbA1c values appear as a calm
-                  history chart in Patterns — educational only, not a diagnosis.
+                  After a visit, add HbA1c, eye or foot screening outcomes. You can also log past HbA1c results
+                  on their own. Those values appear as a history chart here and in Patterns — educational only, not a
+                  diagnosis.
                 </p>
               </InfoSection>
               <InfoSection title="Marking complete">
@@ -591,7 +663,9 @@ export default function Appointments() {
               </DialogTitle>
               <DialogDescription>
                 {resultsMode
-                  ? "Log what you were told. For your records, not a diagnosis."
+                  ? editingAppointment
+                    ? `${editingAppointment.title}. For your records, not a diagnosis.`
+                    : "Log what you were told. For your records, not a diagnosis."
                   : editingAppointment
                     ? showResults
                       ? "Update the visit, or log what you were told."
@@ -609,6 +683,8 @@ export default function Appointments() {
                 />
               ) : null}
 
+              {resultsMode ? null : (
+              <>
               <div className="space-y-2">
                 <Label htmlFor="title" className="text-xs font-medium text-muted-foreground">Title</Label>
                 <Input
@@ -648,7 +724,7 @@ export default function Appointments() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-[minmax(0,1fr)_8.25rem] gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_8.25rem]">
                 <div className="min-w-0 space-y-1.5">
                   <Label htmlFor="date" className="text-xs font-medium text-muted-foreground">Date</Label>
                   <Input
@@ -694,6 +770,10 @@ export default function Appointments() {
                 />
               ) : null}
 
+              </>
+              )}
+
+              {resultsMode ? null : (
               <div className="space-y-2">
                 <Label htmlFor="notes" className="text-xs font-medium text-muted-foreground">Notes</Label>
                 <Textarea
@@ -705,6 +785,7 @@ export default function Appointments() {
                   data-testid="input-appointment-notes"
                 />
               </div>
+              )}
 
               <div className="sticky bottom-0 z-10 -mx-5 bg-gradient-to-t from-background from-65% to-transparent px-5 pb-1 pt-4">
                 <Button
@@ -822,6 +903,126 @@ export default function Appointments() {
         </Button>
       </div>
 
+      <section className="space-y-3" data-testid="hba1c-results-section">
+        <div className="flex items-center justify-between gap-3 px-0.5">
+          <h2 className="font-display text-lg font-semibold text-foreground">HbA1c</h2>
+          <Button
+            type="button"
+            size="sm"
+            className="h-10 shrink-0 rounded-xl"
+            onClick={() => openHba1cLog()}
+            data-testid="button-add-hba1c"
+          >
+            <Plus className="mr-1.5 h-4 w-4" aria-hidden />
+            Add result
+          </Button>
+        </div>
+        <Hba1cHistoryChart points={hba1cPoints} />
+        {hba1cLogs.length > 0 ? (
+          <Card className="rounded-3xl border-border/60 shadow-sm">
+            <CardContent className="divide-y divide-border/50 p-0">
+              {hba1cLogs.map((log) => {
+                const when = log.outcome?.resultDate || log.date;
+                const parsed = parseAppointmentDate(when);
+                return (
+                  <div key={log.id} className="flex items-center gap-3 px-4 py-3" data-testid={`hba1c-log-${log.id}`}>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-foreground">{log.outcome?.hba1cPercent}%</p>
+                      <p className="text-xs text-muted-foreground">
+                        {parsed ? format(parsed, "d MMM yyyy") : when}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-10 rounded-xl px-3 text-muted-foreground"
+                      onClick={() => openHba1cLog(log)}
+                      data-testid={`button-edit-hba1c-${log.id}`}
+                    >
+                      <Pencil className="mr-1 h-3.5 w-3.5" aria-hidden />
+                      Edit
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="h-10 w-10 shrink-0 text-muted-foreground"
+                      onClick={() => requestDelete(log.id)}
+                      aria-label="Delete HbA1c result"
+                      data-testid={`button-delete-hba1c-${log.id}`}
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden />
+                    </Button>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        ) : (
+          <p className="px-0.5 text-sm text-muted-foreground">
+            Add past results here to see them on the graph. You do not need to create an old appointment.
+          </p>
+        )}
+      </section>
+
+      <Dialog
+        open={hba1cOpen}
+        onOpenChange={(open) => {
+          setHba1cOpen(open);
+          if (!open) resetHba1cForm();
+        }}
+      >
+        <DialogContent className="sm:max-w-md" data-testid="dialog-hba1c-log">
+          <DialogHeader className="space-y-1 pr-8 text-left">
+            <DialogTitle>{editingHba1cId ? "Edit HbA1c" : "Add HbA1c"}</DialogTitle>
+            <DialogDescription>A past result for your graph. Educational only, not a diagnosis.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="hba1c-value" className="text-xs font-medium text-muted-foreground">
+                HbA1c (%)
+              </Label>
+              <Input
+                id="hba1c-value"
+                type="number"
+                inputMode="decimal"
+                step="0.1"
+                min={3}
+                max={20}
+                className="h-11 rounded-xl"
+                placeholder="e.g. 7.2"
+                value={hba1cValue}
+                onChange={(e) => setHba1cValue(e.target.value)}
+                data-testid="input-hba1c-log-value"
+              />
+            </div>
+            <div className="min-w-0 space-y-1.5">
+              <Label htmlFor="hba1c-date" className="text-xs font-medium text-muted-foreground">
+                Date of result
+              </Label>
+              <Input
+                id="hba1c-date"
+                type="date"
+                className="native-datetime-input h-11 w-full min-w-0 rounded-xl px-3"
+                value={hba1cDate}
+                onChange={(e) => setHba1cDate(e.target.value)}
+                data-testid="input-hba1c-log-date"
+              />
+            </div>
+            <Button
+              type="button"
+              className="h-12 w-full rounded-2xl"
+              disabled={clampHba1cInput(hba1cValue) == null || !hba1cDate}
+              onClick={() => void saveHba1cLog()}
+              data-testid="button-save-hba1c"
+            >
+              Save result
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {upcomingAppointments.length === 0 && pastAppointments.length === 0 ? null : (
         <>
           {moreUpcoming.length > 0 ? (
@@ -858,59 +1059,66 @@ export default function Appointments() {
                     return (
                       <div
                         key={appointment.id}
-                        className="flex items-center gap-3 px-4 py-3"
+                        className="space-y-2.5 px-4 py-3"
                         data-testid={`appointment-past-${appointment.id}`}
                       >
-                        <span
-                          className={cn(
-                            "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
-                            meta.accent,
-                          )}
-                        >
-                          <Icon className="h-4 w-4" aria-hidden />
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-foreground">{appointment.title}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {d ? format(d, "d MMM yyyy") : "Date unknown"}
-                            {appointment.isCompleted ? " · Completed" : ""}
-                            {formatOutcomeSummary(appointment)
-                              ? ` · ${formatOutcomeSummary(appointment)}`
-                              : ""}
-                          </p>
+                        <div className="flex items-start gap-3">
+                          <span
+                            className={cn(
+                              "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
+                              meta.accent,
+                            )}
+                          >
+                            <Icon className="h-4 w-4" aria-hidden />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-foreground">{appointment.title}</p>
+                            <p className="text-xs leading-snug text-muted-foreground">
+                              {d ? format(d, "d MMM yyyy") : "Date unknown"}
+                              {appointment.isCompleted ? " · Completed" : ""}
+                            </p>
+                            {formatOutcomeSummary(appointment) ? (
+                              <p className="mt-1 text-xs leading-snug text-foreground">
+                                {formatOutcomeSummary(appointment)}
+                              </p>
+                            ) : null}
+                          </div>
                         </div>
-                        {!appointmentHasOutcome(appointment) ? (
+                        <div className="flex flex-wrap gap-2 pl-12">
+                          {!appointmentHasOutcome(appointment) ? (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              className="h-10 rounded-xl px-3 text-xs"
+                              onClick={() => openAddResults(appointment)}
+                              data-testid={`button-add-results-past-${appointment.id}`}
+                            >
+                              <ClipboardList className="mr-1 h-3.5 w-3.5" aria-hidden />
+                              Results
+                            </Button>
+                          ) : null}
                           <Button
                             size="sm"
-                            variant="secondary"
-                            className="h-9 shrink-0 rounded-xl px-2.5 text-xs"
-                            onClick={() => openAddResults(appointment)}
-                            data-testid={`button-add-results-past-${appointment.id}`}
+                            variant="ghost"
+                            className="h-10 rounded-xl px-3 text-xs text-muted-foreground"
+                            onClick={() => openEditDialog(appointment)}
+                            data-testid={`button-edit-past-${appointment.id}`}
                           >
-                            <ClipboardList className="mr-1 h-3.5 w-3.5" aria-hidden />
-                            Results
+                            <Pencil className="mr-1 h-3.5 w-3.5" aria-hidden />
+                            Edit
                           </Button>
-                        ) : null}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-9 shrink-0 rounded-xl px-2.5 text-xs text-muted-foreground"
-                          onClick={() => openEditDialog(appointment)}
-                          data-testid={`button-edit-past-${appointment.id}`}
-                        >
-                          <Pencil className="mr-1 h-3.5 w-3.5" aria-hidden />
-                          Edit
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-9 w-9 shrink-0 text-muted-foreground"
-                          onClick={() => requestDelete(appointment.id)}
-                          data-testid={`button-delete-past-${appointment.id}`}
-                          aria-label="Delete appointment"
-                        >
-                          <Trash2 className="h-4 w-4" aria-hidden />
-                        </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-10 rounded-xl px-3 text-xs text-muted-foreground"
+                            onClick={() => requestDelete(appointment.id)}
+                            data-testid={`button-delete-past-${appointment.id}`}
+                            aria-label="Delete appointment"
+                          >
+                            <Trash2 className="mr-1 h-3.5 w-3.5" aria-hidden />
+                            Delete
+                          </Button>
+                        </div>
                       </div>
                     );
                   })}

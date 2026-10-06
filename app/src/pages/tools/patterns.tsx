@@ -130,7 +130,7 @@ function PatternsInfoDialog() {
       </InfoSection>
       <InfoSection title="HbA1c history">
         <p>
-          When you log HbA1c on clinic or blood-test appointments, those values appear here as a simple trend. Educational
+          HbA1c you log on a visit, or add as a past result on Appointments, appears here as a simple trend. Educational
           only — discuss changes with your diabetes team.
         </p>
       </InfoSection>

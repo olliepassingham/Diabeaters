@@ -291,7 +291,7 @@ export function collectAllActivityEvents(): ActivityEvent[] {
   }
 
   for (const appt of storage.getAppointments()) {
-    if (appt.deletedAt) continue;
+    if (appt.deletedAt || appt.outcome?.recordKind === "hba1c_log") continue;
     const mapped = mapAppointmentActivityEvent({
       id: `appt-${appt.id}`,
       title: appt.title,

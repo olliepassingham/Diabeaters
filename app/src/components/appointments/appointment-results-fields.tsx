@@ -49,7 +49,7 @@ export function AppointmentResultsFields({ type, visitDate, outcome, onChange }:
       </div>
 
       {showHba1c ? (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-3">
           <div className="space-y-1.5">
             <Label htmlFor="outcome-hba1c" className="text-xs font-medium text-muted-foreground">
               HbA1c (%)
@@ -61,6 +61,7 @@ export function AppointmentResultsFields({ type, visitDate, outcome, onChange }:
               step="0.1"
               min={3}
               max={20}
+              className="h-11 w-full min-w-0 rounded-xl"
               placeholder="e.g. 7.2"
               value={outcome.hba1cPercent ?? ""}
               onChange={(e) => {
@@ -78,13 +79,14 @@ export function AppointmentResultsFields({ type, visitDate, outcome, onChange }:
               data-testid="input-outcome-hba1c"
             />
           </div>
-          <div className="space-y-1.5">
+          <div className="min-w-0 space-y-1.5">
             <Label htmlFor="outcome-result-date" className="text-xs font-medium text-muted-foreground">
               Result date
             </Label>
             <Input
               id="outcome-result-date"
               type="date"
+              className="native-datetime-input h-11 w-full min-w-0 rounded-xl px-3"
               value={outcome.resultDate ?? visitDate}
               onChange={(e) =>
                 onChange({

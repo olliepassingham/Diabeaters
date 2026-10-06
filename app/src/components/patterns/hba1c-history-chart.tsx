@@ -60,8 +60,8 @@ export function Hba1cHistoryChart({ points, className }: Props) {
             HbA1c history
           </CardTitle>
           <p className="text-xs leading-snug text-muted-foreground">
-            Log HbA1c on clinic or blood-test appointments to see your history here. Educational only — discuss trends
-            with your team.
+            Add past HbA1c results on Appointments to see your history here. Educational only — discuss trends with
+            your team.
           </p>
         </CardHeader>
         <CardContent className="px-4 pb-4">
@@ -85,7 +85,7 @@ export function Hba1cHistoryChart({ points, className }: Props) {
           HbA1c history
         </CardTitle>
         <p className="text-xs leading-snug text-muted-foreground">
-          Your logged HbA1c from appointments — a conversation starter with your team, not a diagnosis.
+          Your logged HbA1c — a conversation starter with your team, not a diagnosis.
         </p>
       </CardHeader>
       <CardContent className="px-2 pb-4 sm:px-4">

@@ -3,6 +3,7 @@ import {
   buildHba1cHistory,
   clampHba1cInput,
   formatOutcomeSummary,
+  isHistoricHba1cLog,
   normalizeAppointmentOutcome,
   parseAppointmentOutcome,
 } from "./appointment-outcomes";
@@ -45,6 +46,21 @@ describe("appointment-outcomes", () => {
     ]);
     expect(points.map((p) => p.date)).toEqual(["2025-12-15", "2026-06-01"]);
     expect(points[0]!.hba1cPercent).toBe(7.8);
+  });
+
+  it("keeps a standalone HbA1c log distinct from a visit", () => {
+    const logged = appt({
+      id: "h",
+      date: "2024-03-01",
+      title: "HbA1c",
+      type: "blood_test",
+      outcome: { hba1cPercent: 6.8, resultDate: "2024-03-01", recordKind: "hba1c_log" },
+    });
+    expect(isHistoricHba1cLog(logged)).toBe(true);
+    expect(parseAppointmentOutcome(logged.outcome)?.recordKind).toBe("hba1c_log");
+    expect(isHistoricHba1cLog(appt({ id: "v", date: "2024-03-01", outcome: { hba1cPercent: 6.8 } }))).toBe(
+      false,
+    );
   });
 
   it("formats outcome summary", () => {

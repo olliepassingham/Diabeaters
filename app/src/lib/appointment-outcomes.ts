@@ -39,6 +39,7 @@ export function parseAppointmentOutcome(raw: unknown): AppointmentOutcome | unde
   if (typeof o.outcomeNote === "string" && o.outcomeNote.trim()) {
     out.outcomeNote = o.outcomeNote.trim().slice(0, 500);
   }
+  if (o.recordKind === "hba1c_log") out.recordKind = "hba1c_log";
 
   return Object.keys(out).length > 0 ? out : undefined;
 }
@@ -66,6 +67,11 @@ export function appointmentShowsFootFields(type: AppointmentType): boolean {
 
 export function appointmentHasOutcome(a: Appointment): boolean {
   return Boolean(parseAppointmentOutcome(a.outcome));
+}
+
+/** A past HbA1c entered on its own, without a clinic visit. */
+export function isHistoricHba1cLog(a: Appointment): boolean {
+  return parseAppointmentOutcome(a.outcome)?.recordKind === "hba1c_log";
 }
 
 export function screeningResultLabel(r: AppointmentScreeningResult): string {

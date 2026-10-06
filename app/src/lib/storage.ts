@@ -1286,6 +1286,8 @@ export type AppointmentOutcome = {
   eyeResult?: "clear" | "follow_up" | "referral" | "other";
   footResult?: "clear" | "follow_up" | "referral" | "other";
   outcomeNote?: string;
+  /** A logged lab value, not a scheduled visit. */
+  recordKind?: "hba1c_log";
 };
 
 export interface Appointment {
