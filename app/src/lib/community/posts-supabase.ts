@@ -41,6 +41,7 @@ import {
 export const COMMUNITY_POST_IMAGES_BUCKET = "community_post_images";
 export const MAX_POST_IMAGES = 4;
 export const MAX_POST_IMAGE_BYTES = 5 * 1024 * 1024;
+/** Story uploads still use this byte cap. Feed clips are limited by length, not file size. */
 export const MAX_POST_VIDEO_BYTES = 50 * 1024 * 1024;
 
 export type FeedCursor = { created_at: string; id: string };
@@ -572,9 +573,6 @@ function validateImageFiles(files: File[]): Error | null {
 
 function validateVideoFile(file: File | null | undefined): Error | null {
   if (!file) return null;
-  if (file.size > MAX_POST_VIDEO_BYTES) {
-    return new Error("Video must be 50MB or smaller.");
-  }
   if (!isLikelyVideoFile(file)) {
     return new Error("Only MP4, MOV, or WebM videos are allowed.");
   }

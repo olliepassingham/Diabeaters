@@ -4,8 +4,6 @@ import {
   readVideoFileDurationSeconds,
 } from "@/lib/community/feed-video-limits";
 
-/** Keep in sync with `MAX_POST_VIDEO_BYTES` in posts-supabase. */
-const MAX_TRIMMED_VIDEO_BYTES = 50 * 1024 * 1024;
 const TRIM_EPSILON_SEC = 0.2;
 const POSTER_MAX_EDGE_PX = 1280;
 
@@ -294,9 +292,6 @@ export async function trimVideoFile(
     const blob = new Blob(chunks, { type: outType });
     if (blob.size < 1024) {
       throw new Error("The cut video was empty. Try a different section.");
-    }
-    if (blob.size > MAX_TRIMMED_VIDEO_BYTES) {
-      throw new Error("That cut is still over 50MB. Choose a shorter section.");
     }
 
     const baseName = (file.name.replace(/\.[^.]+$/, "") || "clip").slice(0, 80);

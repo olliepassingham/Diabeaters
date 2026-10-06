@@ -32,7 +32,6 @@ import {
   FILE_INPUT_HIDDEN_CLASS,
 } from "@/lib/click-hidden-file-input";
 import { canEngageWithCommunityFeed, COMMUNITY_FEED_ENGAGE_REQUIRED_MESSAGE, useProfile } from "@/lib/profile";
-import { MAX_POST_VIDEO_BYTES } from "@/lib/community/posts-supabase";
 
 export type UseFeedComposerOptions = {
   /** Called after a successful post (e.g. refresh feed list). `pendingId` matches an optimistic row when one was shown. */
@@ -206,15 +205,6 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
     const picked = f;
     if (!isLikelyVideoFile(picked)) {
       toast({ title: "Unsupported file", description: "Choose an MP4, MOV, or WebM video.", variant: "destructive" });
-      if (videoInputRef.current) videoInputRef.current.value = "";
-      return;
-    }
-    if (picked.size > MAX_POST_VIDEO_BYTES) {
-      toast({
-        title: "Video too large",
-        description: "Keep the file to 50MB or smaller.",
-        variant: "destructive",
-      });
       if (videoInputRef.current) videoInputRef.current.value = "";
       return;
     }

@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { MentionTextarea } from "@/components/community/mention-textarea";
 import { Textarea } from "@/components/ui/textarea";
 import { InlineInfoHint } from "@/components/ui/field-label-with-info";
-import { MAX_POST_IMAGES, MAX_POST_VIDEO_BYTES, MAX_POST_VIDEO_SECONDS } from "@/lib/community";
+import { MAX_POST_IMAGES, MAX_POST_VIDEO_SECONDS } from "@/lib/community";
 import type { CommunityTopicId } from "@/lib/community";
 import type { CommunityTopicRow } from "@/lib/community/topics";
 import { eventQuickStartPresets } from "@/lib/community/event-display";
@@ -107,7 +107,6 @@ export function FeedComposerFormBody({
 }: FeedComposerFormBodyProps) {
   const audienceInfo =
     "Posts are shared to the Diabeaters community feed. Avoid personal identifiers. Be kind — report anything unsafe.";
-  const videoMaxMb = Math.round(MAX_POST_VIDEO_BYTES / (1024 * 1024));
   const standardPlaceholder = composerVideoFile
     ? "Share a 30–60s tip from your day…"
     : "Share something…";
@@ -552,7 +551,7 @@ export function FeedComposerFormBody({
         </Button>
         <InlineInfoHint
           ariaLabel="Media limits for posts"
-          content={`Up to ${MAX_POST_IMAGES} photos (5MB each) or one short video (~${guidedVideoMaxSeconds}s, max ${MAX_POST_VIDEO_SECONDS}s / ${videoMaxMb}MB, MP4/MOV/WebM). After you pick a video you can cut the length.`}
+          content={`Up to ${MAX_POST_IMAGES} photos (5MB each) or one short video (~${guidedVideoMaxSeconds}s, max ${MAX_POST_VIDEO_SECONDS}s, MP4/MOV/WebM). After you pick a video you can cut the length.`}
         />
         {hideInlineSubmit ? null : (
           <Button
