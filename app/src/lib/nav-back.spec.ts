@@ -97,6 +97,17 @@ describe("nav-back", () => {
     expect(planNavigateBack("/scenarios/bedtime")).toEqual({ kind: "history" });
   });
 
+  it("returns to the Tools list when Beatie was opened from Tools, not the page before it", () => {
+    trackNavHistory("/carer-view");
+    trackNavHistory("/tools");
+    trackNavHistory("/coach");
+    expect(planNavigateBack("/coach")).toEqual({
+      kind: "href",
+      href: "/tools",
+      clearTab: "tools",
+    });
+  });
+
   it("falls back to the Tools hub when a tool is opened with no in-app previous page", () => {
     expect(planNavigateBack("/tools/patterns")).toEqual({
       kind: "href",

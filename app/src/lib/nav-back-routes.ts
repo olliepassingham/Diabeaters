@@ -155,8 +155,27 @@ export type NavBackPlan =
 export function planNavigateBack(pathname: string, explicitFallback?: string): NavBackPlan {
   const path = normalizeNavPath(pathname);
   const fallback = explicitFallback ?? resolveBackFallback(path);
+  const prev = getInAppNavPrev(path);
 
-  if (hasInAppNavHistory(path)) {
+  // Tab hubs are often not a real history entry (bottom-nav view transitions).
+  // If Beatie or another tool was opened from the Tools list, go back there
+  // instead of skipping to the page before Tools.
+  if (
+    isToolsDrilldownPath(path) &&
+    shouldUseHubBack(explicitFallback, "/tools") &&
+    (prev === "/tools" || !prev)
+  ) {
+    return { kind: "href", href: "/tools", clearTab: "tools" };
+  }
+  if (
+    isGuidesDrilldownPath(path) &&
+    shouldUseHubBack(explicitFallback, "/scenarios") &&
+    (prev === "/scenarios" || !prev)
+  ) {
+    return { kind: "href", href: "/scenarios", clearTab: "scenarios" };
+  }
+
+  if (prev) {
     return { kind: "history" };
   }
 
