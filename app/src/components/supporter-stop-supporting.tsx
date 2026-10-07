@@ -24,7 +24,6 @@ import {
   setActiveAppMode,
   setActiveCarerPatientId,
 } from "@/lib/carer-session";
-import { localIndicatesPatientAccount } from "@/lib/community-path-patient-reconcile";
 import { nextSupportedPerson } from "@/lib/supporter-leave";
 import type { LinkedPatientInfo, LinkedPatientWithProfile } from "@/lib/carers.types";
 
@@ -86,7 +85,7 @@ export function SupporterStopSupporting({
 
     clearActiveCarerPatientId();
     onSwitched(null);
-    if (canSwitchAppMode() || localIndicatesPatientAccount()) {
+    if (canSwitchAppMode()) {
       setActiveAppMode("patient");
       setLocation("/");
     }

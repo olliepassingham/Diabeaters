@@ -260,8 +260,9 @@ export function markDualRolePatientAfterLink(): void {
 /** Dual-role accounts (patient + linked supporter) can swap User / Supporter mode. */
 export function canSwitchAppMode(): boolean {
   const path = getOnboardingAccountPath();
+  if (path === "supporter") return false;
   if (path === "patient" || path === "both") return true;
-  return !isSupporterOnlyAccount();
+  return getPrimaryAppRole() === "patient";
 }
 
 /** Account created as community-only on /welcome — learn/feed session, not full patient tools. */

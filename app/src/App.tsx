@@ -618,7 +618,15 @@ function PatientRouteGuard({ children }: { children: React.ReactNode }) {
   }
   if (isCommunityMode && !isCommunityMemberAllowedPath(pathOnly)) return null;
   if (isCarerMode && !isCommunityPath(pathOnly) && !isCoachPath(pathOnly)) return null;
-  if (!isCommunityMode && (hasCarerIntent() || hasPendingCarer()) && !isCommunityPath(pathOnly)) return null;
+  // Linked supporters keep a pending-carer flag from signup. Do not blank /coach for them.
+  if (
+    !isCarerMode &&
+    !isCommunityMode &&
+    (hasCarerIntent() || hasPendingCarer()) &&
+    !isCommunityPath(pathOnly)
+  ) {
+    return null;
+  }
   return <>{children}</>;
 }
 

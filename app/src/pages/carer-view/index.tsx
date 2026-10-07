@@ -56,7 +56,6 @@ import {
   setActiveAppMode,
   setActiveCarerPatientId,
 } from "@/lib/carer-session";
-import { localIndicatesPatientAccount } from "@/lib/community-path-patient-reconcile";
 import { collectCarerActivityEvents, getActivityWeekSummary } from "@/lib/activity-history";
 import { DevNote } from "@/components/dev/DevNote";
 import { SupporterPushPromptDialog } from "@/components/supporter-push-prompt-dialog";
@@ -1589,7 +1588,7 @@ export default function CarerViewPage() {
 
   useEffect(() => {
     if (phase !== "unlinked") return;
-    if (linkResolvedEmpty && (canSwitchAppMode() || localIndicatesPatientAccount())) {
+    if (linkResolvedEmpty && canSwitchAppMode()) {
       setActiveAppMode("patient");
       clearActiveCarerPatientId();
       setLocation("/");
@@ -1902,7 +1901,7 @@ export default function CarerViewPage() {
 
           <SupporterQuickActions
             showActivity={showCarerActivityLog}
-            showUserModeSwitch={canSwitchAppMode() || localIndicatesPatientAccount()}
+            showUserModeSwitch={canSwitchAppMode()}
             showHypoCheckIn={scopes.hypo_alerts ?? false}
             patientId={activeLink?.patientId}
             patientName={displayName}
