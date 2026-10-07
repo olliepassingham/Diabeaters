@@ -393,20 +393,21 @@ export function StoryCreateSheet({
       <>
         {fileInputs}
         <div className="fixed inset-0 z-[140] flex flex-col bg-background text-foreground">
-          <div className="flex items-center gap-2 px-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+          <div className="shrink-0 border-b border-border/60 bg-background px-2 pb-3 pt-[max(0.85rem,env(safe-area-inset-top))] [padding-left:max(0.5rem,env(safe-area-inset-left))] [padding-right:max(0.5rem,env(safe-area-inset-right))]">
             <button
               type="button"
-              className="flex h-11 items-center gap-0.5 rounded-full pr-3 text-sm font-semibold"
+              className="flex h-11 shrink-0 items-center gap-0.5 rounded-full px-2 text-base font-semibold text-primary active:opacity-70"
+              aria-label="Back to feed"
               onClick={() => {
                 reset();
                 onOpenChange(false);
               }}
             >
-              <ChevronLeft className="h-5 w-5" aria-hidden />
+              <ChevronLeft className="h-6 w-6" aria-hidden />
               Back
             </button>
-            <div className="min-w-0 flex-1">
-              <p className="text-base font-semibold tracking-tight">New story</p>
+            <div className="px-2 pt-0.5">
+              <p className="text-lg font-semibold tracking-tight">New story</p>
               <p className="text-xs text-muted-foreground">Visible for 24 hours</p>
             </div>
           </div>
