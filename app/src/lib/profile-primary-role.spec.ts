@@ -99,4 +99,33 @@ describe("profile-primary-role", () => {
 
     expect(updateProfile).toHaveBeenCalledWith({ id: "u1", primary_app_role: "patient" });
   });
+
+  it("finalizeSupporterLinkCloudSync keeps a supporter account on carer when the phone has a Type 1 profile", async () => {
+    localStorage.setItem("diabeater_onboarding_completed", "true");
+    const { storage } = await import("@/lib/storage");
+    storage.saveProfile({
+      name: "Old Type1",
+      email: "",
+      bgUnits: "mmol/L",
+      carbUnits: "grams",
+      diabetesType: "type1",
+      insulinDeliveryMethod: "pen",
+      usingInsulin: true,
+      hasAcceptedDisclaimer: true,
+      dateOfBirth: "2000-01-01",
+      region: "UK",
+      weightDisplayUnit: "kg",
+    });
+    const { setOnboardingAccountPath, setPrimaryAppRole, cacheCloudPrimaryAppRole } = await import(
+      "@/lib/carer-session"
+    );
+    setOnboardingAccountPath("supporter");
+    setPrimaryAppRole("carer");
+    cacheCloudPrimaryAppRole("carer");
+
+    const { finalizeSupporterLinkCloudSync } = await import("@/lib/profile-primary-role");
+    await finalizeSupporterLinkCloudSync("u1");
+
+    expect(updateProfile).toHaveBeenCalledWith({ id: "u1", primary_app_role: "carer" });
+  });
 });

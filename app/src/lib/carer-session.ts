@@ -232,8 +232,10 @@ export function getPrimaryAppRole(): PrimaryAppRole | null {
 export function isSupporterOnlyAccount(): boolean {
   const path = getOnboardingAccountPath();
   if (path === "patient" || path === "both") return false;
-  if (localIndicatesPatientAccount()) return false;
-  /** Explicit onboarding choice takes priority over a stale/wrong cached cloud role fallback. */
+  /**
+   * Supporter choice and a cloud carer role win over a previous account's Type 1
+   * profile left on this phone. That leftover profile must not turn this login into User mode.
+   */
   if (path === "supporter") return true;
   if (getPrimaryAppRole() === "patient") return false;
   if (isPersistedSupporterAccount()) return true;
@@ -241,6 +243,8 @@ export function isSupporterOnlyAccount(): boolean {
   const cloud = getCachedCloudPrimaryAppRole();
   if (cloud === "patient" || cloud === "community") return false;
   if (cloud === "carer") return true;
+
+  if (localIndicatesPatientAccount()) return false;
 
   if (getPrimaryAppRole() === "carer") return true;
   return false;
@@ -285,16 +289,28 @@ export function promoteCommunityMemberToSupporterAccount(): void {
  * Set supporter-only onboarding markers after linking.
  * Community members become supporter-only; fresh accounts with no role get the same defaults.
  */
+function keepSupporterOnlyAfterLink(): void {
+  setPrimaryAppRole("carer");
+  setOnboardingAccountPath("supporter");
+  markPersistedSupporterAccount();
+}
+
 export function applySupporterAccountRoleAfterLink(): void {
   if (isCommunityMemberAccount()) {
     promoteCommunityMemberToSupporterAccount();
+    return;
+  }
+  const path = getOnboardingAccountPath();
+  const explicitPatient = path === "patient" || path === "both" || getPrimaryAppRole() === "patient";
+  const cloud = getCachedCloudPrimaryAppRole();
+  if (!explicitPatient && (path === "supporter" || cloud === "carer" || getPrimaryAppRole() === "carer")) {
+    keepSupporterOnlyAfterLink();
     return;
   }
   if (localIndicatesPatientAccount()) {
     markDualRolePatientAfterLink();
     return;
   }
-  const path = getOnboardingAccountPath();
   if (path === "patient" || path === "both") {
     if (path === "patient") setOnboardingAccountPath("both");
     if (getPrimaryAppRole() == null) setPrimaryAppRole("patient");

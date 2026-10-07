@@ -185,6 +185,33 @@ describe("carer-session community-only accounts", () => {
     expect(isSupporterOnlyAccount()).toBe(false);
   });
 
+  it("keeps a supporter login in supporter mode when the phone still has a Type 1 profile", () => {
+    setOnboardingAccountPath("supporter");
+    setPrimaryAppRole("carer");
+    cacheCloudPrimaryAppRole("carer");
+    localStorage.setItem("diabeater_onboarding_completed", "true");
+    storage.saveProfile({
+      name: "Old Type1",
+      email: "",
+      bgUnits: "mmol/L",
+      carbUnits: "grams",
+      diabetesType: "type1",
+      insulinDeliveryMethod: "pen",
+      usingInsulin: true,
+      hasAcceptedDisclaimer: true,
+      dateOfBirth: "2000-01-01",
+      region: "UK",
+      weightDisplayUnit: "kg",
+    });
+
+    applySupporterAccountRoleAfterLink();
+
+    expect(getPrimaryAppRole()).toBe("carer");
+    expect(getOnboardingAccountPath()).toBe("supporter");
+    expect(isSupporterOnlyAccount()).toBe(true);
+    expect(canSwitchAppMode()).toBe(false);
+  });
+
   it("stays dual-role when cloud role was wrongly set to carer", () => {
     setOnboardingAccountPath("patient");
     setPrimaryAppRole("patient");
