@@ -14,6 +14,7 @@ import { clickHiddenFileInput, FILE_INPUT_HIDDEN_CLASS, isFilePickerActive } fro
 import { STORY_MEDIA_CLASS, STORY_STAGE_CLASS } from "@/lib/community/story-frame";
 import { cn } from "@/lib/utils";
 import { pickSinglePhoto } from "@/lib/community/pick-post-images";
+import { pickStoryVideoFromLibrary } from "@/lib/community/pick-story-video";
 import {
   insertCommunityStory,
   MAX_STORY_BYTES,
@@ -258,6 +259,27 @@ export function StoryCreateSheet({
     }
   }
 
+  async function chooseVideo() {
+    if (pickingRef.current) return;
+    pickingRef.current = true;
+    try {
+      if (!nativeApp) {
+        clickHiddenFileInput(videoInputRef.current);
+        return;
+      }
+      const picked = await pickStoryVideoFromLibrary();
+      if (picked) await applyPickedFile(picked);
+    } catch (err) {
+      toast({
+        title: "Couldn't open your videos",
+        description: err instanceof Error ? err.message : "Try again.",
+        variant: "destructive",
+      });
+    } finally {
+      pickingRef.current = false;
+    }
+  }
+
   function onPick(files: FileList | null) {
     const picked = files?.[0] ?? null;
     if (photoInputRef.current) photoInputRef.current.value = "";
@@ -488,8 +510,7 @@ export function StoryCreateSheet({
                 icon={<Video className="h-5 w-5 shrink-0" aria-hidden />}
                 title="Choose a video"
                 hint="From your library"
-                accept="video/*"
-                onFile={(picked) => void applyPickedFile(picked)}
+                onClick={() => void chooseVideo()}
               />
             </div>
             <p className="mt-auto flex items-center justify-center gap-2 px-6 pb-[max(1.35rem,env(safe-area-inset-bottom))] text-center text-[13px] leading-snug text-muted-foreground">
