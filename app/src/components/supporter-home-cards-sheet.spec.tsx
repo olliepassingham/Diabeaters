@@ -30,7 +30,7 @@ describe("SupporterHomeCardsSheet", () => {
           {
             id: "appointments",
             label: "Appointments",
-            detail: "A new appointment brings this back. Reminders stay on.",
+            detail: "",
             shown: true,
             locked: false,
           },
@@ -38,7 +38,7 @@ describe("SupporterHomeCardsSheet", () => {
       />,
     );
 
-    expect(screen.getByText(/emergency details stay here/i)).toBeTruthy();
+    expect(screen.getByText(/alerts stay visible/i)).toBeTruthy();
     fireEvent.click(screen.getByTestId("switch-supporter-card-appointments"));
     expect(onShownChange).toHaveBeenCalledWith("appointments", false);
   });
@@ -54,7 +54,7 @@ describe("SupporterHomeCardsSheet", () => {
           {
             id: "supplies",
             label: "Supplies",
-            detail: "Showing because stock is low.",
+            detail: "Low stock",
             shown: true,
             locked: true,
           },

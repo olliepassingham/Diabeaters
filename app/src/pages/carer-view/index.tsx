@@ -1827,9 +1827,7 @@ export default function CarerViewPage() {
     cardOptions.push({
       id: "supplies",
       label: "Supplies",
-      detail: suppliesForced
-        ? "Showing because stock is low."
-        : "Shared stock. This stays on screen if anything is low.",
+      detail: suppliesForced ? "Low stock" : "",
       shown: showSuppliesCard,
       locked: suppliesForced,
     });
@@ -1838,9 +1836,7 @@ export default function CarerViewPage() {
     cardOptions.push({
       id: "situations",
       label: "Situations",
-      detail: travelForced
-        ? "Showing because travel is on."
-        : "Travel, sick day, and bedtime. This stays on screen during a trip.",
+      detail: travelForced ? "On a trip" : "",
       shown: showSituationsCard,
       locked: travelForced,
     });
@@ -1849,7 +1845,7 @@ export default function CarerViewPage() {
     cardOptions.push({
       id: "activity",
       label: "Activity log",
-      detail: "This week's shared activity. The Activity button stays.",
+      detail: "",
       shown: showActivityCard,
       locked: false,
     });
@@ -1858,9 +1854,7 @@ export default function CarerViewPage() {
     cardOptions.push({
       id: "appointments",
       label: "Appointments",
-      detail: appointmentsReady
-        ? "A new appointment brings this back. Reminders stay on."
-        : "Loading appointments.",
+      detail: appointmentsReady ? "" : "Loading",
       shown: appointmentsReady ? showAppointmentsCard : !cardPrefs.hidden.includes("appointments"),
       locked: !appointmentsReady,
     });
@@ -1869,7 +1863,7 @@ export default function CarerViewPage() {
     cardOptions.push({
       id: "clinical",
       label: "Clinical basics",
-      detail: "Delivery method, daily dose, and date of birth.",
+      detail: "",
       shown: showClinicalCard,
       locked: false,
     });
