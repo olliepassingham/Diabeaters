@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { CameraSource } from "@capacitor/camera";
 import { Capacitor } from "@capacitor/core";
-import { Camera, ChevronLeft, Clock3, ImagePlus, Loader2, RefreshCw, Send, Video, X } from "lucide-react";
+import { Camera, ChevronLeft, ChevronRight, Clock3, ImagePlus, Loader2, RefreshCw, Send, Video, X } from "lucide-react";
 import heic2any from "heic2any";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Button } from "@/components/ui/button";
@@ -56,48 +56,80 @@ async function jpegFromHeic(file: File): Promise<File> {
   return new File([blob], `${base}.jpg`, { type: "image/jpeg" });
 }
 
-function StoryDirectFileChoice({
+function StoryChoiceRow({
   icon,
   title,
   hint,
+  prominent,
+  onClick,
   accept,
   capture,
-  prominent,
   onFile,
 }: {
   icon: ReactNode;
   title: string;
   hint: string;
-  accept: string;
-  capture?: "environment" | "user";
   prominent?: boolean;
-  onFile: (file: File) => void;
+  onClick?: () => void;
+  accept?: string;
+  capture?: "environment" | "user";
+  onFile?: (file: File) => void;
 }) {
-  return (
-    <label
-      className={
-        prominent
-          ? "relative flex h-14 w-full items-center gap-3 overflow-hidden rounded-2xl bg-primary px-4 text-left text-primary-foreground active:opacity-90"
-          : "relative flex h-14 w-full items-center gap-3 overflow-hidden rounded-2xl border border-border bg-card px-4 text-left active:bg-muted"
-      }
-    >
-      {icon}
-      <span className="min-w-0">
-        <span className="block text-sm font-semibold">{title}</span>
-        <span className={prominent ? "block text-xs opacity-80" : "block text-xs text-muted-foreground"}>{hint}</span>
+  const className = cn(
+    "relative flex min-h-[4.75rem] w-full items-center gap-3.5 overflow-hidden rounded-[1.35rem] px-4 text-left transition-transform active:scale-[0.99]",
+    prominent
+      ? "bg-primary text-primary-foreground shadow-sm"
+      : "border border-border/50 bg-card text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.04)] active:bg-muted/70",
+  );
+  const body = (
+    <>
+      <span
+        className={cn(
+          "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl",
+          prominent ? "bg-primary-foreground/15" : "bg-primary/10 text-primary",
+        )}
+      >
+        {icon}
       </span>
-      <input
-        type="file"
-        accept={accept}
-        {...(capture ? { capture } : {})}
-        className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
-        onChange={(event) => {
-          const picked = event.target.files?.[0] ?? null;
-          event.target.value = "";
-          if (picked) onFile(picked);
-        }}
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] font-semibold tracking-tight">{title}</span>
+        <span
+          className={cn(
+            "mt-0.5 block text-[13px] leading-snug",
+            prominent ? "text-primary-foreground/80" : "text-muted-foreground",
+          )}
+        >
+          {hint}
+        </span>
+      </span>
+      <ChevronRight
+        className={cn("h-4 w-4 shrink-0", prominent ? "text-primary-foreground/75" : "text-muted-foreground/80")}
+        aria-hidden
       />
-    </label>
+    </>
+  );
+  if (onFile && accept) {
+    return (
+      <label className={className}>
+        {body}
+        <input
+          type="file"
+          accept={accept}
+          {...(capture ? { capture } : {})}
+          className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+          onChange={(event) => {
+            const picked = event.target.files?.[0] ?? null;
+            event.target.value = "";
+            if (picked) onFile(picked);
+          }}
+        />
+      </label>
+    );
+  }
+  return (
+    <button type="button" onClick={onClick} className={className}>
+      {body}
+    </button>
   );
 }
 
@@ -410,63 +442,63 @@ export function StoryCreateSheet({
     );
   }
 
-  if (open && !prefillFile && systemStoryPicker) {
+  if (open && !prefillFile && systemStoryPicker && typeof document !== "undefined") {
     return (
       <>
         {fileInputs}
-        <div className="fixed inset-0 z-[140] flex flex-col bg-background text-foreground">
-          <div className="shrink-0 border-b border-border/60 bg-background px-2 pb-3 pt-[max(0.85rem,env(safe-area-inset-top))] [padding-left:max(0.5rem,env(safe-area-inset-left))] [padding-right:max(0.5rem,env(safe-area-inset-right))]">
-            <button
-              type="button"
-              className="flex h-11 shrink-0 items-center gap-0.5 rounded-full px-2 text-base font-semibold text-primary active:opacity-70"
-              aria-label="Back to feed"
-              onClick={() => {
-                reset();
-                onOpenChange(false);
-              }}
-            >
-              <ChevronLeft className="h-6 w-6" aria-hidden />
-              Back
-            </button>
-            <div className="px-2 pt-0.5">
-              <p className="text-lg font-semibold tracking-tight">New story</p>
-              <p className="text-xs text-muted-foreground">Visible for 24 hours</p>
+        {createPortal(
+          <div className="fixed inset-0 z-[160] flex flex-col bg-background text-foreground">
+            <div className="px-2 pt-[max(0.35rem,env(safe-area-inset-top))] [padding-left:max(0.5rem,env(safe-area-inset-left))] [padding-right:max(0.5rem,env(safe-area-inset-right))]">
+              <button
+                type="button"
+                className="flex h-11 items-center gap-0.5 rounded-full px-2 text-[17px] font-semibold text-primary active:opacity-70"
+                aria-label="Back to feed"
+                onClick={() => {
+                  reset();
+                  onOpenChange(false);
+                }}
+              >
+                <ChevronLeft className="h-6 w-6" aria-hidden />
+                Feed
+              </button>
             </div>
-          </div>
-          <div className="flex flex-1 flex-col justify-center gap-3 px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
-            <StoryDirectFileChoice
-              prominent
-              icon={<Camera className="h-5 w-5 shrink-0" aria-hidden />}
-              title="Take a photo"
-              hint="Opens the camera when you tap"
-              accept="image/*"
-              capture="environment"
-              onFile={(picked) => void applyPickedFile(picked)}
-            />
-            <button
-              type="button"
-              className="flex h-14 w-full items-center gap-3 rounded-2xl border border-border bg-card px-4 text-left active:bg-muted"
-              onClick={() => void choosePhoto(CameraSource.Photos)}
-            >
-              <ImagePlus className="h-5 w-5 shrink-0" aria-hidden />
-              <span>
-                <span className="block text-sm font-semibold">Choose a photo</span>
-                <span className="block text-xs text-muted-foreground">From your library</span>
-              </span>
-            </button>
-            <StoryDirectFileChoice
-              icon={<Video className="h-5 w-5 shrink-0" aria-hidden />}
-              title="Choose a video"
-              hint="Record it in the Camera app, then pick it here"
-              accept="video/*"
-              onFile={(picked) => void applyPickedFile(picked)}
-            />
-            <p className="flex items-center justify-center gap-2 pb-1 text-[11px] text-muted-foreground">
+            <div className="px-5 pb-1 pt-2">
+              <h1 className="font-display text-[1.7rem] font-semibold tracking-tight">New story</h1>
+              <p className="mt-1.5 max-w-[22rem] text-[15px] leading-snug text-muted-foreground">
+                People who follow you can see it for 24 hours.
+              </p>
+            </div>
+            <div className="mt-5 flex flex-col gap-2.5 px-4">
+              <StoryChoiceRow
+                prominent
+                icon={<Camera className="h-5 w-5 shrink-0" aria-hidden />}
+                title="Take a photo"
+                hint="Opens your camera"
+                accept="image/*"
+                capture="environment"
+                onFile={(picked) => void applyPickedFile(picked)}
+              />
+              <StoryChoiceRow
+                icon={<ImagePlus className="h-5 w-5 shrink-0" aria-hidden />}
+                title="Choose a photo"
+                hint="From your library"
+                onClick={() => void choosePhoto(CameraSource.Photos)}
+              />
+              <StoryChoiceRow
+                icon={<Video className="h-5 w-5 shrink-0" aria-hidden />}
+                title="Choose a video"
+                hint="From your library"
+                accept="video/*"
+                onFile={(picked) => void applyPickedFile(picked)}
+              />
+            </div>
+            <p className="mt-auto flex items-center justify-center gap-2 px-6 pb-[max(1.35rem,env(safe-area-inset-bottom))] text-center text-[13px] leading-snug text-muted-foreground">
               <Clock3 className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              <span>Up to {maxMb} MB</span>
+              <span>Up to {maxMb} MB. Record a video in the Camera app, then choose it here.</span>
             </p>
-          </div>
-        </div>
+          </div>,
+          document.body,
+        )}
       </>
     );
   }
