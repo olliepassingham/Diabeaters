@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from "react";
+import { Hba1cUnitToggle } from "@/components/appointments/hba1c-unit-toggle";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,15 +10,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { AppointmentType } from "@/lib/storage";
+import { useHba1cUnit } from "@/hooks/use-hba1c-unit";
 import {
   appointmentShowsEyeFields,
   appointmentShowsFootFields,
   appointmentShowsHba1cFields,
+  clampHba1cInput,
   screeningResultLabel,
   type AppointmentOutcome,
   type AppointmentScreeningResult,
 } from "@/lib/appointment-outcomes";
+import {
+  convertHba1cDraft,
+  displayHba1cInput,
+  hba1cInputToPercent,
+  hba1cUnitLabel,
+} from "@/lib/hba1c-units";
+import type { AppointmentType } from "@/lib/storage";
 
 const SCREENING_OPTIONS: AppointmentScreeningResult[] = ["clear", "follow_up", "referral", "other"];
 
@@ -35,6 +45,24 @@ export function AppointmentResultsFields({ type, visitDate, outcome, onChange }:
   const showHba1c = appointmentShowsHba1cFields(type);
   const showEye = appointmentShowsEyeFields(type);
   const showFoot = appointmentShowsFootFields(type);
+  const [unit, setUnit] = useHba1cUnit();
+  const [draft, setDraft] = useState(() =>
+    outcome.hba1cPercent != null ? displayHba1cInput(outcome.hba1cPercent, unit) : "",
+  );
+  const [focused, setFocused] = useState(false);
+  const previousUnit = useRef(unit);
+
+  useEffect(() => {
+    if (previousUnit.current === unit) return;
+    const from = previousUnit.current;
+    previousUnit.current = unit;
+    setDraft((current) => convertHba1cDraft(current, from, unit, clampHba1cInput));
+  }, [unit]);
+
+  useEffect(() => {
+    if (focused) return;
+    setDraft(outcome.hba1cPercent != null ? displayHba1cInput(outcome.hba1cPercent, unit) : "");
+  }, [focused, outcome.hba1cPercent, unit]);
 
   return (
     <div
@@ -51,30 +79,39 @@ export function AppointmentResultsFields({ type, visitDate, outcome, onChange }:
       {showHba1c ? (
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <Label htmlFor="outcome-hba1c" className="text-xs font-medium text-muted-foreground">
-              HbA1c (%)
-            </Label>
+            <div className="flex items-center justify-between gap-3">
+              <Label htmlFor="outcome-hba1c" className="text-xs font-medium text-muted-foreground">
+                HbA1c ({hba1cUnitLabel(unit)})
+              </Label>
+              <Hba1cUnitToggle unit={unit} onChange={setUnit} />
+            </div>
             <Input
               id="outcome-hba1c"
               type="number"
-              inputMode="decimal"
-              step="0.1"
-              min={3}
-              max={20}
+              inputMode={unit === "mmol" ? "numeric" : "decimal"}
+              step={unit === "mmol" ? "1" : "0.1"}
+              min={unit === "mmol" ? 9 : 3}
+              max={unit === "mmol" ? 195 : 20}
               className="h-11 w-full min-w-0 rounded-xl"
-              placeholder="e.g. 7.2"
-              value={outcome.hba1cPercent ?? ""}
+              placeholder={unit === "mmol" ? "e.g. 53" : "e.g. 7.2"}
+              value={draft}
+              onFocus={() => setFocused(true)}
+              onBlur={() => {
+                setFocused(false);
+                const percent = hba1cInputToPercent(draft, unit, clampHba1cInput);
+                if (percent == null) {
+                  setDraft(outcome.hba1cPercent != null ? displayHba1cInput(outcome.hba1cPercent, unit) : "");
+                }
+              }}
               onChange={(e) => {
                 const raw = e.target.value;
+                setDraft(raw);
                 if (!raw.trim()) {
                   onChange({ ...outcome, hba1cPercent: undefined });
                   return;
                 }
-                const n = Number(raw);
-                onChange({
-                  ...outcome,
-                  hba1cPercent: Number.isFinite(n) ? n : outcome.hba1cPercent,
-                });
+                const percent = hba1cInputToPercent(raw, unit, clampHba1cInput);
+                if (percent != null) onChange({ ...outcome, hba1cPercent: percent });
               }}
               data-testid="input-outcome-hba1c"
             />

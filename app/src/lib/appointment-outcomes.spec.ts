@@ -73,5 +73,15 @@ describe("appointment-outcomes", () => {
     );
     expect(s).toMatch(/HbA1c 6.9%/);
     expect(s).toMatch(/Eyes/);
+    expect(
+      formatOutcomeSummary(
+        appt({
+          id: "1",
+          date: "2026-01-01",
+          outcome: { hba1cPercent: 7 },
+        }),
+        "mmol",
+      ),
+    ).toBe("HbA1c 53 mmol/mol");
   });
 });

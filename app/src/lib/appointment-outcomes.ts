@@ -1,3 +1,4 @@
+import { formatHba1c, type Hba1cUnit } from "@/lib/hba1c-units";
 import type { Appointment, AppointmentOutcome, AppointmentType } from "@/lib/storage";
 
 /** Screening / check result enums — user-entered, educational history only. */
@@ -87,11 +88,11 @@ export function screeningResultLabel(r: AppointmentScreeningResult): string {
   }
 }
 
-export function formatOutcomeSummary(a: Appointment): string | null {
+export function formatOutcomeSummary(a: Appointment, unit: Hba1cUnit = "percent"): string | null {
   const o = parseAppointmentOutcome(a.outcome);
   if (!o) return null;
   const bits: string[] = [];
-  if (o.hba1cPercent != null) bits.push(`HbA1c ${o.hba1cPercent}%`);
+  if (o.hba1cPercent != null) bits.push(`HbA1c ${formatHba1c(o.hba1cPercent, unit)}`);
   if (o.eyeResult) bits.push(`Eyes: ${screeningResultLabel(o.eyeResult)}`);
   if (o.footResult) bits.push(`Feet: ${screeningResultLabel(o.footResult)}`);
   if (o.outcomeNote) bits.push(o.outcomeNote);

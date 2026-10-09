@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent } from "@/components/ui/card";
@@ -49,6 +49,8 @@ import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { ScenarioResultHero } from "@/components/scenarios/scenario-result-hero";
 import { AppointmentResultsFields } from "@/components/appointments/appointment-results-fields";
+import { Hba1cUnitToggle } from "@/components/appointments/hba1c-unit-toggle";
+import { useHba1cUnit } from "@/hooks/use-hba1c-unit";
 import { Hba1cHistoryChart } from "@/components/patterns/hba1c-history-chart";
 import { syncAppointments } from "@/lib/appointments-supabase";
 import { rescheduleAppointmentReminders } from "@/lib/appointment-reminders";
@@ -61,6 +63,13 @@ import {
   normalizeAppointmentOutcome,
   type AppointmentOutcome,
 } from "@/lib/appointment-outcomes";
+import {
+  convertHba1cDraft,
+  displayHba1cInput,
+  formatHba1c,
+  hba1cInputToPercent,
+  hba1cUnitLabel,
+} from "@/lib/hba1c-units";
 import { cn } from "@/lib/utils";
 
 const APPOINTMENT_TYPES: {
@@ -208,6 +217,7 @@ function UpcomingAppointmentCard({
   onAddResults: (appointment: Appointment) => void;
   onDelete: (id: string) => void;
 }) {
+  const [hba1cUnit] = useHba1cUnit();
   const meta = getTypeMeta(appointment.type);
   const Icon = meta.icon;
   const d = parseAppointmentDate(appointment.date);
@@ -266,10 +276,10 @@ function UpcomingAppointmentCard({
               {appointment.notes}
             </p>
           ) : null}
-          {formatOutcomeSummary(appointment) ? (
+          {formatOutcomeSummary(appointment, hba1cUnit) ? (
             <p className="rounded-xl border border-primary/20 bg-primary/[0.06] px-3 py-2 text-sm leading-relaxed text-foreground">
               <span className="font-medium">Results · </span>
-              {formatOutcomeSummary(appointment)}
+              {formatOutcomeSummary(appointment, hba1cUnit)}
             </p>
           ) : null}
         </div>
@@ -350,6 +360,15 @@ export default function Appointments() {
   const [hba1cDate, setHba1cDate] = useState("");
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [hba1cUnit, setHba1cUnit] = useHba1cUnit();
+  const previousHba1cUnit = useRef(hba1cUnit);
+
+  useEffect(() => {
+    if (previousHba1cUnit.current === hba1cUnit) return;
+    const from = previousHba1cUnit.current;
+    previousHba1cUnit.current = hba1cUnit;
+    setHba1cValue((current) => convertHba1cDraft(current, from, hba1cUnit, clampHba1cInput));
+  }, [hba1cUnit]);
 
   useEffect(() => {
     trackFeatureEngagement("appointments");
@@ -446,7 +465,11 @@ export default function Appointments() {
   const openHba1cLog = (existing?: Appointment) => {
     if (existing) {
       setEditingHba1cId(existing.id);
-      setHba1cValue(existing.outcome?.hba1cPercent != null ? String(existing.outcome.hba1cPercent) : "");
+      setHba1cValue(
+        existing.outcome?.hba1cPercent != null
+          ? displayHba1cInput(existing.outcome.hba1cPercent, hba1cUnit)
+          : "",
+      );
       setHba1cDate(existing.outcome?.resultDate || existing.date);
     } else {
       resetHba1cForm();
@@ -461,7 +484,7 @@ export default function Appointments() {
 
   const saveHba1cLog = async () => {
     if (!user?.id) return;
-    const value = clampHba1cInput(hba1cValue);
+    const value = hba1cInputToPercent(hba1cValue, hba1cUnit, clampHba1cInput);
     if (value == null || !/^\d{4}-\d{2}-\d{2}$/.test(hba1cDate)) return;
     const outcome: AppointmentOutcome = {
       hba1cPercent: value,
@@ -927,7 +950,9 @@ export default function Appointments() {
                 return (
                   <div key={log.id} className="flex items-center gap-3 px-4 py-3" data-testid={`hba1c-log-${log.id}`}>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-foreground">{log.outcome?.hba1cPercent}%</p>
+                      <p className="text-sm font-semibold text-foreground">
+                        {log.outcome?.hba1cPercent != null ? formatHba1c(log.outcome.hba1cPercent, hba1cUnit) : ""}
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         {parsed ? format(parsed, "d MMM yyyy") : when}
                       </p>
@@ -980,22 +1005,28 @@ export default function Appointments() {
           </DialogHeader>
           <div className="space-y-4 pt-3">
             <div className="space-y-1.5">
-              <Label htmlFor="hba1c-value" className="text-xs font-medium text-muted-foreground">
-                HbA1c (%)
-              </Label>
+              <div className="flex items-center justify-between gap-3">
+                <Label htmlFor="hba1c-value" className="text-xs font-medium text-muted-foreground">
+                  HbA1c ({hba1cUnitLabel(hba1cUnit)})
+                </Label>
+                <Hba1cUnitToggle unit={hba1cUnit} onChange={setHba1cUnit} />
+              </div>
               <Input
                 id="hba1c-value"
                 type="number"
-                inputMode="decimal"
-                step="0.1"
-                min={3}
-                max={20}
+                inputMode={hba1cUnit === "mmol" ? "numeric" : "decimal"}
+                step={hba1cUnit === "mmol" ? "1" : "0.1"}
+                min={hba1cUnit === "mmol" ? 9 : 3}
+                max={hba1cUnit === "mmol" ? 195 : 20}
                 className="h-11 rounded-xl"
-                placeholder="e.g. 7.2"
+                placeholder={hba1cUnit === "mmol" ? "e.g. 53" : "e.g. 7.2"}
                 value={hba1cValue}
                 onChange={(e) => setHba1cValue(e.target.value)}
                 data-testid="input-hba1c-log-value"
               />
+              <p className="text-xs leading-snug text-muted-foreground">
+                Use the number on your result. A UK lab number is mmol/mol, such as 53. A percentage looks like 7.0%.
+              </p>
             </div>
             <div className="min-w-0 space-y-1.5">
               <Label htmlFor="hba1c-date" className="text-xs font-medium text-muted-foreground">
@@ -1013,7 +1044,7 @@ export default function Appointments() {
             <Button
               type="button"
               className="h-12 w-full rounded-2xl"
-              disabled={clampHba1cInput(hba1cValue) == null || !hba1cDate}
+              disabled={hba1cInputToPercent(hba1cValue, hba1cUnit, clampHba1cInput) == null || !hba1cDate}
               onClick={() => void saveHba1cLog()}
               data-testid="button-save-hba1c"
             >
@@ -1077,9 +1108,9 @@ export default function Appointments() {
                               {d ? format(d, "d MMM yyyy") : "Date unknown"}
                               {appointment.isCompleted ? " · Completed" : ""}
                             </p>
-                            {formatOutcomeSummary(appointment) ? (
+                            {formatOutcomeSummary(appointment, hba1cUnit) ? (
                               <p className="mt-1 text-xs leading-snug text-foreground">
-                                {formatOutcomeSummary(appointment)}
+                                {formatOutcomeSummary(appointment, hba1cUnit)}
                               </p>
                             ) : null}
                           </div>
