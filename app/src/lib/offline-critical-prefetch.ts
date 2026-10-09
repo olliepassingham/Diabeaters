@@ -4,9 +4,9 @@ import { prefetchToolsHubLinkedChunks } from "@/lib/tools-route-prefetch";
 let started = false;
 
 /**
- * Warm dashboard, guides, tools, and safety chunks as soon as the JS bundle loads.
- * Critical for offline use after a single online session (and bundled native builds).
- * Help Now / emergency / hypo also ship via `offline-safety-entry` side-effect imports.
+ * Warm guides, tools, and safety chunks after the shell can paint.
+ * The service worker precaches those files for offline use.
+ * Help Now, emergency, and hypo help still ship in the first file via `offline-safety-entry`.
  */
 export function prefetchOfflineCriticalRoutes(): void {
   if (started || typeof window === "undefined") return;

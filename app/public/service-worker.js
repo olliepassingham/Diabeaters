@@ -80,27 +80,31 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (isNavigationRequest(event.request)) {
+    const cachePromise = caches.open(STATIC_CACHE);
+    const refreshPromise = cachePromise.then(async (cache) => {
+      try {
+        const fetched = await fetch(event.request);
+        if (fetched.ok) {
+          await cache.put('/index.html', fetched.clone());
+          await cache.put('/', fetched.clone());
+        }
+        return fetched;
+      } catch {
+        return null;
+      }
+    });
+    event.waitUntil(refreshPromise.then(() => undefined));
     event.respondWith(
       (async () => {
-        const cache = await caches.open(STATIC_CACHE);
+        const cache = await cachePromise;
         const cached =
           (await cache.match(event.request)) ||
           (await cache.match('/index.html')) ||
           (await cache.match('/'));
-        try {
-          const fetched = await fetch(event.request);
-          if (fetched.ok) {
-            const clone = fetched.clone();
-            void cache.put('/index.html', clone);
-            void cache.put('/', clone);
-          }
-          if (fetched.ok) return fetched;
-          if (cached) return cached;
-          return fetched;
-        } catch {
-          if (cached) return cached;
-          return new Response('Offline', { status: 503, statusText: 'Offline' });
-        }
+        if (cached) return cached;
+        const fetched = await refreshPromise;
+        if (fetched) return fetched;
+        return new Response('Offline', { status: 503, statusText: 'Offline' });
       })(),
     );
     return;

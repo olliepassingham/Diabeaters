@@ -45,16 +45,6 @@ import {
 import { handleNotificationButtonAction } from "@/lib/notification-actions";
 import { ensurePushDeepLinkListenersAttached } from "@/lib/push-tokens";
 import Dashboard from "@/pages/dashboard";
-import ToolsPage from "@/pages/tools/index";
-import Bedtime from "@/pages/bedtime";
-import SickDay from "@/pages/sick-day";
-import Travel from "@/pages/travel";
-import Scenarios from "@/pages/scenarios";
-import ScenarioExercisePage from "@/pages/scenarios/exercise";
-import AlcoholScenarioPage from "@/pages/scenarios/alcohol";
-import DrivingScenarioPage from "@/pages/scenarios/driving";
-import PumpFailurePage from "@/pages/scenarios/pump-failure";
-import Supplies from "@/pages/supplies";
 
 const Login = lazy(() => import("@/pages/login"));
 const Signup = lazy(() => import("@/pages/signup"));
@@ -143,12 +133,22 @@ import { AskAnythingProvider } from "@/components/ai-coach/ask-anything-context"
 import { isCommunityAccountProfile, storage } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 import { getCommunityMemberLandingPath, resolveCommunityMemberLandingPath } from "@/lib/community-landing";
-import NotFound from "@/pages/not-found";
-import ShotsPage from "@/pages/shots";
-import Privacy from "@/pages/privacy";
-import Support from "@/pages/support";
-import MedicalSourcesPage from "@/pages/medical-sources";
 const Account = lazy(() => import("@/pages/account"));
+const ToolsPage = lazy(() => import("@/pages/tools/index"));
+const Bedtime = lazy(() => import("@/pages/bedtime"));
+const SickDay = lazy(() => import("@/pages/sick-day"));
+const Travel = lazy(() => import("@/pages/travel"));
+const Scenarios = lazy(() => import("@/pages/scenarios"));
+const ScenarioExercisePage = lazy(() => import("@/pages/scenarios/exercise"));
+const AlcoholScenarioPage = lazy(() => import("@/pages/scenarios/alcohol"));
+const DrivingScenarioPage = lazy(() => import("@/pages/scenarios/driving"));
+const PumpFailurePage = lazy(() => import("@/pages/scenarios/pump-failure"));
+const Supplies = lazy(() => import("@/pages/supplies"));
+const NotFound = lazy(() => import("@/pages/not-found"));
+const ShotsPage = lazy(() => import("@/pages/shots"));
+const Privacy = lazy(() => import("@/pages/privacy"));
+const Support = lazy(() => import("@/pages/support"));
+const MedicalSourcesPage = lazy(() => import("@/pages/medical-sources"));
 const CommunityHome = lazy(() => import("@/pages/community/index"));
 const CommunitySetup = lazy(() => import("@/pages/community/setup"));
 const CommunityPost = lazy(() => import("@/pages/community/post"));
@@ -843,7 +843,9 @@ function InnerRouter() {
       </Route>
       <Route path="/medical-sources">
         <PatientRouteGuard>
-          <MedicalSourcesPage />
+          <Suspense fallback={<RouteFallback />}>
+            <MedicalSourcesPage />
+          </Suspense>
         </PatientRouteGuard>
       </Route>
       <Route path="/">
@@ -853,47 +855,65 @@ function InnerRouter() {
       </Route>
       <Route path="/supplies">
         <PatientRouteGuard>
-          <Supplies />
+          <Suspense fallback={<RouteFallback />}>
+            <Supplies />
+          </Suspense>
         </PatientRouteGuard>
       </Route>
       <Route path="/scenarios/exercise">
         <PatientRouteGuard>
-          <ScenarioExercisePage />
+          <Suspense fallback={<RouteFallback />}>
+            <ScenarioExercisePage />
+          </Suspense>
         </PatientRouteGuard>
       </Route>
       <Route path="/scenarios/bedtime">
         <PatientRouteGuard>
-          <Bedtime />
+          <Suspense fallback={<RouteFallback />}>
+            <Bedtime />
+          </Suspense>
         </PatientRouteGuard>
       </Route>
       <Route path="/scenarios/sick-day">
         <PatientRouteGuard>
-          <SickDay />
+          <Suspense fallback={<RouteFallback />}>
+            <SickDay />
+          </Suspense>
         </PatientRouteGuard>
       </Route>
       <Route path="/scenarios/travel">
         <PatientRouteGuard>
-          <Travel />
+          <Suspense fallback={<RouteFallback />}>
+            <Travel />
+          </Suspense>
         </PatientRouteGuard>
       </Route>
       <Route path="/scenarios/alcohol">
         <PatientRouteGuard>
-          <AlcoholScenarioPage />
+          <Suspense fallback={<RouteFallback />}>
+            <AlcoholScenarioPage />
+          </Suspense>
         </PatientRouteGuard>
       </Route>
       <Route path="/scenarios/driving">
         <PatientRouteGuard>
-          <DrivingScenarioPage />
+          <Suspense fallback={<RouteFallback />}>
+            <DrivingScenarioPage />
+          </Suspense>
         </PatientRouteGuard>
       </Route>
       <Route path="/scenarios/pump-failure">
         <PatientRouteGuard>
-          <PumpFailurePage />
+          <Suspense fallback={<RouteFallback />}>
+            <PumpFailurePage />
+          </Suspense>
         </PatientRouteGuard>
       </Route>
       <Route path="/scenarios">
         <PatientRouteGuard>
-          <Scenarios />
+          <Suspense fallback={<RouteFallback />}>
+            <Scenarios />
+          </Suspense>
         </PatientRouteGuard>
       </Route>
       <Route path="/tools/hypo-help">
@@ -983,7 +1003,9 @@ function InnerRouter() {
         </Suspense>
       </Route>
       <Route path="/tools">
-        <ToolsPage />
+        <Suspense fallback={<RouteFallback />}>
+          <ToolsPage />
+        </Suspense>
       </Route>
       <Route path="/adviser">
         <PatientRouteGuard>
@@ -1094,7 +1116,11 @@ function InnerRouter() {
           </Suspense>
         </PatientRouteGuard>
       </Route>
-      <Route path="*" component={NotFound} />
+      <Route path="*">
+        <Suspense fallback={<RouteFallback />}>
+          <NotFound />
+        </Suspense>
+      </Route>
     </Switch>
   );
 }
@@ -1641,8 +1667,16 @@ function MainRouter() {
           <CarerSetup />
         </Suspense>
       </Route>
-      <Route path="/privacy" component={Privacy} />
-      <Route path="/support" component={Support} />
+      <Route path="/privacy">
+        <Suspense fallback={<RouteFallback />}>
+          <Privacy />
+        </Suspense>
+      </Route>
+      <Route path="/support">
+        <Suspense fallback={<RouteFallback />}>
+          <Support />
+        </Suspense>
+      </Route>
       <Route path="*">
         <RootCatchAll />
       </Route>
@@ -1815,7 +1849,11 @@ function AppContent() {
   ]);
 
   if (location.startsWith("/_shots")) {
-    return <ShotsPage />;
+    return (
+      <Suspense fallback={<RouteFallback />}>
+        <ShotsPage />
+      </Suspense>
+    );
   }
 
   if (publicEntry || location === "/privacy" || location === "/support") {

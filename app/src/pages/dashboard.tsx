@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useLocation, useSearch } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle, ArrowRight, X } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Link } from "wouter";
@@ -35,7 +34,7 @@ import { PageHeader, PageShell } from "@/components/layout";
 import { PendingHypoCheckInBanner } from "@/components/pending-hypo-check-in-banner";
 import { isAiCoachEnabled, isCommunityEnabled } from "@/lib/flags";
 import { useOffline } from "@/hooks/use-offline";
-import { HomeMetaBadge, homeDataPanelClass, homeHeroPanelClass } from "@/components/home/home-ui";
+import { HomeMetaBadge } from "@/components/home/home-ui";
 import { HomeCommandHero } from "@/components/home/HomeCommandHero";
 import { HomeTodayPulse } from "@/components/home/HomeTodayPulse";
 import { HomeCgmGraph } from "@/components/home/HomeCgmGraph";
@@ -51,43 +50,6 @@ const VERIFIED_WELCOME_PENDING_KEY = "diabeater_verified_welcome_pending";
 const VERIFIED_WELCOME_DISMISSED_AT_KEY = "diabeater_verified_welcome_dismissed_at";
 const VERIFIED_WELCOME_DISMISS_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
-
-function DashboardSkeleton() {
-  return (
-    <PageShell variant="wide" density="compact" className="animate-fade-in">
-      <div className={cn(homeHeroPanelClass, "p-4 space-y-4")}>
-        <Skeleton className="h-3 w-36 skeleton-shimmer" />
-        <div className="flex items-center justify-between gap-4">
-          <Skeleton className="h-12 w-32 rounded-full skeleton-shimmer" />
-          <Skeleton className="h-16 w-24 rounded-xl skeleton-shimmer" />
-        </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <Skeleton className="h-11 rounded-2xl skeleton-shimmer" />
-          <Skeleton className="h-11 rounded-2xl skeleton-shimmer" />
-          <Skeleton className="h-11 rounded-2xl skeleton-shimmer" />
-          <Skeleton className="h-11 rounded-2xl skeleton-shimmer" />
-        </div>
-      </div>
-      <div className={cn(homeDataPanelClass, "p-3")}>
-        <Skeleton className="h-12 w-full rounded-lg skeleton-shimmer" />
-      </div>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <Card className="border-border/70 shadow-sm">
-          <CardContent className="space-y-2 p-4">
-            <Skeleton className="h-4 w-28 skeleton-shimmer" />
-            <Skeleton className="h-24 w-full rounded-md skeleton-shimmer" />
-          </CardContent>
-        </Card>
-        <Card className="border-border/70 shadow-sm">
-          <CardContent className="space-y-2 p-4">
-            <Skeleton className="h-4 w-28 skeleton-shimmer" />
-            <Skeleton className="h-24 w-full rounded-md skeleton-shimmer" />
-          </CardContent>
-        </Card>
-      </div>
-    </PageShell>
-  );
-}
 
 const ONBOARDING_SETUP_GRACE_DAYS = 5;
 
@@ -201,9 +163,27 @@ export default function Dashboard() {
   const { profile: cloudProfile, loading: cloudProfileLoading } = useProfile();
   const isOffline = useOffline();
   const isMobile = useIsMobile();
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [supplies, setSupplies] = useState<LocalSupply[]>([]);
-  const [scenarioState, setScenarioState] = useState<ScenarioState>({ travelModeActive: false, sickDayActive: false });
+  const [profile, setProfile] = useState<UserProfile | null>(() => {
+    try {
+      return storage.getProfile();
+    } catch {
+      return null;
+    }
+  });
+  const [supplies, setSupplies] = useState<LocalSupply[]>(() => {
+    try {
+      return storage.getSupplies();
+    } catch {
+      return [];
+    }
+  });
+  const [scenarioState, setScenarioState] = useState<ScenarioState>(() => {
+    try {
+      return storage.getScenarioState();
+    } catch {
+      return { travelModeActive: false, sickDayActive: false };
+    }
+  });
   const [widgetsDialogOpen, setWidgetsDialogOpen] = useState(false);
   const {
     placements,
@@ -216,7 +196,6 @@ export default function Dashboard() {
   const [isSettingsComplete, setIsSettingsComplete] = useState(() => storage.isSettingsComplete());
   const [settingsCompletion, setSettingsCompletion] = useState(() => storage.getSettingsCompletion());
   const [softSetupNudgeDismissed, setSoftSetupNudgeDismissed] = useState(() => isSoftSetupNudgeDismissed());
-  const [isLoading, setIsLoading] = useState(true);
   const [showVerifiedWelcome, setShowVerifiedWelcome] = useState(false);
 
   useEffect(() => {
@@ -234,7 +213,6 @@ export default function Dashboard() {
     if (getSupabase()) {
       void repairSickDayCloudIfLocalInactive();
     }
-    setIsLoading(false);
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
@@ -338,10 +316,6 @@ export default function Dashboard() {
     .filter((w) => w.type !== "community-quick-post" || showCommunityQuickPostWidget)
     .filter((w) => isCommunityDash || w.type !== "community-quick-post")
     .filter((w) => !isCommunityDash || communityDashWidgetAllow.has(w.type));
-
-  if (isLoading) {
-    return <DashboardSkeleton />;
-  }
 
   return (
     <PageShell

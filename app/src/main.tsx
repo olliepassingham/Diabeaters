@@ -19,7 +19,6 @@ import { isCapacitorNativeShell } from "@/lib/native-platform";
 import { ensurePushDeepLinkListenersAttached } from "@/lib/push-tokens";
 import { hideNativeSplashWhenReady } from "@/lib/native-splash";
 import { prefetchOfflineCriticalRoutes } from "@/lib/offline-critical-prefetch";
-import "@/lib/offline-guides-entry";
 import "@/lib/offline-safety-entry";
 
 migrateLegacyThemeModeKey();
