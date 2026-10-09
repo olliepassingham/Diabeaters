@@ -17,7 +17,7 @@ import {
 } from "./pharmacy";
 import { format, startOfDay } from "date-fns";
 
-import { isPumpDeliveryMethod } from "./insulin-delivery-method";
+import { isPenDeliveryMethod, isPumpDeliveryMethod } from "./insulin-delivery-method";
 import { UK_DEFAULT_UNITS_PER_INSULIN_PEN } from "./insulin-pen-units";
 import { getEffectiveTdd, hasConfiguredTdd } from "./tdd";
 import appPkg from "../../package.json";
@@ -635,6 +635,8 @@ export interface UserSettings {
   suppliesSmarterForecastEnabled?: boolean;
   /** Hybrid/full closed loop — temp-basal coaching is softened when true. */
   usesClosedLoop?: boolean;
+  /** When carb ratios, correction factor, target range, or weight were last saved. */
+  dosingPrefsUpdatedAt?: string;
 }
 
 export interface Supply {
@@ -1818,7 +1820,7 @@ function clearBackedUpDiabeatersStorage(): void {
 
 /** A single "finish your setup" checklist item, once we know whether it's still missing. */
 export interface SettingsCompletionItem {
-  key: "tdd" | "carbRatio" | "correctionFactor" | "targetRange";
+  key: "name" | "delivery" | "weight" | "tdd" | "carbRatio" | "correctionFactor" | "targetRange";
   label: string;
   href: string;
 }
@@ -1833,30 +1835,55 @@ interface SettingsCompletionCheck extends SettingsCompletionItem {
  * requiring a specific meal's ratio left some users (e.g. those who skip
  * breakfast, or only dose for dinner/snacks) permanently stuck below 100%.
  */
-function settingsCompletionItems(settings: UserSettings): SettingsCompletionCheck[] {
+function settingsNameDone(profile: UserProfile | null): boolean {
+  const name = profile?.name?.trim() ?? "";
+  if (!name) return false;
+  return !name.includes("@");
+}
+
+function settingsCompletionItems(settings: UserSettings, profile: UserProfile | null): SettingsCompletionCheck[] {
+  const deliveryChosen = isPenDeliveryMethod(profile?.insulinDeliveryMethod) || isPumpDeliveryMethod(profile?.insulinDeliveryMethod);
   return [
+    {
+      key: "name",
+      label: "Your name",
+      href: "/settings/usage#settings-name",
+      done: settingsNameDone(profile),
+    },
+    {
+      key: "delivery",
+      label: "Pen or pump",
+      href: "/settings/usage#settings-delivery",
+      done: Boolean(profile) && deliveryChosen,
+    },
+    {
+      key: "weight",
+      label: "Body weight",
+      href: "/settings/usage#settings-weight",
+      done: typeof profile?.bodyWeightKg === "number" && profile.bodyWeightKg > 0,
+    },
     {
       key: "tdd",
       label: "Total daily dose",
-      href: "/settings/ratios",
+      href: "/settings/ratios#settings-tdd",
       done: hasConfiguredTdd(settings),
     },
     {
       key: "carbRatio",
       label: "A carb ratio (breakfast, lunch, dinner, or snack)",
-      href: "/settings/ratios",
+      href: "/settings/ratios#settings-carb-ratios",
       done: !!(settings.breakfastRatio || settings.lunchRatio || settings.dinnerRatio || settings.snackRatio),
     },
     {
       key: "correctionFactor",
       label: "Correction factor",
-      href: "/settings/ratios",
+      href: "/settings/ratios#settings-correction",
       done: !!settings.correctionFactor,
     },
     {
       key: "targetRange",
-      label: "Target BG range",
-      href: "/settings/ratios",
+      label: "Target range",
+      href: "/settings/ratios#settings-target",
       done: !!(settings.targetBgLow && settings.targetBgHigh),
     },
   ];
@@ -3108,7 +3135,7 @@ export const storage = {
     missing: SettingsCompletionItem[];
   } {
     const settings = this.getSettings();
-    const items = settingsCompletionItems(settings);
+    const items = settingsCompletionItems(settings, this.getProfile());
 
     const missing = items.filter((item) => !item.done);
     const completed = items.length - missing.length;

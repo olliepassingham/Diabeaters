@@ -41,7 +41,7 @@ import { shouldReceiveBedtimeCheckReminders } from "@/lib/bedtime-reminder-eligi
 import { reschedulePumpChangeReminders } from "@/lib/pump-change-reminders";
 import { seedPatientFirstRunDefaultsIfNeeded } from "@/lib/starter-patient-defaults";
 import { seedDefaultTargetBgRangeIfNeeded } from "@/lib/starter-target-range";
-import { targetBgRangeInputValues } from "@/lib/target-bg-range";
+import { defaultTargetBgRange, formatTargetBgRangeLabel } from "@/lib/target-bg-range";
 import { syncNotificationPreferences } from "@/lib/notification-preferences";
 import { ensureNativePushRegistered, resetNativePushRegistrationState } from "@/lib/push-tokens";
 import { Link, useLocation } from "wouter";
@@ -66,7 +66,7 @@ import {
 } from "@/lib/body-weight";
 import { normalizeDateOfBirthInput } from "@/lib/user-age";
 import { scrollToSettingsHashTarget, scrollAppMainToTop } from "@/lib/settings-nav";
-import { describePartialClinicalPrefsCloudSync, syncClinicalPrefsToCloud, syncRegionToCloud } from "@/lib/clinical-prefs-cloud-sync";
+import { describePartialClinicalPrefsCloudSync, syncClinicalPrefsToCloud, syncDosingPrefsToCloud, syncRegionToCloud } from "@/lib/clinical-prefs-cloud-sync";
 import { getEffectiveTdd, withReconciledTdd } from "@/lib/tdd";
 import {
   APP_REGION_OPTIONS,
@@ -152,7 +152,7 @@ function ProfileTab({
 
   return (
     <div className="space-y-3 rounded-xl border border-border/50 bg-muted/10 p-3 sm:p-4">
-      <div className="space-y-1.5">
+      <div id="settings-name" className="scroll-mt-28 space-y-1.5">
         <FieldLabelWithInfo
           htmlFor="user-display-name"
           info={<p>Shown on Help now and your emergency card so bystanders know who needs help.</p>}
@@ -231,7 +231,7 @@ function ProfileTab({
           </Select>
         </div>
       </div>
-      <div className="space-y-1.5">
+      <div id="settings-delivery" className="scroll-mt-28 space-y-1.5">
         <FieldLabelWithInfo
           htmlFor="delivery-method"
           info={
@@ -287,14 +287,14 @@ function ProfileTab({
           data-testid="input-settings-dob"
         />
       </div>
-      <div className="space-y-1.5">
+      <div id="settings-weight" className="scroll-mt-28 space-y-1.5">
         <FieldLabelWithInfo
           htmlFor="settings-body-weight"
           info={
             <p>
               Used for hypo treatment estimates in Hypo help. Pre-fills the hypo calculator so you do not need to enter
-              weight during a hypo. Stored on this device only. Update when your weight changes — especially important
-              for under-18s.
+              weight during a hypo. Saved with your account so a new phone can restore it. Update when your weight
+              changes — especially important for under-18s.
             </p>
           }
         >
@@ -405,7 +405,7 @@ function InsulinTab({
   return (
     <div className="space-y-4">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          <div className="space-y-2 rounded-[1.15rem] border border-border/60 bg-muted/15 px-3.5 py-3">
+          <div id="settings-tdd" className="scroll-mt-28 space-y-2 rounded-[1.15rem] border border-border/60 bg-muted/15 px-3.5 py-3">
             <FieldLabelWithInfo
               htmlFor="tdd"
               info={diabetesTermInfo(DIABETES_TERMS.tdd, "Enter your typical total units per day.")}
@@ -415,7 +415,7 @@ function InsulinTab({
             <Input id="tdd" type="number" placeholder="e.g., 40" value={tdd} onChange={(e) => setTdd(e.target.value)} data-testid="input-tdd" />
             <ClinicalWarningHint warning={validateTDD(tdd)} />
           </div>
-          <div className="space-y-2 rounded-[1.15rem] border border-border/60 bg-muted/15 px-3.5 py-3">
+          <div id="settings-correction" className="scroll-mt-28 space-y-2 rounded-[1.15rem] border border-border/60 bg-muted/15 px-3.5 py-3">
             <FieldLabelWithInfo
               htmlFor="correction-factor"
               info={diabetesTermInfo(
@@ -428,7 +428,7 @@ function InsulinTab({
             <Input id="correction-factor" type="number" step="0.1" placeholder={bgUnits === "mmol/L" ? "e.g., 3" : "e.g., 50"} value={correctionFactor} onChange={(e) => setCorrectionFactor(e.target.value)} data-testid="input-correction-factor" />
             <ClinicalWarningHint warning={validateCorrectionFactor(correctionFactor, bgUnits)} />
           </div>
-          <div className="space-y-2 rounded-[1.15rem] border border-border/60 bg-muted/15 px-3.5 py-3">
+          <div id="settings-target" className="scroll-mt-28 space-y-2 rounded-[1.15rem] border border-border/60 bg-muted/15 px-3.5 py-3">
             <StaticLabelWithInfo
               ariaLabel="About target range"
               info={diabetesTermInfo(DIABETES_TERMS.targetRange)}
@@ -445,6 +445,21 @@ function InsulinTab({
             <ClinicalWarningHint warning={validateTargetBgLow(targetBgLow, bgUnits)} />
             <ClinicalWarningHint warning={validateTargetBgHigh(targetBgHigh, bgUnits)} />
             <ClinicalWarningHint warning={validateTargetRange(targetBgLow, targetBgHigh)} />
+            {!targetBgLow.trim() && !targetBgHigh.trim() ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 rounded-xl"
+                onClick={() => {
+                  const range = defaultTargetBgRange(bgUnits === "mg/dL" ? "mg/dL" : "mmol/L");
+                  setTargetBgLow(String(range.low));
+                  setTargetBgHigh(String(range.high));
+                }}
+                data-testid="button-confirm-target-range"
+              >
+                Use {formatTargetBgRangeLabel(undefined, bgUnits === "mg/dL" ? "mg/dL" : "mmol/L")}
+              </Button>
+            ) : null}
           </div>
         </div>
 
@@ -531,7 +546,7 @@ function InsulinTab({
             </div>
           )}
 
-          <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div id="settings-carb-ratios" className="scroll-mt-28 flex items-center justify-between gap-2 flex-wrap">
             <StaticLabelWithInfo
               labelClassName="text-sm font-medium"
               ariaLabel="About carb ratios"
@@ -1040,7 +1055,7 @@ export default function Settings() {
   const [shortActingInjectionsPerDay, setShortActingInjectionsPerDay] = useState("");
   const [longActingInjectionsPerDay, setLongActingInjectionsPerDay] = useState("");
   const [primingUnits, setPrimingUnits] = useState("");
-  const [basalInjectionTime, setBasalInjectionTime] = useState("22:00");
+  const [basalInjectionTime, setBasalInjectionTime] = useState("");
   const [basalInjectionTime2, setBasalInjectionTime2] = useState("");
   const [cgmDays, setCgmDays] = useState("");
   const [siteChangeDays, setSiteChangeDays] = useState("");
@@ -1151,12 +1166,8 @@ export default function Settings() {
       const sGpu = parseRatioToGramsPerUnit(storedSettings.snackRatio);
       setSnackRatio(sGpu ? gramsPerUnitToInputValue(sGpu, format, cpSize) : "");
       setCorrectionFactor(storedSettings.correctionFactor?.toString() || "");
-      const targetInputs = targetBgRangeInputValues(
-        storedSettings,
-        storedProfile?.bgUnits === "mg/dL" ? "mg/dL" : "mmol/L",
-      );
-      setTargetBgLow(targetInputs.low);
-      setTargetBgHigh(targetInputs.high);
+      setTargetBgLow(storedSettings.targetBgLow != null ? String(storedSettings.targetBgLow) : "");
+      setTargetBgHigh(storedSettings.targetBgHigh != null ? String(storedSettings.targetBgHigh) : "");
       setShortActingUnitsPerDay(storedSettings.shortActingUnitsPerDay?.toString() || "");
       setLongActingUnitsPerDay(storedSettings.longActingUnitsPerDay?.toString() || "");
       setInjectionsPerDay(storedSettings.injectionsPerDay?.toString() || "");
@@ -1173,7 +1184,7 @@ export default function Settings() {
         setLongActingInjectionsPerDay(storedSettings.longActingInjectionsPerDay?.toString() || "");
       }
       setPrimingUnits(storedSettings.primingUnitsPerInjection?.toString() || "");
-      setBasalInjectionTime(storedSettings.basalInjectionTime || "22:00");
+      setBasalInjectionTime(storedSettings.basalInjectionTime || "");
       setBasalInjectionTime2(storedSettings.basalInjectionTime2 || "");
       setCgmDays(storedSettings.cgmDays?.toString() || "");
       setSiteChangeDays(storedSettings.siteChangeDays?.toString() || "3");
@@ -1196,12 +1207,6 @@ export default function Settings() {
       setReservoirCapacity("300");
       setUnitsPerInsulinPen(String(UK_DEFAULT_UNITS_PER_INSULIN_PEN));
       setNeedlesPerBox(String(UK_DEFAULT_NEEDLES_PER_BOX));
-      const targetInputs = targetBgRangeInputValues(
-        null,
-        storedProfile?.bgUnits === "mg/dL" ? "mg/dL" : "mmol/L",
-      );
-      setTargetBgLow(targetInputs.low);
-      setTargetBgHigh(targetInputs.high);
     }
     
     setNotifSettings(storage.getNotificationSettings());
@@ -1360,6 +1365,14 @@ export default function Settings() {
     const wasPump = isPumpDeliveryMethod(base.insulinDeliveryMethod);
     storage.saveProfile(updatedProfile);
     setProfile(updatedProfile);
+    const weightChanged =
+      (parsedKg ?? undefined) !== base.bodyWeightKg || weightDisplayUnit !== base.weightDisplayUnit;
+    if (weightChanged) {
+      const current = storage.getSettings();
+      const stamped = { ...current, dosingPrefsUpdatedAt: new Date().toISOString() };
+      storage.saveSettings(stamped);
+      setSettings(stamped);
+    }
 
     if (isPumpDeliveryMethod(deliveryMethod) || isPenDeliveryMethod(deliveryMethod)) {
       seedPatientFirstRunDefaultsIfNeeded({
@@ -1386,6 +1399,16 @@ export default function Settings() {
         void queryClient.invalidateQueries({ queryKey: profileQueryKey(user.id) });
       }
       cloud = await syncClinicalPrefsToCloud(user.id);
+      if (weightChanged) {
+        const dosing = await syncDosingPrefsToCloud(user.id);
+        if (dosing.error && !opts?.quietSuccess) {
+          toast({
+            title: "Saved on this device",
+            description: `Could not sync weight to your account: ${dosing.error.message}`,
+            variant: "destructive",
+          });
+        }
+      }
       const regionCloud = await syncRegionToCloud(user.id);
       if (cloud.error) {
         toast({
@@ -1486,7 +1509,7 @@ export default function Settings() {
     }
   };
 
-  const handleSaveInsulin = async () => {
+  const handleSaveInsulin = async (opts?: { quietSuccess?: boolean }) => {
     const cpSize = carbPortionSize ? parseFloat(carbPortionSize) : undefined;
     const bGpu = parseInputToGramsPerUnit(breakfastRatio, ratioFormat, cpSize);
     const lGpu = parseInputToGramsPerUnit(lunchRatio, ratioFormat, cpSize);
@@ -1502,6 +1525,7 @@ export default function Settings() {
       correctionFactor: correctionFactor ? parseFloat(correctionFactor) : undefined,
       targetBgLow: targetBgLow ? parseFloat(targetBgLow) : undefined,
       targetBgHigh: targetBgHigh ? parseFloat(targetBgHigh) : undefined,
+      dosingPrefsUpdatedAt: new Date().toISOString(),
     };
     storage.saveSettings(newSettings);
     setSettings(newSettings);
@@ -1513,25 +1537,6 @@ export default function Settings() {
       storage.saveProfile(updatedProfile);
       setProfile(updatedProfile);
     }
-    let cloud: Awaited<ReturnType<typeof syncClinicalPrefsToCloud>> = { error: null };
-    if (user?.id) {
-      cloud = await syncClinicalPrefsToCloud(user.id);
-      if (cloud.error) {
-        toast({
-          title: "Insulin settings saved on this device",
-          description: `Could not sync TDD to your account: ${cloud.error.message}`,
-          variant: "destructive",
-        });
-        return;
-      }
-    }
-    const partial = describePartialClinicalPrefsCloudSync(cloud);
-    toast({
-      title: "Insulin settings saved",
-      description: partial
-        ? `Your insulin settings have been updated. ${partial}`
-        : "Your insulin settings have been updated.",
-    });
     setRatiosBaseline(
       buildRatiosPageSnapshot({
         tdd,
@@ -1546,6 +1551,30 @@ export default function Settings() {
         carbPortionSize,
       }),
     );
+    let cloud: Awaited<ReturnType<typeof syncClinicalPrefsToCloud>> = { error: null };
+    let dosingSkipped = false;
+    if (user?.id) {
+      cloud = await syncClinicalPrefsToCloud(user.id);
+      const dosing = await syncDosingPrefsToCloud(user.id);
+      dosingSkipped = Boolean(dosing.skipped);
+      if (cloud.error || dosing.error) {
+        toast({
+          title: "Insulin settings saved on this device",
+          description: `Could not sync to your account: ${(cloud.error ?? dosing.error)?.message ?? "Try again."}`,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+    if (opts?.quietSuccess) return;
+    const partial = describePartialClinicalPrefsCloudSync(cloud);
+    const dosingNote = dosingSkipped
+      ? "Ratios, correction factor, target range, and weight stay on this phone until the account update is applied."
+      : "";
+    toast({
+      title: "Insulin settings saved",
+      description: [partial, dosingNote].filter(Boolean).join(" ") || "Your insulin settings have been updated.",
+    });
   };
 
   const handleSaveUsage = (opts?: { quietSuccess?: boolean }): boolean => {
@@ -1634,7 +1663,7 @@ export default function Settings() {
     return tddReconciled;
   };
 
-  const handleSaveUsagePage = async () => {
+  const handleSaveUsagePage = async (opts?: { quietSuccess?: boolean }) => {
     const save = await handleSaveProfile({ quietSuccess: true, requireWeightForHypo: false });
     if (!save.ok) return;
     const tddReconciled = handleSaveUsage({ quietSuccess: true });
@@ -1657,12 +1686,14 @@ export default function Settings() {
       insulinDeliveryMethodCloudSkipped: save.insulinDeliveryMethodCloudSkipped,
       tddCloudSkipped,
     });
-    toast({
-      title: "Saved",
-      description: partial
-        ? `Personal & usage settings are updated on this device. ${partial}`
-        : "Personal & usage settings are updated on this device.",
-    });
+    if (!opts?.quietSuccess) {
+      toast({
+        title: "Saved",
+        description: partial
+          ? `Personal & usage settings are updated on this device. ${partial}`
+          : "Personal & usage settings are updated on this device.",
+      });
+    }
     setUsageBaseline(
       buildUsagePageSnapshot({
         userDisplayName,
@@ -1864,6 +1895,38 @@ export default function Settings() {
 
   const usagePageDirty = usageBaseline !== null && usageSnapshotCurrent !== usageBaseline;
   const ratiosPageDirty = ratiosBaseline !== null && ratiosSnapshotCurrent !== ratiosBaseline;
+  const saveInsulinRef = useRef(handleSaveInsulin);
+  const saveUsageRef = useRef(handleSaveUsagePage);
+  saveInsulinRef.current = handleSaveInsulin;
+  saveUsageRef.current = handleSaveUsagePage;
+  const ratiosDirtyRef = useRef(false);
+  const usageDirtyRef = useRef(false);
+  ratiosDirtyRef.current = pathOnly === "/settings/ratios" && ratiosPageDirty;
+  usageDirtyRef.current = pathOnly === "/settings/usage" && usagePageDirty;
+
+  useEffect(() => {
+    if (pathOnly !== "/settings/ratios" || !ratiosPageDirty) return;
+    const timer = window.setTimeout(() => {
+      void saveInsulinRef.current({ quietSuccess: true });
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [pathOnly, ratiosPageDirty, ratiosSnapshotCurrent]);
+
+  useEffect(() => {
+    if (pathOnly !== "/settings/usage" || !usagePageDirty) return;
+    if (userDisplayName.trim() && isEmailLike(userDisplayName.trim())) return;
+    const timer = window.setTimeout(() => {
+      void saveUsageRef.current({ quietSuccess: true });
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [pathOnly, usagePageDirty, usageSnapshotCurrent, userDisplayName]);
+
+  useEffect(() => {
+    return () => {
+      if (ratiosDirtyRef.current) void saveInsulinRef.current({ quietSuccess: true });
+      if (usageDirtyRef.current) void saveUsageRef.current({ quietSuccess: true });
+    };
+  }, []);
 
   useEffect(() => {
     if (formBaselineInitialized.current || !profile) return;
@@ -1996,7 +2059,7 @@ export default function Settings() {
       <div id="settings-ratios" className="scroll-mt-28 space-y-3">
         <SettingsSectionHeader
           title="Insulin ratios"
-          description="Used across meal, correction, and adviser tools."
+          description="Used across meal, correction, and adviser tools. Changes save on their own."
         />
         <InsulinTab
           bgUnits={bgUnits}

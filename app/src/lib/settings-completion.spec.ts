@@ -1,17 +1,33 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { storage } from "./storage";
+import { storage, type UserProfile } from "./storage";
+
+const readyProfile: UserProfile = {
+  name: "Alex",
+  email: "",
+  dateOfBirth: "",
+  bgUnits: "mmol/L",
+  carbUnits: "grams",
+  diabetesType: "type1",
+  insulinDeliveryMethod: "pen",
+  usingInsulin: true,
+  hasAcceptedDisclaimer: true,
+  bodyWeightKg: 70,
+};
 
 describe("settings completion (Finish your setup)", () => {
   beforeEach(() => {
     localStorage.clear();
   });
 
-  it("is 0% with no settings and lists all four items as missing", () => {
+  it("is 0% with no settings and lists every required item", () => {
     const completion = storage.getSettingsCompletion();
     expect(completion.percentage).toBe(0);
     expect(completion.completed).toBe(0);
-    expect(completion.total).toBe(4);
+    expect(completion.total).toBe(7);
     expect(completion.missing.map((m) => m.key)).toEqual([
+      "name",
+      "delivery",
+      "weight",
       "tdd",
       "carbRatio",
       "correctionFactor",
@@ -21,50 +37,50 @@ describe("settings completion (Finish your setup)", () => {
   });
 
   it("counts a dinner-only or snack-only ratio as satisfying the carb ratio requirement", () => {
-    // Regression test: a user who only ever fills in a dinner or snack ratio
-    // (e.g. skips breakfast, or doses only for dinner) used to be stuck below
-    // 100% forever because the old check only looked at breakfast/lunch.
+    storage.saveProfile(readyProfile);
     storage.saveSettings({
       tdd: 40,
       correctionFactor: 3,
       targetBgLow: 4,
       targetBgHigh: 8,
-      dinnerRatio: 10,
+      dinnerRatio: "10",
     });
     expect(storage.getSettingsCompletion().missing.some((m) => m.key === "carbRatio")).toBe(false);
     expect(storage.isSettingsComplete()).toBe(true);
 
     localStorage.clear();
+    storage.saveProfile(readyProfile);
     storage.saveSettings({
       tdd: 40,
       correctionFactor: 3,
       targetBgLow: 4,
       targetBgHigh: 8,
-      snackRatio: 12,
+      snackRatio: "12",
     });
     expect(storage.isSettingsComplete()).toBe(true);
   });
 
-  it("reaches exactly 75% when only one item is missing, and names it", () => {
+  it("names the one missing item when everything else is set", () => {
+    storage.saveProfile(readyProfile);
     storage.saveSettings({
       tdd: 40,
-      breakfastRatio: 10,
+      breakfastRatio: "10",
       correctionFactor: 3,
-      // targetBgLow/targetBgHigh intentionally left unset
     });
     const completion = storage.getSettingsCompletion();
-    expect(completion.percentage).toBe(75);
-    expect(completion.completed).toBe(3);
-    expect(completion.total).toBe(4);
-    expect(completion.missing).toHaveLength(1);
-    expect(completion.missing[0].key).toBe("targetRange");
+    expect(completion.completed).toBe(6);
+    expect(completion.total).toBe(7);
+    expect(completion.percentage).toBe(86);
+    expect(completion.missing.map((m) => m.key)).toEqual(["targetRange"]);
+    expect(completion.missing[0]?.href).toBe("/settings/ratios#settings-target");
     expect(storage.isSettingsComplete()).toBe(false);
   });
 
-  it("is 100% complete once TDD, a carb ratio, correction factor, and target range are all set", () => {
+  it("is 100% once name, delivery, weight, and the insulin numbers are set", () => {
+    storage.saveProfile(readyProfile);
     storage.saveSettings({
       tdd: 40,
-      lunchRatio: 8,
+      lunchRatio: "8",
       correctionFactor: 3,
       targetBgLow: 4,
       targetBgHigh: 8,
@@ -75,11 +91,17 @@ describe("settings completion (Finish your setup)", () => {
     expect(storage.isSettingsComplete()).toBe(true);
   });
 
+  it("does not treat a blank name or an email as a finished name", () => {
+    storage.saveProfile({ ...readyProfile, name: "alex@example.com" });
+    expect(storage.getSettingsCompletion().missing.some((m) => m.key === "name")).toBe(true);
+  });
+
   it("accepts derived MDI total (short + long acting units) in place of an explicit TDD", () => {
+    storage.saveProfile(readyProfile);
     storage.saveSettings({
       shortActingUnitsPerDay: 20,
       longActingUnitsPerDay: 15,
-      lunchRatio: 8,
+      lunchRatio: "8",
       correctionFactor: 3,
       targetBgLow: 4,
       targetBgHigh: 8,

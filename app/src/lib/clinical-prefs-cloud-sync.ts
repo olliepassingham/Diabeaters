@@ -27,6 +27,12 @@ import { normalizeDateOfBirthInput } from "@/lib/user-age";
 import { isEmailLike } from "@/lib/user-display-name";
 import { normalizeAppRegion } from "@/lib/region";
 import { UK_DEFAULT_NEEDLES_PER_BOX, UK_DEFAULT_UNITS_PER_INSULIN_PEN } from "@/lib/storage";
+import {
+  buildDosingPrefs,
+  localDosingHasValues,
+  parseDosingPrefs,
+  shouldApplyCloudDosingPrefs,
+} from "@/lib/dosing-prefs";
 
 /** PostgREST when a `profiles` column exists in repo migrations but not in the linked project (or schema cache is stale). */
 export function isMissingProfileColumnSchemaError(message: string, column: string): boolean {
@@ -249,6 +255,44 @@ export function applyClinicalPrefsFromCloudRow(row: ProfileRow | null): void {
       }
     }
   }
+
+  applyDosingPrefsFromCloud(row.dosing_prefs);
+}
+
+function applyDosingPrefsFromCloud(raw: unknown): void {
+  const cloud = parseDosingPrefs(raw);
+  if (!cloud) return;
+  const settings = storage.getSettings();
+  const profile = storage.getProfile();
+  if (
+    !shouldApplyCloudDosingPrefs({
+      localUpdatedAt: settings.dosingPrefsUpdatedAt,
+      localHasValues: localDosingHasValues(settings, profile?.bodyWeightKg),
+      cloudUpdatedAt: cloud.updatedAt,
+    })
+  ) {
+    return;
+  }
+
+  storage.saveSettings({
+    ...settings,
+    breakfastRatio: cloud.breakfastRatio ?? undefined,
+    lunchRatio: cloud.lunchRatio ?? undefined,
+    dinnerRatio: cloud.dinnerRatio ?? undefined,
+    snackRatio: cloud.snackRatio ?? undefined,
+    correctionFactor: cloud.correctionFactor ?? undefined,
+    targetBgLow: cloud.targetBgLow ?? undefined,
+    targetBgHigh: cloud.targetBgHigh ?? undefined,
+    dosingPrefsUpdatedAt: cloud.updatedAt,
+  });
+
+  if (cloud.bodyWeightKg == null) return;
+  const nextProfile = profile ?? defaultProfileSkeleton("pen");
+  storage.saveProfile({
+    ...nextProfile,
+    bodyWeightKg: cloud.bodyWeightKg,
+    weightDisplayUnit: cloud.weightDisplayUnit ?? nextProfile.weightDisplayUnit,
+  });
 }
 
 export type ClinicalPrefsCloudSyncResult = {
@@ -481,6 +525,33 @@ export async function syncPharmacyToCloud(userId: string): Promise<{ error: Erro
   }
   if (isMissingProfileColumnSchemaError(error.message, "pharmacy")) {
     return { error: null, pharmacyCloudSkipped: true };
+  }
+  return { error };
+}
+
+/** Push ratios, correction factor, target range, and weight. Missing column stays local. */
+export async function syncDosingPrefsToCloud(
+  userId: string,
+): Promise<{ error: Error | null; skipped?: boolean }> {
+  const settings = storage.getSettings();
+  const profile = storage.getProfile();
+  const updatedAt = settings.dosingPrefsUpdatedAt || new Date().toISOString();
+  if (!settings.dosingPrefsUpdatedAt) {
+    storage.saveSettings({ ...settings, dosingPrefsUpdatedAt: updatedAt });
+  }
+  const dosing_prefs = buildDosingPrefs({
+    settings,
+    bodyWeightKg: profile?.bodyWeightKg,
+    weightDisplayUnit: profile?.weightDisplayUnit,
+    updatedAt,
+  });
+  const { error } = await updateProfile({ id: userId, dosing_prefs });
+  if (!error) {
+    await queryClient.invalidateQueries({ queryKey: profileQueryKey(userId) });
+    return { error: null };
+  }
+  if (isMissingProfileColumnSchemaError(error.message, "dosing_prefs")) {
+    return { error: null, skipped: true };
   }
   return { error };
 }

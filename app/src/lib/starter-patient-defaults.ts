@@ -7,7 +7,7 @@ import { isCommunityAccountProfile, storage } from "@/lib/storage";
 
 /**
  * First-run (and empty-account) defaults for patient mode:
- * typical target range + delivery-method starter supplies + example quick exercise.
+ * delivery-method starter supplies + example quick exercise. Target range is confirmed in Settings.
  */
 export function seedPatientFirstRunDefaultsIfNeeded(opts: PumpSupplySeedOptions = {}): {
   targetSeeded: boolean;

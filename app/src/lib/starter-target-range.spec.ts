@@ -23,37 +23,18 @@ describe("seedDefaultTargetBgRangeIfNeeded", () => {
     storageMock.getSettings.mockReturnValue({});
   });
 
-  it("prefills 4–10 mmol/L when unset", () => {
+  it("does not write a target range until the person confirms one", () => {
     const r = seedDefaultTargetBgRangeIfNeeded();
-    expect(r.seeded).toBe(true);
-    expect(storageMock.saveSettings).toHaveBeenCalledWith(
-      expect.objectContaining({ targetBgLow: 4, targetBgHigh: 10 }),
-    );
-    expect(localStorage.getItem(STARTER_TARGET_RANGE_SEEDED_KEY)).toBe("1");
+    expect(r.seeded).toBe(false);
+    expect(storageMock.saveSettings).not.toHaveBeenCalled();
+    expect(localStorage.getItem(STARTER_TARGET_RANGE_SEEDED_KEY)).toBeNull();
   });
 
-  it("prefills 72–180 mg/dL for US units", () => {
-    storageMock.getProfile.mockReturnValue({ bgUnits: "mg/dL" });
-    const r = seedDefaultTargetBgRangeIfNeeded();
-    expect(r.seeded).toBe(true);
-    expect(storageMock.saveSettings).toHaveBeenCalledWith(
-      expect.objectContaining({ targetBgLow: 72, targetBgHigh: 180 }),
-    );
-  });
-
-  it("does not overwrite existing targets", () => {
+  it("remembers that a saved range already exists", () => {
     storageMock.getSettings.mockReturnValue({ targetBgLow: 5, targetBgHigh: 9 });
     const r = seedDefaultTargetBgRangeIfNeeded();
     expect(r.seeded).toBe(false);
     expect(storageMock.saveSettings).not.toHaveBeenCalled();
     expect(localStorage.getItem(STARTER_TARGET_RANGE_SEEDED_KEY)).toBe("1");
-  });
-
-  it("writes the default again if both bounds are cleared later", () => {
-    seedDefaultTargetBgRangeIfNeeded();
-    storageMock.getSettings.mockReturnValue({});
-    const r2 = seedDefaultTargetBgRangeIfNeeded();
-    expect(r2.seeded).toBe(true);
-    expect(storageMock.saveSettings).toHaveBeenCalledTimes(2);
   });
 });

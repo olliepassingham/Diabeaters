@@ -9,6 +9,7 @@ import { getSupabase } from "./supabase";
 import { normalizeDateOfBirthInput } from "./user-age";
 import type { PublicProfileStreak } from "./user-achievements";
 import { carbSourcePreferencesFromCloud } from "./carb-source-preferences";
+import { parseDosingPrefs, type DosingPrefs } from "./dosing-prefs";
 
 export type ProfileRow = {
   id: string;
@@ -48,6 +49,8 @@ export type ProfileRow = {
   public_streak_counts?: Record<string, number> | null;
   /** Named carb favourites + scenario defaults for hypo/exercise/driving hints. */
   carb_source_prefs?: import("@/lib/carb-source-preferences").CarbSourcePreferences | null;
+  /** Ratios, correction factor, target range, and body weight for a new phone. */
+  dosing_prefs?: DosingPrefs | null;
   /** Supporter opt-in: show linked patient on public community profile when allowed. */
   show_supported_person_on_profile?: boolean;
 };
@@ -173,6 +176,8 @@ function rowFromData(data: Record<string, unknown>): ProfileRow {
     carb_source_prefs = carbSourcePreferencesFromCloud(rawCarbPrefs);
   } else carb_source_prefs = null;
 
+  const dosing_prefs = parseDosingPrefs(data.dosing_prefs);
+
   return {
     id: String(data.id),
     full_name: (data.full_name as string | null) ?? null,
@@ -197,6 +202,7 @@ function rowFromData(data: Record<string, unknown>): ProfileRow {
     pinned_achievement_ids,
     public_streak_counts,
     carb_source_prefs,
+    dosing_prefs,
     show_supported_person_on_profile:
       typeof data.show_supported_person_on_profile === "boolean" ? data.show_supported_person_on_profile : false,
   };
@@ -634,6 +640,7 @@ export type ProfileUpdatePayload = {
     | "pinned_achievement_ids"
     | "public_streak_counts"
     | "carb_source_prefs"
+    | "dosing_prefs"
     | "show_supported_person_on_profile"
   >
 >;
@@ -669,6 +676,7 @@ export async function updateProfile(
     pinned_achievement_ids,
     public_streak_counts,
     carb_source_prefs,
+    dosing_prefs,
     show_supported_person_on_profile,
   } = payload;
   const update: Record<string, unknown> = {};
@@ -777,6 +785,9 @@ export async function updateProfile(
   }
   if (carb_source_prefs !== undefined) {
     update.carb_source_prefs = carb_source_prefs ?? null;
+  }
+  if (dosing_prefs !== undefined) {
+    update.dosing_prefs = dosing_prefs ?? null;
   }
   if (show_supported_person_on_profile !== undefined) {
     update.show_supported_person_on_profile = Boolean(show_supported_person_on_profile);
