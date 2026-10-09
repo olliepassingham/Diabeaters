@@ -1836,7 +1836,8 @@ interface SettingsCompletionCheck extends SettingsCompletionItem {
  * breakfast, or only dose for dinner/snacks) permanently stuck below 100%.
  */
 function settingsNameDone(profile: UserProfile | null): boolean {
-  const name = profile?.name?.trim() ?? "";
+  const raw = profile?.name;
+  const name = typeof raw === "string" ? raw.trim() : "";
   if (!name) return false;
   return !name.includes("@");
 }
@@ -3134,8 +3135,26 @@ export const storage = {
     total: number;
     missing: SettingsCompletionItem[];
   } {
-    const settings = this.getSettings();
-    const items = settingsCompletionItems(settings, this.getProfile());
+    let settings: UserSettings = {};
+    let profile: UserProfile | null = null;
+    try {
+      const rawSettings = this.getSettings();
+      settings = rawSettings && typeof rawSettings === "object" ? rawSettings : {};
+    } catch {
+      settings = {};
+    }
+    try {
+      const rawProfile = this.getProfile();
+      profile = rawProfile && typeof rawProfile === "object" ? rawProfile : null;
+    } catch {
+      profile = null;
+    }
+    let items: SettingsCompletionCheck[];
+    try {
+      items = settingsCompletionItems(settings, profile);
+    } catch {
+      return { percentage: 0, completed: 0, total: 7, missing: [] };
+    }
 
     const missing = items.filter((item) => !item.done);
     const completed = items.length - missing.length;

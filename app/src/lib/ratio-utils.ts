@@ -7,8 +7,11 @@ export function getCarbPortionSize(cpSize?: number): number {
 }
 
 export function parseRatioToGramsPerUnit(ratioStr?: string): number | null {
-  if (!ratioStr) return null;
-  const trimmed = ratioStr.trim();
+  const raw = ratioStr as unknown;
+  const asText =
+    typeof raw === "number" && Number.isFinite(raw) ? String(raw) : typeof raw === "string" ? raw : "";
+  if (!asText.trim()) return null;
+  const trimmed = asText.trim();
 
   const matchOneToX = trimmed.match(/^1\s*:\s*(\d+(?:\.\d+)?)g?$/);
   if (matchOneToX) {

@@ -445,7 +445,8 @@ function InsulinTab({
             <ClinicalWarningHint warning={validateTargetBgLow(targetBgLow, bgUnits)} />
             <ClinicalWarningHint warning={validateTargetBgHigh(targetBgHigh, bgUnits)} />
             <ClinicalWarningHint warning={validateTargetRange(targetBgLow, targetBgHigh)} />
-            {!targetBgLow.trim() && !targetBgHigh.trim() ? (
+            {!(typeof targetBgLow === "string" && targetBgLow.trim()) &&
+            !(typeof targetBgHigh === "string" && targetBgHigh.trim()) ? (
               <Button
                 type="button"
                 variant="outline"
@@ -1095,7 +1096,7 @@ export default function Settings() {
     setProfile((prev) => {
       const base = prev ?? storage.getProfile();
       if (!base) return prev;
-      if (base.dateOfBirth?.trim()) return prev;
+      if (typeof base.dateOfBirth === "string" && base.dateOfBirth.trim()) return prev;
       return { ...base, dateOfBirth: nd };
     });
   }, [cloudProfile?.date_of_birth]);
@@ -1184,8 +1185,12 @@ export default function Settings() {
         setLongActingInjectionsPerDay(storedSettings.longActingInjectionsPerDay?.toString() || "");
       }
       setPrimingUnits(storedSettings.primingUnitsPerInjection?.toString() || "");
-      setBasalInjectionTime(storedSettings.basalInjectionTime || "");
-      setBasalInjectionTime2(storedSettings.basalInjectionTime2 || "");
+      setBasalInjectionTime(
+        typeof storedSettings.basalInjectionTime === "string" ? storedSettings.basalInjectionTime : "",
+      );
+      setBasalInjectionTime2(
+        typeof storedSettings.basalInjectionTime2 === "string" ? storedSettings.basalInjectionTime2 : "",
+      );
       setCgmDays(storedSettings.cgmDays?.toString() || "");
       setSiteChangeDays(storedSettings.siteChangeDays?.toString() || "3");
       setReservoirChangeDays(storedSettings.reservoirChangeDays?.toString() || "3");
@@ -1336,7 +1341,9 @@ export default function Settings() {
       });
       return { ok: false };
     }
-    const normalizedDob = normalizeDateOfBirthInput(base.dateOfBirth?.trim() || null);
+    const normalizedDob = normalizeDateOfBirthInput(
+      typeof base.dateOfBirth === "string" ? base.dateOfBirth.trim() : null,
+    );
     const parsedKg = parseWeightInputToKg(bodyWeightInput, weightDisplayUnit);
     if (
       opts?.requireWeightForHypo !== false &&
@@ -1985,7 +1992,9 @@ export default function Settings() {
           weightDisplayUnit={weightDisplayUnit}
           setWeightDisplayUnit={setWeightDisplayUnit}
           weightRequiredForHypo={profileWeightRequiredForHypo(
-            normalizeDateOfBirthInput(profile?.dateOfBirth?.trim() || null),
+            normalizeDateOfBirthInput(
+              typeof profile?.dateOfBirth === "string" ? profile.dateOfBirth.trim() : null,
+            ),
           )}
           onSave={() => void handleSaveProfile()}
           showDesktopSave={usagePageDirty}

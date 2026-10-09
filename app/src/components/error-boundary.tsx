@@ -1,7 +1,11 @@
 import { Component, ErrorInfo, ReactNode } from "react";
 import { captureException } from "@/observability/sentry";
 import { isOnline } from "@/lib/offline";
-import { isLazyChunkLoadError } from "@/lib/chunk-error-recovery";
+import {
+  isLazyChunkLoadError,
+  markChunkRecoveryAttempted,
+  shouldReloadAfterChunkError,
+} from "@/lib/chunk-error-recovery";
 
 interface Props {
   children: ReactNode;
@@ -30,6 +34,10 @@ export class ErrorBoundary extends Component<Props, State> {
     if (errorInfo?.componentStack) {
       this.setState({ componentStack: errorInfo.componentStack });
     }
+    if (shouldReloadAfterChunkError(error)) {
+      markChunkRecoveryAttempted();
+      window.location.reload();
+    }
   }
 
   public render() {
@@ -50,6 +58,9 @@ export class ErrorBoundary extends Component<Props, State> {
                     : "This page failed to load. Close and reopen the app, or connect briefly and try again."
                 : "If the problem keeps happening, try closing and reopening the app."}
             </p>
+            {this.state.error?.message ? (
+              <p className="text-xs text-muted-foreground break-words">{this.state.error.message}</p>
+            ) : null}
             {import.meta.env.DEV && this.state.error ? (
               <pre className="mt-2 max-h-48 overflow-auto rounded-md border border-border bg-muted/50 p-2 text-left text-[11px] text-muted-foreground whitespace-pre-wrap break-words">
                 {[

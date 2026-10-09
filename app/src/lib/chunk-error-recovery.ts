@@ -8,7 +8,10 @@ export function isLazyChunkLoadError(error: Error | null): boolean {
   return (
     msg.includes("Failed to fetch dynamically imported module") ||
     msg.includes("Importing a module script failed") ||
-    msg.includes("error loading dynamically imported module")
+    msg.includes("error loading dynamically imported module") ||
+    msg.includes("Load failed") ||
+    msg.includes("Failed to load module script") ||
+    msg.includes("Unexpected token '<'")
   );
 }
 

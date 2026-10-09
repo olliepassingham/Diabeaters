@@ -46,33 +46,39 @@ export type RatiosPageSnapshotFields = {
   carbPortionSize: string;
 };
 
+function snapshotText(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return "";
+}
+
 export function buildUsagePageSnapshot(fields: UsagePageSnapshotFields): string {
   return JSON.stringify({
-    userDisplayName: fields.userDisplayName.trim(),
+    userDisplayName: snapshotText(fields.userDisplayName),
     appRegion: fields.appRegion,
-    emergencyNumber: fields.emergencyNumber.trim(),
+    emergencyNumber: snapshotText(fields.emergencyNumber),
     bgUnits: fields.bgUnits,
     carbUnits: fields.carbUnits,
     deliveryMethod: fields.deliveryMethod,
-    bodyWeightInput: fields.bodyWeightInput.trim(),
+    bodyWeightInput: snapshotText(fields.bodyWeightInput),
     weightDisplayUnit: fields.weightDisplayUnit,
-    dateOfBirth: normalizeDateOfBirthInput(fields.dateOfBirth.trim() || null) ?? "",
-    shortActingUnitsPerDay: fields.shortActingUnitsPerDay.trim(),
-    longActingUnitsPerDay: fields.longActingUnitsPerDay.trim(),
-    shortActingInjectionsPerDay: fields.shortActingInjectionsPerDay.trim(),
-    longActingInjectionsPerDay: fields.longActingInjectionsPerDay.trim(),
-    primingUnits: fields.primingUnits.trim(),
-    basalInjectionTime: fields.basalInjectionTime.trim(),
-    basalInjectionTime2: fields.basalInjectionTime2.trim(),
-    cgmDays: fields.cgmDays.trim(),
-    siteChangeDays: fields.siteChangeDays.trim(),
-    reservoirChangeDays: fields.reservoirChangeDays.trim(),
-    reservoirCapacity: fields.reservoirCapacity.trim(),
-    unitsPerInsulinPen: fields.unitsPerInsulinPen.trim(),
-    needlesPerBox: fields.needlesPerBox.trim(),
-    infusionSetsPerBox: fields.infusionSetsPerBox.trim(),
-    reservoirsPerBox: fields.reservoirsPerBox.trim(),
-    insulinCartridgeUnits: fields.insulinCartridgeUnits.trim(),
+    dateOfBirth: normalizeDateOfBirthInput(snapshotText(fields.dateOfBirth) || null) ?? "",
+    shortActingUnitsPerDay: snapshotText(fields.shortActingUnitsPerDay),
+    longActingUnitsPerDay: snapshotText(fields.longActingUnitsPerDay),
+    shortActingInjectionsPerDay: snapshotText(fields.shortActingInjectionsPerDay),
+    longActingInjectionsPerDay: snapshotText(fields.longActingInjectionsPerDay),
+    primingUnits: snapshotText(fields.primingUnits),
+    basalInjectionTime: snapshotText(fields.basalInjectionTime),
+    basalInjectionTime2: snapshotText(fields.basalInjectionTime2),
+    cgmDays: snapshotText(fields.cgmDays),
+    siteChangeDays: snapshotText(fields.siteChangeDays),
+    reservoirChangeDays: snapshotText(fields.reservoirChangeDays),
+    reservoirCapacity: snapshotText(fields.reservoirCapacity),
+    unitsPerInsulinPen: snapshotText(fields.unitsPerInsulinPen),
+    needlesPerBox: snapshotText(fields.needlesPerBox),
+    infusionSetsPerBox: snapshotText(fields.infusionSetsPerBox),
+    reservoirsPerBox: snapshotText(fields.reservoirsPerBox),
+    insulinCartridgeUnits: snapshotText(fields.insulinCartridgeUnits),
     suppliesSmarterForecastEnabled: fields.suppliesSmarterForecastEnabled,
     usesClosedLoop: fields.usesClosedLoop,
   });
@@ -80,15 +86,15 @@ export function buildUsagePageSnapshot(fields: UsagePageSnapshotFields): string 
 
 export function buildRatiosPageSnapshot(fields: RatiosPageSnapshotFields): string {
   return JSON.stringify({
-    tdd: fields.tdd.trim(),
-    breakfastRatio: fields.breakfastRatio.trim(),
-    lunchRatio: fields.lunchRatio.trim(),
-    dinnerRatio: fields.dinnerRatio.trim(),
-    snackRatio: fields.snackRatio.trim(),
-    correctionFactor: fields.correctionFactor.trim(),
-    targetBgLow: fields.targetBgLow.trim(),
-    targetBgHigh: fields.targetBgHigh.trim(),
+    tdd: snapshotText(fields.tdd),
+    breakfastRatio: snapshotText(fields.breakfastRatio),
+    lunchRatio: snapshotText(fields.lunchRatio),
+    dinnerRatio: snapshotText(fields.dinnerRatio),
+    snackRatio: snapshotText(fields.snackRatio),
+    correctionFactor: snapshotText(fields.correctionFactor),
+    targetBgLow: snapshotText(fields.targetBgLow),
+    targetBgHigh: snapshotText(fields.targetBgHigh),
     ratioFormat: fields.ratioFormat,
-    carbPortionSize: fields.carbPortionSize.trim(),
+    carbPortionSize: snapshotText(fields.carbPortionSize),
   });
 }

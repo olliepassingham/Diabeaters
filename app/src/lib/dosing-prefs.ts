@@ -26,6 +26,7 @@ function finiteNumber(value: unknown): number | null {
 }
 
 function ratioString(value: unknown): string | null {
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   return trimmed ? trimmed : null;
@@ -58,10 +59,10 @@ export function buildDosingPrefs(input: {
   updatedAt: string;
 }): DosingPrefs {
   return {
-    breakfastRatio: input.settings.breakfastRatio?.trim() || null,
-    lunchRatio: input.settings.lunchRatio?.trim() || null,
-    dinnerRatio: input.settings.dinnerRatio?.trim() || null,
-    snackRatio: input.settings.snackRatio?.trim() || null,
+    breakfastRatio: ratioString(input.settings.breakfastRatio),
+    lunchRatio: ratioString(input.settings.lunchRatio),
+    dinnerRatio: ratioString(input.settings.dinnerRatio),
+    snackRatio: ratioString(input.settings.snackRatio),
     correctionFactor:
       typeof input.settings.correctionFactor === "number" && Number.isFinite(input.settings.correctionFactor)
         ? input.settings.correctionFactor

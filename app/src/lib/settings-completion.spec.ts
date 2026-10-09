@@ -96,6 +96,12 @@ describe("settings completion (Finish your setup)", () => {
     expect(storage.getSettingsCompletion().missing.some((m) => m.key === "name")).toBe(true);
   });
 
+  it("does not crash when a saved name is not text", () => {
+    storage.saveProfile({ ...readyProfile, name: 12 as unknown as string });
+    expect(() => storage.getSettingsCompletion()).not.toThrow();
+    expect(storage.getSettingsCompletion().missing.some((m) => m.key === "name")).toBe(true);
+  });
+
   it("accepts derived MDI total (short + long acting units) in place of an explicit TDD", () => {
     storage.saveProfile(readyProfile);
     storage.saveSettings({

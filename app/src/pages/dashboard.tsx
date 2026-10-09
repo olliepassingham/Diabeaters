@@ -316,7 +316,9 @@ export default function Dashboard() {
   const isCommunityDash =
     isCommunityAccountProfile(profile) && mode !== "patient" && mode !== "carer";
 
-  const dashboardDisplayName = cloudProfile?.full_name?.trim() || profile?.name?.trim() || "";
+  const cloudDisplayName = typeof cloudProfile?.full_name === "string" ? cloudProfile.full_name.trim() : "";
+  const localDisplayName = typeof profile?.name === "string" ? profile.name.trim() : "";
+  const dashboardDisplayName = cloudDisplayName || localDisplayName;
   const dashboardFirstName = dashboardDisplayName.split(" ")[0] || "";
   const showWelcomeWidget =
     !isCommunityDash && shouldOfferWelcomeWidget() && !dashboardFirstName;

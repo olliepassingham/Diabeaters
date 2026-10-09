@@ -10,6 +10,7 @@ describe("chunk error recovery", () => {
 
   it("detects lazy chunk load failures", () => {
     expect(isLazyChunkLoadError(new Error("Failed to fetch dynamically imported module"))).toBe(true);
+    expect(isLazyChunkLoadError(new Error("Load failed"))).toBe(true);
     expect(isLazyChunkLoadError(new Error("boom"))).toBe(false);
   });
 
