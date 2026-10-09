@@ -38,10 +38,10 @@ type Props = {
   className?: string;
 };
 
-/** Match feed post author avatars. */
-const AVATAR_CLASS = "!h-11 !w-11";
-const ITEM_WIDTH = "w-14";
-const NAME_CLASS = "w-full truncate text-center text-[10px] font-medium leading-tight text-muted-foreground";
+/** Match a larger story row, closer to a photo-app strip. */
+const AVATAR_CLASS = "!h-16 !w-16";
+const ITEM_WIDTH = "w-[4.6rem]";
+const NAME_CLASS = "w-full truncate text-center text-[11px] font-medium leading-tight text-foreground/80";
 
 function SelfStoryCell({
   self,
@@ -139,7 +139,7 @@ function FeedStoriesStrip({ children }: { children: ReactNode }) {
     <div className="relative -mx-1">
       <div
         ref={scrollRef}
-        className="flex gap-2.5 overflow-x-auto px-0.5 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex gap-3.5 overflow-x-auto px-1 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         data-testid="feed-stories-strip"
         aria-label="Stories"
       >

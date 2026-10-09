@@ -1,17 +1,25 @@
-import { useCallback, useEffect, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { Volume2, VolumeX } from "lucide-react";
+import { Bookmark, Heart, Loader2, MessageSquare, Share2 } from "lucide-react";
 import { Link } from "wouter";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
+import { CommunityPostImageGrid } from "@/components/community/community-post-image-grid";
+import { FeedEventCard } from "@/components/community/feed-event-card";
+import { FeedLinkPreview } from "@/components/community/feed-link-preview";
+import { FeedPollCard } from "@/components/community/feed-poll-card";
+import { FeedPostVideo } from "@/components/community/feed-post-video";
 import { renderBodyWithMentions } from "@/components/community/render-body-with-mentions";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/auth-context";
 import {
   fetchCommunityPostById,
-  getPostImageSignedUrls,
-  getPostVideoSignedUrl,
   parseEventExtra,
   parsePollExtra,
   type CommunityPostRow,
 } from "@/lib/community";
+import { communityContentNoteHint, communityContentNoteLabel } from "@/lib/community/content-notes";
+import { getFirstWhitelistedFeedLink } from "@/lib/community/link-whitelist";
+import { communityTopicLabel } from "@/lib/community/topics";
 import { getProfilesByIds } from "@/lib/profile";
 import { cn } from "@/lib/utils";
 
@@ -22,10 +30,6 @@ type AuthorMeta = {
   avatarUrl: string | null;
 };
 
-type SharedMedia =
-  | { kind: "images"; urls: string[] }
-  | { kind: "video"; url: string };
-
 type Props = {
   postId: string;
   className?: string;
@@ -33,102 +37,16 @@ type Props = {
   onOpenAuthor: (authorId: string) => void;
 };
 
-function AuthorChip({
-  author,
-  post,
-  onLight,
-  onOpenAuthor,
-}: {
-  author: AuthorMeta;
-  post: CommunityPostRow;
-  onLight: boolean;
-  onOpenAuthor: (authorId: string) => void;
-}) {
-  return (
-    <Link
-      href={`/community/profile/${encodeURIComponent(author.id)}`}
-      onClick={(e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        onOpenAuthor(author.id);
-      }}
-      className={cn(
-        "flex w-full items-center gap-3 rounded-2xl px-2.5 py-2 outline-none transition-colors focus-visible:ring-2",
-        onLight
-          ? "hover:bg-slate-900/[0.04] focus-visible:ring-teal-600/35"
-          : "bg-white/15 text-white hover:bg-white/20 focus-visible:ring-white/40",
-      )}
-      data-testid="story-shared-post-author-link"
-    >
-      <CommunityAuthorAvatar
-        displayName={author.name}
-        avatarPath={author.avatarUrl}
-        size="sm"
-        className="!h-10 !w-10 shrink-0"
-      />
-      <span className={cn("min-w-0 flex-1 text-left", onLight ? "text-foreground" : "text-white")}>
-        <span className="block truncate text-[15px] font-semibold leading-tight">{author.name}</span>
-        <span className={cn("block truncate text-[13px] leading-tight", onLight ? "text-muted-foreground" : "text-white/70")}>
-          {author.handle ? `@${author.handle}` : "View profile"}
-          {post.created_at
-            ? ` · ${formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}`
-            : ""}
-        </span>
-      </span>
-    </Link>
-  );
-}
-
-function PhotoCollage({ urls }: { urls: string[] }) {
-  if (urls.length <= 1) {
-    return <img src={urls[0]} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" />;
-  }
-  if (urls.length === 2) {
-    return (
-      <div className="pointer-events-none absolute inset-0 grid grid-cols-2 gap-0.5">
-        {urls.map((url) => (
-          <img key={url} src={url} alt="" className="h-full w-full object-cover" />
-        ))}
-      </div>
-    );
-  }
-  if (urls.length === 3) {
-    return (
-      <div className="pointer-events-none absolute inset-0 grid grid-rows-[1.15fr_0.85fr] gap-0.5">
-        <img src={urls[0]} alt="" className="h-full w-full object-cover" />
-        <div className="grid grid-cols-2 gap-0.5">
-          <img src={urls[1]} alt="" className="h-full w-full object-cover" />
-          <img src={urls[2]} alt="" className="h-full w-full object-cover" />
-        </div>
-      </div>
-    );
-  }
-  return (
-    <div className="pointer-events-none absolute inset-0 grid grid-cols-2 grid-rows-2 gap-0.5">
-      {urls.slice(0, 4).map((url) => (
-        <img key={url} src={url} alt="" className="h-full w-full object-cover" />
-      ))}
-    </div>
-  );
-}
-
 /**
- * Full-bleed story stage for a reshared feed post.
- * The card matches the feed: author, photos, caption, and a tap through to the post.
+ * A reshared feed post inside a story. Same card as the feed: author, topic,
+ * media, caption, and the action row, on the app canvas rather than a dark stage.
  */
 export function StorySharedPostStage({ postId, className, onOpenPost, onOpenAuthor }: Props) {
+  const { user } = useAuth();
   const [post, setPost] = useState<CommunityPostRow | null>(null);
   const [author, setAuthor] = useState<AuthorMeta | null>(null);
-  const [media, setMedia] = useState<SharedMedia | null>(null);
-  const [muted, setMuted] = useState(true);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
-
-  const toggleMute = useCallback((e: MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    setMuted((m) => !m);
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -136,8 +54,6 @@ export function StorySharedPostStage({ postId, className, onOpenPost, onOpenAuth
     setFailed(false);
     setPost(null);
     setAuthor(null);
-    setMedia(null);
-    setMuted(true);
 
     void (async () => {
       const res = await fetchCommunityPostById(postId);
@@ -153,26 +69,12 @@ export function StorySharedPostStage({ postId, className, onOpenPost, onOpenAuth
       const prof = await getProfilesByIds([row.author_id]);
       if (cancelled) return;
       const p = prof.get(row.author_id);
-      const name = p?.full_name?.trim() || "Member";
-      const handle = p?.public_handle?.trim().replace(/^@/, "") || null;
       setAuthor({
         id: row.author_id,
-        name,
-        handle,
+        name: p?.full_name?.trim() || "Member",
+        handle: p?.public_handle?.trim().replace(/^@/, "") || null,
         avatarUrl: p?.avatar_url ?? null,
       });
-
-      const videoPath = row.video_url?.trim() || null;
-      if (videoPath) {
-        const url = await getPostVideoSignedUrl(videoPath);
-        if (!cancelled && url) setMedia({ kind: "video", url });
-      } else {
-        const paths = (row.image_urls ?? []).filter(Boolean).slice(0, 4);
-        if (paths.length > 0) {
-          const urls = (await getPostImageSignedUrls(paths)).filter((url): url is string => Boolean(url));
-          if (!cancelled && urls.length > 0) setMedia({ kind: "images", urls });
-        }
-      }
       setLoading(false);
     })();
 
@@ -183,200 +85,295 @@ export function StorySharedPostStage({ postId, className, onOpenPost, onOpenAuth
 
   if (loading) {
     return (
-      <div
-        className={cn(
-          "absolute inset-0 flex items-center justify-center bg-black",
-          className,
-        )}
-        aria-hidden
-      >
-        <div className="h-10 w-10 animate-pulse rounded-full bg-teal-800/15" />
+      <div className={cn("flex h-full w-full items-center justify-center bg-background", className)}>
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden />
       </div>
     );
   }
 
   if (failed || !post || !author) {
     return (
-      <div
-        className={cn(
-          "absolute inset-0 flex items-center justify-center bg-black px-8",
-          className,
-        )}
-      >
-        <p className="text-center text-sm text-white/75">This post is no longer available.</p>
+      <div className={cn("flex h-full w-full items-center justify-center bg-background px-8", className)}>
+        <p className="text-center text-sm text-muted-foreground">This post is no longer available.</p>
       </div>
     );
   }
 
-  const poll = post.post_kind === "poll" ? parsePollExtra(post.post_extra) : null;
-  const event = post.post_kind === "event" ? parseEventExtra(post.post_extra) : null;
-  const body = post.body.trim();
-  const caption =
-    (event?.title?.trim() && body === event.title.trim() ? "" : body) ||
-    event?.title?.trim() ||
-    "";
-  const quoteText = poll?.question?.trim() || caption || "Shared from the feed";
-  const showMediaCard = Boolean(media) && !poll;
-  const footerCaption = caption || event?.title?.trim() || "";
-
   return (
-    <div
-      className={cn(
-        "absolute inset-0 overflow-hidden",
-        "bg-black",
-        className,
-      )}
-      data-testid="story-shared-post-stage"
-    >
-      {showMediaCard && media ? (
-        <>
-          {media.kind === "images" ? (
-            <img
-              src={media.urls[0]}
-              alt=""
-              className="absolute inset-0 h-full w-full scale-110 object-cover opacity-40 blur-2xl"
-              aria-hidden
-            />
-          ) : (
-            <video
-              src={media.url}
-              muted
-              playsInline
-              preload="metadata"
-              className="absolute inset-0 h-full w-full scale-110 object-cover opacity-40 blur-2xl"
-              aria-hidden
-            />
-          )}
-          <div className="absolute inset-0 bg-black/70" />
-        </>
-      ) : null}
-
-      <div className="pointer-events-none absolute inset-0 z-[9] flex flex-col justify-center px-3.5 pb-[max(6.75rem,env(safe-area-inset-bottom))] pt-[max(5.25rem,calc(env(safe-area-inset-top)+4rem))] sm:px-5">
-        {showMediaCard && media ? (
-          <div className="mx-auto flex min-h-0 w-full max-w-lg flex-1 flex-col overflow-hidden rounded-[1.6rem] bg-white shadow-[0_24px_60px_-24px_rgba(0,0,0,0.65)]">
-            <div className="pointer-events-auto flex shrink-0 items-center gap-2 px-3 pb-2 pt-3">
-              <div className="min-w-0 flex-1">
-                <AuthorChip author={author} post={post} onLight onOpenAuthor={onOpenAuthor} />
-              </div>
-              <span className="shrink-0 rounded-full bg-teal-700/10 px-2.5 py-1 text-[11px] font-semibold tracking-tight text-teal-800">
-                Shared post
-              </span>
-            </div>
-
-            <div className="relative min-h-0 flex-1 overflow-hidden bg-slate-100">
-              <button
-                type="button"
-                className="pointer-events-auto absolute inset-0 z-0 cursor-pointer border-0 bg-transparent"
-                aria-label="View original post"
-                data-testid="button-story-open-post"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onOpenPost();
-                }}
-              />
-              {media.kind === "images" ? (
-                <PhotoCollage urls={media.urls} />
-              ) : (
-                <video
-                  src={media.url}
-                  muted={muted}
-                  loop
-                  playsInline
-                  autoPlay
-                  className="pointer-events-none absolute inset-0 h-full w-full object-cover"
-                  data-testid="story-shared-post-video"
-                />
-              )}
-              {media.kind === "video" ? (
-                <button
-                  type="button"
-                  className="pointer-events-auto absolute bottom-3 left-1/2 z-20 flex h-10 w-10 -translate-x-1/2 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm"
-                  onClick={toggleMute}
-                  onPointerDown={(e) => {
-                    e.stopPropagation();
-                  }}
-                  aria-label={muted ? "Unmute video" : "Mute video"}
-                  data-testid="story-shared-post-mute"
-                >
-                  {muted ? <VolumeX className="h-4 w-4" aria-hidden /> : <Volume2 className="h-4 w-4" aria-hidden />}
-                </button>
-              ) : null}
-            </div>
-
-            <div className="flex shrink-0 flex-col gap-2 px-4 pb-3.5 pt-3">
-              {footerCaption ? (
-                <button
-                  type="button"
-                  className="pointer-events-auto line-clamp-4 text-left text-sm font-normal leading-snug text-foreground"
-                  data-testid="story-shared-post-caption"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onOpenPost();
-                  }}
-                >
-                  <span className="mr-1.5 font-semibold">{author.name}</span>
-                  <span className="whitespace-pre-wrap">{renderBodyWithMentions(footerCaption, post.mention_map ?? {})}</span>
-                </button>
-              ) : null}
-              <button
-                type="button"
-                className="pointer-events-auto self-start text-sm font-semibold text-teal-800"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onOpenPost();
-                }}
-              >
-                View post
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="mx-auto flex w-full max-w-lg flex-col overflow-hidden rounded-[1.6rem] bg-white shadow-[0_24px_60px_-24px_rgba(0,0,0,0.65)]">
-            <div className="pointer-events-auto flex shrink-0 items-center gap-2 px-3 pb-1 pt-3">
-              <div className="min-w-0 flex-1">
-                <AuthorChip author={author} post={post} onLight onOpenAuthor={onOpenAuthor} />
-              </div>
-              <span className="shrink-0 rounded-full bg-teal-700/10 px-2.5 py-1 text-[11px] font-semibold tracking-tight text-teal-800">
-                Shared post
-              </span>
-            </div>
-            <button
-              type="button"
-              className="pointer-events-auto line-clamp-[12] whitespace-pre-wrap px-4 pb-2 pt-1 text-left text-[15px] font-normal leading-[1.45] text-foreground"
-              aria-label="View original post"
-              data-testid="button-story-open-post"
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenPost();
-              }}
-            >
-              {poll ? quoteText : renderBodyWithMentions(quoteText, post.mention_map ?? {})}
-            </button>
-            {poll?.options?.length ? (
-              <ul className="pointer-events-none space-y-2 px-4 pb-2">
-                {poll.options.slice(0, 4).map((opt) => (
-                  <li
-                    key={opt}
-                    className="rounded-2xl border border-slate-900/10 bg-slate-50 px-3.5 py-2.5 text-sm font-medium text-slate-800"
-                  >
-                    {opt}
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-            <button
-              type="button"
-              className="pointer-events-auto self-start px-4 pb-4 pt-1 text-sm font-semibold text-teal-800"
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenPost();
-              }}
-            >
-              View post
-            </button>
-          </div>
-        )}
+    <div className={cn("h-full w-full overflow-y-auto bg-background", className)}>
+      <div className="mx-auto flex min-h-full w-full max-w-lg flex-col px-3 py-[max(5.25rem,calc(env(safe-area-inset-top)+4.5rem))] pb-[max(7.5rem,calc(env(safe-area-inset-bottom)+5.5rem))]">
+        <SharedFeedCard
+          post={post}
+          author={author}
+          viewerId={user?.id}
+          onOpenPost={onOpenPost}
+          onOpenAuthor={onOpenAuthor}
+        />
       </div>
     </div>
+  );
+}
+
+function SharedFeedCard({
+  post,
+  author,
+  viewerId,
+  onOpenPost,
+  onOpenAuthor,
+}: {
+  post: CommunityPostRow;
+  author: AuthorMeta;
+  viewerId: string | undefined;
+  onOpenPost: () => void;
+  onOpenAuthor: (authorId: string) => void;
+}) {
+  const eventExtra = post.post_kind === "event" ? parseEventExtra(post.post_extra) : null;
+  const pollExtra = post.post_kind === "poll" ? parsePollExtra(post.post_extra) : null;
+  const topicLabel = communityTopicLabel(post.topic);
+  const contentNoteLabel = post.content_note ? communityContentNoteLabel(post.content_note) : null;
+  const contentNoteHint = post.content_note ? communityContentNoteHint(post.content_note) : null;
+  const previewLink = useMemo(() => getFirstWhitelistedFeedLink(post.body), [post.body]);
+  const bodyText = (() => {
+    const b = post.body.trim();
+    if (b.length === 0) return null;
+    if (pollExtra && b === pollExtra.question.trim()) return null;
+    if (eventExtra && b === eventExtra.title.trim()) return null;
+    return b;
+  })();
+  const hasFeedImages = !eventExtra && !post.video_url && post.image_urls.length > 0;
+  const hasFeedVideo = !eventExtra && Boolean(post.video_url);
+  const isMediaFirst = hasFeedVideo || hasFeedImages;
+
+  return (
+    <article
+      className="my-auto w-full overflow-hidden rounded-3xl border border-border/40 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)] dark:bg-card/80 dark:shadow-none"
+      data-testid="story-shared-post-card"
+    >
+      <div className="flex items-center gap-3 px-3.5 pb-2.5 pt-3 sm:px-4">
+        <button
+          type="button"
+          className="shrink-0 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label={author.name}
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenAuthor(author.id);
+          }}
+        >
+          <CommunityAuthorAvatar
+            displayName={author.name}
+            avatarPath={author.avatarUrl}
+            size="md"
+            className="!h-11 !w-11"
+          />
+        </button>
+        <div className="min-w-0 flex-1">
+          <div className="space-y-0.5">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
+              <Link
+                href={`/community/profile/${post.author_id}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onOpenAuthor(author.id);
+                }}
+                className="truncate text-[15px] font-semibold leading-tight text-foreground hover:underline underline-offset-2"
+              >
+                {author.name}
+              </Link>
+              {author.handle ? (
+                <span className="truncate text-[13px] text-muted-foreground">@{author.handle}</span>
+              ) : null}
+            </div>
+            <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12px] text-muted-foreground">
+              <span className="inline-flex max-w-[10rem] truncate rounded-full bg-muted/60 px-1.5 py-0.5 text-[11px] font-medium text-foreground/80">
+                {topicLabel}
+              </span>
+              {contentNoteLabel ? (
+                <>
+                  <span aria-hidden>·</span>
+                  <span
+                    title={contentNoteHint ?? contentNoteLabel}
+                    className="inline-flex max-w-[9rem] truncate rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-medium text-amber-900 dark:text-amber-100"
+                  >
+                    {contentNoteLabel}
+                  </span>
+                </>
+              ) : null}
+              <span aria-hidden>·</span>
+              <time title={post.created_at}>
+                {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+              </time>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {hasFeedVideo && post.video_url ? (
+        <FeedPostVideo path={post.video_url} posterPath={post.video_poster_url} priority topicLabel={topicLabel} />
+      ) : null}
+      {hasFeedVideo ? (
+        <div className="flex items-center gap-2 border-b border-border/30 px-3.5 py-2 text-[11px] text-muted-foreground sm:px-4">
+          <span className="min-w-0 flex-1 leading-snug">Peer experience — not medical advice or dosing guidance.</span>
+        </div>
+      ) : null}
+      {hasFeedImages ? (
+        <CommunityPostImageGrid
+          paths={post.image_urls}
+          altTexts={post.image_alt_texts}
+          variant="feed"
+          priority
+        />
+      ) : null}
+
+      {!isMediaFirst ? (
+        <div className="space-y-2 px-3.5 pb-1 sm:px-4">
+          {bodyText ? (
+            <p className="whitespace-pre-wrap text-[15px] leading-[1.45] text-foreground">
+              {renderBodyWithMentions(bodyText, post.mention_map)}
+            </p>
+          ) : null}
+          {eventExtra ? (
+            <FeedEventCard
+              event={eventExtra}
+              imagePaths={post.image_urls}
+              imageAltTexts={post.image_alt_texts}
+              interestedCount={post.interested_count}
+              interestedByMe={post.interested_by_me}
+            />
+          ) : null}
+          {pollExtra ? (
+            <FeedPollCard
+              postId={post.id}
+              question={pollExtra.question}
+              options={pollExtra.options}
+              viewerId={viewerId}
+            />
+          ) : null}
+          {previewLink ? <FeedLinkPreview href={previewLink} className="mt-1" /> : null}
+        </div>
+      ) : null}
+
+      <div className="flex items-center justify-between gap-1 px-2 pb-2 pt-1 sm:px-3.5">
+        <div className="flex min-w-0 items-center">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-11 w-11 p-0 text-foreground hover:text-foreground"
+            aria-label={post.liked_by_me ? "Unlike" : "Like"}
+            aria-pressed={post.liked_by_me}
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenPost();
+            }}
+          >
+            <Heart
+              className={cn(
+                "h-[22px] w-[22px] shrink-0",
+                post.liked_by_me && "scale-105 fill-primary text-primary",
+              )}
+            />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-11 w-11 p-0 text-foreground hover:text-foreground"
+            aria-label={`${post.comment_count} comment${post.comment_count === 1 ? "" : "s"}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenPost();
+            }}
+          >
+            <MessageSquare className="h-[22px] w-[22px] shrink-0" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-11 w-11 p-0 text-foreground hover:text-foreground"
+            aria-label="Open post"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenPost();
+            }}
+          >
+            <Share2 className="h-[21px] w-[21px] shrink-0" aria-hidden />
+          </Button>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-11 w-11 p-0 text-foreground hover:text-foreground"
+          aria-pressed={post.saved_by_me}
+          aria-label={post.saved_by_me ? "Remove bookmark" : "Save post"}
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenPost();
+          }}
+        >
+          <Bookmark
+            className={cn("h-[22px] w-[22px] shrink-0", post.saved_by_me && "fill-primary text-primary")}
+          />
+        </Button>
+      </div>
+
+      {post.like_count > 0 ? (
+        <button
+          type="button"
+          className="flex w-full items-center px-3.5 pb-0.5 text-left sm:px-4"
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenPost();
+          }}
+        >
+          <span className="text-sm font-semibold text-foreground">
+            {post.like_count === 1 ? "1 like" : `${post.like_count} likes`}
+          </span>
+        </button>
+      ) : null}
+
+      {isMediaFirst && bodyText ? (
+        <p className="px-3.5 pb-3 pt-1.5 text-sm leading-snug text-foreground sm:px-4">
+          <button
+            type="button"
+            className="mr-1.5 font-semibold hover:underline underline-offset-2"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenAuthor(author.id);
+            }}
+          >
+            {author.name}
+          </button>
+          <span className="whitespace-pre-wrap">{renderBodyWithMentions(bodyText, post.mention_map)}</span>
+        </p>
+      ) : (
+        <div className="h-2" />
+      )}
+
+      {isMediaFirst && (eventExtra || pollExtra || previewLink) ? (
+        <div className="space-y-2 px-3.5 pb-3 sm:px-4">
+          {eventExtra ? (
+            <FeedEventCard
+              event={eventExtra}
+              imagePaths={post.image_urls}
+              imageAltTexts={post.image_alt_texts}
+              interestedCount={post.interested_count}
+              interestedByMe={post.interested_by_me}
+            />
+          ) : null}
+          {pollExtra ? (
+            <FeedPollCard
+              postId={post.id}
+              question={pollExtra.question}
+              options={pollExtra.options}
+              viewerId={viewerId}
+            />
+          ) : null}
+          {previewLink ? <FeedLinkPreview href={previewLink} /> : null}
+        </div>
+      ) : null}
+    </article>
   );
 }

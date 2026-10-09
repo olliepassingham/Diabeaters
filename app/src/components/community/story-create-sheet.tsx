@@ -8,8 +8,11 @@ import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Button } from "@/components/ui/button";
 import { StoryCameraCapture } from "@/components/community/story-camera-capture";
 import { StoryOverlayEditor } from "@/components/community/story-overlay-editor";
+import { StorySharedPostStage } from "@/components/community/story-shared-post-stage";
 import { useToast } from "@/hooks/use-toast";
 import { clickHiddenFileInput, FILE_INPUT_HIDDEN_CLASS, isFilePickerActive } from "@/lib/click-hidden-file-input";
+import { STORY_MEDIA_CLASS, STORY_STAGE_CLASS } from "@/lib/community/story-frame";
+import { cn } from "@/lib/utils";
 import { pickSinglePhoto } from "@/lib/community/pick-post-images";
 import {
   insertCommunityStory,
@@ -306,12 +309,24 @@ export function StoryCreateSheet({
         {createPortal(
           <div
             data-story-stage
-            className="fixed inset-0 z-[140] flex h-dvh max-h-dvh items-center justify-center bg-black text-white touch-manipulation [-webkit-tap-highlight-color:transparent]"
+            className={cn(
+              "fixed inset-0 z-[140] flex h-dvh max-h-dvh touch-manipulation [-webkit-tap-highlight-color:transparent]",
+              linkedPostId
+                ? "bg-background text-foreground"
+                : "items-center justify-center bg-black text-white",
+            )}
           >
             <div
-              className="relative h-full w-full max-w-[min(100%,calc(100dvh*9/16))] overflow-hidden"
+              className={linkedPostId ? "relative h-full w-full" : STORY_STAGE_CLASS}
               data-testid="story-editor-stage"
             >
+            {linkedPostId ? (
+              <StorySharedPostStage
+                postId={linkedPostId}
+                onOpenPost={() => {}}
+                onOpenAuthor={() => {}}
+              />
+            ) : (
             <StoryOverlayEditor
               overlays={overlays}
               onChange={setOverlays}
@@ -321,26 +336,28 @@ export function StoryCreateSheet({
               {file?.type.startsWith("video/") ? (
                 <video
                   src={preview}
-                  className="h-full w-full object-cover"
+                  className={STORY_MEDIA_CLASS}
                   autoPlay
                   muted
                   loop
                   playsInline
                 />
               ) : (
-                <img
-                  src={preview}
-                  alt=""
-                  className="h-full w-full bg-black object-contain"
-                />
+                <img src={preview} alt="" className={STORY_MEDIA_CLASS} />
               )}
             </StoryOverlayEditor>
+            )}
 
             {!textEditing ? (
               <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between px-3 pt-[max(0.75rem,env(safe-area-inset-top))] [padding-left:max(0.75rem,env(safe-area-inset-left))] [padding-right:max(0.75rem,env(safe-area-inset-right))]">
                 <button
                   type="button"
-                  className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-md active:scale-95"
+                  className={cn(
+                    "pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-md active:scale-95",
+                    linkedPostId
+                      ? "bg-card text-foreground shadow-sm ring-1 ring-border/60"
+                      : "bg-black/45 text-white",
+                  )}
                   aria-label="Close story"
                   onClick={() => {
                     reset();
@@ -362,7 +379,12 @@ export function StoryCreateSheet({
               <div className="absolute inset-x-0 bottom-0 z-20 flex items-end justify-between gap-3 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]">
                 <button
                   type="button"
-                  className="flex h-11 w-11 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-md active:scale-95"
+                  className={cn(
+                    "flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-md active:scale-95",
+                    linkedPostId
+                      ? "bg-card text-foreground shadow-sm ring-1 ring-border/60"
+                      : "bg-black/45 text-white",
+                  )}
                   aria-label="Change photo or video"
                   onClick={reset}
                 >

@@ -674,7 +674,7 @@ export function FeedPostCard({
 
   const engagementRow = (
     <div
-      className="flex items-center justify-between gap-1 px-2 pt-1 sm:px-3.5"
+      className="flex items-center justify-between gap-1 px-2 pb-2 pt-1 sm:px-3.5"
       data-testid="post-engagement-row"
     >
       <div className="flex min-w-0 items-center">
@@ -776,8 +776,8 @@ export function FeedPostCard({
 
   return (
     <>
-    <article className="animate-soft-in overflow-hidden rounded-[1.35rem] border border-border/50 bg-card/90 py-3 shadow-none dark:bg-card/70">
-      <div className="flex items-center gap-3 px-3.5 pb-1 pt-0.5 sm:px-4">
+    <article className="animate-soft-in overflow-hidden rounded-3xl border border-border/40 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)] dark:bg-card/80 dark:shadow-none">
+      <div className="flex items-center gap-3 px-3.5 pb-2.5 pt-3 sm:px-4">
         <CommunityAuthorAvatar
           displayName={authorDisplayName}
           avatarPath={authorAvatarPath}

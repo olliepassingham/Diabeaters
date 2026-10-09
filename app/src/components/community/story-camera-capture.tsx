@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type TouchEvent } from "react";
 import { ImagePlus, RefreshCw, Square, X } from "lucide-react";
+import { objectCoverSourceRect, STORY_MEDIA_CLASS, STORY_STAGE_CLASS } from "@/lib/community/story-frame";
 import { cn } from "@/lib/utils";
 
 export type StoryCameraMode = "photo" | "video";
@@ -141,16 +142,18 @@ export function StoryCameraCapture({ active, onClose, onCapture, onLibrary }: Pr
   function capturePhoto() {
     const video = videoRef.current;
     if (!video || !video.videoWidth) return;
+    const box = video.getBoundingClientRect();
+    const crop = objectCoverSourceRect(video.videoWidth, video.videoHeight, box.width, box.height);
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    canvas.width = Math.max(1, Math.round(crop.sw));
+    canvas.height = Math.max(1, Math.round(crop.sh));
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     if (facing === "user") {
       ctx.translate(canvas.width, 0);
       ctx.scale(-1, 1);
     }
-    ctx.drawImage(video, 0, 0);
+    ctx.drawImage(video, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, canvas.width, canvas.height);
     canvas.toBlob(
       (blob) => {
         if (!blob) return;
@@ -205,17 +208,19 @@ export function StoryCameraCapture({ active, onClose, onCapture, onLibrary }: Pr
 
   return (
     <div
-      className="fixed inset-0 z-[140] bg-black text-white"
+      className="fixed inset-0 z-[140] flex items-center justify-center bg-black text-white"
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
-      <video
-        ref={videoRef}
-        className={cn("h-full w-full object-cover", facing === "user" && "-scale-x-100")}
-        autoPlay
-        muted
-        playsInline
-      />
+      <div className={STORY_STAGE_CLASS}>
+        <video
+          ref={videoRef}
+          className={cn(STORY_MEDIA_CLASS, facing === "user" && "-scale-x-100")}
+          autoPlay
+          muted
+          playsInline
+        />
+      </div>
 
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/50" />
 

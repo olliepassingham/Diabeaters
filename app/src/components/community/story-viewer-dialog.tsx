@@ -34,6 +34,7 @@ import {
   type StoryReactionKind,
   type StoryReactionSummary,
 } from "@/lib/community/stories-supabase";
+import { STORY_MEDIA_CLASS, STORY_STAGE_CLASS } from "@/lib/community/story-frame";
 import { cn } from "@/lib/utils";
 
 const DISMISS_DRAG_PX = 72;
@@ -143,6 +144,14 @@ export function StoryViewerDialog({
 
   const current = queue[index];
   const isLast = index >= queue.length - 1;
+  const authorRun = useMemo(() => {
+    if (!current) return { count: 1, local: 0 };
+    let start = index;
+    while (start > 0 && queue[start - 1]?.authorId === current.authorId) start -= 1;
+    let end = index;
+    while (end < queue.length - 1 && queue[end + 1]?.authorId === current.authorId) end += 1;
+    return { count: end - start + 1, local: index - start };
+  }, [current, index, queue]);
   const displayName = current?.authorDisplayName?.trim() || "Story";
   const profileHref = current ? `/community/profile/${encodeURIComponent(current.authorId)}` : "#";
   const isOwnStory = Boolean(viewerId && current?.authorId === viewerId);
@@ -230,10 +239,11 @@ export function StoryViewerDialog({
     setMediaUrl(cached);
     if (cached) return;
     let cancelled = false;
+    const linkedPostId = resolvedStory.source_post_id;
     void getStoryMediaSignedUrl(resolvedStory.media_path).then((url) => {
       if (cancelled) return;
       if (url) setMediaUrl(url);
-      else setFailed(true);
+      else if (!linkedPostId) setFailed(true);
     });
     return () => {
       cancelled = true;
@@ -471,7 +481,10 @@ export function StoryViewerDialog({
     <>
       <Dialog open={open} onOpenChange={onOpenChange} mobileSheet={false}>
         <DialogContent
-          className="inset-0 left-0 top-0 flex h-dvh max-h-dvh w-screen max-w-none translate-x-0 translate-y-0 animate-none flex-col gap-0 overflow-hidden rounded-none border-0 bg-black p-0 shadow-none [&>button]:hidden"
+          className={cn(
+            "inset-0 left-0 top-0 flex h-dvh max-h-dvh w-screen max-w-none translate-x-0 translate-y-0 animate-none flex-col gap-0 overflow-hidden rounded-none border-0 p-0 shadow-none [&>button]:hidden",
+            sourcePostId ? "bg-background text-foreground" : "bg-black",
+          )}
           style={{ animation: "none", transform: "none" }}
           aria-describedby={undefined}
         >
@@ -490,17 +503,27 @@ export function StoryViewerDialog({
             onTouchEnd={onTouchEnd}
             onTouchCancel={onTouchEnd}
           >
-            <div className="pointer-events-none absolute inset-x-0 top-0 z-30 bg-gradient-to-b from-black/45 to-transparent px-3 pb-8 pt-[max(0.45rem,env(safe-area-inset-top))]">
+            <div
+              className={cn(
+                "pointer-events-none absolute inset-x-0 top-0 z-30 px-3 pb-8 pt-[max(0.45rem,env(safe-area-inset-top))]",
+                sourcePostId
+                  ? "bg-gradient-to-b from-background via-background/95 to-transparent"
+                  : "bg-gradient-to-b from-black/45 to-transparent",
+              )}
+            >
               <div className="pointer-events-auto mb-2 flex gap-1" aria-hidden>
-              {(queue.length > 0 ? queue : [{ authorId: "story" }]).map((entry, i) => (
+              {Array.from({ length: authorRun.count }, (_, i) => (
                 <div
-                  key={`${entry.authorId}-${i}`}
-                  className="h-[2px] min-w-0 flex-1 overflow-hidden rounded-full bg-white/25"
+                  key={i}
+                  className={cn(
+                    "h-[3px] min-w-0 flex-1 overflow-hidden rounded-full",
+                    sourcePostId ? "bg-foreground/15" : "bg-white/30",
+                  )}
                 >
                   <div
-                    className="h-full rounded-full bg-white"
+                    className={cn("h-full rounded-full", sourcePostId ? "bg-foreground" : "bg-white")}
                     style={{
-                      width: i < index ? "100%" : i === index ? `${progress * 100}%` : "0%",
+                      width: i < authorRun.local ? "100%" : i === authorRun.local ? `${progress * 100}%` : "0%",
                     }}
                   />
                 </div>
@@ -514,29 +537,47 @@ export function StoryViewerDialog({
                     e.stopPropagation();
                     closeViewer();
                   }}
-                  className="flex min-w-0 max-w-[calc(100%-5.5rem)] items-center gap-2.5 rounded-full py-1 pr-3 pl-1 outline-none transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/35"
+                  className={cn(
+                    "flex min-w-0 max-w-[calc(100%-5.5rem)] items-center gap-2.5 rounded-full py-1 pl-1 pr-3 outline-none transition-colors focus-visible:ring-2",
+                    sourcePostId
+                      ? "hover:bg-muted focus-visible:ring-ring"
+                      : "hover:bg-white/10 focus-visible:ring-white/35",
+                  )}
                   data-testid="story-viewer-author-link"
                 >
                   <CommunityAuthorAvatar
                     displayName={displayName}
                     avatarPath={current.authorAvatarUrl}
                     size="sm"
-                    className="!h-9 !w-9 shrink-0 shadow-md ring-2 ring-white/25"
+                    className={cn(
+                      "!h-9 !w-9 shrink-0 shadow-md ring-2",
+                      sourcePostId ? "ring-border" : "ring-white/25",
+                    )}
                   />
                   <span className="min-w-0 text-left">
-                    <span className="block truncate text-[13px] font-semibold leading-tight tracking-tight text-white">
+                    <span
+                      className={cn(
+                        "block truncate text-[13px] font-semibold leading-tight tracking-tight",
+                        sourcePostId ? "text-foreground" : "text-white",
+                      )}
+                    >
                       {displayName}
                     </span>
                     {resolvedStory?.created_at ? (
                       <time
-                        className="block truncate text-[11px] leading-tight text-white/60"
+                        className={cn(
+                          "block truncate text-[11px] leading-tight",
+                          sourcePostId ? "text-muted-foreground" : "text-white/60",
+                        )}
                         dateTime={resolvedStory.created_at}
                         title={resolvedStory.created_at}
                       >
                         {formatDistanceToNow(new Date(resolvedStory.created_at), { addSuffix: true })}
                       </time>
                     ) : (
-                      <span className="block text-[11px] leading-tight text-white/50">View profile</span>
+                      <span className={cn("block text-[11px] leading-tight", sourcePostId ? "text-muted-foreground" : "text-white/50")}>
+                        View profile
+                      </span>
                     )}
                   </span>
                 </Link>
@@ -549,7 +590,12 @@ export function StoryViewerDialog({
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="h-9 w-9 rounded-full bg-black/25 text-white/90 backdrop-blur-md hover:bg-black/40 hover:text-white focus-visible:ring-white/35"
+                    className={cn(
+                      "h-9 w-9 rounded-full backdrop-blur-md",
+                      sourcePostId
+                        ? "bg-card text-foreground shadow-sm ring-1 ring-border/60 hover:bg-muted"
+                        : "bg-black/25 text-white/90 hover:bg-black/40 hover:text-white focus-visible:ring-white/35",
+                    )}
                     disabled={!resolvedStory || deleteBusy}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -565,7 +611,12 @@ export function StoryViewerDialog({
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="h-9 w-9 rounded-full bg-black/25 text-white/90 backdrop-blur-md hover:bg-black/40 hover:text-white focus-visible:ring-white/35"
+                    className={cn(
+                      "h-9 w-9 rounded-full backdrop-blur-md",
+                      sourcePostId
+                        ? "bg-card text-foreground shadow-sm ring-1 ring-border/60 hover:bg-muted"
+                        : "bg-black/25 text-white/90 hover:bg-black/40 hover:text-white focus-visible:ring-white/35",
+                    )}
                     disabled={reportBusy || !resolvedStory}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -580,7 +631,12 @@ export function StoryViewerDialog({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="h-9 w-9 rounded-full bg-black/25 text-white/90 backdrop-blur-md hover:bg-black/40 hover:text-white focus-visible:ring-white/35"
+                  className={cn(
+                    "h-9 w-9 rounded-full backdrop-blur-md",
+                    sourcePostId
+                      ? "bg-card text-foreground shadow-sm ring-1 ring-border/60 hover:bg-muted"
+                      : "bg-black/25 text-white/90 hover:bg-black/40 hover:text-white focus-visible:ring-white/35",
+                  )}
                   onClick={(e) => {
                     e.stopPropagation();
                     closeViewer();
@@ -593,7 +649,12 @@ export function StoryViewerDialog({
             </div>
             </div>
 
-            <div className="absolute inset-0 overflow-hidden bg-black">
+            <div
+              className={cn(
+                "absolute inset-0 overflow-hidden",
+                sourcePostId ? "bg-background" : "flex items-center justify-center bg-black",
+              )}
+            >
               {loading ? (
                 <div className="absolute inset-0 flex items-center justify-center">
                   <Loader2 className="h-8 w-8 animate-spin text-white/70" aria-hidden />
@@ -602,54 +663,60 @@ export function StoryViewerDialog({
                 <p className="absolute inset-0 flex items-center justify-center px-6 text-center text-sm text-white/70">
                   This story is no longer available.
                 </p>
-              ) : sourcePostId ? (
-                <>
-                  <StorySharedPostStage
-                    postId={sourcePostId}
-                    onOpenPost={openSourcePost}
-                    onOpenAuthor={openSourceAuthor}
-                  />
-                  {resolvedStory.overlays?.length ? (
-                    <div className="pointer-events-none absolute inset-0 z-[11]">
-                      <StoryOverlayLayer overlays={resolvedStory.overlays} />
-                    </div>
-                  ) : null}
-                </>
-              ) : !mediaUrl ? (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Loader2 className="h-8 w-8 animate-spin text-white/70" aria-hidden />
-                </div>
               ) : (
-                <div className="absolute inset-0 overflow-hidden">
-                  {resolvedStory.media_kind === "image" ? (
-                    <img
-                      src={mediaUrl}
-                      alt=""
-                      decoding="async"
-                      fetchPriority="high"
-                      className="absolute inset-0 h-full w-full bg-black object-contain"
-                    />
+                <div className={sourcePostId ? "relative h-full w-full" : STORY_STAGE_CLASS}>
+                  {sourcePostId ? (
+                    <>
+                      <StorySharedPostStage
+                        postId={sourcePostId}
+                        onOpenPost={openSourcePost}
+                        onOpenAuthor={openSourceAuthor}
+                      />
+                      {resolvedStory.overlays?.length ? (
+                        <div className="pointer-events-none absolute inset-0 z-[11]">
+                          <StoryOverlayLayer overlays={resolvedStory.overlays} />
+                        </div>
+                      ) : null}
+                    </>
+                  ) : !mediaUrl ? (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Loader2 className="h-8 w-8 animate-spin text-white/70" aria-hidden />
+                    </div>
                   ) : (
-                    <video
-                      ref={videoRef}
-                      src={mediaUrl}
-                      className="absolute inset-0 h-full w-full object-cover"
-                      controls={false}
-                      playsInline
-                      autoPlay
-                      muted
-                      preload="auto"
-                      onTimeUpdate={(e) => {
-                        const v = e.currentTarget;
-                        if (!v.duration || !Number.isFinite(v.duration)) return;
-                        const next = Math.min(1, v.currentTime / v.duration);
-                        progressRef.current = next;
-                        setProgress(next);
-                      }}
-                      onEnded={() => advance()}
-                    />
+                    <>
+                      {resolvedStory.media_kind === "image" ? (
+                        <img
+                          src={mediaUrl}
+                          alt=""
+                          decoding="async"
+                          fetchPriority="high"
+                          className={STORY_MEDIA_CLASS}
+                        />
+                      ) : (
+                        <video
+                          ref={videoRef}
+                          src={mediaUrl}
+                          className={STORY_MEDIA_CLASS}
+                          controls={false}
+                          playsInline
+                          autoPlay
+                          muted
+                          preload="auto"
+                          onTimeUpdate={(e) => {
+                            const v = e.currentTarget;
+                            if (!v.duration || !Number.isFinite(v.duration)) return;
+                            const next = Math.min(1, v.currentTime / v.duration);
+                            progressRef.current = next;
+                            setProgress(next);
+                          }}
+                          onEnded={() => advance()}
+                        />
+                      )}
+                      <div className="pointer-events-none absolute inset-0">
+                        <StoryOverlayLayer overlays={resolvedStory.overlays} />
+                      </div>
+                    </>
                   )}
-                  <StoryOverlayLayer overlays={resolvedStory.overlays} />
                 </div>
               )}
 
@@ -658,7 +725,7 @@ export function StoryViewerDialog({
                 type="button"
                 className={cn(
                   "absolute inset-y-0 left-0 z-10 cursor-pointer border-0 bg-transparent",
-                  sourcePostId ? "w-10" : "w-[18%]",
+                  sourcePostId ? "w-10" : "w-[30%]",
                 )}
                 aria-label="Previous story"
                 onClick={(e) => {
@@ -689,7 +756,7 @@ export function StoryViewerDialog({
               {!sourcePostId ? (
                 <button
                   type="button"
-                  className="absolute inset-y-0 left-[18%] right-[18%] z-[5] cursor-pointer border-0 bg-transparent"
+                  className="absolute inset-y-0 left-[30%] right-[18%] z-[5] cursor-pointer border-0 bg-transparent"
                   aria-label={isLast ? "Close story" : "Next story"}
                   onClick={() => {
                     if (suppressClick.current) {
@@ -703,12 +770,24 @@ export function StoryViewerDialog({
             </div>
 
             <div
-              className="absolute inset-x-0 bottom-0 z-30 bg-gradient-to-t from-black/50 to-transparent px-4 pb-[max(1.1rem,env(safe-area-inset-bottom))] pt-10"
+              className={cn(
+                "absolute inset-x-0 bottom-0 z-30 px-4 pb-[max(1.1rem,env(safe-area-inset-bottom))] pt-10",
+                sourcePostId
+                  ? "bg-gradient-to-t from-background via-background/95 to-transparent"
+                  : "bg-gradient-to-t from-black/50 to-transparent",
+              )}
               onClick={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
             >
               {resolvedStory?.caption ? (
-                <p className="mb-3 text-center text-sm font-medium leading-snug text-white drop-shadow-[0_1px_8px_rgba(0,0,0,0.65)]">
+                <p
+                  className={cn(
+                    "mb-3 text-center text-sm font-medium leading-snug",
+                    sourcePostId
+                      ? "text-foreground"
+                      : "text-white drop-shadow-[0_1px_8px_rgba(0,0,0,0.65)]",
+                  )}
+                >
                   {resolvedStory.caption}
                 </p>
               ) : null}
@@ -717,13 +796,18 @@ export function StoryViewerDialog({
                 <div className="flex justify-center gap-2">
                   <button
                     type="button"
-                    className="inline-flex items-center gap-1.5 rounded-full bg-black/35 px-3 py-1.5 text-[12px] font-semibold tracking-wide text-white/95 backdrop-blur-md transition-colors hover:bg-black/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold tracking-wide backdrop-blur-md transition-colors focus-visible:outline-none focus-visible:ring-2",
+                      sourcePostId
+                        ? "bg-card text-foreground shadow-sm ring-1 ring-border/60 hover:bg-muted focus-visible:ring-ring"
+                        : "bg-black/35 text-white/95 hover:bg-black/50 focus-visible:ring-white/35",
+                    )}
                     onClick={(e) => {
                       e.stopPropagation();
                       openViewers();
                     }}
                   >
-                    <Eye className="h-3.5 w-3.5 text-white/90" aria-hidden />
+                    <Eye className={cn("h-3.5 w-3.5", sourcePostId ? "text-foreground/80" : "text-white/90")} aria-hidden />
                     Activity
                   </button>
                 </div>
@@ -732,14 +816,22 @@ export function StoryViewerDialog({
                   {canInteract ? (
                     replyOpen ? (
                     <div
-                      className="flex items-center gap-2 rounded-full border border-white/12 bg-black/45 p-1 pl-4 backdrop-blur-xl"
+                      className={cn(
+                        "flex items-center gap-2 rounded-full border p-1 pl-4 backdrop-blur-xl",
+                        sourcePostId ? "border-border bg-card" : "border-white/12 bg-black/45",
+                      )}
                       onClick={(e) => e.stopPropagation()}
                     >
                       <Input
                         value={replyDraft}
                         onChange={(e) => setReplyDraft(e.target.value)}
                         placeholder="Send a reply…"
-                        className="h-10 border-0 bg-transparent px-0 text-white shadow-none placeholder:text-white/45 focus-visible:ring-0"
+                        className={cn(
+                          "h-10 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0",
+                          sourcePostId
+                            ? "text-foreground placeholder:text-muted-foreground"
+                            : "text-white placeholder:text-white/45",
+                        )}
                         maxLength={500}
                         autoFocus
                         onKeyDown={(e) => {
@@ -762,7 +854,10 @@ export function StoryViewerDialog({
                     </div>
                   ) : (
                     <div
-                      className="mx-auto flex w-fit items-center gap-0.5 rounded-full border border-white/12 bg-black/40 p-1 backdrop-blur-xl"
+                      className={cn(
+                        "mx-auto flex w-fit items-center gap-0.5 rounded-full border p-1 backdrop-blur-xl",
+                        sourcePostId ? "border-border bg-card shadow-sm" : "border-white/12 bg-black/40",
+                      )}
                       onClick={(e) => e.stopPropagation()}
                     >
                       {STORY_REACTION_OPTIONS.map((opt) => (
@@ -772,8 +867,10 @@ export function StoryViewerDialog({
                           variant="ghost"
                           size="sm"
                           className={cn(
-                            "h-11 min-w-11 rounded-full px-2 text-xl hover:bg-white/15",
-                            reactions?.my_reaction === opt.kind && "bg-white/20 ring-1 ring-white/40",
+                            "h-11 min-w-11 rounded-full px-2 text-xl",
+                            sourcePostId ? "hover:bg-muted" : "hover:bg-white/15",
+                            reactions?.my_reaction === opt.kind &&
+                              (sourcePostId ? "bg-muted ring-1 ring-border" : "bg-white/20 ring-1 ring-white/40"),
                           )}
                           disabled={reactionBusy}
                           aria-label={opt.label}
@@ -787,7 +884,10 @@ export function StoryViewerDialog({
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="h-11 gap-1.5 rounded-full px-3.5 text-[13px] font-medium text-white hover:bg-white/15"
+                        className={cn(
+                          "h-11 gap-1.5 rounded-full px-3.5 text-[13px] font-medium",
+                          sourcePostId ? "text-foreground hover:bg-muted" : "text-white hover:bg-white/15",
+                        )}
                         onClick={() => setReplyOpen(true)}
                       >
                         <MessageCircle className="h-4 w-4" />

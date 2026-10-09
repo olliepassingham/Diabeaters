@@ -33,16 +33,10 @@ export function StoryAvatarRing({
 
   const ringClass =
     state === "unseen"
-      ? prominent
-        ? "bg-[conic-gradient(from_210deg,rgb(var(--color-primary)),#f43f5e,#f59e0b,rgb(var(--color-primary)))]"
-        : subtle || compact
-          ? "bg-gradient-to-tr from-primary/50 via-primary/35 to-primary/25"
-          : "bg-gradient-to-tr from-primary via-rose-400 to-amber-400"
+      ? "bg-[conic-gradient(from_200deg,#f9ce34,#ee2a7b,#6228d7,#f9ce34)]"
       : prominent
         ? "bg-muted-foreground/55"
-        : subtle || compact
-          ? "bg-muted-foreground/30"
-          : "bg-muted-foreground/45";
+        : "bg-muted-foreground/35";
 
   const ringPad = prominent ? "p-[3.5px]" : compact ? "p-[1px]" : subtle ? "p-[1.5px]" : "p-[2.5px]";
   const innerPad = prominent ? "p-[3px]" : compact ? "p-0" : subtle ? "p-px" : "p-[2px]";

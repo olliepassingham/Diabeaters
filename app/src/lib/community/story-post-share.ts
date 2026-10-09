@@ -433,36 +433,8 @@ function eventParts(iso: string): { weekday: string; day: string; month: string;
   };
 }
 
-function drawAtmosphere(ctx: CanvasRenderingContext2D, media: CanvasImageSource | null) {
-  ctx.fillStyle = "#0c2f2c";
-  ctx.fillRect(0, 0, W, H);
-
-  if (media) {
-    ctx.save();
-    ctx.filter = "blur(48px)";
-    drawCover(ctx, media, -120, -120, W + 240, H + 240, 0);
-    ctx.restore();
-    ctx.fillStyle = "rgba(12, 47, 44, 0.55)";
-    ctx.fillRect(0, 0, W, H);
-  } else {
-    const a = ctx.createRadialGradient(W * 0.28, H * 0.22, 40, W * 0.28, H * 0.22, 900);
-    a.addColorStop(0, "rgba(45, 212, 191, 0.34)");
-    a.addColorStop(1, "rgba(45, 212, 191, 0)");
-    ctx.fillStyle = a;
-    ctx.fillRect(0, 0, W, H);
-    const b = ctx.createRadialGradient(W * 0.82, H * 0.78, 20, W * 0.82, H * 0.78, 860);
-    b.addColorStop(0, "rgba(56, 189, 248, 0.2)");
-    b.addColorStop(1, "rgba(56, 189, 248, 0)");
-    ctx.fillStyle = b;
-    ctx.fillRect(0, 0, W, H);
-  }
-
-  const vignette = ctx.createLinearGradient(0, 0, 0, H);
-  vignette.addColorStop(0, "rgba(0,0,0,0.22)");
-  vignette.addColorStop(0.2, "rgba(0,0,0,0)");
-  vignette.addColorStop(0.82, "rgba(0,0,0,0)");
-  vignette.addColorStop(1, "rgba(0,0,0,0.28)");
-  ctx.fillStyle = vignette;
+function drawAtmosphere(ctx: CanvasRenderingContext2D, _media: CanvasImageSource | null) {
+  ctx.fillStyle = "#f4f4f5";
   ctx.fillRect(0, 0, W, H);
 }
 
@@ -641,18 +613,8 @@ function drawSharedFeedCard(
   photo: CanvasImageSource | null,
   timeLabel: string,
 ) {
-  const hero = images[0] ?? null;
-  ctx.fillStyle = "#07080b";
+  ctx.fillStyle = "#f4f4f5";
   ctx.fillRect(0, 0, W, H);
-  if (hero) {
-    ctx.save();
-    ctx.filter = "blur(42px)";
-    ctx.globalAlpha = 0.45;
-    drawCover(ctx, hero, -80, -80, W + 160, H + 160, 0);
-    ctx.restore();
-    ctx.fillStyle = "rgba(7, 8, 11, 0.72)";
-    ctx.fillRect(0, 0, W, H);
-  }
 
   const cardX = 56;
   const cardW = W - 112;
@@ -720,7 +682,7 @@ function drawSharedFeedCard(
   ctx.restore();
 
   roundRect(ctx, cardX, cardY, cardW, cardH, radius);
-  ctx.strokeStyle = "rgba(255,255,255,0.16)";
+  ctx.strokeStyle = "rgba(15, 23, 42, 0.08)";
   ctx.lineWidth = 2;
   ctx.stroke();
 }
@@ -749,7 +711,7 @@ function drawTextFeedCard(
   photo: CanvasImageSource | null,
   timeLabel: string,
 ) {
-  ctx.fillStyle = "#07080b";
+  ctx.fillStyle = "#f4f4f5";
   ctx.fillRect(0, 0, W, H);
 
   const cardX = 56;
@@ -812,7 +774,7 @@ function drawTextFeedCard(
   ctx.restore();
 
   roundRect(ctx, cardX, cardY, cardW, cardH, radius);
-  ctx.strokeStyle = "rgba(255,255,255,0.16)";
+  ctx.strokeStyle = "rgba(15, 23, 42, 0.08)";
   ctx.lineWidth = 2;
   ctx.stroke();
 }
