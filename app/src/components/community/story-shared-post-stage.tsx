@@ -188,6 +188,11 @@ function SharedFeedCard({
               <span className="inline-flex max-w-[10rem] truncate rounded-full bg-muted/60 px-1.5 py-0.5 text-[11px] font-medium text-foreground/80">
                 {topicLabel}
               </span>
+              {post.audience === "followers" ? (
+                <span className="inline-flex rounded-full bg-muted/60 px-1.5 py-0.5 text-[11px] font-medium text-foreground/80">
+                  Followers
+                </span>
+              ) : null}
               {contentNoteLabel ? (
                 <>
                   <span aria-hidden>·</span>

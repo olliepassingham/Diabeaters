@@ -16,6 +16,7 @@ function videoPost(id: string, body: string): CommunityPostRow {
     video_poster_url: null,
     content_note: "experience-sharing",
     post_kind: "standard",
+    audience: "everyone",
     post_extra: null,
     mention_map: {},
     mentioned_user_ids: [],

@@ -26,6 +26,8 @@ export type CommunityPostRow = {
   /** Self-labeled sensitive-topic / experience-sharing hint for readers. */
   content_note: CommunityContentNoteId | null;
   post_kind: CommunityPostKind;
+  /** everyone: the community feed. followers: author and people who follow them. */
+  audience: "everyone" | "followers";
   post_extra: CommunityPollExtra | CommunityEventExtra | null;
   /** Lowercase handle -> mentioned user id (for rendering @mentions in body). */
   mention_map: Record<string, string>;

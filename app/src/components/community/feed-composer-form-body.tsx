@@ -7,7 +7,7 @@ import { MentionTextarea } from "@/components/community/mention-textarea";
 import { Textarea } from "@/components/ui/textarea";
 import { InlineInfoHint } from "@/components/ui/field-label-with-info";
 import { MAX_POST_IMAGES, MAX_POST_VIDEO_SECONDS } from "@/lib/community";
-import type { CommunityTopicId } from "@/lib/community";
+import type { CommunityPostAudience, CommunityTopicId } from "@/lib/community";
 import type { CommunityTopicRow } from "@/lib/community/topics";
 import { eventQuickStartPresets } from "@/lib/community/event-display";
 import { clickHiddenFileInput } from "@/lib/click-hidden-file-input";
@@ -61,6 +61,8 @@ export type FeedComposerFormBodyProps = {
   hideInlineSubmit?: boolean;
   /** What the send button should say while a post is being prepared or uploaded. */
   submitStatusLabel?: string | null;
+  postAudience: CommunityPostAudience;
+  setPostAudience: (audience: CommunityPostAudience) => void;
 };
 
 export function FeedComposerFormBody({
@@ -104,6 +106,8 @@ export function FeedComposerFormBody({
   autoFocusComposer = false,
   hideInlineSubmit = false,
   submitStatusLabel = null,
+  postAudience,
+  setPostAudience,
 }: FeedComposerFormBodyProps) {
   const audienceInfo =
     "Posts are shared to the Diabeaters community feed. Avoid personal identifiers. Be kind — report anything unsafe.";
@@ -367,8 +371,7 @@ export function FeedComposerFormBody({
           disabled={submitting || !user || !canComposeToFeed}
           className="min-h-[9.5rem] px-0.5 text-[17px] leading-snug"
         />
-        <div className="flex items-center justify-between gap-2 pt-0.5">
-          <p className="text-[11px] text-muted-foreground">Posts are shared with the community.</p>
+        <div className="flex items-center justify-end gap-2 pt-0.5">
           {composer.length > 0 ? (
             <p className="text-[11px] tabular-nums text-muted-foreground">{composer.length}/8000</p>
           ) : (
@@ -481,6 +484,37 @@ export function FeedComposerFormBody({
           </div>
         </details>
       ) : null}
+      <div className="flex items-start gap-2" role="radiogroup" aria-label="Who can see this post">
+        {(
+          [
+            ["everyone", "Everyone"],
+            ["followers", "Followers"],
+          ] as const
+        ).map(([id, label]) => {
+          const selected = postAudience === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              disabled={submitting || !user || !canComposeToFeed}
+              onClick={() => setPostAudience(id)}
+              className={cn(
+                "shrink-0 rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors",
+                selected ? "bg-foreground text-background" : "bg-muted/80 text-muted-foreground active:bg-muted",
+              )}
+            >
+              {label}
+            </button>
+          );
+        })}
+        <p className="min-w-0 flex-1 pt-1 text-[11px] leading-snug text-muted-foreground">
+          {postAudience === "followers"
+            ? "Only people who follow you can see this. Your profile stays public."
+            : "Anyone in the community can see this."}
+        </p>
+      </div>
       <div
         className={cn(
           "sticky bottom-0 z-10 mt-auto flex items-center gap-1 border-t border-border/40 bg-background/95 py-2 backdrop-blur-md",

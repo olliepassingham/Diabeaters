@@ -291,7 +291,7 @@ export default function CommunityHomePage() {
   const fetchFeedPage = useCallback(
     (limit: number, cursor: FeedCursor | null) =>
       feedTab === "everyone"
-        ? fetchCommunityPostsPage(limit, cursor, topicFilter)
+        ? fetchCommunityPostsPage(limit, cursor, topicFilter, true)
         : fetchCommunityPostsFromFollowingPage(limit, cursor, topicFilter),
     [feedTab, topicFilter],
   );

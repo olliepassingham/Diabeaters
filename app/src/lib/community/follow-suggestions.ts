@@ -110,7 +110,7 @@ async function fetchFollowSuggestionsClientFallback(
 
   const [followingRes, pageRes, followersRes] = await Promise.all([
     listFolloweeIdsForCurrentUser(),
-    fetchCommunityPostsPage(50, null),
+    fetchCommunityPostsPage(50, null, null, true),
     (async () => {
       const supabase = getSupabase();
       if (!supabase) return { ids: [] as string[], error: null };

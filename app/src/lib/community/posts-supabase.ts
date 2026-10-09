@@ -31,6 +31,7 @@ import {
   getPostMediaSignedUrl,
   getPostMediaSignedUrls,
 } from "./post-media-signed-urls";
+import type { CommunityPostAudience } from "./post-audience";
 import type { CommunityPostAuthorPreview, CommunityPostCommentRow, CommunityPostRow } from "./types";
 import {
   DEFAULT_COMMUNITY_TOPIC,
@@ -154,6 +155,7 @@ function mapPost(r: Record<string, unknown>): CommunityPostRow {
         : null,
     content_note: mapContentNote(r.content_note),
     post_kind,
+    audience: r.audience === "followers" ? "followers" : "everyone",
     post_extra,
     mention_map: parseMentionMap(r.mention_map),
     mentioned_user_ids: parseMentionedUserIds(r.mentioned_user_ids),
@@ -605,6 +607,7 @@ export async function fetchCommunityPostsPage(
   limit: number,
   cursor: FeedCursor | null,
   topicFilter?: CommunityTopicId | null,
+  everyoneOnly = false,
 ): Promise<{
   data: CommunityPostRow[] | null;
   error: Error | null;
@@ -613,21 +616,17 @@ export async function fetchCommunityPostsPage(
   if (!supabase) return { data: null, error: new Error("Supabase not configured") };
 
   const lim = Math.min(Math.max(limit, 1), PAGE_LIMIT_CAP);
-
-  const { data, error } = await supabase.rpc("fetch_community_posts_page", {
-    p_limit: lim,
-    p_cursor_created_at: cursor?.created_at ?? null,
-    p_cursor_id: cursor?.id ?? null,
-    p_author_ids: null,
-    p_topic: topicFilter ?? null,
+  return collectCommunityPostPage(lim, cursor, everyoneOnly, async (pageCursor) => {
+    const { data, error } = await supabase.rpc("fetch_community_posts_page", {
+      p_limit: lim,
+      p_cursor_created_at: pageCursor?.created_at ?? null,
+      p_cursor_id: pageCursor?.id ?? null,
+      p_author_ids: null,
+      p_topic: topicFilter ?? null,
+    });
+    if (error) return { data: null, error: wrapFeedRpcError(error) };
+    return { data: (data ?? []) as Record<string, unknown>[], error: null };
   });
-
-  if (error) return { data: null, error: wrapFeedRpcError(error) };
-  const raw = (data ?? []) as Record<string, unknown>[];
-  const posts = raw.map((row) => mapPost(row));
-
-  const dataOut = await finalizePostRowsForFeed(posts);
-  return { data: dataOut, error: null };
 }
 
 /** Recent standard posts that include a video — used by the Feed “Watch & learn” strip. */
@@ -650,7 +649,7 @@ export async function fetchRecentCommunityVideoPosts(limit = 12): Promise<{
   if (error) return { data: null, error: wrapFeedRpcError(error) };
   const posts = ((data ?? []) as Record<string, unknown>[])
     .map((row) => mapPost(row))
-    .filter((post) => Boolean(post.video_url));
+    .filter((post) => Boolean(post.video_url) && post.audience !== "followers");
   return { data: await finalizePostRowsForFeed(posts), error: null };
 }
 
@@ -698,6 +697,7 @@ export async function searchCommunityPostsPage(
   query: string,
   topicFilter?: CommunityTopicId | null,
   authorIds?: string[] | null,
+  everyoneOnly = false,
 ): Promise<{
   data: CommunityPostRow[] | null;
   error: Error | null;
@@ -712,20 +712,49 @@ export async function searchCommunityPostsPage(
   const ids =
     authorIds != null && authorIds.length > 0 ? [...new Set(authorIds.filter(Boolean))] : null;
 
-  const { data, error } = await supabase.rpc("search_community_posts", {
-    p_query: q,
-    p_limit: lim,
-    p_cursor_created_at: cursor?.created_at ?? null,
-    p_cursor_id: cursor?.id ?? null,
-    p_topic: topicFilter ?? null,
-    p_author_ids: ids,
+  return collectCommunityPostPage(lim, cursor, everyoneOnly, async (pageCursor) => {
+    const { data, error } = await supabase.rpc("search_community_posts", {
+      p_query: q,
+      p_limit: lim,
+      p_cursor_created_at: pageCursor?.created_at ?? null,
+      p_cursor_id: pageCursor?.id ?? null,
+      p_topic: topicFilter ?? null,
+      p_author_ids: ids,
+    });
+    if (error) return { data: null, error: wrapFeedRpcError(error) };
+    return { data: (data ?? []) as Record<string, unknown>[], error: null };
   });
+}
 
-  if (error) return { data: null, error: wrapFeedRpcError(error) };
-  const raw = (data ?? []) as Record<string, unknown>[];
-  const posts = raw.map((row) => mapPost(row));
-  const dataOut = await finalizePostRowsForFeed(posts);
-  return { data: dataOut, error: null };
+/**
+ * Everyone feed skips followers-only posts. If a page is mostly those, keep
+ * reading so the visible page still fills up.
+ */
+async function collectCommunityPostPage(
+  limit: number,
+  cursor: FeedCursor | null,
+  everyoneOnly: boolean,
+  loadRaw: (
+    cursor: FeedCursor | null,
+  ) => Promise<{ data: Record<string, unknown>[] | null; error: Error | null }>,
+): Promise<{ data: CommunityPostRow[] | null; error: Error | null }> {
+  const collected: CommunityPostRow[] = [];
+  let pageCursor = cursor;
+  for (let pass = 0; pass < 6 && collected.length < limit; pass += 1) {
+    const loaded = await loadRaw(pageCursor);
+    if (loaded.error) return { data: null, error: loaded.error };
+    const raw = loaded.data ?? [];
+    if (raw.length === 0) break;
+    const posts = raw
+      .map((row) => mapPost(row))
+      .filter((post) => !everyoneOnly || post.audience !== "followers");
+    collected.push(...posts);
+    const last = raw[raw.length - 1]!;
+    pageCursor = { created_at: String(last.created_at ?? ""), id: String(last.id ?? "") };
+    if (raw.length < limit) break;
+  }
+  const page = collected.slice(0, limit);
+  return { data: await finalizePostRowsForFeed(page), error: null };
 }
 
 export async function togglePostSave(
@@ -818,6 +847,7 @@ export type InsertFeedPostInput =
       imageAlts?: string[];
       contentNote?: CommunityContentNoteId | null;
       mentions: FeedPostMentions;
+      audience?: CommunityPostAudience;
     }
   | {
       kind: "poll";
@@ -828,6 +858,7 @@ export type InsertFeedPostInput =
       imageFiles?: File[];
       imageAlts?: string[];
       mentions: FeedPostMentions;
+      audience?: CommunityPostAudience;
     }
   | {
       kind: "event";
@@ -840,6 +871,7 @@ export type InsertFeedPostInput =
       imageFiles?: File[];
       imageAlts?: string[];
       mentions: FeedPostMentions;
+      audience?: CommunityPostAudience;
     };
 
 function normalizeMentionsForInsert(
@@ -888,6 +920,7 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
   videoPosterFile?: File | null;
   imageAlts?: string[];
   contentNote?: CommunityContentNoteId | null;
+  audience?: CommunityPostAudience;
 }): Promise<{ data: CommunityPostRow | null; error: Error | null }> {
   const { supabase, uid, mentioned_user_ids } = params;
   const files = params.imageFiles.filter(Boolean);
@@ -929,6 +962,7 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
       mentioned_user_ids,
     };
     if (contentNote) insertRow.content_note = contentNote;
+    if (params.audience === "followers") insertRow.audience = "followers";
     const { data, error } = await supabase.from("community_posts").insert(insertRow).select("*").single();
 
     if (error) return { data: null, error: new Error(error.message) };
@@ -1008,6 +1042,7 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
       insertPayload.image_alt_texts = imageAltsForInsert;
     }
     if (contentNote) insertPayload.content_note = contentNote;
+    if (params.audience === "followers") insertPayload.audience = "followers";
 
     const { data, error } = await supabase.from("community_posts").insert(insertPayload).select("*").single();
 
@@ -1137,6 +1172,7 @@ export async function insertFeedPost(
       mentioned_user_ids,
       imageFiles,
       imageAlts: input.imageAlts,
+      audience: input.audience,
     });
   }
 
@@ -1165,6 +1201,7 @@ export async function insertFeedPost(
       mentioned_user_ids,
       imageFiles,
       imageAlts: input.imageAlts,
+      audience: input.audience,
     });
   }
 
@@ -1191,6 +1228,7 @@ export async function insertFeedPost(
     videoPosterFile: input.videoPosterFile ?? null,
     imageAlts: input.imageAlts,
     contentNote: input.contentNote,
+    audience: input.audience,
   });
 }
 

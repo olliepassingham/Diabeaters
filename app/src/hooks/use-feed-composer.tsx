@@ -18,10 +18,13 @@ import {
   insertFeedPost,
   isLikelyVideoFile,
   readFeedComposerDraft,
+  readPostAudiencePreference,
   readVideoFileDurationSeconds,
+  type CommunityPostAudience,
   type CommunityPostRow,
   type CommunityTopicId,
 } from "@/lib/community";
+import { writePostAudiencePreference } from "@/lib/community/post-audience";
 import { defaultEventStartsAtLocal } from "@/lib/community/event-display";
 import { isLikelyImageFile, pickPostImagesFromLibrary } from "@/lib/community/pick-post-images";
 import { preparePostImageFiles } from "@/lib/community/prepare-post-image";
@@ -67,6 +70,7 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
   const [composerTopic, setComposerTopic] = useState<CommunityTopicId>(
     () => readFeedComposerDraft()?.topic ?? DEFAULT_COMMUNITY_TOPIC,
   );
+  const [postAudience, setPostAudienceState] = useState<CommunityPostAudience>(() => readPostAudiencePreference());
   const [composer, setComposer] = useState(() => readFeedComposerDraft()?.body ?? "");
   const [composerFiles, setComposerFiles] = useState<File[]>([]);
   const [composerVideoFile, setComposerVideoFile] = useState<File | null>(null);
@@ -386,6 +390,7 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
       video_poster_url: null,
       content_note: composerVideoFile ? VIDEO_POST_DEFAULT_CONTENT_NOTE : null,
       post_kind: composerPostKind,
+      audience: postAudience,
       post_extra: postExtra,
       mention_map: mentions.mentionMap,
       mentioned_user_ids: mentions.userIds,
@@ -483,6 +488,7 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
           imageAlts: composerImageAlts,
           contentNote: composerVideoFile ? VIDEO_POST_DEFAULT_CONTENT_NOTE : null,
           mentions,
+          audience: postAudience,
         });
       } else if (composerPostKind === "poll") {
         res = await insertFeedPost({
@@ -494,6 +500,7 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
           imageFiles: imageFiles.length ? imageFiles : undefined,
           imageAlts: composerImageAlts,
           mentions,
+          audience: postAudience,
         });
       } else {
         res = await insertFeedPost({
@@ -507,6 +514,7 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
           imageFiles: imageFiles.length ? imageFiles : undefined,
           imageAlts: composerImageAlts,
           mentions,
+          audience: postAudience,
         });
       }
 
@@ -526,7 +534,11 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
         toast({
           title:
             options.postedToastTitle ??
-            (postedKind === "event" ? "Event shared" : "Posted"),
+            (postedKind === "event"
+              ? "Event shared"
+              : postAudience === "followers"
+                ? "Posted for your followers"
+                : "Posted"),
           description: options.postedToastDescription,
         });
       }
@@ -654,6 +666,11 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
     guidedVideoMaxSeconds: GUIDED_POST_VIDEO_MAX_SECONDS,
     formatVideoDurationSeconds,
     submitStatusLabel,
+    postAudience,
+    setPostAudience: (audience) => {
+      setPostAudienceState(audience);
+      writePostAudiencePreference(audience);
+    },
   };
 
   return {

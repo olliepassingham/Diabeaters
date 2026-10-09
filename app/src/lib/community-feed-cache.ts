@@ -80,7 +80,7 @@ export function buildCommunityFeedQueryKey(params: {
     COMMUNITY_FEED_QUERY_ROOT,
     params.scopeKey,
     params.viewerId,
-    params.useServerSearch ? "search" : params.feedTab ?? "everyone",
+    params.useServerSearch ? `search:${params.feedTab ?? "everyone"}` : params.feedTab ?? "everyone",
     params.topicFilter ?? "",
     params.debouncedSearch ?? "",
     authorIds,
@@ -104,10 +104,12 @@ export function prependPostedToCommunityFeed(queryClient: QueryClient, post: Com
     const typed = key as unknown as CommunityFeedQueryKey;
     if (!data?.pages?.length) continue;
     if (typed[7] === "saved") continue;
-    if (typed[3] === "search") continue;
+    const lane = String(typed[3] ?? "");
+    if (lane.startsWith("search")) continue;
     if (String(typed[5] ?? "").trim()) continue;
     const topic = typed[4];
     if (topic && topic !== post.topic) continue;
+    if (post.audience === "followers" && lane === "everyone") continue;
     if (data.pages.some((page) => page.some((row) => row.id === post.id))) continue;
     const [first, ...rest] = data.pages;
     queryClient.setQueryData(key, {
@@ -146,7 +148,7 @@ async function fetchMainFeedPage(
 ): Promise<CommunityPostRow[]> {
   const res =
     feedTab === "everyone"
-      ? await fetchCommunityPostsPage(pageSize, cursor, topicFilter)
+      ? await fetchCommunityPostsPage(pageSize, cursor, topicFilter, true)
       : await fetchCommunityPostsFromFollowingPage(pageSize, cursor, topicFilter);
   if (res.error) throw res.error;
   return res.data ?? [];

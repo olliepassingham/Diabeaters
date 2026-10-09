@@ -244,6 +244,7 @@ export function FeedPostList(props: {
           debouncedSearch,
           topicFilter,
           authorIdsForServerSearch,
+          props.feedTab !== "following",
         );
         if (res.error) throw new Error(res.error.message);
         return res.data ?? [];
@@ -355,11 +356,12 @@ export function FeedPostList(props: {
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "community_posts" },
         (payload) => {
-          const row = payload.new as { id?: string; author_id?: string; topic?: string };
+          const row = payload.new as { id?: string; author_id?: string; topic?: string; audience?: string };
           if (!row?.author_id || !row.id) return;
           if (row.author_id === selfId) return;
           if (blockedUserIdsRef.current.has(row.author_id)) return;
           if (topic != null && row.topic !== topic) return;
+          if (props.feedTab !== "following" && row.audience === "followers") return;
           if (following && !following.includes(row.author_id)) return;
           setNewPostCount((c) => c + 1);
         },
@@ -370,7 +372,7 @@ export function FeedPostList(props: {
       cancelled = true;
       void supabase.removeChannel(channel);
     };
-  }, [props.viewerId, topicFilter, followingAuthorIdsForSearch, useServerSearch, props.feedListRevision]);
+  }, [props.viewerId, props.feedTab, topicFilter, followingAuthorIdsForSearch, useServerSearch, props.feedListRevision]);
 
   /** Seed author rows from post payload so names/avatar paths paint with the feed (not after a second fetch). */
   useLayoutEffect(() => {
@@ -464,10 +466,11 @@ export function FeedPostList(props: {
       if (props.savedOnly) return false;
       if (useServerSearch) return false;
       if (topicFilter && p.topic !== topicFilter) return false;
+      if (props.feedTab !== "following" && p.audience === "followers") return false;
       return true;
     });
     return pending.length > 0 ? [...pending, ...list] : list;
-  }, [posts, props.searchQuery, props.savedOnly, props.pendingPosts, authorMeta, useServerSearch, topicFilter]);
+  }, [posts, props.searchQuery, props.savedOnly, props.pendingPosts, props.feedTab, authorMeta, useServerSearch, topicFilter]);
 
   useEffect(() => {
     if (displayPosts.length === 0) return;
