@@ -674,7 +674,10 @@ export function FeedPostCard({
 
   const engagementRow = (
     <div
-      className="flex items-center justify-between gap-1 px-2 pb-2 pt-1 sm:px-3.5"
+      className={cn(
+        "flex items-center justify-between gap-1 px-2 pt-1 sm:px-3.5",
+        likesLine ? "pb-0.5" : "pb-3.5",
+      )}
       data-testid="post-engagement-row"
     >
       <div className="flex min-w-0 items-center">
@@ -976,7 +979,10 @@ export function FeedPostCard({
       {post.like_count > 0 ? (
         <button
           type="button"
-          className="flex w-full items-center gap-2 px-3.5 pt-0.5 text-left transition-opacity hover:opacity-80 active:opacity-70 sm:px-4"
+          className={cn(
+            "flex min-h-10 w-full items-center gap-2.5 px-4 pt-1.5 text-left transition-opacity hover:opacity-80 active:opacity-70",
+            post.comment_count > 0 ? "pb-0.5" : "pb-3.5",
+          )}
           disabled={!viewerId}
           aria-label={`${post.like_count} ${post.like_count === 1 ? "like" : "likes"} — see who liked`}
           onClick={() => setLikersOpen(true)}
@@ -1031,7 +1037,7 @@ export function FeedPostCard({
       {!expanded && post.comment_count > 0 ? (
         <button
           type="button"
-          className="block px-3.5 pt-1 text-left text-[13px] font-medium text-muted-foreground hover:text-foreground sm:px-4"
+          className="block px-4 pb-3.5 pt-1 text-left text-[13px] font-medium text-muted-foreground hover:text-foreground"
           onClick={onToggleComments}
         >
           View all {post.comment_count} comment{post.comment_count === 1 ? "" : "s"}
