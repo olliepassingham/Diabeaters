@@ -49,7 +49,7 @@ export function HubListRow({
   onWarm?: () => void;
   onPress?: () => void;
 }) {
-  const ink = accent ?? TONE_ACCENT[tone];
+  const ink = tone === "guide" ? "teal" : (accent ?? TONE_ACCENT[tone]);
   return (
     <li className={cn("hub-list-card", tone === "guide" && "hub-list-card-steady", `hub-accent-${ink}`)}>
       <Link

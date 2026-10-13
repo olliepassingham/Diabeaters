@@ -19,7 +19,6 @@ type ScenarioCardDef = {
   icon: LucideIcon;
   title: string;
   description: string;
-  accent: "teal" | "indigo" | "amber" | "sky" | "rose" | "gold" | "violet";
 };
 
 const SCENARIO_CARDS: ScenarioCardDef[] = [
@@ -28,42 +27,36 @@ const SCENARIO_CARDS: ScenarioCardDef[] = [
     icon: Dumbbell,
     title: "Exercise",
     description: "Pre-workout fuel and insulin planning",
-    accent: "teal",
   },
   {
     href: "/scenarios/bedtime",
     icon: Moon,
     title: "Bedtime",
     description: "Evening readiness and correction check",
-    accent: "indigo",
   },
   {
     href: "/scenarios/sick-day",
     icon: Thermometer,
     title: "Sick day",
     description: "Illness-adjusted dose guidance and logs",
-    accent: "amber",
   },
   {
     href: "/scenarios/travel",
     icon: Plane,
     title: "Travel",
     description: "Trip checklist and timezone tips",
-    accent: "sky",
   },
   {
     href: "/scenarios/alcohol",
     icon: Wine,
     title: "Alcohol",
     description: "Situation prep and delayed-low awareness",
-    accent: "rose",
   },
   {
     href: "/scenarios/driving",
     icon: Car,
     title: "Driving",
     description: "Readiness from glucose and trend",
-    accent: "gold",
   },
 ];
 
@@ -75,7 +68,7 @@ function scenarioCardsForProfile(dateOfBirth: string | undefined): ScenarioCardD
   });
 }
 
-function ScenarioCard({ href, icon, title, description, accent }: ScenarioCardDef) {
+function ScenarioCard({ href, icon, title, description }: ScenarioCardDef) {
   return (
     <HubListRow
       href={href}
@@ -83,7 +76,6 @@ function ScenarioCard({ href, icon, title, description, accent }: ScenarioCardDe
       title={title}
       description={description}
       tone="guide"
-      accent={accent}
       onPress={() => {
         void hapticLight();
       }}
@@ -214,7 +206,6 @@ export default function Scenarios() {
             icon={Syringe}
             title="Pump failure"
             description={pumpFailureCardDescription}
-            accent="violet"
           />
         ) : null}
       </HubListPanel>

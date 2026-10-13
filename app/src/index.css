@@ -1093,7 +1093,7 @@
   --hub-ink: rgb(91 58 168);
 }
 
-/* Guides share one box. Only the short bar keeps its own colour. */
+/* Guides share one box and one primary-to-gold line. */
 .hub-list-card-steady {
   --hub-wash: rgb(var(--color-primary) / 0.11);
   --hub-edge: rgb(var(--color-primary) / 0.22);
