@@ -152,6 +152,9 @@ describe("CarbEstimatorSheet", () => {
 
     expect(screen.queryByTestId("button-carb-category-routines")).toBeNull();
     expect(screen.getByText("Your meal · 1 item")).not.toBeNull();
+    const scroll = screen.getByTestId("carb-estimator-scroll");
+    expect(scroll.className).toContain("overflow-y-auto");
+    expect(scroll.contains(screen.getByTestId("button-use-carb-estimate"))).toBe(false);
     expect(screen.getByTestId("button-use-carb-estimate").textContent).toBe("Use these foods");
     fireEvent.click(screen.getByTestId("button-use-carb-estimate"));
     expect(onConfirm).toHaveBeenCalledWith(

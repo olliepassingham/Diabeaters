@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link, useLocation } from "wouter";
-import { Repeat, Plus, Utensils, Coffee, Sun, Moon, Cookie, Check, Trash2, Pencil, TrendingUp, History, Tag, Dumbbell, Play, RotateCcw, BookmarkPlus, X } from "lucide-react";
+import { Repeat, Plus, Utensils, Coffee, Sun, Moon, Cookie, Check, Trash2, Pencil, TrendingUp, History, Tag, Dumbbell, Play, RotateCcw, BookmarkPlus, X, ChevronRight } from "lucide-react";
 import { CarbEstimatorSheet } from "@/components/carb-estimator-sheet";
 import { MealImpactCard } from "@/components/meal-impact-card";
 import { mealCompositionFromFoods, routineCarbFoodLines, routineFoodsFromSelections, selectionsFromRoutineFoods } from "@/lib/carb-estimator";
@@ -583,21 +583,32 @@ export function RoutinesContent() {
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <Label htmlFor="carbs">Carbs (approx)</Label>
-                      <button
-                        type="button"
-                        className="text-xs font-medium text-primary"
-                        onClick={openFoodBuilder}
-                        data-testid="button-routine-build-foods"
-                      >
-                        {carbFoods.length ? "Edit foods" : "Build from foods"}
-                      </button>
-                    </div>
+                    <Label htmlFor="carbs">Carbs (approx)</Label>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-3 rounded-2xl border border-border/60 bg-muted/30 px-3 py-3 text-left transition-colors hover:bg-muted/50"
+                      onClick={openFoodBuilder}
+                      data-testid="button-routine-build-foods"
+                    >
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                        <Utensils className="h-4 w-4" aria-hidden />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-semibold text-foreground">
+                          {carbFoods.length ? "Edit foods" : "Build from foods"}
+                        </span>
+                        <span className="block text-xs text-muted-foreground">
+                          {carbFoods.length
+                            ? "Change the foods in this meal"
+                            : "Open the food list and fill in the carbs"}
+                        </span>
+                      </span>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                    </button>
                     <Input
                       id="carbs"
                       type="number"
-                      placeholder="e.g., 45"
+                      placeholder="Or type the carbs, e.g. 45"
                       value={carbEstimate}
                       onChange={(e) => setCarbEstimate(e.target.value)}
                       data-testid="input-carbs"
@@ -622,7 +633,7 @@ export function RoutinesContent() {
                       </div>
                     ) : (
                       <p className="text-[11px] leading-snug text-muted-foreground">
-                        Search foods for a closer estimate, or type a number. This does not change the insulin dose.
+                        Or type a number. This does not change the insulin dose.
                       </p>
                     )}
                   </div>

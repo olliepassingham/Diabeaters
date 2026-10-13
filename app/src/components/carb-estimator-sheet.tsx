@@ -189,6 +189,7 @@ export function CarbEstimatorSheet({
     <BottomSheet
       open={open}
       onOpenChange={onOpenChange}
+      bodyClassName="flex min-h-0 flex-col"
       className="h-[min(94dvh,calc(100dvh-var(--keyboard-inset-bottom,0px)-0.5rem))] rounded-t-[1.75rem]"
       title={
         <span className="flex items-center gap-2">
@@ -199,8 +200,12 @@ export function CarbEstimatorSheet({
         </span>
       }
     >
-      <div className="flex min-h-0 flex-1 flex-col" data-testid="carb-estimator-sheet">
-        <div className="min-h-0 flex-1 overscroll-contain overflow-y-auto px-5 pb-5 touch-pan-y sm:px-6">
+      <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden" data-testid="carb-estimator-sheet">
+        <div
+          className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain px-5 pb-5 sm:px-6"
+          data-vaul-no-drag
+          data-testid="carb-estimator-scroll"
+        >
           {view === "browse" ? (
             <>
               <div className="sticky top-0 z-10 -mx-5 bg-background px-5 pb-2 sm:-mx-6 sm:px-6">
