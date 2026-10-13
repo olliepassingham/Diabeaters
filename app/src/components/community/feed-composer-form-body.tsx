@@ -308,7 +308,7 @@ export function FeedComposerFormBody({
               <Label htmlFor="feed-event-start" className="text-xs font-medium text-muted-foreground">
                 When
               </Label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="flex min-w-0 flex-col gap-2">
                 <Input
                   id="feed-event-start"
                   type="date"
@@ -319,7 +319,7 @@ export function FeedComposerFormBody({
                   disabled={submitting || !user || !canComposeToFeed}
                   aria-label="Event date"
                   data-vaul-no-drag
-                  className="composer-field feed-datetime-input h-11 min-w-0 rounded-xl text-foreground dark:[color-scheme:dark]"
+                  className="composer-field native-datetime-input feed-datetime-input h-11 w-full min-w-0 max-w-full rounded-xl text-foreground dark:[color-scheme:dark]"
                 />
                 <Input
                   id="feed-event-time"
@@ -331,7 +331,7 @@ export function FeedComposerFormBody({
                   disabled={submitting || !user || !canComposeToFeed}
                   aria-label="Event time"
                   data-vaul-no-drag
-                  className="composer-field feed-datetime-input h-11 min-w-0 rounded-xl text-foreground dark:[color-scheme:dark]"
+                  className="composer-field native-datetime-input feed-datetime-input h-11 w-full min-w-0 max-w-full rounded-xl text-foreground dark:[color-scheme:dark]"
                 />
               </div>
               <div className="flex flex-wrap gap-1.5">
