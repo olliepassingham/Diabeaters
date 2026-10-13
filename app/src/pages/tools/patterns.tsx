@@ -9,6 +9,7 @@ import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { OverlappingBarChart } from "@/components/patterns/overlapping-bar-chart";
 import { WeeklyTrendChart } from "@/components/patterns/weekly-trend-chart";
 import { GlucoseDayOverlayChart } from "@/components/patterns/glucose-day-overlay-chart";
+import { FortnightRangeCard } from "@/components/patterns/fortnight-range-card";
 import { Hba1cHistoryChart } from "@/components/patterns/hba1c-history-chart";
 import { PatternInsightCard } from "@/components/patterns/pattern-insight-card";
 import { computePatternInsights } from "@/lib/insights/pattern-insights";
@@ -22,7 +23,8 @@ import { DIABEATER_APPOINTMENTS_CHANGED_EVENT, storage } from "@/lib/storage";
 import { buildHba1cHistory } from "@/lib/appointment-outcomes";
 import { isCgmPrefillActive } from "@/lib/cgm/preferences";
 import { fetchLiveCgmHistory } from "@/lib/cgm/live-cgm-history";
-import { countCgmLocalHistoryDays, getCgmLocalHistory } from "@/lib/cgm/cgm-history-store";
+import { CGM_HISTORY_RETENTION_DAYS, countCgmLocalHistoryDays, getCgmLocalHistory } from "@/lib/cgm/cgm-history-store";
+import { buildFortnightRangePicture } from "@/lib/cgm/fortnight-range";
 import {
   buildGlucoseDayOverlay,
   glucoseTimeWindowById,
@@ -128,6 +130,13 @@ function PatternsInfoDialog() {
           in the app on this phone. Open Hypo history from this page for monthly counts and what you treated with.
         </p>
       </InfoSection>
+      <InfoSection title="Last 14 days">
+        <p>
+          When this phone has stored enough sensor readings across the last 14 days, a simple split shows how much of
+          that time was in range, below range, and above range. Very low readings are called out inside below range.
+          It is a picture of readings on this phone, not a lab HbA1c.
+        </p>
+      </InfoSection>
       <InfoSection title="HbA1c history">
         <p>
           HbA1c you log on a visit, or add as a past result on Appointments, appears here as a simple trend. Educational
@@ -143,23 +152,16 @@ function PatternsInfoDialog() {
   );
 }
 
-function GlucoseDayPatternCard() {
-  const [refreshTick, setRefreshTick] = useState(0);
-  const [filters, setFilters] = useState(() => readGlucoseDayFilters());
-  const { dayRange, timeWindowId, dayKind } = filters;
+function usePatternsCgmRefresh(): number {
+  const [tick, setTick] = useState(0);
   const cgmConnected = isCgmPrefillActive();
-  const timeWindow = glucoseTimeWindowById(timeWindowId);
-
-  useEffect(() => {
-    writeGlucoseDayFilters(filters);
-  }, [filters]);
 
   useEffect(() => {
     if (!cgmConnected) return;
     let cancelled = false;
     void fetchLiveCgmHistory({ minutes: 1440, maxCount: 288 })
       .then(() => {
-        if (!cancelled) setRefreshTick((t) => t + 1);
+        if (!cancelled) setTick((t) => t + 1);
       })
       .catch(() => {
         // Best-effort — the page still works from whatever local history already exists.
@@ -169,13 +171,26 @@ function GlucoseDayPatternCard() {
     };
   }, [cgmConnected]);
 
+  return tick;
+}
+
+function GlucoseDayPatternCard({ historyTick }: { historyTick: number }) {
+  const [filters, setFilters] = useState(() => readGlucoseDayFilters());
+  const { dayRange, timeWindowId, dayKind } = filters;
+  const cgmConnected = isCgmPrefillActive();
+  const timeWindow = glucoseTimeWindowById(timeWindowId);
+
+  useEffect(() => {
+    writeGlucoseDayFilters(filters);
+  }, [filters]);
+
   const units = normalizeBgUnits(storage.getProfile()?.bgUnits);
   const targetRange = useMemo(() => resolveUserTargetBgRange(storage.getSettings(), units), [units]);
 
   const dayCount = useMemo(
     () => (cgmConnected ? countCgmLocalHistoryDays(dayRange) : 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [cgmConnected, refreshTick, dayRange],
+    [cgmConnected, historyTick, dayRange],
   );
   const series = useMemo(
     () =>
@@ -187,7 +202,7 @@ function GlucoseDayPatternCard() {
           )
         : [],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [cgmConnected, units, refreshTick, filters],
+    [cgmConnected, units, historyTick, filters],
   );
 
   if (!cgmConnected) {
@@ -306,8 +321,27 @@ function GlucoseDayPatternCard() {
   );
 }
 
+function FortnightRangeSection({ historyTick }: { historyTick: number }) {
+  const cgmConnected = isCgmPrefillActive();
+  const units = normalizeBgUnits(storage.getProfile()?.bgUnits);
+  const targetRange = useMemo(() => resolveUserTargetBgRange(storage.getSettings(), units), [units]);
+  const picture = useMemo(() => {
+    if (!cgmConnected) return null;
+    return buildFortnightRangePicture(
+      getCgmLocalHistory(CGM_HISTORY_RETENTION_DAYS),
+      units,
+      targetRange.low,
+      targetRange.high,
+    );
+  }, [cgmConnected, historyTick, targetRange.high, targetRange.low, units]);
+
+  if (!picture) return null;
+  return <FortnightRangeCard picture={picture} units={units} />;
+}
+
 export default function PatternsPage() {
   const [dismissTick, setDismissTick] = useState(0);
+  const historyTick = usePatternsCgmRefresh();
 
   const hypos = useMemo(() => storage.getHypoTreatments(), []);
   const exerciseOutcomes = useMemo(() => storage.getExerciseOutcomes(), []);
@@ -370,7 +404,9 @@ export default function PatternsPage() {
         actions={<PatternsInfoDialog />}
       />
 
-      <GlucoseDayPatternCard />
+      <GlucoseDayPatternCard historyTick={historyTick} />
+
+      <FortnightRangeSection historyTick={historyTick} />
 
       <Hba1cHistoryFromAppointments />
 
