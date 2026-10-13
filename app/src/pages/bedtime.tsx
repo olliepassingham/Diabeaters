@@ -53,7 +53,7 @@ import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import { InlineInfoHint } from "@/components/ui/field-label-with-info";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
-import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { GuideFrame, PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
 import { BedtimeResultView, type BedtimeAction } from "@/components/scenarios/bedtime-result-view";
@@ -1174,6 +1174,7 @@ export default function Bedtime() {
           </>
         }
       />
+      <GuideFrame>
       {(scenarioState.sickDayActive || scenarioState.travelModeActive) && (
         <div className="flex flex-wrap gap-2" data-testid="container-active-scenarios">
           {scenarioState.sickDayActive && (
@@ -1775,6 +1776,7 @@ export default function Bedtime() {
         logs={bedtimeLogs}
         onSaved={refreshBedtimeLogs}
       />
+      </GuideFrame>
     </PageShell>
   );
 }

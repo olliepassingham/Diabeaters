@@ -13,7 +13,8 @@ import {
   type CommunityContentNoteId,
 } from "./content-notes";
 import {
-  GUIDED_POST_VIDEO_MAX_SECONDS,
+  feedVideoTooLargeMessage,
+  formatVideoDurationSeconds,
   MAX_POST_VIDEO_SECONDS,
   isLikelyVideoFile,
   readVideoFileDurationSeconds,
@@ -558,6 +559,14 @@ function extFromVideoFile(f: File): string {
   return "mp4";
 }
 
+function videoContentType(file: File): string {
+  if (file.type.startsWith("video/")) return file.type;
+  const ext = extFromVideoFile(file);
+  if (ext === "mov") return "video/quicktime";
+  if (ext === "webm") return "video/webm";
+  return "video/mp4";
+}
+
 function validateImageFiles(files: File[]): Error | null {
   if (files.length > MAX_POST_IMAGES) {
     return new Error(`You can attach up to ${MAX_POST_IMAGES} images per post.`);
@@ -584,10 +593,12 @@ function validateVideoFile(file: File | null | undefined): Error | null {
 export async function validateFeedVideoFile(file: File): Promise<Error | null> {
   const basic = validateVideoFile(file);
   if (basic) return basic;
+  const tooLarge = feedVideoTooLargeMessage(file);
+  if (tooLarge) return new Error(tooLarge);
   const duration = await readVideoFileDurationSeconds(file);
   if (duration != null && duration > MAX_POST_VIDEO_SECONDS) {
     return new Error(
-      `Keep clips to about ${GUIDED_POST_VIDEO_MAX_SECONDS}s (max ${MAX_POST_VIDEO_SECONDS}s) so they stay easy to watch on a phone.`,
+      `Videos can be up to ${formatVideoDurationSeconds(MAX_POST_VIDEO_SECONDS)}. Trim this one before posting.`,
     );
   }
   return null;
@@ -988,7 +999,7 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
         .upload(pendingVideoPath, videoFile, {
           cacheControl: "604800",
           upsert: false,
-          contentType: videoFile.type || undefined,
+          contentType: videoContentType(videoFile),
         });
       if (upErr) throw new Error(upErr.message);
 

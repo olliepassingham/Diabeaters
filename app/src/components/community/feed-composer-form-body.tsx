@@ -1,4 +1,4 @@
-import type { Dispatch, RefObject, SetStateAction } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import { BarChart2, Calendar, ImagePlus, Plus, Send, Video, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,6 @@ import { MAX_POST_IMAGES, MAX_POST_VIDEO_SECONDS } from "@/lib/community";
 import type { CommunityPostAudience, CommunityTopicId } from "@/lib/community";
 import type { CommunityTopicRow } from "@/lib/community/topics";
 import { eventQuickStartPresets } from "@/lib/community/event-display";
-import { clickHiddenFileInput } from "@/lib/click-hidden-file-input";
 import { cn } from "@/lib/utils";
 
 export const MAX_POLL_OPTIONS = 6;
@@ -47,8 +46,8 @@ export type FeedComposerFormBodyProps = {
   removeComposerVideo: () => void;
   composerImageAlts: string[];
   setComposerImageAlts: Dispatch<SetStateAction<string[]>>;
-  videoInputRef: RefObject<HTMLInputElement>;
   pickImagesFromLibraryOnly: () => Promise<void>;
+  pickVideoFromLibraryOnly: () => Promise<void>;
   onPollModeClick: () => void;
   onEventModeClick: () => void;
   composerCanSubmit: boolean;
@@ -93,8 +92,8 @@ export function FeedComposerFormBody({
   removeComposerVideo,
   composerImageAlts,
   setComposerImageAlts,
-  videoInputRef,
   pickImagesFromLibraryOnly,
+  pickVideoFromLibraryOnly,
   onPollModeClick,
   onEventModeClick,
   composerCanSubmit,
@@ -108,9 +107,7 @@ export function FeedComposerFormBody({
 }: FeedComposerFormBodyProps) {
   const audienceInfo =
     "Posts are shared to the Diabeaters community feed. Avoid personal identifiers. Be kind — report anything unsafe.";
-  const standardPlaceholder = composerVideoFile
-    ? "Share a 30–60s tip from your day…"
-    : "Share something…";
+  const standardPlaceholder = composerVideoFile ? "Say what this video is about…" : "Share something…";
   const videoDurationOverGuide =
     composerVideoDurationSeconds != null && composerVideoDurationSeconds > guidedVideoMaxSeconds;
 
@@ -421,11 +418,11 @@ export function FeedComposerFormBody({
             <video src={composerVideoPreview} controls playsInline preload="metadata" className="max-h-64 w-full" />
           </div>
           <p className="text-[11px] leading-snug text-muted-foreground">
-            Aim for about {guidedVideoMaxSeconds}s. Shows in Watch and on the Feed.
+            Shows in Watch and on the Feed. Up to {formatVideoDurationSeconds(MAX_POST_VIDEO_SECONDS)}.
             {composerVideoDurationSeconds != null
               ? ` ${formatVideoDurationSeconds(composerVideoDurationSeconds)}.`
               : null}
-            {videoDurationOverGuide ? ` Max ${MAX_POST_VIDEO_SECONDS}s.` : null}
+            {videoDurationOverGuide ? ` Max ${formatVideoDurationSeconds(MAX_POST_VIDEO_SECONDS)}.` : null}
           </p>
           {composerVideoFile?.name ? (
             <p className="truncate text-[11px] text-muted-foreground" title={composerVideoFile.name}>
@@ -576,7 +573,7 @@ export function FeedComposerFormBody({
               Boolean(composerVideoFile) ||
               composerFiles.length > 0
             }
-            onClick={() => clickHiddenFileInput(videoInputRef.current)}
+            onClick={() => void pickVideoFromLibraryOnly()}
             aria-label="Add video to post"
           >
             <Video className="h-5 w-5" />
@@ -608,7 +605,7 @@ export function FeedComposerFormBody({
         </Button>
         <InlineInfoHint
           ariaLabel="Media limits for posts"
-          content={`Up to ${MAX_POST_IMAGES} photos (5MB each) or one short video (~${guidedVideoMaxSeconds}s, max ${MAX_POST_VIDEO_SECONDS}s, MP4/MOV/WebM). After you pick a video you can cut the length.`}
+          content={`Up to ${MAX_POST_IMAGES} photos, or one video up to ${formatVideoDurationSeconds(MAX_POST_VIDEO_SECONDS)} (MP4, MOV, or WebM, under 500MB). You can trim it before posting.`}
         />
         {hideInlineSubmit ? null : (
           <Button

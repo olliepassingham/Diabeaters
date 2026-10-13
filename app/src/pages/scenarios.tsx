@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
-import { Link, useLocation, useSearch } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import type { LucideIcon } from "lucide-react";
-import { Card } from "@/components/ui/card";
+import { HubListPanel, HubListRow } from "@/components/hub-list-panel";
 import { trackFeatureEngagement } from "@/components/discovery-prompts";
-import { Moon, Thermometer, Plane, Dumbbell, Syringe, Wine, Car, ChevronRight } from "lucide-react";
+import { Moon, Thermometer, Plane, Dumbbell, Syringe, Wine, Car } from "lucide-react";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { storage, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
@@ -19,6 +19,7 @@ type ScenarioCardDef = {
   icon: LucideIcon;
   title: string;
   description: string;
+  accent: "teal" | "indigo" | "amber" | "sky" | "rose" | "gold" | "violet";
 };
 
 const SCENARIO_CARDS: ScenarioCardDef[] = [
@@ -27,36 +28,42 @@ const SCENARIO_CARDS: ScenarioCardDef[] = [
     icon: Dumbbell,
     title: "Exercise",
     description: "Pre-workout fuel and insulin planning",
+    accent: "teal",
   },
   {
     href: "/scenarios/bedtime",
     icon: Moon,
     title: "Bedtime",
     description: "Evening readiness and correction check",
+    accent: "indigo",
   },
   {
     href: "/scenarios/sick-day",
     icon: Thermometer,
     title: "Sick day",
     description: "Illness-adjusted dose guidance and logs",
+    accent: "amber",
   },
   {
     href: "/scenarios/travel",
     icon: Plane,
     title: "Travel",
     description: "Trip checklist and timezone tips",
+    accent: "sky",
   },
   {
     href: "/scenarios/alcohol",
     icon: Wine,
     title: "Alcohol",
     description: "Situation prep and delayed-low awareness",
+    accent: "rose",
   },
   {
     href: "/scenarios/driving",
     icon: Car,
     title: "Driving",
     description: "Readiness from glucose and trend",
+    accent: "gold",
   },
 ];
 
@@ -68,32 +75,19 @@ function scenarioCardsForProfile(dateOfBirth: string | undefined): ScenarioCardD
   });
 }
 
-function ScenarioCard({ href, icon: Icon, title, description }: ScenarioCardDef) {
+function ScenarioCard({ href, icon, title, description, accent }: ScenarioCardDef) {
   return (
-    <Link
+    <HubListRow
       href={href}
-      className="group pressable block h-full min-w-0 w-full rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-      onClick={() => {
+      icon={icon}
+      title={title}
+      description={description}
+      tone="guide"
+      accent={accent}
+      onPress={() => {
         void hapticLight();
       }}
-    >
-      <Card
-        variant="glass"
-        className="pressable card-interactive flex h-full min-h-[5.5rem] w-full cursor-pointer flex-col rounded-2xl px-5 py-4 sm:min-h-[6rem] sm:px-6 sm:py-5"
-      >
-        <div className="flex h-full items-center gap-3 sm:gap-4">
-          <Icon className="h-7 w-7 shrink-0 text-primary sm:h-8 sm:w-8" aria-hidden />
-          <div className="min-w-0 flex-1">
-            <h3 className="font-display text-h3 font-semibold text-foreground">{title}</h3>
-            <p className="mt-0.5 truncate text-sm text-muted-foreground">{description}</p>
-          </div>
-          <ChevronRight
-            className="h-5 w-5 shrink-0 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5"
-            aria-hidden
-          />
-        </div>
-      </Card>
-    </Link>
+    />
   );
 }
 
@@ -210,26 +204,20 @@ export default function Scenarios() {
       <DobUnknownNotice testId="guides-dob-unknown-notice" />
       <OfflineDeviceNotice />
 
-      <div className="grid w-full grid-cols-1 gap-y-3 gap-x-5 md:grid-cols-2 md:gap-x-6 md:gap-y-4">
-        {visibleScenarioCards.map((c, idx) => (
-          <div key={c.href} className="animate-soft-in" style={{ animationDelay: `${idx * 45}ms` }}>
-            <ScenarioCard {...c} />
-          </div>
+      <HubListPanel label="Situation guides" density="compact">
+        {visibleScenarioCards.map((c) => (
+          <ScenarioCard key={c.href} {...c} />
         ))}
         {showPumpFailureCard ? (
-          <div
-            className="animate-soft-in"
-            style={{ animationDelay: `${visibleScenarioCards.length * 45}ms` }}
-          >
-            <ScenarioCard
-              href="/scenarios/pump-failure"
-              icon={Syringe}
-              title="Pump failure"
-              description={pumpFailureCardDescription}
-            />
-          </div>
+          <ScenarioCard
+            href="/scenarios/pump-failure"
+            icon={Syringe}
+            title="Pump failure"
+            description={pumpFailureCardDescription}
+            accent="violet"
+          />
         ) : null}
-      </div>
+      </HubListPanel>
 
       <p className="pt-1 text-center">{guidesAboutDialog}</p>
     </PageShell>

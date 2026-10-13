@@ -33,7 +33,7 @@ export function ScenarioToolHeroCard({
   const hasBody = body != null;
 
   return (
-    <Card className={cn("overflow-hidden shadow-sm", className)} {...cardProps}>
+    <Card className={cn("guide-content-panel overflow-hidden shadow-sm", className)} {...cardProps}>
       {header != null ? (
         <CardHeader className={cn(hasBody ? "pb-3" : "pb-4 sm:pb-5", classNames?.header)}>{header}</CardHeader>
       ) : null}

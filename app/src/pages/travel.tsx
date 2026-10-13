@@ -76,7 +76,7 @@ import {
 } from "@/lib/travel-supply-policy";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { GuideFrame, PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
 import { fetchScenarioStateForUser, upsertScenario } from "@/lib/scenarios-supabase";
 import { invokeNotifyScenarioStarted } from "@/lib/invoke-notify-scenario-started";
@@ -1766,6 +1766,7 @@ export default function Travel() {
           <ScenarioCoachLink topic="travel" from="travel-active" q={activeCoachPrompt} />
         </header>
 
+        <GuideFrame>
         <section
           className="overflow-hidden rounded-[1.5rem] border border-sky-500/20 bg-gradient-to-br from-sky-500/[0.12] via-card to-card px-4 py-4"
           data-testid="travel-active-day-hero"
@@ -2066,6 +2067,7 @@ export default function Travel() {
         </Tabs>
 
         <TravelDisclaimerCard compact />
+        </GuideFrame>
       </PageShell>
     );
   }
@@ -2122,6 +2124,7 @@ export default function Travel() {
           }
         />
 
+        <GuideFrame>
         {!holidayPrep ? (
           <section
             className="overflow-hidden rounded-[1.75rem] border border-sky-500/20 bg-gradient-to-b from-sky-500/[0.12] via-card to-card px-5 pb-5 pt-6 shadow-[0_18px_40px_-28px_rgba(14,165,233,0.55)]"
@@ -2452,6 +2455,7 @@ export default function Travel() {
         </section>
 
         <TravelDisclaimerCard compact />
+        </GuideFrame>
       </PageShell>
     );
   }
@@ -2471,6 +2475,7 @@ export default function Travel() {
           actions={<ScenarioCoachLink topic="travel" from="travel-setup" />}
         />
 
+        <GuideFrame>
         {(holidayPrep || plan.destination.trim()) && (
           <div
             className="rounded-xl border border-border/50 bg-muted/15 px-3 py-2"
@@ -2829,6 +2834,7 @@ export default function Travel() {
             ) : null}
           </CardContent>
         </Card>
+        </GuideFrame>
       </PageShell>
       <div
         className="fixed bottom-[var(--bottom-nav-height,0px)] left-0 right-0 z-40 border-t border-border/80 bg-background/95 px-4 py-2.5 backdrop-blur supports-[backdrop-filter]:bg-background/85 pb-[max(0.625rem,env(safe-area-inset-bottom))]"
@@ -2877,6 +2883,7 @@ export default function Travel() {
         actions={<ScenarioCoachLink topic="travel" from="travel-results" />}
       />
 
+      <GuideFrame>
       <div className="overflow-hidden rounded-2xl border border-sky-500/25 bg-gradient-to-br from-sky-500/[0.10] via-card to-card shadow-[0_12px_40px_-24px_rgba(14,165,233,0.45)]">
         <div className="px-3.5 pb-3.5 pt-3.5 sm:px-5">
           <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">Packed</p>
@@ -3337,6 +3344,7 @@ export default function Travel() {
         )}
 
       </Tabs>
+      </GuideFrame>
     </PageShell>
   );
 }

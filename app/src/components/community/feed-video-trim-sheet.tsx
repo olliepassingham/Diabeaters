@@ -49,7 +49,7 @@ export function FeedVideoTrimSheet({ open, file, onOpenChange, onConfirm }: Prop
       if (cancelled) return;
       const dur = seconds && seconds > 0 ? seconds : 0;
       setDuration(dur);
-      setRange(defaultVideoTrimRange(dur || GUIDED_POST_VIDEO_MAX_SECONDS));
+      setRange(dur > 0 ? defaultVideoTrimRange(dur) : { startSec: 0, endSec: 0 });
     });
     return () => {
       cancelled = true;
@@ -116,7 +116,7 @@ export function FeedVideoTrimSheet({ open, file, onOpenChange, onConfirm }: Prop
           Cut your clip
         </span>
       }
-      description="Drag the handles, then use the cut. Aim for about 60 seconds."
+      description="Use the whole video, or drag the handles to keep a shorter part. Up to 10 minutes."
       className="sm:max-w-lg"
       bodyClassName="space-y-4 px-4 pb-5 pt-1"
       handleOnly
@@ -149,10 +149,10 @@ export function FeedVideoTrimSheet({ open, file, onOpenChange, onConfirm }: Prop
             )}
           >
             {overHardCap
-              ? `Max ${MAX_POST_VIDEO_SECONDS}s`
+              ? `Max ${formatVideoDurationSeconds(MAX_POST_VIDEO_SECONDS)}`
               : overGuide
-                ? `Aim for ~${GUIDED_POST_VIDEO_MAX_SECONDS}s`
-                : `Guide ~${GUIDED_POST_VIDEO_MAX_SECONDS}s`}
+                ? `Shorter clips are easier to watch`
+                : `Up to ${formatVideoDurationSeconds(MAX_POST_VIDEO_SECONDS)}`}
           </span>
         </div>
         <Slider
@@ -185,7 +185,9 @@ export function FeedVideoTrimSheet({ open, file, onOpenChange, onConfirm }: Prop
               style={{ width: `${Math.round(progress * 100)}%` }}
             />
           </div>
-          <p className="text-center text-xs text-muted-foreground">Cutting clip…</p>
+          <p className="text-center text-xs text-muted-foreground">
+            {duration > 0 && selectedSeconds < duration - 0.4 ? "Cutting clip…" : "Preparing video…"}
+          </p>
         </div>
       ) : null}
 
@@ -202,7 +204,7 @@ export function FeedVideoTrimSheet({ open, file, onOpenChange, onConfirm }: Prop
         <Button
           type="button"
           className="h-11 flex-1 rounded-xl"
-          disabled={!file || busy || overHardCap || !duration}
+          disabled={!file || busy || (duration > 0 && overHardCap)}
           onClick={() => void handleConfirm()}
           data-testid="button-feed-video-trim-confirm"
         >

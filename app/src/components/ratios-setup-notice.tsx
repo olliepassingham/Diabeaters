@@ -47,19 +47,15 @@ export function RatiosSetupNotice({
       data-testid={testId}
     >
       <CardContent className="p-4 sm:p-5">
-        <div className="flex items-start gap-3">
+        <div className="flex items-center gap-3">
           <div
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"
             aria-hidden
           >
             <Calculator className="h-5 w-5" strokeWidth={1.75} />
           </div>
-          <div className="min-w-0 flex-1 space-y-1.5">
+          <div className="min-w-0 flex-1 space-y-1">
             <p className="text-sm font-medium text-foreground">Add your carb ratios for meal tools</p>
-            <p className="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-              Meal &amp; ratios and correction help use the numbers you save in Settings. Not sure yet? Use the Ratio
-              Adviser there to find a starting point.
-            </p>
             <Link
               href={SETTINGS_RATIOS_HREF}
               className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"

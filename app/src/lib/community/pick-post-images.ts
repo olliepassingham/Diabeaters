@@ -1,6 +1,7 @@
-import { Camera, CameraResultType, CameraSource } from "@capacitor/camera";
+import { Camera, CameraResultType, CameraSource, MediaType, MediaTypeSelection } from "@capacitor/camera";
 import { Capacitor } from "@capacitor/core";
 import { beginFilePickerHold, clickHiddenFileInput, unlockSystemPickerPointerEvents } from "@/lib/click-hidden-file-input";
+import { fileFromGalleryMedia, isGalleryPickerCancel } from "@/lib/community/pick-story-video";
 
 const MAX_POST_IMAGES = 4;
 
@@ -43,14 +44,6 @@ function fileFromCameraBase64(base64: string | undefined, format: string | undef
   return new File([bytes], `photo-${Date.now()}.${ext}`, { type });
 }
 
-async function fileFromWebPath(webPath: string, name: string): Promise<File | null> {
-  const r = await fetch(webPath);
-  const blob = await r.blob();
-  const type = blob.type.startsWith("image/") ? blob.type : "image/jpeg";
-  if (!type.startsWith("image/")) return null;
-  return new File([blob], name, { type });
-}
-
 /** Native photo library picker; on web, triggers the hidden file input instead. */
 export async function pickPostImagesFromLibrary(
   currentCount: number,
@@ -67,21 +60,33 @@ export async function pickPostImagesFromLibrary(
   const endHold = beginFilePickerHold();
   const restore = unlockSystemPickerPointerEvents();
   try {
-    const res = await Camera.pickImages({ limit: remaining, quality: 90 });
-    const photos = res?.photos ?? [];
+    const res = await Camera.chooseFromGallery({
+      mediaType: MediaTypeSelection.Photo,
+      allowMultipleSelection: remaining > 1,
+      limit: remaining,
+      // JPEG so HEIC camera-roll photos can be resized in the page. Fullscreen
+      // avoids the popover that ignores the first tap.
+      quality: 90,
+      includeMetadata: true,
+      presentationStyle: "fullscreen",
+    });
+    const photos = (res?.results ?? []).filter((item) => item.type !== MediaType.Video);
     if (photos.length === 0) return [];
 
     const newFiles: File[] = [];
-    for (const p of photos) {
-      const webPath = p.webPath?.trim();
-      if (!webPath) continue;
-      const name = p.path?.split("/").pop()?.trim() || `photo-${Date.now()}.jpg`;
-      const file = await fileFromWebPath(webPath, name);
-      if (!file) continue;
+    for (const photo of photos) {
+      const file = await fileFromGalleryMedia(photo, "photo");
+      if (!file || !isLikelyImageFile(file)) continue;
       newFiles.push(file);
       if (currentCount + newFiles.length >= MAX_POST_IMAGES) break;
     }
+    if (newFiles.length === 0) {
+      throw new Error("Couldn't read that photo. Try choosing it again.");
+    }
     return newFiles;
+  } catch (error) {
+    if (isGalleryPickerCancel(error)) return [];
+    throw error instanceof Error ? error : new Error("Couldn't open your photos.");
   } finally {
     restore();
     endHold();

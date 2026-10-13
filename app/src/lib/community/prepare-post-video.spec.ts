@@ -7,10 +7,11 @@ describe("defaultVideoTrimRange", () => {
     expect(defaultVideoTrimRange(24)).toEqual({ startSec: 0, endSec: 24 });
   });
 
-  it("defaults long clips to the guided length", () => {
-    expect(defaultVideoTrimRange(180)).toEqual({
+  it("keeps a clip that fits the upload limit whole", () => {
+    expect(defaultVideoTrimRange(180)).toEqual({ startSec: 0, endSec: 180 });
+    expect(defaultVideoTrimRange(MAX_POST_VIDEO_SECONDS + 40)).toEqual({
       startSec: 0,
-      endSec: GUIDED_POST_VIDEO_MAX_SECONDS,
+      endSec: MAX_POST_VIDEO_SECONDS,
     });
     expect(GUIDED_POST_VIDEO_MAX_SECONDS).toBeLessThanOrEqual(MAX_POST_VIDEO_SECONDS);
   });

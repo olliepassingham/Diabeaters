@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   Calculator,
@@ -9,9 +9,6 @@ import {
   BookOpen,
   Lightbulb,
   Calendar,
-  HeartPulse,
-  Map as MapIcon,
-  ChevronRight,
   MessageCircle,
   ScrollText,
   Sparkles,
@@ -21,7 +18,8 @@ import {
   ArrowLeftRight,
   History,
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { HubListPanel, HubListRow, type HubListAccent, type HubListTone } from "@/components/hub-list-panel";
+import { cn } from "@/lib/utils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { getActiveAppMode, hasCarerIntent, hasPendingCarer, isCarerSessionMode, isCommunitySessionMode } from "@/lib/carer-session";
@@ -31,7 +29,6 @@ import { PageHeader, PageShell } from "@/components/layout";
 import { HubLoadingSkeleton } from "@/components/empty-state";
 import { CommunityPushPromptDialog } from "@/components/community-push-prompt-dialog";
 import { useCommunityPushPromptAfterOnboarding } from "@/hooks/use-community-push-prompt-after-onboarding";
-import { cn } from "@/lib/utils";
 import { isAiCoachEnabled } from "@/lib/flags";
 import { AI_ASSISTANT_NAME } from "@/lib/ai-coach/persona";
 import { buildCoachHref } from "@/lib/ai-coach/links";
@@ -43,10 +40,6 @@ import { filterOfflineCloudTools } from "@/lib/offline-app-gate";
 import { OfflineDeviceNotice } from "@/components/offline-device-notice";
 import { hasLiveCgmCredentials, readCgmPreferences } from "@/lib/cgm/preferences";
 import { hapticLight } from "@/lib/haptics";
-
-function tileEnterDelay(index: number, stepMs = 12, capMs = 72): string {
-  return `${Math.min(index * stepMs, capMs)}ms`;
-}
 
 type ToolDef = {
   id: string;
@@ -259,100 +252,41 @@ export function communityToolsForHub(): ToolDef[] {
   return [coach, ...COMMUNITY_TOOLS];
 }
 
-/** Shared icon badge — soft tinted circle so tiles read as a single family across the hub. */
-function ToolIconBadge({
-  icon: Icon,
-  size = "default",
+function ToolRows({
+  tools,
+  tone,
+  accent,
 }: {
-  icon: React.ComponentType<{ className?: string }>;
-  size?: "default" | "large";
+  tools: ToolDef[];
+  tone: HubListTone;
+  accent: HubListAccent;
 }) {
-  return (
-    <span
-      className={cn(
-        "flex shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors duration-[var(--app-motion-duration)] ease-[var(--app-motion-ease)] group-hover:bg-primary/15",
-        size === "large" ? "h-11 w-11 sm:h-12 sm:w-12" : "h-10 w-10 sm:h-11 sm:w-11",
-      )}
-      aria-hidden
-    >
-      <Icon className={size === "large" ? "h-5 w-5 sm:h-[1.35rem] sm:w-[1.35rem]" : "h-5 w-5"} />
-    </span>
-  );
-}
-
-function ToolCard({
-  href,
-  icon: Icon,
-  title,
-  description,
-  layout = "default",
-}: Omit<ToolDef, "id"> & { layout?: "default" | "compact" }) {
-  const warm = useCallback(() => prefetchToolsDestinationHref(href), [href]);
-  const cardClass =
-    layout === "compact"
-      ? "pressable card-interactive flex h-full min-h-[5.75rem] w-full cursor-pointer flex-col rounded-2xl border-border/40"
-      : "pressable card-interactive flex h-full min-h-[6.25rem] w-full cursor-pointer flex-col rounded-2xl border-border/40";
-  const pad = layout === "compact" ? "p-4 sm:p-5" : "p-4 sm:p-5";
-  return (
-    <Link
-      href={href}
-      className="pressable group block h-full min-w-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-      onPointerEnter={warm}
-      onFocus={warm}
-      onTouchStart={warm}
-      onClick={() => {
+  return tools.map((tool) => (
+    <HubListRow
+      key={tool.id}
+      href={tool.href}
+      icon={tool.icon}
+      title={tool.title}
+      description={tool.description}
+      tone={tone}
+      accent={accent}
+      onWarm={() => prefetchToolsDestinationHref(tool.href)}
+      onPress={() => {
         void hapticLight();
       }}
-    >
-      <Card variant="glass" className={cardClass}>
-        <CardContent className={cn("flex h-full items-center gap-3", pad)}>
-          <ToolIconBadge icon={Icon} />
-          <div className="min-w-0 flex-1">
-            <h3 className="truncate font-display text-h3 font-semibold text-foreground">{title}</h3>
-            <p className="mt-0.5 truncate text-sm text-muted-foreground">{description}</p>
-          </div>
-          <ChevronRight
-            className="h-[1.125rem] w-[1.125rem] shrink-0 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5"
-            aria-hidden
-          />
-        </CardContent>
-      </Card>
-    </Link>
-  );
-}
-
-/** Full-width horizontal strip for a single “Learn” tool on patient hub. */
-function LearnToolRow({ href, icon: Icon, title, description }: Omit<ToolDef, "id">) {
-  const warm = useCallback(() => prefetchToolsDestinationHref(href), [href]);
-  return (
-    <Link
-      href={href}
-      className="pressable group block min-w-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-      onPointerEnter={warm}
-      onFocus={warm}
-      onTouchStart={warm}
-      onClick={() => {
-        void hapticLight();
-      }}
-    >
-      <Card variant="glass" className="pressable card-interactive cursor-pointer rounded-2xl border-border/40">
-        <CardContent className="flex items-center gap-3 p-4 sm:gap-4 sm:p-4">
-          <ToolIconBadge icon={Icon} size="large" />
-          <div className="min-w-0 flex-1">
-            <h3 className="truncate font-display text-h3 font-semibold text-foreground">{title}</h3>
-            <p className="mt-0.5 truncate text-sm text-muted-foreground">{description}</p>
-          </div>
-          <ChevronRight
-            className="h-[1.125rem] w-[1.125rem] shrink-0 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5"
-            aria-hidden
-          />
-        </CardContent>
-      </Card>
-    </Link>
-  );
+    />
+  ));
 }
 
 /** Matches the eyebrow label style used on Account (`SettingsGroupLabel`) and the glossary. */
+type ToolsHubSection = "act-now" | "plan" | "learn";
+
+const TOOLS_HUB_SECTIONS: { id: ToolsHubSection; label: string }[] = [
+  { id: "act-now", label: "Act now" },
+  { id: "plan", label: "Plan" },
+  { id: "learn", label: "Learn" },
+];
+
 function SectionHeader({ title }: { title: string }) {
   return (
     <h2 className="text-[11px] font-semibold uppercase tracking-[0.09em] text-muted-foreground">{title}</h2>
@@ -438,6 +372,23 @@ export function ToolsHubPage({
   const supporterTools =
     hubVariant === "carer" || hubVariant === "community" ? ([...actNow, ...learn] as ToolDef[]) : [];
 
+  const patientSections = TOOLS_HUB_SECTIONS.filter((section) => {
+    if (section.id === "act-now") return actNow.length > 0;
+    if (section.id === "plan") return plan.length > 0;
+    return learn.length > 0;
+  });
+  const [patientSection, setPatientSection] = useState<ToolsHubSection>("act-now");
+  const activePatientSection = patientSections.some((section) => section.id === patientSection)
+    ? patientSection
+    : patientSections[0]?.id ?? "act-now";
+  const activePatientTools =
+    activePatientSection === "plan" ? plan : activePatientSection === "learn" ? learn : actNow;
+  const activePatientTone: HubListTone = activePatientSection === "act-now" ? "accent" : "quiet";
+  const activePatientAccent: HubListAccent =
+    activePatientSection === "plan" ? "sky" : activePatientSection === "learn" ? "gold" : "teal";
+  const activePatientLabel =
+    TOOLS_HUB_SECTIONS.find((section) => section.id === activePatientSection)?.label ?? "Act now";
+
   return (
     <PageShell variant="standard" density="compact" className="max-w-5xl pt-0 space-y-6">
       <h1 className="sr-only">Tools</h1>
@@ -458,83 +409,62 @@ export function ToolsHubPage({
             </div>
             <ToolsAboutDialog hubVariant={hubVariant} />
           </div>
-          <ul className="grid list-none grid-cols-1 gap-3 md:grid-cols-2 md:gap-5" aria-label="Supporter tools">
-            {supporterTools.map((t, idx) => (
-              <li
-                key={t.id}
-                className="min-h-0 animate-soft-in motion-safe:[animation-duration:0.2s]"
-                style={{ animationDelay: tileEnterDelay(idx, 10, 56) }}
-              >
-                <ToolCard href={t.href} icon={t.icon} title={t.title} description={t.description} layout="compact" />
-              </li>
-            ))}
-          </ul>
+          <HubListPanel label="Supporter tools">
+            <ToolRows tools={supporterTools} tone="accent" accent="teal" />
+          </HubListPanel>
         </section>
       ) : (
         <>
-          {actNow.length > 0 ? (
-            <section className="space-y-3" aria-label="Act now tools" data-testid="tools-section-act-now">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-2">
-                  <HeartPulse className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                  <SectionHeader title="Act now" />
+          {patientSections.length > 0 ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div
+                  role="tablist"
+                  aria-label="Tool groups"
+                  className="grid min-w-0 flex-1 gap-1 rounded-2xl bg-muted/60 p-1"
+                  style={{ gridTemplateColumns: `repeat(${patientSections.length}, minmax(0, 1fr))` }}
+                >
+                  {patientSections.map((section) => {
+                    const selected = section.id === activePatientSection;
+                    return (
+                      <button
+                        key={section.id}
+                        type="button"
+                        role="tab"
+                        id={`tools-tab-${section.id}`}
+                        aria-selected={selected}
+                        aria-controls={`tools-panel-${section.id}`}
+                        data-testid={`tools-tab-${section.id}`}
+                        className={cn(
+                          "h-10 rounded-xl px-2 text-sm font-semibold",
+                          selected
+                            ? "bg-background text-foreground shadow-sm"
+                            : "text-muted-foreground",
+                        )}
+                        onClick={() => {
+                          setPatientSection(section.id);
+                          void hapticLight();
+                        }}
+                      >
+                        {section.label}
+                      </button>
+                    );
+                  })}
                 </div>
                 <ToolsAboutDialog hubVariant={hubVariant} />
               </div>
-              <ul
-                className="grid list-none grid-cols-1 gap-3 md:grid-cols-2 md:gap-5"
-                aria-label="Act now"
+              <section
+                id={`tools-panel-${activePatientSection}`}
+                role="tabpanel"
+                aria-labelledby={`tools-tab-${activePatientSection}`}
+                aria-label={`${activePatientLabel} tools`}
+                data-testid={`tools-section-${activePatientSection}`}
               >
-                {actNow.map((t, idx) => (
-                  <li key={t.id} className="min-h-0 animate-soft-in" style={{ animationDelay: `${idx * 30}ms` }}>
-                    <ToolCard href={t.href} icon={t.icon} title={t.title} description={t.description} layout="compact" />
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
-
-          {plan.length > 0 ? (
-            <section className="space-y-3" aria-label="Plan tools" data-testid="tools-section-plan">
-              <div className="flex items-center gap-2">
-                <MapIcon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                <SectionHeader title="Plan" />
-              </div>
-              <ul
-                className="grid list-none grid-cols-1 gap-3 md:grid-cols-2 md:gap-5"
-                aria-label="Plan"
-              >
-                {plan.map((t, idx) => (
-                  <li
-                    key={t.id}
-                    className="min-h-0 animate-soft-in motion-safe:[animation-duration:0.2s]"
-                    style={{ animationDelay: tileEnterDelay(idx) }}
-                  >
-                    <ToolCard href={t.href} icon={t.icon} title={t.title} description={t.description} />
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
-
-          {learn.length > 0 ? (
-            <section className="space-y-3" aria-label="Learn tools" data-testid="tools-section-learn">
-              <div className="flex items-center gap-2">
-                <BookOpen className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                <SectionHeader title="Learn" />
-              </div>
-              <ul className="list-none space-y-3" aria-label="Learn">
-                {learn.map((t, idx) => (
-                  <li
-                    key={t.id}
-                    className="min-h-0 animate-soft-in motion-safe:[animation-duration:0.2s]"
-                    style={{ animationDelay: tileEnterDelay(idx) }}
-                  >
-                    <LearnToolRow href={t.href} icon={t.icon} title={t.title} description={t.description} />
-                  </li>
-                ))}
-              </ul>
-            </section>
+                <HubListPanel label={activePatientLabel}>
+                  <ToolRows tools={activePatientTools} tone={activePatientTone} accent={activePatientAccent} />
+                </HubListPanel>
+              </section>
+            </div>
           ) : null}
         </>
       )}

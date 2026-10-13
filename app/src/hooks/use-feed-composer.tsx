@@ -27,6 +27,7 @@ import {
 import { writePostAudiencePreference } from "@/lib/community/post-audience";
 import { defaultEventStartsAtLocal } from "@/lib/community/event-display";
 import { isLikelyImageFile, pickPostImagesFromLibrary } from "@/lib/community/pick-post-images";
+import { pickStoryVideoFromLibrary } from "@/lib/community/pick-story-video";
 import { preparePostImageFiles } from "@/lib/community/prepare-post-image";
 import type { PreparedPostVideo } from "@/lib/community/prepare-post-video";
 import {
@@ -205,8 +206,10 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
   async function onPickVideo(files: FileList | null) {
     const f = files?.[0] ?? null;
     if (!f) return;
-    // Keep a stable File reference before clearing the input.
-    const picked = f;
+    await attachPickedVideo(f);
+  }
+
+  async function attachPickedVideo(picked: File) {
     if (!isLikelyVideoFile(picked)) {
       toast({ title: "Unsupported file", description: "Choose an MP4, MOV, or WebM video.", variant: "destructive" });
       if (videoInputRef.current) videoInputRef.current.value = "";
@@ -265,10 +268,29 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
       // Web path: pickPostImagesFromLibrary only clicks the input and returns [].
       // Do not clear the input here — that races the system picker and drops the first selection.
     } catch (e) {
-      clickHiddenFileInput(fileInputRef.current);
       toast({
         title: "Could not open Photos",
-        description: e instanceof Error ? e.message : "Try selecting from your camera roll.",
+        description: e instanceof Error ? e.message : "Try choosing the photo again.",
+        variant: "destructive",
+      });
+    } finally {
+      endHold();
+    }
+  }
+
+  async function pickVideoFromLibraryOnly() {
+    if (!Capacitor.isNativePlatform()) {
+      clickHiddenFileInput(videoInputRef.current);
+      return;
+    }
+    const endHold = beginFilePickerHold();
+    try {
+      const file = await pickStoryVideoFromLibrary();
+      if (file) await attachPickedVideo(file);
+    } catch (e) {
+      toast({
+        title: "Could not open your videos",
+        description: e instanceof Error ? e.message : "Try choosing the video again.",
         variant: "destructive",
       });
     } finally {
@@ -594,7 +616,7 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
             <input
               ref={videoInputRef}
               type="file"
-              accept="video/*"
+              accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.m4v,.webm"
               className={FILE_INPUT_HIDDEN_CLASS}
               id="feed-composer-video"
               disabled={videoDisabled}
@@ -658,8 +680,8 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
     removeComposerVideo,
     composerImageAlts,
     setComposerImageAlts,
-    videoInputRef,
     pickImagesFromLibraryOnly,
+    pickVideoFromLibraryOnly,
     onPollModeClick,
     onEventModeClick,
     composerCanSubmit,

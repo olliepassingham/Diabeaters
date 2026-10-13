@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { GuideFrame, PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
 import { ScenarioToolDisclaimer } from "@/components/disclaimer";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
@@ -397,6 +397,7 @@ export default function PumpFailurePage() {
         actions={<ScenarioCoachLink topic="pump-failure" />}
       />
 
+      <GuideFrame>
       <PumpFailureEmergencyCollapsible
         regionFooter={regionFooter}
         open={emergencyOpen}
@@ -503,6 +504,7 @@ export default function PumpFailurePage() {
         <ScenarioToolDisclaimer />
         <MedicalSourcesLink anchor="sickday" />
       </footer>
+      </GuideFrame>
     </PageShell>
   );
 }

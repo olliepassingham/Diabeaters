@@ -9,7 +9,6 @@ import {
   Flower2,
   Footprints,
   RotateCcw,
-  Sparkles,
   Swords,
   Waves,
   X,
@@ -403,7 +402,7 @@ export function ExerciseFuelCalculator() {
   const [result, setResult] = useState<ExerciseFuelCalculatorResult | null>(null);
   const [bgUnits, setBgUnits] = useState("mmol/L");
   const [isPump, setIsPump] = useState(false);
-  const [formOpen, setFormOpen] = useState(false);
+  const [formOpen, setFormOpen] = useState(true);
   const [extrasOpen, setExtrasOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
@@ -625,7 +624,7 @@ export function ExerciseFuelCalculator() {
 
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium text-muted-foreground">Activity</Label>
-                  <div className="grid grid-cols-2 gap-1.5">
+                  <div className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     {EXERCISE_TYPE_OPTIONS.map((o) => {
                       const active = exerciseType === o.value;
                       return (
@@ -635,7 +634,7 @@ export function ExerciseFuelCalculator() {
                           size="sm"
                           variant="ghost"
                           className={cn(
-                            "h-auto min-h-10 justify-start whitespace-normal rounded-xl px-2.5 py-2 text-left text-xs font-medium leading-snug",
+                            "h-9 shrink-0 rounded-xl px-2.5 text-xs font-medium",
                             active
                               ? "bg-background text-foreground shadow-sm ring-1 ring-border/60"
                               : "bg-muted/30 text-muted-foreground hover:text-foreground",
@@ -643,7 +642,7 @@ export function ExerciseFuelCalculator() {
                           onClick={() => setExerciseType(o.value)}
                         >
                           <ExerciseTypeIcon type={o.value} className="mr-1.5 h-3.5 w-3.5 shrink-0 opacity-80" />
-                          <span className="min-w-0">{o.label}</span>
+                          {o.label}
                         </Button>
                       );
                     })}
@@ -664,7 +663,7 @@ export function ExerciseFuelCalculator() {
                   </div>
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid grid-cols-[minmax(0,1fr)_5.75rem] gap-2">
                   <div className="space-y-1.5">
                     <Label className="text-xs font-medium text-muted-foreground">Intensity</Label>
                     <div
@@ -717,7 +716,7 @@ export function ExerciseFuelCalculator() {
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium text-muted-foreground">Starting in</Label>
                   <div
-                    className="flex flex-wrap gap-1.5"
+                    className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                     role="group"
                     aria-label="Minutes until exercise starts"
                   >
@@ -802,54 +801,16 @@ export function ExerciseFuelCalculator() {
                     }
                   />
                 </div>
-                {!mealCarbsTouched && suggestedMealCarbs != null && suggestedMealCarbs > 0 ? (
-                  <div
-                    className="relative overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/[0.08] via-primary/[0.03] to-transparent px-4 py-4"
-                    data-testid="efc-suggested-carbs-card"
-                  >
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-primary/90">
-                      Suggested for you
-                    </p>
-                    <p className="mt-1 flex items-baseline gap-1.5">
-                      <span
-                        className="text-4xl font-bold tabular-nums tracking-tight text-foreground"
-                        data-testid="efc-suggested-carbs-value"
-                      >
-                        {suggestedMealCarbs}
-                      </span>
-                      <span className="text-base font-semibold text-muted-foreground">g before exercise</span>
-                    </p>
-                    <p className="mt-1.5 text-xs leading-snug text-muted-foreground">
-                      Based on your session, BG, and trend
-                    </p>
-                  </div>
-                ) : !mealCarbsTouched ? (
-                  <div
-                    className="flex items-center gap-3 rounded-2xl border border-border/40 bg-muted/20 px-4 py-3.5"
-                    data-testid="efc-suggested-carbs-none"
-                  >
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-                      <Sparkles className="h-4 w-4" aria-hidden />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground">No carbs suggested right now</p>
-                      <p className="text-xs text-muted-foreground">Enter an amount below if you&apos;re planning to eat</p>
-                    </div>
-                  </div>
-                ) : null}
-
                 <div className="space-y-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="efc-meal-carbs" className="text-xs font-medium text-muted-foreground">
-                      {!mealCarbsTouched && suggestedMealCarbs != null && suggestedMealCarbs > 0
-                        ? "Know your own amount instead?"
-                        : "Carbs before exercise"}
+                      Carbs before exercise
                     </Label>
                     <div className="flex items-stretch gap-2">
                       <Input
                         id="efc-meal-carbs"
                         type="number"
-                        placeholder="40"
+                        placeholder={suggestedMealCarbs != null && suggestedMealCarbs > 0 ? String(suggestedMealCarbs) : ""}
                         value={mealCarbs}
                         onChange={(e) => {
                           setMealCarbs(e.target.value);
@@ -872,24 +833,45 @@ export function ExerciseFuelCalculator() {
                         <RotateCcw className="h-3 w-3 shrink-0 text-primary" aria-hidden />
                         Use our estimate{suggestedMealCarbs != null ? ` (${suggestedMealCarbs}g)` : ""}
                       </button>
-                    ) : null}
+                    ) : (
+                      <p className="text-[11px] leading-snug text-muted-foreground" data-testid="efc-suggested-carbs-card">
+                        {suggestedMealCarbs != null && suggestedMealCarbs > 0 ? (
+                          <>
+                            Suggested{" "}
+                            <span data-testid="efc-suggested-carbs-value">{suggestedMealCarbs}g</span> from this
+                            session. Type over it if you already know the amount.
+                          </>
+                        ) : (
+                          <span data-testid="efc-suggested-carbs-none">
+                            No carbs suggested. Type an amount if you are planning to eat.
+                          </span>
+                        )}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="efc-meal-type" className="text-xs font-medium text-muted-foreground">
-                      Meal type
-                    </Label>
-                    <Select value={mealType} onValueChange={setMealType}>
-                      <SelectTrigger id="efc-meal-type" className="h-12 rounded-xl" data-testid="efc-meal-type">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {EXERCISE_MEAL_TYPE_OPTIONS.map((o) => (
-                          <SelectItem key={o.value} value={o.value}>
-                            {o.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label className="text-xs font-medium text-muted-foreground">Meal type</Label>
+                    <div className="grid grid-cols-4 gap-1 rounded-2xl bg-muted/30 p-1" role="group" aria-label="Meal type">
+                      {EXERCISE_MEAL_TYPE_OPTIONS.map((o) => (
+                        <Button
+                          key={o.value}
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className={cn(
+                            "h-9 rounded-xl px-1 text-xs font-medium",
+                            mealType === o.value
+                              ? "bg-background text-foreground shadow-sm"
+                              : "text-muted-foreground hover:text-foreground",
+                          )}
+                          onClick={() => setMealType(o.value)}
+                          data-testid={`efc-meal-type-${o.value}`}
+                          aria-pressed={mealType === o.value}
+                        >
+                          {o.label}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>

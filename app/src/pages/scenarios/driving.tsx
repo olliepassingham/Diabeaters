@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
-import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { GuideFrame, PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
 import { Disclaimer } from "@/components/disclaimer";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
@@ -292,6 +292,7 @@ export default function DrivingScenarioPage() {
           />
         </div>
 
+        <GuideFrame>
         {phase === "form" ? (
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
@@ -492,6 +493,7 @@ export default function DrivingScenarioPage() {
             Not a substitute for your clinic or licensing rules.
           </p>
         </div>
+        </GuideFrame>
       </PageShell>
 
       {phase === "form" ? (

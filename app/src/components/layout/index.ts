@@ -1,3 +1,4 @@
+export { GuideFrame } from "./guide-frame";
 export { PageShell, type PageShellProps, type PageShellVariant } from "./page-shell";
 export { PageSectionLabel } from "./page-section-label";
 export { PageHeader, type PageHeaderProps } from "./page-header";

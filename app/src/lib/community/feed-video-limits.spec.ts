@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { formatVideoDurationSeconds, GUIDED_POST_VIDEO_MAX_SECONDS, isLikelyVideoFile, MAX_POST_VIDEO_SECONDS } from "@/lib/community/feed-video-limits";
+import { feedVideoTooLargeMessage, formatVideoDurationSeconds, GUIDED_POST_VIDEO_MAX_SECONDS, isLikelyVideoFile, MAX_FEED_VIDEO_BYTES, MAX_POST_VIDEO_SECONDS } from "@/lib/community/feed-video-limits";
 
 describe("feed video limits", () => {
-  it("keeps short-form guidance under a hard mobile-friendly cap", () => {
-    expect(GUIDED_POST_VIDEO_MAX_SECONDS).toBe(60);
-    expect(MAX_POST_VIDEO_SECONDS).toBe(90);
-    expect(MAX_POST_VIDEO_SECONDS).toBeGreaterThan(GUIDED_POST_VIDEO_MAX_SECONDS);
+  it("accepts influencer-length clips up to 10 minutes and 500MB", () => {
+    expect(GUIDED_POST_VIDEO_MAX_SECONDS).toBe(180);
+    expect(MAX_POST_VIDEO_SECONDS).toBe(600);
+    expect(MAX_POST_VIDEO_SECONDS).toBeGreaterThanOrEqual(GUIDED_POST_VIDEO_MAX_SECONDS);
+    expect(MAX_FEED_VIDEO_BYTES).toBe(524288000);
+    expect(feedVideoTooLargeMessage(new File([new Uint8Array(8)], "clip.mp4", { type: "video/mp4" }))).toBeNull();
   });
 
   it("formats durations for composer feedback", () => {

@@ -26,7 +26,7 @@ import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { closedLoopSafetyNote, usesClosedLoop } from "@/lib/closed-loop";
 import { getEffectiveTdd, hasConfiguredTdd } from "@/lib/tdd";
 import { parseRatioToGramsPerUnit, formatRatioForDisplay } from "@/lib/ratio-utils";
-import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { GuideFrame, PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { ScenarioActiveCard } from "@/components/scenarios/ScenarioActiveCard";
 import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
 import {
@@ -1405,6 +1405,7 @@ export default function SickDay() {
           }
         />
 
+        <GuideFrame>
         {isExtended ? (
           <p
             className={cn(
@@ -2406,6 +2407,7 @@ export default function SickDay() {
             </Button>
           </Link>
         </div>
+        </GuideFrame>
       </PageShell>
     );
   }
@@ -2424,6 +2426,7 @@ export default function SickDay() {
         }
       />
 
+      <GuideFrame>
       <div className="space-y-4">
         {!results ? (
           <>
@@ -2522,6 +2525,7 @@ export default function SickDay() {
         )}
 
       </div>
+      </GuideFrame>
     </PageShell>
 
     {!results ? (

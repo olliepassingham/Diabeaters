@@ -1,9 +1,18 @@
-/** Client-side helpers for short peer-learning video clips in the community feed. */
+/** Client-side helpers for video clips in the community feed. */
 
-/** Soft target length shown in composer guidance. */
-export const GUIDED_POST_VIDEO_MAX_SECONDS = 60;
-/** Hard upload cap — keeps feed clips short and mobile-friendly. */
-export const MAX_POST_VIDEO_SECONDS = 90;
+/** Soft hint. The composer still accepts anything up to the hard cap. */
+export const GUIDED_POST_VIDEO_MAX_SECONDS = 180;
+/** Influencer clips: up to 10 minutes. Longer than this must be trimmed first. */
+export const MAX_POST_VIDEO_SECONDS = 10 * 60;
+/** Matches the community_post_images bucket limit (500MB). */
+export const MAX_FEED_VIDEO_BYTES = 524288000;
+
+export function feedVideoTooLargeMessage(file: File): string | null {
+  if (file.size > MAX_FEED_VIDEO_BYTES) {
+    return "That video is too large to upload. Keep it under 500MB.";
+  }
+  return null;
+}
 
 export function formatVideoDurationSeconds(totalSeconds: number): string {
   const seconds = Math.max(0, Math.round(totalSeconds));
@@ -27,22 +36,64 @@ export function isLikelyVideoFile(file: File): boolean {
   return VIDEO_NAME_RE.test(file.name);
 }
 
-/** Reads duration from a local video File via HTMLVideoElement metadata. */
+/**
+ * Reads duration from a local video File.
+ * Some camera-roll files report Infinity until the end of the file is seeked.
+ */
 export function readVideoFileDurationSeconds(file: File): Promise<number | null> {
   if (typeof document === "undefined") return Promise.resolve(null);
   return new Promise((resolve) => {
     const url = URL.createObjectURL(file);
     const video = document.createElement("video");
     video.preload = "metadata";
+    video.muted = true;
+    video.playsInline = true;
+    let settled = false;
+
     const finish = (value: number | null) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
       URL.revokeObjectURL(url);
+      video.removeAttribute("src");
+      video.load();
       resolve(value);
     };
-    video.onloadedmetadata = () => {
+
+    const knownDuration = () => {
       const duration = video.duration;
-      finish(Number.isFinite(duration) && duration > 0 ? duration : null);
+      return Number.isFinite(duration) && duration > 0 ? duration : null;
+    };
+
+    const acceptIfKnown = () => {
+      const duration = knownDuration();
+      if (duration != null) finish(duration);
+      return duration != null;
+    };
+
+    const seekPastEnd = () => {
+      const onTime = () => {
+        video.removeEventListener("timeupdate", onTime);
+        if (!acceptIfKnown()) finish(null);
+      };
+      video.addEventListener("timeupdate", onTime);
+      try {
+        video.currentTime = 1e101;
+      } catch {
+        video.removeEventListener("timeupdate", onTime);
+        finish(null);
+      }
+    };
+
+    video.onloadedmetadata = () => {
+      if (acceptIfKnown()) return;
+      if (video.duration === Number.POSITIVE_INFINITY) seekPastEnd();
+    };
+    video.ondurationchange = () => {
+      acceptIfKnown();
     };
     video.onerror = () => finish(null);
+    const timer = window.setTimeout(() => finish(knownDuration()), 12000);
     video.src = url;
   });
 }

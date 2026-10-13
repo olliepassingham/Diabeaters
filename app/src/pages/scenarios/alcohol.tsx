@@ -26,7 +26,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { GuideFrame, PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
 import { Disclaimer } from "@/components/disclaimer";
@@ -1167,6 +1167,7 @@ export default function AlcoholScenarioPage() {
           />
         </div>
 
+        <GuideFrame>
         {phase !== "result" ? (
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-base font-medium text-muted-foreground">
@@ -1489,6 +1490,7 @@ export default function AlcoholScenarioPage() {
         ) : null}
 
         <Disclaimer className="text-center text-base leading-relaxed" />
+        </GuideFrame>
       </PageShell>
 
       {showSticky ? (

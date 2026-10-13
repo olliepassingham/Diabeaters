@@ -1,5 +1,5 @@
 import {
-  GUIDED_POST_VIDEO_MAX_SECONDS,
+  feedVideoTooLargeMessage,
   MAX_POST_VIDEO_SECONDS,
   readVideoFileDurationSeconds,
 } from "@/lib/community/feed-video-limits";
@@ -22,11 +22,12 @@ function clampRange(startSec: number, endSec: number, duration: number): VideoTr
   return { startSec: start, endSec: end };
 }
 
-/** Default selection: first ~60s (or the full clip when shorter). */
+/** Default selection is the whole clip, capped at the upload limit. */
 export function defaultVideoTrimRange(durationSec: number): VideoTrimRange {
   const dur = Math.max(0, durationSec);
-  const end = Math.min(dur, GUIDED_POST_VIDEO_MAX_SECONDS);
-  return { startSec: 0, endSec: Math.max(0.5, end || Math.min(dur, MAX_POST_VIDEO_SECONDS)) };
+  if (dur <= 0) return { startSec: 0, endSec: 0.5 };
+  const end = Math.min(dur, MAX_POST_VIDEO_SECONDS);
+  return { startSec: 0, endSec: Math.max(0.5, end) };
 }
 
 function loadVideoElement(file: File): Promise<HTMLVideoElement> {
@@ -191,6 +192,9 @@ export async function trimVideoFile(
     throw new Error("Video trimming needs a browser.");
   }
 
+  const tooLarge = feedVideoTooLargeMessage(file);
+  if (tooLarge) throw new Error(tooLarge);
+
   const duration = (await readVideoFileDurationSeconds(file)) ?? 0;
   const clamped = clampRange(range.startSec, range.endSec, duration || range.endSec);
   const span = clamped.endSec - clamped.startSec;
@@ -199,9 +203,7 @@ export async function trimVideoFile(
     throw new Error("Choose a longer section of the video.");
   }
   if (span > MAX_POST_VIDEO_SECONDS + 0.05) {
-    throw new Error(
-      `Keep clips to about ${GUIDED_POST_VIDEO_MAX_SECONDS}s (max ${MAX_POST_VIDEO_SECONDS}s).`,
-    );
+    throw new Error("Videos can be up to 10 minutes. Drag the handles to a shorter section.");
   }
 
   if (duration > 0 && nearlyFullRange(clamped, duration) && duration <= MAX_POST_VIDEO_SECONDS) {
@@ -309,13 +311,27 @@ export type PreparedPostVideo = {
   range: VideoTrimRange;
 };
 
-/** Trim (when needed) and capture a poster for the feed. */
+/** Trim only when the selection is shorter than the file. Otherwise upload the original. */
 export async function preparePostVideo(
   file: File,
   range: VideoTrimRange,
   opts?: { onProgress?: (ratio: number) => void },
 ): Promise<PreparedPostVideo> {
+  const tooLarge = feedVideoTooLargeMessage(file);
+  if (tooLarge) throw new Error(tooLarge);
+
+  const known = await readVideoFileDurationSeconds(file);
+  if (known == null) {
+    opts?.onProgress?.(1);
+    const poster = await captureVideoPosterJpeg(file, 0.12);
+    return { video: file, poster, range };
+  }
+
   const video = await trimVideoFile(file, range, opts);
   const poster = await captureVideoPosterJpeg(video, 0.12);
-  return { video, poster, range: clampRange(range.startSec, range.endSec, (await readVideoFileDurationSeconds(video)) ?? range.endSec) };
+  return {
+    video,
+    poster,
+    range: clampRange(range.startSec, range.endSec, (await readVideoFileDurationSeconds(video)) ?? range.endSec),
+  };
 }
