@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MentionTextarea } from "@/components/community/mention-textarea";
-import { Textarea } from "@/components/ui/textarea";
 import { InlineInfoHint } from "@/components/ui/field-label-with-info";
 import { MAX_POST_IMAGES, MAX_POST_VIDEO_SECONDS } from "@/lib/community";
 import type { CommunityPostAudience, CommunityTopicId } from "@/lib/community";
@@ -83,8 +82,6 @@ export function FeedComposerFormBody({
   setEventStartsAt,
   eventLocation,
   setEventLocation,
-  eventDetails,
-  setEventDetails,
   composer,
   setComposer,
   composerPreviews,
@@ -236,121 +233,147 @@ export function FeedComposerFormBody({
         </div>
       ) : null}
       {composerPostKind === "event" ? (
-        <div className="min-w-0 space-y-3 overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-b from-primary/[0.05] to-muted/15 p-3.5 text-foreground dark:from-primary/[0.08]">
-          <div className="space-y-1">
-            <p className="font-display text-sm font-semibold tracking-tight">Create an event</p>
+        <div className="min-w-0 space-y-4" data-vaul-no-drag>
+          <div onFocusCapture={keepComposerFieldVisible}>
+          <MentionTextarea
+            value={composer}
+            onChange={setComposer}
+            currentUserId={user?.id}
+            hideHint
+            bare
+            autoGrow
+            maxGrowPx={180}
+            placeholder="Write a note above the event…"
+            rows={2}
+            maxLength={8000}
+            disabled={submitting || !user || !canComposeToFeed}
+            className="min-h-12 resize-none px-0.5 text-[17px] leading-snug"
+          />
           </div>
 
-          <div className="space-y-2">
-            <Label className="text-xs font-medium text-muted-foreground">Cover photo</Label>
-            {composerPreviews.length > 0 ? (
-              <div className="relative overflow-hidden rounded-xl border border-border/50">
-                <img src={composerPreviews[0]} alt="" className="h-32 w-full object-cover sm:h-36" />
+          <div
+            className="space-y-3.5 rounded-[1.35rem] border border-border/50 bg-card p-3.5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
+            data-vaul-no-drag
+          >
+            <div className="space-y-2">
+              {composerPreviews.length > 0 ? (
+                <div className="relative overflow-hidden rounded-2xl border border-border/40">
+                  <img src={composerPreviews[0]} alt="" className="h-36 w-full object-cover" />
+                  <button
+                    type="button"
+                    className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-background/95 text-foreground shadow-sm ring-1 ring-border/50"
+                    onClick={() => removeComposerImage(0)}
+                    disabled={submitting}
+                    aria-label="Remove cover photo"
+                    data-vaul-no-drag
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
                 <button
                   type="button"
-                  className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full border border-border/60 bg-background/95 text-foreground shadow-sm"
-                  onClick={() => removeComposerImage(0)}
-                  disabled={submitting}
-                  aria-label="Remove cover photo"
+                  className="flex h-24 w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-border/70 bg-muted/20 text-sm text-muted-foreground"
+                  disabled={submitting || !user || !canComposeToFeed || composerFiles.length >= MAX_POST_IMAGES}
+                  onClick={() => void pickImagesFromLibraryOnly()}
+                  data-vaul-no-drag
                 >
-                  <X className="h-4 w-4" />
+                  <ImagePlus className="h-4 w-4" aria-hidden />
+                  Cover photo
                 </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                className="flex h-28 w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-primary/30 bg-background/50 text-xs text-muted-foreground transition-colors hover:border-primary/50 hover:bg-background/80"
-                disabled={submitting || !user || !canComposeToFeed || composerFiles.length >= MAX_POST_IMAGES}
-                onClick={() => void pickImagesFromLibraryOnly()}
-              >
-                <ImagePlus className="h-5 w-5 text-primary/70" aria-hidden />
-                Add a cover photo
-              </button>
-            )}
-          </div>
-
-          <div className="min-w-0 space-y-1">
-            <Label htmlFor="feed-event-title">Event name</Label>
-            <Input
-              id="feed-event-title"
-              value={eventTitle}
-              onChange={(e) => setEventTitle(e.target.value.slice(0, 500))}
-              placeholder="e.g. London T1D coffee meetup"
-              disabled={submitting || !user || !canComposeToFeed}
-              maxLength={500}
-              className="h-11"
-            />
-          </div>
-
-          <div className="min-w-0 space-y-2">
-            <Label htmlFor="feed-event-start">When</Label>
-            <Input
-              id="feed-event-start"
-              type="datetime-local"
-              value={eventStartsAt}
-              onChange={(e) => setEventStartsAt(e.target.value)}
-              disabled={submitting || !user || !canComposeToFeed}
-              className="feed-datetime-input min-w-0 max-w-full text-base text-foreground dark:[color-scheme:dark]"
-            />
-            <div className="flex flex-wrap gap-1.5">
-              {eventQuickStartPresets().map((preset) => (
-                <button
-                  key={preset.id}
-                  type="button"
-                  className={cn(
-                    "rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
-                    eventStartsAt === preset.value
-                      ? "border-primary/40 bg-primary/10 text-primary"
-                      : "border-border/50 bg-background/60 text-muted-foreground hover:border-primary/30 hover:text-foreground",
-                  )}
-                  disabled={submitting || !user || !canComposeToFeed}
-                  onClick={() => setEventStartsAt(preset.value)}
-                >
-                  {preset.label}
-                </button>
-              ))}
+              )}
             </div>
-          </div>
 
-          <div className="min-w-0 space-y-1">
-            <Label htmlFor="feed-event-loc">Where (optional)</Label>
-            <Input
-              id="feed-event-loc"
-              value={eventLocation}
-              onChange={(e) => setEventLocation(e.target.value.slice(0, 500))}
-              placeholder="Park name, city, or venue"
-              disabled={submitting || !user || !canComposeToFeed}
-              maxLength={500}
-              className="h-11"
-            />
-          </div>
+            <div className="min-w-0 space-y-1.5">
+              <Label htmlFor="feed-event-title" className="text-xs font-medium text-muted-foreground">
+                Event name
+              </Label>
+              <Input
+                id="feed-event-title"
+                value={eventTitle}
+                onChange={(e) => setEventTitle(e.target.value.slice(0, 500))}
+                onPointerDown={(e) => e.stopPropagation()}
+                onFocus={keepComposerFieldVisible}
+                placeholder="London T1D coffee meetup"
+                disabled={submitting || !user || !canComposeToFeed}
+                maxLength={500}
+                autoComplete="off"
+                enterKeyHint="next"
+                data-vaul-no-drag
+                className="composer-field h-11 rounded-xl"
+              />
+            </div>
 
-          <div className="min-w-0 space-y-1">
-            <Label htmlFor="feed-event-details">About this event</Label>
-            <Textarea
-              id="feed-event-details"
-              value={eventDetails}
-              onChange={(e) => setEventDetails(e.target.value.slice(0, 2000))}
-              placeholder="Who is it for? What should people bring?"
-              rows={3}
-              disabled={submitting || !user || !canComposeToFeed}
-              maxLength={2000}
-              className="surface-field min-h-[5rem] rounded-xl"
-            />
-          </div>
+            <div className="min-w-0 space-y-2">
+              <Label htmlFor="feed-event-start" className="text-xs font-medium text-muted-foreground">
+                When
+              </Label>
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  id="feed-event-start"
+                  type="date"
+                  value={eventDatePart(eventStartsAt)}
+                  onChange={(e) => setEventStartsAt(withEventDate(eventStartsAt, e.target.value))}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onFocus={keepComposerFieldVisible}
+                  disabled={submitting || !user || !canComposeToFeed}
+                  aria-label="Event date"
+                  data-vaul-no-drag
+                  className="composer-field feed-datetime-input h-11 min-w-0 rounded-xl text-foreground dark:[color-scheme:dark]"
+                />
+                <Input
+                  id="feed-event-time"
+                  type="time"
+                  value={eventTimePart(eventStartsAt)}
+                  onChange={(e) => setEventStartsAt(withEventTime(eventStartsAt, e.target.value))}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onFocus={keepComposerFieldVisible}
+                  disabled={submitting || !user || !canComposeToFeed}
+                  aria-label="Event time"
+                  data-vaul-no-drag
+                  className="composer-field feed-datetime-input h-11 min-w-0 rounded-xl text-foreground dark:[color-scheme:dark]"
+                />
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {eventQuickStartPresets().map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    data-vaul-no-drag
+                    className={cn(
+                      "h-8 rounded-full border px-3 text-xs font-medium",
+                      eventStartsAt === preset.value
+                        ? "border-primary/40 bg-primary/10 text-primary"
+                        : "border-border/60 bg-background text-muted-foreground",
+                    )}
+                    disabled={submitting || !user || !canComposeToFeed}
+                    onClick={() => setEventStartsAt(preset.value)}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-          <div className="min-w-0 space-y-1 border-t border-border/40 pt-2">
-            <Label htmlFor="feed-event-intro">Short intro (optional)</Label>
-            <MentionTextarea
-              value={composer}
-              onChange={setComposer}
-              currentUserId={user?.id}
-              hideHint
-              placeholder="A quick note that appears above the event card…"
-              rows={2}
-              maxLength={8000}
-              disabled={submitting || !user || !canComposeToFeed}
-            />
+            <div className="min-w-0 space-y-1.5">
+              <Label htmlFor="feed-event-loc" className="text-xs font-medium text-muted-foreground">
+                Where
+              </Label>
+              <Input
+                id="feed-event-loc"
+                value={eventLocation}
+                onChange={(e) => setEventLocation(e.target.value.slice(0, 500))}
+                onPointerDown={(e) => e.stopPropagation()}
+                onFocus={keepComposerFieldVisible}
+                placeholder="Optional place or venue"
+                disabled={submitting || !user || !canComposeToFeed}
+                maxLength={500}
+                autoComplete="off"
+                enterKeyHint="done"
+                data-vaul-no-drag
+                className="composer-field h-11 rounded-xl"
+              />
+            </div>
           </div>
         </div>
       ) : null}
@@ -517,7 +540,7 @@ export function FeedComposerFormBody({
       </div>
       <div
         className={cn(
-          "sticky bottom-0 z-10 mt-auto flex items-center gap-1 border-t border-border/40 bg-background/95 py-2 backdrop-blur-md",
+          "sticky bottom-0 z-10 mt-auto flex items-center gap-1 border-t border-border/40 bg-background py-2",
           hideInlineSubmit
             ? "-mx-4 px-3 pb-[max(0.55rem,calc(env(safe-area-inset-bottom,0px)-var(--keyboard-inset-bottom,0px)))]"
             : "pt-3",
@@ -606,4 +629,42 @@ export function FeedComposerFormBody({
       </div>
     </>
   );
+}
+
+function eventDatePart(value: string): string {
+  return value.split("T")[0] ?? "";
+}
+
+function eventTimePart(value: string): string {
+  return (value.split("T")[1] ?? "10:00").slice(0, 5);
+}
+
+function withEventDate(current: string, date: string): string {
+  if (!date) return current;
+  return `${date}T${eventTimePart(current)}`;
+}
+
+function withEventTime(current: string, time: string): string {
+  const date = eventDatePart(current);
+  if (!date || !time) return current;
+  return `${date}T${time.slice(0, 5)}`;
+}
+
+function keepComposerFieldVisible(event: { currentTarget: EventTarget | null }) {
+  const field = event.currentTarget;
+  if (!(field instanceof HTMLElement)) return;
+  const sheet = field.closest("[data-keyboard-sheet]");
+  if (sheet instanceof HTMLElement && sheet.scrollTop !== 0) sheet.scrollTop = 0;
+  const scroller = field.closest("[data-composer-scroll]");
+  if (!(scroller instanceof HTMLElement)) return;
+  window.setTimeout(() => {
+    const fieldRect = field.getBoundingClientRect();
+    const box = scroller.getBoundingClientRect();
+    const pad = 20;
+    if (fieldRect.bottom > box.bottom - pad) {
+      scroller.scrollTop += fieldRect.bottom - (box.bottom - pad);
+    } else if (fieldRect.top < box.top + pad) {
+      scroller.scrollTop -= box.top + pad - fieldRect.top;
+    }
+  }, 60);
 }

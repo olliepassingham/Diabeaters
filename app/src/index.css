@@ -555,6 +555,28 @@
     text-align: left;
   }
 
+  /* Blur and transform transitions on focused fields make iOS move the caret and the sheet. */
+  .composer-field {
+    background: rgb(var(--color-bg-card)) !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    font-size: 16px !important;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+  }
+
+  [data-keyboard-sheet] input,
+  [data-keyboard-sheet] textarea,
+  [data-keyboard-sheet] select {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    font-size: 16px;
+  }
+
+  html[data-composer-sheet] #app-scroll-main {
+    view-transition-name: none;
+    overflow: hidden;
+  }
+
   /**
    * Native date and time fields: iOS Safari otherwise inflates these controls
    * and blows past the phone viewport.

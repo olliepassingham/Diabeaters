@@ -16,14 +16,27 @@ import { cn } from "@/lib/utils";
 type Props = {
   overlays: StoryOverlay[];
   onChange: (overlays: StoryOverlay[]) => void;
-  children: ReactNode;
+  children?: ReactNode;
   className?: string;
   onEditingChange?: (editing: boolean) => void;
+  /** New text on a light card should start dark so it is readable. */
+  newTextColor?: StoryTextColor;
+  newTextStyle?: StoryOverlayStyle;
+  transparent?: boolean;
 };
 
 const TAP_MOVE_PX = 8;
 
-export function StoryOverlayEditor({ overlays, onChange, children, className, onEditingChange }: Props) {
+export function StoryOverlayEditor({
+  overlays,
+  onChange,
+  children,
+  className,
+  onEditingChange,
+  newTextColor = "white",
+  newTextStyle = "shadow",
+  transparent = false,
+}: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ id: string; startX: number; startY: number; originX: number; originY: number } | null>(
@@ -144,8 +157,8 @@ export function StoryOverlayEditor({ overlays, onChange, children, className, on
       text: "",
       x: 0.5,
       y: point.y,
-      style: "shadow",
-      color: "white",
+      style: newTextStyle,
+      color: newTextColor,
       font: "classic",
     };
     flushSync(() => {
@@ -219,7 +232,11 @@ export function StoryOverlayEditor({ overlays, onChange, children, className, on
   return (
     <div
       ref={containerRef}
-      className={cn("relative overflow-hidden bg-black touch-none select-none", className)}
+      className={cn(
+        "relative overflow-hidden touch-none select-none",
+        transparent ? "bg-transparent" : "bg-black",
+        className,
+      )}
       data-vaul-no-drag
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -279,7 +296,10 @@ export function StoryOverlayEditor({ overlays, onChange, children, className, on
                 aria-multiline="true"
                 data-story-text
                 suppressContentEditableWarning
-                className="relative min-h-[1.3em] w-full whitespace-pre-wrap break-words text-center caret-white outline-none select-text"
+                className={cn(
+                  "relative min-h-[1.3em] w-full whitespace-pre-wrap break-words text-center outline-none select-text",
+                  editing.color === "black" ? "caret-black" : "caret-white",
+                )}
                 style={{ WebkitUserSelect: "text", userSelect: "text" }}
                 onInput={(e) => {
                   const raw = e.currentTarget.innerText.replace(/\u00a0/g, " ");

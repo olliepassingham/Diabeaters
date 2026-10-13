@@ -17,6 +17,7 @@ export function CommunityFeedComposerDrawer({
   submitting,
   submitLabel = "Post",
   busyLabel = null,
+  title = "New post",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -26,6 +27,7 @@ export function CommunityFeedComposerDrawer({
   submitting: boolean;
   submitLabel?: string;
   busyLabel?: string | null;
+  title?: string;
 }) {
   const pickerActive = useSyncExternalStore(subscribeFilePickerActive, isFilePickerActive, () => false);
 
@@ -35,13 +37,24 @@ export function CommunityFeedComposerDrawer({
     const body = document.body;
     const prevHtml = html.style.overflow;
     const prevBody = body.style.overflow;
-    const scrollY = window.scrollY;
+    const scroller = document.getElementById("app-scroll-main");
+    const lockedScroll = scroller?.scrollTop ?? 0;
     html.style.overflow = "hidden";
     body.style.overflow = "hidden";
+    html.setAttribute("data-composer-sheet", "");
+    const pin = () => {
+      if (scroller && scroller.scrollTop !== lockedScroll) scroller.scrollTop = lockedScroll;
+      if (window.scrollX !== 0 || window.scrollY !== 0) window.scrollTo(0, 0);
+    };
+    pin();
+    scroller?.addEventListener("scroll", pin);
+    window.addEventListener("scroll", pin);
     return () => {
+      scroller?.removeEventListener("scroll", pin);
+      window.removeEventListener("scroll", pin);
       html.style.overflow = prevHtml;
       body.style.overflow = prevBody;
-      window.scrollTo(0, scrollY);
+      html.removeAttribute("data-composer-sheet");
     };
   }, [open]);
 
@@ -51,6 +64,7 @@ export function CommunityFeedComposerDrawer({
       dismissible={!pickerActive}
       shouldScaleBackground={false}
       repositionInputs={false}
+      handleOnly
       noBodyStyles
       onOpenChange={(next) => {
         if (!next && isFilePickerActive()) return;
@@ -61,8 +75,11 @@ export function CommunityFeedComposerDrawer({
         <Drawer.Overlay className="fixed inset-x-0 top-[var(--vv-offset-top,0px)] z-[110] h-[var(--vv-height,100dvh)] bg-black/55" />
         <Drawer.Content
           data-keyboard-sheet
+          onScroll={(e) => {
+            if (e.currentTarget.scrollTop !== 0) e.currentTarget.scrollTop = 0;
+          }}
           className={cn(
-            "fixed inset-x-0 top-[var(--vv-offset-top,0px)] z-[110] flex h-[var(--vv-height,100dvh)] max-h-[var(--vv-height,100dvh)] flex-col overflow-hidden bg-background p-0 text-foreground outline-none",
+            "fixed inset-x-0 top-[var(--vv-offset-top,0px)] z-[110] flex h-[var(--vv-height,100dvh)] max-h-[var(--vv-height,100dvh)] flex-col overflow-clip bg-background p-0 text-foreground outline-none",
             "pt-[env(safe-area-inset-top,0px)]",
           )}
         >
@@ -75,7 +92,7 @@ export function CommunityFeedComposerDrawer({
               <span className="sr-only">Close</span>
             </Drawer.Close>
             <Drawer.Title className="min-w-0 flex-1 text-[17px] font-semibold tracking-tight text-foreground">
-              New post
+              {title}
             </Drawer.Title>
             <Drawer.Description className="sr-only">
               Write a post, add a photo or video, or create a poll or event.
@@ -99,7 +116,11 @@ export function CommunityFeedComposerDrawer({
                   : "Sharing your post…"}
             </p>
           ) : null}
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4">
+          <div
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4"
+            data-vaul-no-drag
+            data-composer-scroll
+          >
             {children}
           </div>
         </Drawer.Content>

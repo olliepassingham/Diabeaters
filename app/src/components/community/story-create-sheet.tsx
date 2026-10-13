@@ -375,11 +375,22 @@ export function StoryCreateSheet({
               data-testid="story-editor-stage"
             >
             {linkedPostId ? (
-              <StorySharedPostStage
-                postId={linkedPostId}
-                onOpenPost={() => {}}
-                onOpenAuthor={() => {}}
-              />
+              <>
+                <StorySharedPostStage
+                  postId={linkedPostId}
+                  className="pointer-events-none"
+                  onOpenPost={() => {}}
+                  onOpenAuthor={() => {}}
+                />
+                <StoryOverlayEditor
+                  overlays={overlays}
+                  onChange={setOverlays}
+                  onEditingChange={setTextEditing}
+                  newTextColor="black"
+                  transparent
+                  className="absolute inset-0 z-[5]"
+                />
+              </>
             ) : (
             <StoryOverlayEditor
               overlays={overlays}
@@ -423,9 +434,16 @@ export function StoryCreateSheet({
               </div>
             ) : null}
 
-            {!textEditing && !linkedPostId && overlays.every((o) => !o.text.trim()) ? (
-              <p className="pointer-events-none absolute inset-x-0 bottom-[max(5.5rem,calc(env(safe-area-inset-bottom)+4.5rem))] z-10 px-16 text-center text-[13px] font-medium tracking-wide text-white/75 drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]">
-                Tap the photo to add text
+            {!textEditing && overlays.every((o) => !o.text.trim()) ? (
+              <p
+                className={cn(
+                  "pointer-events-none absolute inset-x-0 z-10 px-16 text-center text-[13px] font-medium tracking-wide",
+                  linkedPostId
+                    ? "bottom-[max(5.75rem,calc(env(safe-area-inset-bottom)+4.75rem))] text-muted-foreground"
+                    : "bottom-[max(5.5rem,calc(env(safe-area-inset-bottom)+4.5rem))] text-white/75 drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]",
+                )}
+              >
+                {linkedPostId ? "Tap to add text" : "Tap the photo to add text"}
               </p>
             ) : null}
 
