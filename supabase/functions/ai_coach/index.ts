@@ -9,6 +9,7 @@
  * @see docs/regulatory/ai_coach_system_prompt.md
  */
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { matchAppGuide } from "../_shared/ai-coach/appGuides.ts";
 import { packContext } from "../_shared/ai-coach/contextPacker.ts";
 import {
   loadCoachScenarioFlags,
@@ -629,6 +630,9 @@ Deno.serve(async (req: Request) => {
       ratiosAreSet,
       ...(pharmacyStatus ? { pharmacyStatus } : {}),
       ...(suppliesSummary ? { suppliesSummary } : {}),
+      matchedGuide: matchAppGuide(message),
+      savedMeals: b.savedMeals,
+      toolsUsed: b.toolsUsed,
     });
 
     let llmReply: CoachReply;

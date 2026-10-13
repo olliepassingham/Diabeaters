@@ -5,11 +5,12 @@
  * from `supplies` using the authenticated user id. It **does** take a separate
  * clamped `exerciseSessions14d` hint (exercise is not in the DB yet) so
  * activity counts can inform replies without exposing notes.
- * This module stays numbers/booleans only — no free-text notes, names, or
- * destinations.
+ * Meal names and carb grams from Routines may be included. Doses, ratios,
+ * and free-text notes stay out.
  */
 
 import { normalizeDateOfBirthInput } from "@/lib/user-age";
+import { listMealRoutinesForCarbEstimator } from "@/lib/carb-estimator-routines";
 import { isCommunityAccountProfile, storage } from "@/lib/storage";
 import { isPenDeliveryMethod, isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import type { TravelTripStyle } from "@/lib/travel-active-guidance";
@@ -35,6 +36,36 @@ function listSupplies(): ReturnType<typeof storage.getSupplies> {
   } catch {
     return [];
   }
+}
+
+function buildSavedMeals(): AiCoachClientPayload["savedMeals"] {
+  try {
+    return listMealRoutinesForCarbEstimator({ limit: 6 })
+      .map((routine) => ({
+        name: routine.name.replace(/\s+/g, " ").trim().slice(0, 60),
+        carbGrams: Math.round(Number(routine.carbEstimate)),
+      }))
+      .filter((meal) => meal.name.length >= 2 && meal.carbGrams >= 1 && meal.carbGrams <= 300);
+  } catch {
+    return [];
+  }
+}
+
+function buildToolsUsed(): string[] {
+  const tools: string[] = [];
+  try {
+    if (storage.getRoutines().length > 0) tools.push("routines");
+    if (listSupplies().length > 0) tools.push("supplies");
+    if (storage.getExerciseOutcomes().length > 0) tools.push("exercise");
+    if (storage.getHypoTreatments().length > 0) tools.push("hypos");
+    if (storage.getAppointments().length > 0) tools.push("appointments");
+    const scenario = storage.getScenarioState();
+    if (scenario.travelModeActive) tools.push("travel");
+    if (scenario.sickDayActive) tools.push("sick-day");
+  } catch {
+    return tools;
+  }
+  return tools;
 }
 
 function cutoff(): number {
@@ -91,6 +122,10 @@ export interface AiCoachClientPayload {
   dateOfBirth?: string;
   /** Client-computed pharmacy status (server cannot infer timezone in v1). */
   pharmacyStatus: AiCoachPharmacyStatusWire;
+  /** Saved meal names and carb gram estimates. Never doses. */
+  savedMeals: { name: string; carbGrams: number }[];
+  /** Tools this account already has something saved for. */
+  toolsUsed: string[];
 }
 
 export function buildCoachDeviceSetupWire(): AiCoachDeviceSetupWire {
@@ -177,6 +212,8 @@ export function buildAiCoachClientPayload(): AiCoachClientPayload {
         todaySummary: null,
         tomorrowSummary: null,
       },
+      savedMeals: [],
+      toolsUsed: [],
     };
   }
 
@@ -286,5 +323,7 @@ export function buildAiCoachClientPayload(): AiCoachClientPayload {
     deviceSetup: buildCoachDeviceSetupWire(),
     pharmacyStatus,
     ...(dateOfBirth ? { dateOfBirth } : {}),
+    savedMeals: buildSavedMeals(),
+    toolsUsed: buildToolsUsed(),
   };
 }

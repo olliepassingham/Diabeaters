@@ -11,6 +11,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { matchAppGuide } from "./appGuides.ts";
 import { packContext, type PackContextInput } from "./contextPacker.ts";
 
 const FIXED_NOW = new Date("2026-05-01T00:00:00Z");
@@ -266,5 +267,33 @@ describe("packContext — PII strip", () => {
     expect(json).not.toContain("Alex Example");
     expect(json).not.toContain("alex@example.com");
     expect(json).not.toContain("SW1A");
+  });
+
+  it("keeps a matching guide, meal names, and known tools, and drops doses", () => {
+    const adult = packContext(
+      input({
+        matchedGuide: matchAppGuide("How does the exercise guide work?"),
+        savedMeals: [
+          { name: "Pasta night", carbGrams: 55 },
+          { name: "8 units breakfast", carbGrams: 40 },
+          { name: "1:10 lunch", carbGrams: 30 },
+        ],
+        toolsUsed: ["routines", "not-a-tool", "hypos"],
+      }),
+    );
+    expect(adult.matchedGuide?.href).toBe("/scenarios/exercise");
+    expect(adult.savedMeals).toEqual([{ name: "Pasta night", carbGrams: 55 }]);
+    expect(adult.toolsUsed).toEqual(["routines", "hypos"]);
+    expect(JSON.stringify(adult)).not.toContain("8 units");
+    expect(JSON.stringify(adult)).not.toContain("1:10");
+
+    const child = packContext(
+      input({
+        profile: { ...input().profile, dateOfBirth: "2014-06-15" },
+        matchedGuide: matchAppGuide("Can I drink alcohol tonight?"),
+      }),
+    );
+    expect(child.profile.ageBand).toBe("under18");
+    expect(child.matchedGuide).toBeUndefined();
   });
 });

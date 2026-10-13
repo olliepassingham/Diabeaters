@@ -12,7 +12,8 @@
  * Pure logic — runs under both Deno and Vitest.
  */
 
-import type { CoachContext, CoachSuppliesSummary, CoachTravelTripStyle } from "./types.ts";
+import type { MatchedAppGuide } from "./appGuides.ts";
+import { ALLOWED_HREFS, type CoachContext, type CoachSavedMeal, type CoachSuppliesSummary, type CoachToolId, type CoachTravelTripStyle } from "./types.ts";
 
 const SPARSE_BG_THRESHOLD = 14;
 const SPARSE_EXERCISE_THRESHOLD = 1;
@@ -56,6 +57,77 @@ export interface PackContextInput {
   suppliesSummary?: CoachSuppliesSummary;
   /** Optional: override "now" for deterministic tests. */
   now?: Date;
+  /** Guide matched from the latest message. Dropped when the href is not allowed for this profile. */
+  matchedGuide?: MatchedAppGuide | null;
+  /** Client meal names and carb grams. Sanitised; dose-like names are dropped. */
+  savedMeals?: unknown;
+  /** Client tool ids. Unknown ids are dropped. */
+  toolsUsed?: unknown;
+}
+
+const TOOL_IDS: ReadonlySet<CoachToolId> = new Set([
+  "routines",
+  "supplies",
+  "exercise",
+  "hypos",
+  "appointments",
+  "travel",
+  "sick-day",
+]);
+
+const DOSE_LIKE_NAME = /\d+\s*(u|iu|units?)\b/i;
+const RATIO_LIKE_NAME = /\d+\s*:\s*\d+/;
+
+function guideBlockedForProfile(href: string, profile: CoachContext["profile"]): boolean {
+  if (href !== "/scenarios/alcohol" && href !== "/scenarios/driving") return false;
+  const years = profile.ageYears;
+  if (years == null) return true;
+  if (href === "/scenarios/alcohol") return years < 18;
+  return years < 17;
+}
+
+function sanitizeMatchedGuide(
+  raw: MatchedAppGuide | null | undefined,
+  profile: CoachContext["profile"],
+): CoachContext["matchedGuide"] {
+  if (!raw) return undefined;
+  if (!ALLOWED_HREFS.includes(raw.href as (typeof ALLOWED_HREFS)[number])) return undefined;
+  if (guideBlockedForProfile(raw.href, profile)) return undefined;
+  const label = raw.label.replace(/\s+/g, " ").trim().slice(0, 40);
+  const excerpt = raw.excerpt.replace(/\s+/g, " ").trim().slice(0, 500);
+  if (!label || excerpt.length < 20) return undefined;
+  return { href: raw.href, label, excerpt };
+}
+
+function sanitizeSavedMeals(raw: unknown): CoachSavedMeal[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const meals: CoachSavedMeal[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as { name?: unknown; carbGrams?: unknown };
+    const name = typeof row.name === "string" ? row.name.replace(/\s+/g, " ").trim().slice(0, 60) : "";
+    if (name.length < 2) continue;
+    if (DOSE_LIKE_NAME.test(name) || RATIO_LIKE_NAME.test(name)) continue;
+    const carbs = typeof row.carbGrams === "number" ? row.carbGrams : Number.NaN;
+    if (!Number.isFinite(carbs)) continue;
+    const carbGrams = Math.round(carbs);
+    if (carbGrams < 1 || carbGrams > 300) continue;
+    meals.push({ name, carbGrams });
+    if (meals.length >= 6) break;
+  }
+  return meals.length ? meals : undefined;
+}
+
+function sanitizeToolsUsed(raw: unknown): CoachToolId[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const tools: CoachToolId[] = [];
+  for (const item of raw) {
+    if (typeof item !== "string") continue;
+    const id = item.trim().toLowerCase() as CoachToolId;
+    if (!TOOL_IDS.has(id) || tools.includes(id)) continue;
+    tools.push(id);
+  }
+  return tools.length ? tools : undefined;
 }
 
 function sanitizeSuppliesSummary(s: CoachSuppliesSummary): CoachSuppliesSummary {
@@ -221,6 +293,10 @@ export function packContext(input: PackContextInput): CoachContext {
       ? sanitizeSuppliesSummary(input.suppliesSummary)
       : undefined;
 
+  const matchedGuide = sanitizeMatchedGuide(input.matchedGuide, profile);
+  const savedMeals = sanitizeSavedMeals(input.savedMeals);
+  const toolsUsed = sanitizeToolsUsed(input.toolsUsed);
+
   return {
     profile,
     ...(input.pharmacyStatus ? { pharmacy: input.pharmacyStatus } : {}),
@@ -228,5 +304,8 @@ export function packContext(input: PackContextInput): CoachContext {
     ...(supplies ? { supplies } : {}),
     ratiosAreSet: Boolean(input.ratiosAreSet),
     dataSparse,
+    ...(matchedGuide ? { matchedGuide } : {}),
+    ...(savedMeals ? { savedMeals } : {}),
+    ...(toolsUsed ? { toolsUsed } : {}),
   };
 }

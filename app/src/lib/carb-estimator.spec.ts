@@ -27,6 +27,11 @@ describe("carb estimator", () => {
     expect(searchCarbFoods("chicken")[0]?.id).toBe("chicken");
     expect(searchCarbFoods("pitta")[0]?.id).toBe("pitta");
     expect(searchCarbFoods("peas")[0]?.id).toBe("peas");
+    expect(searchCarbFoods("butty")[0]?.id).toBe("sandwich");
+    expect(searchCarbFoods("sarnie")[0]?.id).toBe("sandwich");
+    expect(searchCarbFoods("chips")[0]?.id).toBe("chips");
+    expect(searchCarbFoods("ketchup")[0]?.id).toBe("ketchup");
+    expect(searchCarbFoods("pasta sauce")[0]?.id).toBe("pasta-sauce");
   });
 
   it("keeps one entry per food", () => {

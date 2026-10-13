@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Minus, TrendingDown, TrendingUp } from "lucide-react";
 
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CgmPrefillButton } from "@/components/cgm-prefill-button";
 import { useAutoCgmBgField } from "@/hooks/use-auto-cgm-bg-field";
+import { isFreshCgmPrefill } from "@/lib/cgm/apply-cgm-prefill";
 import { carbSourceLogLabel } from "@/lib/hypo-treatment-display";
 import type { UserProfile } from "@/lib/storage";
 import { cn } from "@/lib/utils";
@@ -45,6 +46,7 @@ export function LogHypoTreatmentSheet({
   const bgUnitsLabel: "mmol/L" | "mg/dL" = profile?.bgUnits === "mg/dL" ? "mg/dL" : "mmol/L";
   const glucoseStep = bgUnitsLabel === "mg/dL" ? "1" : "0.1";
   const preferred = carbSourceLogLabel(profile, "hypo");
+  const openedRef = useRef(false);
 
   const treatments = useMemo(() => {
     if (!preferred || TREATMENT_OPTIONS.some((opt) => opt.value === preferred)) {
@@ -54,11 +56,25 @@ export function LogHypoTreatmentSheet({
   }, [preferred]);
 
   useEffect(() => {
-    if (!open) return;
-    setGlucose("");
-    setNotes("");
+    if (!open) {
+      openedRef.current = false;
+      return;
+    }
     setTreatment(preferred ?? "");
-  }, [open, preferred]);
+    if (openedRef.current) return;
+    openedRef.current = true;
+    setNotes("");
+    const fresh = isFreshCgmPrefill(cgm.prefill) ? cgm.prefill : null;
+    setGlucose(fresh?.value ?? "");
+  }, [open, preferred, cgm.prefill]);
+
+  const liveMatches = Boolean(
+    cgm.prefill &&
+      glucose.trim().replace(",", ".") === cgm.prefill.value.trim().replace(",", "."),
+  );
+  const liveTrend = liveMatches ? cgm.prefill?.reading?.trend : null;
+  const TrendIcon =
+    liveTrend === "rising" ? TrendingUp : liveTrend === "falling" ? TrendingDown : liveTrend === "flat" ? Minus : null;
 
   return (
     <BottomSheet
@@ -73,32 +89,45 @@ export function LogHypoTreatmentSheet({
         data-testid="sheet-log-hypo-treatment"
       >
         <section className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground">Blood glucose</p>
-          <div className="flex h-12 items-center gap-2 rounded-xl border border-border/70 bg-background px-3">
-            <Input
-              id="dash-hypo-glucose"
-              type="number"
-              inputMode="decimal"
-              step={glucoseStep}
-              placeholder={bgUnitsLabel === "mg/dL" ? "58" : "3.2"}
-              value={glucose}
-              onChange={(e) => cgm.onBgChange(e.target.value)}
-              className="h-11 border-0 bg-transparent px-0 text-lg tabular-nums shadow-none focus-visible:ring-0"
-              data-testid="input-dashboard-hypo-glucose"
-            />
-            <span className="shrink-0 text-sm text-muted-foreground">{bgUnitsLabel}</span>
+          <div className="flex items-baseline justify-between gap-2">
+            <p className="text-xs font-medium text-muted-foreground">Blood glucose</p>
+            <p className="text-[11px] text-muted-foreground">Optional</p>
           </div>
-          <CgmPrefillButton
-            prefill={cgm.prefill}
-            loading={cgm.loading}
-            bgUnits={bgUnitsLabel}
-            currentValue={glucose}
-            onApply={cgm.onBgChange}
-            onRefresh={cgm.refresh}
-            emptyHint={cgm.emptyHint}
-            allowSync
-            testId="button-dashboard-hypo-cgm-prefill"
-          />
+          <div className="space-y-2 rounded-2xl border border-border/60 bg-background/80 p-3 shadow-sm">
+            <label htmlFor="dash-hypo-glucose" className="sr-only">
+              Blood glucose ({bgUnitsLabel})
+            </label>
+            <div className="flex items-stretch gap-2">
+              <Input
+                id="dash-hypo-glucose"
+                type="number"
+                inputMode="decimal"
+                step={glucoseStep}
+                placeholder={bgUnitsLabel === "mg/dL" ? "58" : "3.2"}
+                value={glucose}
+                onChange={(e) => cgm.onBgChange(e.target.value)}
+                className="h-14 flex-1 rounded-xl border-border/60 bg-background text-center text-3xl font-semibold tabular-nums tracking-tight shadow-none"
+                data-testid="input-dashboard-hypo-glucose"
+              />
+              <span className="flex min-w-[4.5rem] flex-col items-center justify-center gap-0.5 rounded-xl border border-border/60 bg-muted/40 px-2 text-sm font-semibold text-muted-foreground">
+                {TrendIcon ? (
+                  <TrendIcon className="h-3.5 w-3.5" aria-label={liveTrend ?? undefined} />
+                ) : null}
+                {bgUnitsLabel}
+              </span>
+            </div>
+            <CgmPrefillButton
+              prefill={cgm.prefill}
+              loading={cgm.loading}
+              bgUnits={bgUnitsLabel}
+              currentValue={glucose}
+              onApply={cgm.onBgChange}
+              onRefresh={cgm.refresh}
+              emptyHint={cgm.emptyHint}
+              allowSync
+              testId="button-dashboard-hypo-cgm-prefill"
+            />
+          </div>
         </section>
 
         <section className="space-y-2">

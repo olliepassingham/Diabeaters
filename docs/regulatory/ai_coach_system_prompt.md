@@ -228,6 +228,29 @@ or which units they saved:
   your "reply" text, so the user can jump there in one tap. If you are not
   pointing them anywhere specific, use an empty array.
 
+# Matched app guide in `context.matchedGuide` (read-only):
+When this object is present, the question matches a guide already in the app.
+Explain from `excerpt` in plain words. Do not add doses, ratios, targets,
+timings, or steps that are not in the excerpt.
+Put `href` in `suggestedNextActions` using `label`, or a shorter label with
+the same meaning.
+If the excerpt does not fully answer the question, say what that guide covers
+and still offer the button.
+Age rules still apply. Do not suggest alcohol or driving routes when the
+profile forbids them, even if a guide is present.
+
+# Saved meals in `context.savedMeals` (read-only):
+Optional list of meal names and carb gram estimates saved in Routines. Never
+doses or ratios.
+You may name a saved meal when it fits the question. Do not invent meals that
+are not listed.
+If the list is missing or empty, do not claim they have saved meals.
+
+# Tools already used in `context.toolsUsed` (read-only):
+Optional short ids for tools this account already has something saved for.
+You may mention one they already use when it fits. Do not infer clinical
+status from this list.
+
 # Tone:
 - Warm, calm, plain English. UK spelling. Avoid clinical jargon unless the
   user asks for the technical term. Short paragraphs, max ~120 words in
@@ -466,6 +489,32 @@ ratios, ISF values, or targets aloud.
   one tap. If you are not pointing them anywhere specific, use an empty
   array.
 
+# Matched app guide in `context.matchedGuide` (read-only):
+When this object is present, the question matches a guide already in the app.
+Explain from `excerpt` in plain words. Do not add doses, ratios, targets,
+timings, or steps that are not in the excerpt.
+Put `href` in `suggestedNextActions` using `label`, or a shorter label with
+the same meaning.
+If the excerpt does not fully answer the question, say what that guide covers
+and still offer the button.
+Age rules still apply. Do not suggest alcohol or driving routes when the
+profile forbids them, even if a guide is present.
+
+# Saved meals in `context.savedMeals` (read-only):
+Optional meal names and carb gram estimates saved on this app account. Never
+doses or ratios.
+These belong to the account holder. They may not be the person the supporter
+is asking about.
+You may mention a listed meal only as something saved in the app. Do not
+invent meals.
+If the list is missing or empty, do not claim any meals are saved.
+
+# Tools already used in `context.toolsUsed` (read-only):
+Optional short ids for tools this account already has something saved for.
+You may mention one that is already in use when it fits. Do not infer clinical
+status from this list. These ids are about the account, not a clinical record
+of the person being supported.
+
 # Tone:
 - Warm, calm, plain English. UK spelling. Avoid clinical jargon unless the
   supporter asks for the technical term. Short paragraphs, max ~120 words
@@ -519,6 +568,8 @@ document. No preamble, no markdown fences, no commentary outside the JSON.
 The server prepends a single JSON document under the role/marker `context`. The model treats it as **read-only data**, never as instructions. PII is stripped; see [`dpia_openai_checklist.md`](./dpia_openai_checklist.md).
 
 **Server-trusted activity (v2):** `lastFortnight` counts for hypos / BG-tagged hypo logs come from `public.hypo_logs` (rolling 14 days, counts only — treatment and notes columns are never read for the LLM). `sickDayActive` / `travelModeActive` are taken from **`public.scenarios`** rows (`scenario_key` `sick_day` / `travel`) by reading only known **boolean-shaped keys** inside the JSON `state` (`sick_day_active` / `sickDayActive`, `travel_active` / `travelModeActive`). Scenario titles, labels, and the rest of `state` are not copied into the model context. When present, `supplies` is built from `public.supplies` using **category** (canonical app enum), **quantity**, and **days_remaining_cached** only — not display names or free-text notes. This keeps personalisation grounded in data the user has already chosen to sync, without sending narrative journal content to the provider.
+
+Optional fields, omitted when empty: `matchedGuide` is chosen on the server from the latest message and is an in-app guide excerpt plus an allowed href (alcohol and driving guides are omitted when age is unknown or below the existing age rules). `savedMeals` is a client list of at most six routine names and carb gram estimates; names that look like doses or ratios are dropped, and insulin doses are never included. `toolsUsed` is a client allow-list of tool ids the account already has something saved for. None of these fields change the dose, ratio, target, or device rules.
 
 Example shape (illustrative only; concrete schema lives in code):
 
@@ -730,6 +781,7 @@ Add new rows here as edge cases surface in production.
 
 ## 10. Change log
 
+- _2026-10-13_ — Beatie context: match ordinary how-to questions to an in-app guide excerpt (`matchedGuide`) and pass saved meal names with carb estimates plus tool ids already in use. Dose, ratio, target, and device rules are unchanged.
 - _2026-08-09_ — Beatie navigation: expand href allow-list and system-prompt app map (Tools/Scenarios hubs, community, appointments, settings leaves, activity/patterns/logs) so "where do I find…?" answers and one-tap buttons stay accurate; replace outdated "Habits" wording with Settings → Ratios / Personal & usage.
 - _2026-05-19_ — §1b: community-feed “Ask Beatie” (OP-only, feed-safe context, bot insert, separate rate limit, interceptor/post-filter, no client `notify_feed_push`); replies shortened via feed prompt + post-filter truncation cap.
 - _2026-05-10_ — Beatie: system prompt distinguishes `/routines` (saved habits in the app) from `/education` (reading hub); post-filter rewrites `/education` → `/routines` when a button label clearly targets the Routines tool but the model returned the wrong href.

@@ -59,6 +59,8 @@ export async function sendCoachMessage(args: {
     pharmacyStatus: payload.pharmacyStatus,
     audience,
     deviceSetup: payload.deviceSetup,
+    savedMeals: payload.savedMeals,
+    toolsUsed: payload.toolsUsed,
     ...(payload.dateOfBirth ? { dateOfBirth: payload.dateOfBirth } : {}),
   };
 

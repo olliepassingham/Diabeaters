@@ -7,6 +7,7 @@ import {
   type CarbFoodCategory,
   type CarbPortion,
 } from "@/lib/carb-estimator-data";
+import { listCustomCarbFoods } from "@/lib/custom-carb-foods";
 import type { RoutineCarbFood } from "@/lib/storage";
 
 export type CarbEstimateSelection = {
@@ -64,7 +65,8 @@ export function searchCarbFoods(
 ): CarbFood[] {
   const normalized = normalizeCarbSearch(query);
   const limit = Math.max(1, Math.min(50, Math.floor(options.limit ?? 12)));
-  return CARB_FOODS
+  const foods = [...CARB_FOODS, ...listCustomCarbFoods()];
+  return foods
     .filter((food) => !options.category || options.category === "all" || food.category === options.category)
     .map((food, index) => ({ food, index, score: searchScore(food, normalized) }))
     .filter(({ score }) => score > 0)
@@ -74,7 +76,7 @@ export function searchCarbFoods(
 }
 
 export function getCarbFood(foodId: string): CarbFood | null {
-  return CARB_FOODS.find((food) => food.id === foodId) ?? null;
+  return CARB_FOODS.find((food) => food.id === foodId) ?? listCustomCarbFoods().find((food) => food.id === foodId) ?? null;
 }
 
 export function estimateCarbSelection(selection: CarbEstimateSelection): CarbEstimatedItem | null {

@@ -202,7 +202,36 @@ export interface CoachContext {
   ratiosAreSet: boolean;
   /** Empty when the user has logged < ~14 days of data; the model is told to admit this. */
   dataSparse: boolean;
+  /**
+   * Present when the latest message matches an in-app guide. Excerpt only;
+   * the model must not add doses or steps that are not in it.
+   */
+  matchedGuide?: CoachMatchedGuide;
+  /** Meal names and carb gram estimates from Routines. Never doses. */
+  savedMeals?: CoachSavedMeal[];
+  /** Short ids for tools this account already has something saved for. */
+  toolsUsed?: CoachToolId[];
 }
+
+export interface CoachMatchedGuide {
+  href: string;
+  label: string;
+  excerpt: string;
+}
+
+export interface CoachSavedMeal {
+  name: string;
+  carbGrams: number;
+}
+
+export type CoachToolId =
+  | "routines"
+  | "supplies"
+  | "exercise"
+  | "hypos"
+  | "appointments"
+  | "travel"
+  | "sick-day";
 
 /** Aggregated supply rows for Coach — counts and enums only. */
 export interface CoachSuppliesSummary {

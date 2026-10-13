@@ -34,6 +34,7 @@ import {
   ROUTINE_MEAL_TYPE_LABELS,
 } from "@/lib/carb-estimator-routines";
 import { mealCompositionSummaryLabel } from "@/lib/meal-impact";
+import { saveCustomCarbFood } from "@/lib/custom-carb-foods";
 import { storage, type Routine } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 
@@ -87,6 +88,8 @@ export function CarbEstimatorSheet({
   const [selections, setSelections] = useState<CarbEstimateSelection[]>([]);
   const [view, setView] = useState<"browse" | "meal">("browse");
   const [patternOpen, setPatternOpen] = useState(false);
+  const [ownFoodOpen, setOwnFoodOpen] = useState(false);
+  const [customListVersion, setCustomListVersion] = useState(0);
   const estimate = useMemo(() => estimateCarbMeal(selections), [selections]);
   const [confirmedGrams, setConfirmedGrams] = useState("");
   const initialSelectionsRef = useRef(initialSelections);
@@ -107,6 +110,7 @@ export function CarbEstimatorSheet({
     if (!open) return;
     const seeded = (initialSelectionsRef.current ?? []).filter((selection) => estimateCarbSelection(selection));
     setQuery("");
+    setOwnFoodOpen(false);
     setSelections(seeded);
     setPatternOpen(false);
     setView(seeded.length ? "meal" : "browse");
@@ -129,7 +133,7 @@ export function CarbEstimatorSheet({
             category: query.trim() ? "all" : category === "all" ? "all" : category,
             limit: query.trim() ? 12 : 10,
           }),
-    [category, query],
+    [category, query, customListVersion],
   );
 
   const addFood = (food: CarbFood) => {
@@ -373,8 +377,28 @@ export function CarbEstimatorSheet({
               </div>
             ) : (
               <p className="py-5 text-center text-sm text-muted-foreground">
-                No curated match. Try a simpler food name.
+                No match in the list. Save your own food if you know the carbs.
               </p>
+            )}
+            {ownFoodOpen || (query.trim().length >= 2 && results.length === 0) ? (
+              <SaveOwnFoodForm
+                suggestedName={query.trim()}
+                onSaved={(food) => {
+                  addFood(food);
+                  setCustomListVersion((version) => version + 1);
+                  setOwnFoodOpen(false);
+                  setQuery("");
+                }}
+              />
+            ) : (
+              <button
+                type="button"
+                className="mt-3 text-xs font-medium text-primary"
+                onClick={() => setOwnFoodOpen(true)}
+                data-testid="button-carb-estimator-own-food"
+              >
+                Add a food that is not listed
+              </button>
             )}
               </section>
               )}
@@ -627,5 +651,78 @@ export function CarbEstimatorSheet({
         </div>
       </div>
     </BottomSheet>
+  );
+}
+
+function SaveOwnFoodForm({
+  suggestedName,
+  onSaved,
+}: {
+  suggestedName: string;
+  onSaved: (food: CarbFood) => void;
+}) {
+  const [name, setName] = useState(suggestedName);
+  const [grams, setGrams] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    setName(suggestedName);
+    setError("");
+  }, [suggestedName]);
+
+  return (
+    <form
+      className="mt-3 rounded-2xl border border-border/60 bg-muted/30 p-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const food = saveCustomCarbFood(name, Number(grams));
+        if (!food) {
+          setError("Add a food name and a carb amount from 0 to 250g.");
+          return;
+        }
+        setGrams("");
+        setError("");
+        onSaved(food);
+      }}
+    >
+      <p className="text-sm font-medium text-foreground">Save your own food</p>
+      <p className="mt-0.5 text-[11px] text-muted-foreground">
+        Enter the carbohydrate amount you want to reuse. It stays on this phone and shows up in search.
+      </p>
+      <div className="mt-3 grid grid-cols-[1fr_6.5rem] gap-2">
+        <div>
+          <Label htmlFor="custom-carb-food-name" className="text-[10px] text-muted-foreground">
+            Name
+          </Label>
+          <Input
+            id="custom-carb-food-name"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            className="mt-1 h-10 rounded-xl"
+            data-testid="input-custom-carb-food-name"
+          />
+        </div>
+        <div>
+          <Label htmlFor="custom-carb-food-grams" className="text-[10px] text-muted-foreground">
+            Carbs (g)
+          </Label>
+          <Input
+            id="custom-carb-food-grams"
+            type="number"
+            inputMode="decimal"
+            min="0"
+            max="250"
+            value={grams}
+            onChange={(event) => setGrams(event.target.value)}
+            className="mt-1 h-10 rounded-xl text-right tabular-nums"
+            data-testid="input-custom-carb-food-grams"
+          />
+        </div>
+      </div>
+      {error ? <p className="mt-2 text-xs text-destructive">{error}</p> : null}
+      <Button type="submit" variant="secondary" className="mt-3 h-10 w-full rounded-xl" data-testid="button-save-custom-carb-food">
+        Save and add
+      </Button>
+    </form>
   );
 }

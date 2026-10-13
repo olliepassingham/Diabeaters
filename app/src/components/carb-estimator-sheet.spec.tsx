@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { CarbEstimatorSheet } from "@/components/carb-estimator-sheet";
+import { saveCustomCarbFood } from "@/lib/custom-carb-foods";
 import { storage } from "@/lib/storage";
 
 const setLocation = vi.fn();
@@ -163,5 +164,40 @@ describe("CarbEstimatorSheet", () => {
         selections: [expect.objectContaining({ foodId: "banana", portionId: "regular", quantity: 1 })],
       }),
     );
+  });
+
+  it("saves a food that is not listed and offers it in search", () => {
+    render(
+      <CarbEstimatorSheet open onOpenChange={() => {}} onConfirm={() => {}} includeSavedRoutines={false} />,
+    );
+
+    fireEvent.change(screen.getByTestId("input-carb-food-search"), {
+      target: { value: "Corner shop yoghurt" },
+    });
+    expect(screen.getByText("No match in the list. Save your own food if you know the carbs.")).not.toBeNull();
+    fireEvent.change(screen.getByTestId("input-custom-carb-food-grams"), { target: { value: "18" } });
+    fireEvent.click(screen.getByTestId("button-save-custom-carb-food"));
+    expect(screen.getByText("Your meal · 1 item")).not.toBeNull();
+
+    fireEvent.click(screen.getByTestId("button-carb-estimator-add-more"));
+    fireEvent.change(screen.getByTestId("input-carb-food-search"), {
+      target: { value: "yoghurt" },
+    });
+    expect(screen.getByTestId("button-add-carb-food-custom-corner-shop-yoghurt")).not.toBeNull();
+  });
+
+  it("reopens a saved custom food on a routine", () => {
+    const saved = saveCustomCarbFood("Family curry", 46);
+    render(
+      <CarbEstimatorSheet
+        open
+        onOpenChange={() => {}}
+        onConfirm={() => {}}
+        includeSavedRoutines={false}
+        initialSelections={[{ id: "saved-curry", foodId: saved!.id, portionId: "serving", quantity: 1 }]}
+      />,
+    );
+    expect(screen.getByText("Family curry")).not.toBeNull();
+    expect(screen.getByText("Likely range 39–53g")).not.toBeNull();
   });
 });

@@ -1,4 +1,4 @@
-export const CARB_CATALOGUE_VERSION = "2026-10-01";
+export const CARB_CATALOGUE_VERSION = "2026-10-13";
 
 export type CarbFoodCategory =
   | "breakfast"
@@ -99,7 +99,7 @@ export const CARB_FOODS: CarbFood[] = [
   {
     id: "rice",
     name: "Cooked rice",
-    aliases: ["white rice", "brown rice", "basmati", "jasmine rice"],
+    aliases: ["white rice", "brown rice", "basmati", "jasmine rice", "cup of rice"],
     category: "staples",
     portions: [p("small", "Small serving (100g)", 28, 15), p("regular", "Serving (150g)", 42, 15), p("large", "Large serving (225g)", 63, 15)],
   },
@@ -127,7 +127,7 @@ export const CARB_FOODS: CarbFood[] = [
   {
     id: "chips",
     name: "Chips",
-    aliases: ["fries", "french fries"],
+    aliases: ["fries", "french fries", "chip shop chips", "oven chips"],
     category: "staples",
     portions: [p("small", "Small portion (100g)", 30, 25), p("regular", "Regular portion (160g)", 48, 25), p("large", "Large portion (220g)", 66, 25)],
   },
@@ -169,7 +169,7 @@ export const CARB_FOODS: CarbFood[] = [
   {
     id: "milk",
     name: "Milk",
-    aliases: ["semi skimmed milk", "whole milk", "skimmed milk"],
+    aliases: ["semi skimmed milk", "whole milk", "skimmed milk", "milk on cereal"],
     category: "dairy",
     portions: [p("splash", "Splash (50ml)", 2.5, 10), p("glass", "Glass (200ml)", 10, 10), p("large", "Large glass (300ml)", 15, 10)],
   },
@@ -246,7 +246,7 @@ export const CARB_FOODS: CarbFood[] = [
   {
     id: "sandwich",
     name: "Filled sandwich",
-    aliases: ["sandwich", "packed lunch"],
+    aliases: ["sandwich", "packed lunch", "butty", "sarnie"],
     category: "meals",
     portions: [p("small", "Small, 2 thin slices", 30, 25), p("regular", "Regular sandwich", 40, 25), p("large", "Large or thick-cut", 55, 25)],
   },
@@ -817,6 +817,74 @@ export const CARB_FOODS: CarbFood[] = [
     category: "meals",
     portions: [p("small", "1 taco", 15, 30), p("regular", "2 tacos", 30, 30), p("large", "3 tacos", 45, 30)],
   },
+  // Cooking ingredients. Figures are rounded from UK food composition
+  // (McCance and Widdowson / CoFID), not a brand label: ketchup about 23g/100g,
+  // mayonnaise about 2g/100g, tomato pasta sauce about 7g/100g, soy sauce about
+  // 8g/100g, sucrose 4g per teaspoon, made-up gravy about 4g/100ml, coleslaw
+  // about 7g/100g, Yorkshire pudding about 22g/100g, a medium white slice about 16g.
+  {
+    id: "ketchup",
+    name: "Tomato ketchup",
+    aliases: ["ketchup", "red sauce"],
+    category: "meals",
+    portions: [p("small", "1 teaspoon", 1, 15), p("regular", "1 tablespoon", 4, 15), p("large", "2 tablespoons", 7, 15)],
+  },
+  {
+    id: "mayonnaise",
+    name: "Mayonnaise",
+    aliases: ["mayo"],
+    category: "meals",
+    portions: [p("small", "1 teaspoon", 0, 50), p("regular", "1 tablespoon", 1, 50), p("large", "2 tablespoons", 2, 50)],
+  },
+  {
+    id: "pasta-sauce",
+    name: "Tomato pasta sauce",
+    aliases: ["pasta sauce", "tomato cooking sauce", "bolognese sauce"],
+    category: "meals",
+    portions: [p("small", "2 tablespoons (30g)", 2, 30), p("regular", "Serving (100g)", 7, 30), p("large", "Large serving (150g)", 10, 30)],
+  },
+  {
+    id: "soy-sauce",
+    name: "Soy sauce",
+    aliases: ["soya sauce"],
+    category: "meals",
+    portions: [p("small", "1 teaspoon", 1, 40), p("regular", "1 tablespoon", 1, 40), p("large", "2 tablespoons", 2, 40)],
+  },
+  {
+    id: "white-sugar",
+    name: "White sugar",
+    aliases: ["sugar", "caster sugar", "granulated sugar"],
+    category: "snacks",
+    portions: [p("small", "1 teaspoon", 4, 10), p("regular", "2 teaspoons", 8, 10), p("large", "1 tablespoon", 12, 10)],
+  },
+  {
+    id: "gravy",
+    name: "Gravy",
+    aliases: ["made up gravy"],
+    category: "meals",
+    portions: [p("small", "Small jug (50ml)", 2, 35), p("regular", "Serving (100ml)", 4, 35), p("large", "Large serving (200ml)", 8, 35)],
+  },
+  {
+    id: "coleslaw",
+    name: "Coleslaw",
+    aliases: ["slaw"],
+    category: "veg",
+    portions: [p("small", "1 spoon (40g)", 3, 30), p("regular", "Serving (80g)", 6, 30), p("large", "Large serving (120g)", 8, 30)],
+  },
+  {
+    id: "yorkshire-pudding",
+    name: "Yorkshire pudding",
+    aliases: ["yorkshire", "yorkie"],
+    category: "bread",
+    portions: [p("small", "1 pudding", 10, 30), p("regular", "2 puddings", 20, 30), p("large", "3 puddings", 30, 30)],
+  },
+  {
+    id: "cheese-on-toast",
+    name: "Cheese on toast",
+    aliases: ["cheese toast", "cheese on toastie"],
+    category: "meals",
+    portions: [p("small", "1 slice", 16, 20), p("regular", "2 slices", 32, 20), p("large", "2 thick slices", 40, 20)],
+  },
 ];
 
 export const CARB_CATEGORY_LABELS: Record<CarbFoodCategory, string> = {
@@ -951,4 +1019,13 @@ export const CARB_COMPOSITION_HINTS: Record<string, CarbCompositionHint> = {
   "fish-finger-sandwich": hint("balanced", true, true),
   "pad-thai": hint("starchy", true, true),
   tacos: hint("balanced", true, true),
+  ketchup: hint("quick_refined"),
+  mayonnaise: hint("unsure", true),
+  "pasta-sauce": hint("starchy"),
+  "soy-sauce": hint("unsure"),
+  "white-sugar": hint("quick_refined"),
+  gravy: hint("starchy"),
+  coleslaw: hint("unsure", true, false, true),
+  "yorkshire-pudding": hint("quick_refined", true),
+  "cheese-on-toast": hint("quick_refined", true, true),
 };
