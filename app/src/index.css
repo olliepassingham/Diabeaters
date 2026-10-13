@@ -207,6 +207,11 @@
     pointer-events: none;
   }
 
+  /* The feed scroller is a view-transition group, which would trap a fixed comment bar. */
+  html[data-comment-keyboard] #app-scroll-main {
+    view-transition-name: none;
+  }
+
   .comment-composer-pinned {
     position: fixed !important;
     left: 0 !important;

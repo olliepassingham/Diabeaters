@@ -264,6 +264,9 @@ export function FeedPostCard({
   const [commentBarHeight, setCommentBarHeight] = useState(0);
   const commentComposerRef = useRef<HTMLDivElement>(null);
   const commentSlotRef = useRef<HTMLDivElement>(null);
+  const [commentHost] = useState<HTMLDivElement | null>(() =>
+    typeof document === "undefined" ? null : document.createElement("div"),
+  );
   const [shareOpen, setShareOpen] = useState(false);
   const [shareHandle, setShareHandle] = useState("");
   const [shareNote, setShareNote] = useState("");
@@ -332,47 +335,31 @@ export function FeedPostCard({
   }, [commentFocused, commentImagePreviewUrl, commentDraft, expanded]);
 
   useLayoutEffect(() => {
-    const el = commentComposerRef.current;
-    const slot = commentSlotRef.current;
-    if (!el || !slot) return;
-
-    if (commentFocused) {
-      el.style.position = "";
-      el.style.top = "";
-      el.style.left = "";
-      el.style.width = "";
-      el.style.right = "";
-      el.style.transform = "";
-      el.style.zIndex = "";
+    const host = commentHost;
+    if (!host) return;
+    if (!expanded) {
+      host.remove();
       return;
     }
+    if (commentFocused) {
+      const moved = host.parentElement !== document.body;
+      if (moved) document.body.appendChild(host);
+      if (moved) {
+        const field = host.querySelector("textarea");
+        if (field instanceof HTMLTextAreaElement && document.activeElement !== field) {
+          field.focus({ preventScroll: true });
+        }
+      }
+      return;
+    }
+    const slot = commentSlotRef.current;
+    if (slot && host.parentElement !== slot) slot.appendChild(host);
+  }, [commentFocused, commentHost, expanded]);
 
-    const place = () => {
-      if (el.classList.contains("comment-composer-pinned")) return;
-      const rect = slot.getBoundingClientRect();
-      el.style.position = "fixed";
-      el.style.top = `${rect.top}px`;
-      el.style.left = `${rect.left}px`;
-      el.style.width = `${rect.width}px`;
-      el.style.right = "auto";
-      el.style.transform = "none";
-      el.style.zIndex = "20";
-    };
-
-    place();
-    const scroller = document.getElementById("app-scroll-main");
-    scroller?.addEventListener("scroll", place, { passive: true });
-    window.addEventListener("resize", place);
-    const vv = window.visualViewport;
-    vv?.addEventListener("resize", place);
-    vv?.addEventListener("scroll", place);
-    return () => {
-      scroller?.removeEventListener("scroll", place);
-      window.removeEventListener("resize", place);
-      vv?.removeEventListener("resize", place);
-      vv?.removeEventListener("scroll", place);
-    };
-  }, [commentFocused, commentBarHeight, expanded]);
+  useEffect(() => {
+    const host = commentHost;
+    return () => host?.remove();
+  }, [commentHost]);
 
   const [likersOpen, setLikersOpen] = useState(false);
   const [likersLoading, setLikersLoading] = useState(false);
@@ -1045,7 +1032,7 @@ export function FeedPostCard({
       ) : null}
 
       {expanded ? (
-        <div className="mt-2.5 space-y-3 border-t border-border/30 px-3.5 pb-0.5 pt-3 sm:px-4">
+        <div className="mt-2.5 space-y-3 border-t border-border/30 px-3.5 pb-3.5 pt-3 sm:px-4">
           {loadingComments ? (
             <div className="space-y-1.5" aria-busy="true">
               <Skeleton className="h-11 w-full rounded-lg" />
@@ -1104,18 +1091,17 @@ export function FeedPostCard({
               )}
             </div>
           )}
-          <div ref={commentSlotRef} aria-hidden className="pointer-events-none" style={{ height: commentBarHeight || 56 }} />
-          {createPortal(
+          <div
+            ref={commentSlotRef}
+            aria-hidden={commentFocused || undefined}
+            className={commentFocused ? "pointer-events-none" : "min-w-0"}
+            style={commentFocused ? { height: commentBarHeight || 56 } : undefined}
+          />
+          {commentHost
+            ? createPortal(
             <div
               ref={commentComposerRef}
               data-comment-composer=""
-              onPointerDown={(event) => {
-                const target = event.target;
-                if (!(target instanceof Element) || !target.closest("textarea")) return;
-                event.currentTarget.classList.add("comment-composer-pinned");
-                document.documentElement.setAttribute("data-comment-keyboard", "");
-                setCommentFocused(true);
-              }}
               onFocus={(event) => {
                 event.currentTarget.classList.add("comment-composer-pinned");
                 document.documentElement.setAttribute("data-comment-keyboard", "");
@@ -1131,7 +1117,7 @@ export function FeedPostCard({
                   setCommentFocused(false);
                 }, 160);
               }}
-              className={cn("space-y-2", commentFocused && "comment-composer-pinned")}
+              className={cn("min-w-0 space-y-2", commentFocused && "comment-composer-pinned")}
             >
             {commentImagePreviewUrl ? (
               <div className="flex items-start gap-2 rounded-2xl border border-border/50 bg-muted/30 p-2">
@@ -1203,8 +1189,9 @@ export function FeedPostCard({
               </div>
             </div>
             </div>,
-            document.body,
-          )}
+            commentHost,
+          )
+            : null}
         </div>
       ) : null}
     </article>
