@@ -29,7 +29,8 @@ import { defaultEventStartsAtLocal } from "@/lib/community/event-display";
 import { isLikelyImageFile, pickPostImagesFromLibrary } from "@/lib/community/pick-post-images";
 import { pickStoryVideoFromLibrary } from "@/lib/community/pick-story-video";
 import { preparePostImageFiles } from "@/lib/community/prepare-post-image";
-import type { PreparedPostVideo } from "@/lib/community/prepare-post-video";
+import { captureVideoPosterJpeg, type PreparedPostVideo } from "@/lib/community/prepare-post-video";
+import { feedVideoTooLargeMessage, MAX_POST_VIDEO_SECONDS } from "@/lib/community/feed-video-limits";
 import {
   beginFilePickerHold,
   clickHiddenFileInput,
@@ -94,6 +95,7 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
+  const acceptingVideoRef = useRef<File | null>(null);
 
   const hasFeedHandle = Boolean(profile?.public_handle?.trim());
   const canComposeToFeed =
@@ -209,25 +211,13 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
     await attachPickedVideo(f);
   }
 
-  async function attachPickedVideo(picked: File) {
-    if (!isLikelyVideoFile(picked)) {
-      toast({ title: "Unsupported file", description: "Choose an MP4, MOV, or WebM video.", variant: "destructive" });
-      if (videoInputRef.current) videoInputRef.current.value = "";
-      return;
-    }
-    // Keep the composer open under the trim sheet after the OS picker closes.
-    setSheetOpen(true);
-    setTrimSourceFile(picked);
-    setTrimSheetOpen(true);
-    if (videoInputRef.current) videoInputRef.current.value = "";
-  }
-
-  function onTrimConfirm(prepared: PreparedPostVideo) {
+  function acceptComposerVideo(file: File, poster: File | null) {
     setComposerFiles([]);
     setComposerImageAlts([]);
     if (fileInputRef.current) fileInputRef.current.value = "";
-    setComposerVideoFile(prepared.video);
-    setComposerVideoPosterFile(prepared.poster);
+    acceptingVideoRef.current = file;
+    setComposerVideoFile(file);
+    setComposerVideoPosterFile(poster);
     if (composerTopic === DEFAULT_COMMUNITY_TOPIC) {
       setComposerTopic("tips-what-worked");
     }
@@ -235,7 +225,41 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
     setSheetOpen(true);
   }
 
+  async function attachPickedVideo(picked: File) {
+    if (!isLikelyVideoFile(picked)) {
+      toast({ title: "Unsupported file", description: "Choose an MP4, MOV, or WebM video.", variant: "destructive" });
+      if (videoInputRef.current) videoInputRef.current.value = "";
+      return;
+    }
+    const tooLarge = feedVideoTooLargeMessage(picked);
+    if (tooLarge) {
+      toast({ title: "Video too large", description: tooLarge, variant: "destructive" });
+      if (videoInputRef.current) videoInputRef.current.value = "";
+      return;
+    }
+    setSheetOpen(true);
+    if (videoInputRef.current) videoInputRef.current.value = "";
+
+    const duration = await readVideoFileDurationSeconds(picked);
+    if (duration != null && duration > MAX_POST_VIDEO_SECONDS) {
+      setTrimSourceFile(picked);
+      setTrimSheetOpen(true);
+      return;
+    }
+
+    acceptComposerVideo(picked, null);
+    const poster = await captureVideoPosterJpeg(picked, 0.12);
+    if (poster && acceptingVideoRef.current === picked) {
+      setComposerVideoPosterFile(poster);
+    }
+  }
+
+  function onTrimConfirm(prepared: PreparedPostVideo) {
+    acceptComposerVideo(prepared.video, prepared.poster);
+  }
+
   function removeComposerVideo() {
+    acceptingVideoRef.current = null;
     setComposerVideoFile(null);
     setComposerVideoPosterFile(null);
     setComposerVideoDurationSeconds(null);

@@ -418,7 +418,7 @@ export function FeedComposerFormBody({
             <video src={composerVideoPreview} controls playsInline preload="metadata" className="max-h-64 w-full" />
           </div>
           <p className="text-[11px] leading-snug text-muted-foreground">
-            Shows in Watch and on the Feed. Up to {formatVideoDurationSeconds(MAX_POST_VIDEO_SECONDS)}.
+            Ready to post. Videos up to {formatVideoDurationSeconds(MAX_POST_VIDEO_SECONDS)} go up as you chose them.
             {composerVideoDurationSeconds != null
               ? ` ${formatVideoDurationSeconds(composerVideoDurationSeconds)}.`
               : null}

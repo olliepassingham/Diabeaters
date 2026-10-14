@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2, Play, Volume2, VolumeX } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Loader2, Maximize2, Play } from "lucide-react";
 import { FeedMediaLightbox } from "@/components/community/feed-media-lightbox";
 import { APP_SCROLL_MAIN_ID } from "@/lib/app-scroll";
 import { claimActiveFeedVideo, releaseActiveFeedVideo } from "@/lib/feed-video-playback";
@@ -32,14 +32,17 @@ export function FeedPostVideo({ path, posterPath = null, className, priority = f
   const [failed, setFailed] = useState(false);
   const [muted, setMuted] = useState(() => readFeedVideoMuted());
   const [playing, setPlaying] = useState(false);
-  const [showMuteHint, setShowMuteHint] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [playbackError, setPlaybackError] = useState(false);
+  const [frame, setFrame] = useState<{ w: number; h: number } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     const cached = getCachedPostMediaSignedUrl(path);
     setSrc(cached);
     setFailed(false);
+    setPlaybackError(false);
+    setFrame(null);
     void getPostVideoSignedUrl(path).then((url) => {
       if (cancelled) return;
       if (url) setSrc(url);
@@ -137,25 +140,10 @@ export function FeedPostVideo({ path, posterPath = null, className, priority = f
     };
   }, [expanded, src, muted]);
 
-  useEffect(() => {
-    if (!showMuteHint) return;
-    const t = window.setTimeout(() => setShowMuteHint(false), 1200);
-    return () => window.clearTimeout(t);
-  }, [showMuteHint, muted]);
-
-  const toggleMute = useCallback(() => {
-    setMuted((m) => {
-      const next = !m;
-      writeFeedVideoMuted(next);
-      return next;
-    });
-    setShowMuteHint(true);
-  }, []);
-
-  if (failed) {
+  if (failed || playbackError) {
     return (
       <p className={cn("px-3 py-8 text-center text-xs text-muted-foreground", className)}>
-        Video could not be loaded. Try refreshing the feed.
+        This video could not play. Try refreshing the feed.
       </p>
     );
   }
@@ -179,66 +167,55 @@ export function FeedPostVideo({ path, posterPath = null, className, priority = f
       <div
         ref={containerRef}
         className={cn("group relative w-full overflow-hidden bg-black", className)}
+        style={frame ? { aspectRatio: `${frame.w} / ${frame.h}`, maxHeight: "70dvh" } : { aspectRatio: "4 / 5", maxHeight: "70dvh" }}
         data-testid="feed-post-video"
       >
+        {src ? (
+          <video
+            ref={videoRef}
+            src={src}
+            poster={posterSrc ?? undefined}
+            muted={muted}
+            loop
+            playsInline
+            controls
+            preload={priority ? "auto" : "metadata"}
+            className="h-full w-full bg-black object-contain"
+            onLoadedMetadata={(event) => {
+              const v = event.currentTarget;
+              if (v.videoWidth > 0 && v.videoHeight > 0) {
+                setFrame({ w: v.videoWidth, h: v.videoHeight });
+              }
+            }}
+            onPlay={() => setPlaying(true)}
+            onPause={() => setPlaying(false)}
+            onVolumeChange={(event) => {
+              const next = event.currentTarget.muted;
+              setMuted(next);
+              writeFeedVideoMuted(next);
+            }}
+            onError={() => setPlaybackError(true)}
+          />
+        ) : (
+          <img src={posterSrc!} alt="" className="h-full w-full object-contain" />
+        )}
+        {topicLabel ? (
+          <span className="pointer-events-none absolute left-3 top-3 z-10 max-w-[70%] truncate rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
+            {topicLabel}
+          </span>
+        ) : !playing && src ? (
+          <span className="pointer-events-none absolute left-3 top-3 z-10 inline-flex items-center gap-1 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
+            <Play className="h-3.5 w-3.5 fill-current" aria-hidden />
+            Video
+          </span>
+        ) : null}
         <button
           type="button"
-          className="relative block w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+          className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm"
           onClick={() => setExpanded(true)}
           aria-label="Watch video fullscreen"
         >
-          {src ? (
-            <video
-              ref={videoRef}
-              src={src}
-              poster={posterSrc ?? undefined}
-              muted={muted}
-              loop
-              playsInline
-              preload={priority ? "auto" : "metadata"}
-              className="pointer-events-none aspect-[4/5] max-h-[min(85vw,32rem)] w-full object-cover"
-              onPlay={() => setPlaying(true)}
-              onPause={() => setPlaying(false)}
-            />
-          ) : (
-            <img
-              src={posterSrc!}
-              alt=""
-              className="aspect-[4/5] max-h-[min(85vw,32rem)] w-full object-cover"
-            />
-          )}
-          <div
-            className={cn(
-              "pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/55 to-transparent transition-opacity duration-300",
-              playing ? "opacity-100" : "opacity-90",
-            )}
-            aria-hidden
-          />
-          {topicLabel ? (
-            <span className="pointer-events-none absolute left-3 top-3 max-w-[70%] truncate rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
-              {topicLabel}
-            </span>
-          ) : null}
-          <span
-            className={cn(
-              "pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-full bg-black/55 px-4 py-2 text-sm font-semibold text-white backdrop-blur-sm transition-opacity duration-200",
-              playing ? "opacity-0" : "opacity-100",
-            )}
-          >
-            <Play className="h-4 w-4 fill-current" aria-hidden />
-            Watch
-          </span>
-        </button>
-        <button
-          type="button"
-          className={cn(
-            "absolute bottom-3 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition-all duration-200",
-            showMuteHint || muted ? "scale-100 opacity-100" : "scale-95 opacity-0 group-hover:opacity-100",
-          )}
-          onClick={toggleMute}
-          aria-label={muted ? "Unmute video" : "Mute video"}
-        >
-          {muted ? <VolumeX className="h-4 w-4" aria-hidden /> : <Volume2 className="h-4 w-4" aria-hidden />}
+          <Maximize2 className="h-4 w-4" aria-hidden />
         </button>
       </div>
 
@@ -253,6 +230,7 @@ export function FeedPostVideo({ path, posterPath = null, className, priority = f
             playsInline
             controls
             className="max-h-[85dvh] w-full object-contain"
+            onError={() => setPlaybackError(true)}
           />
         ) : null}
       </FeedMediaLightbox>
