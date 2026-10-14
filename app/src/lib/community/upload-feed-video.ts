@@ -189,18 +189,151 @@ export async function resumableUploadFeedVideo(options: {
   }
 }
 
-async function standardUpload(
-  supabase: SupabaseClient,
-  path: string,
-  file: File,
-  upsert: boolean,
-): Promise<void> {
-  const { error } = await supabase.storage.from(COMMUNITY_POST_IMAGES_BUCKET).upload(path, file, {
-    cacheControl: "604800",
-    upsert,
-    contentType: file.type || "video/mp4",
+export type VideoUploadResponse = {
+  status: number;
+  location: string | null;
+  uploadOffset: string | null;
+  text: string;
+};
+
+export function storageObjectUploadUrl(supabaseUrl: string, objectPath: string): string {
+  const encoded = objectPath
+    .split("/")
+    .filter(Boolean)
+    .map((part) => encodeURIComponent(part))
+    .join("/");
+  return `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/${COMMUNITY_POST_IMAGES_BUCKET}/${encoded}`;
+}
+
+export function feedVideoContentType(file: File): string {
+  return feedVideoStorageExt(file) === "webm" ? "video/webm" : "video/mp4";
+}
+
+function storageErrorText(status: number, text: string): string {
+  try {
+    const body = JSON.parse(text) as { message?: string; error?: string; msg?: string };
+    return body.message || body.error || body.msg || `Upload failed (${status})`;
+  } catch {
+    return text.trim() || `Upload failed (${status})`;
+  }
+}
+
+/** XMLHttpRequest streams a camera-roll file. fetch() on iPhone aborts that body with "Load failed". */
+export function xhrUpload(options: {
+  url: string;
+  method: string;
+  headers: Record<string, string>;
+  body?: Blob | null;
+}): Promise<VideoUploadResponse> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open(options.method, options.url);
+    xhr.timeout = 0;
+    for (const [key, value] of Object.entries(options.headers)) {
+      xhr.setRequestHeader(key, value);
+    }
+    xhr.onload = () => {
+      resolve({
+        status: xhr.status,
+        location: xhr.getResponseHeader("location"),
+        uploadOffset: xhr.getResponseHeader("upload-offset"),
+        text: xhr.responseText || "",
+      });
+    };
+    xhr.onerror = () => reject(new Error("Load failed"));
+    xhr.ontimeout = () => reject(new Error("The upload timed out."));
+    xhr.send(options.body ?? null);
   });
-  if (error) throw new Error(error.message);
+}
+
+async function uploadOriginalVideo(options: {
+  supabaseUrl: string;
+  accessToken: string;
+  anonKey: string;
+  objectPath: string;
+  file: File;
+  upsert: boolean;
+  send?: typeof xhrUpload;
+}): Promise<void> {
+  const send = options.send ?? xhrUpload;
+  const contentType = feedVideoContentType(options.file);
+  const response = await send({
+    url: storageObjectUploadUrl(options.supabaseUrl, options.objectPath),
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${options.accessToken}`,
+      apikey: options.anonKey,
+      "x-upsert": String(options.upsert),
+      "cache-control": "max-age=604800",
+      "content-type": contentType,
+    },
+    body: options.file,
+  });
+  if (response.status < 200 || response.status >= 300) {
+    throw new Error(storageErrorText(response.status, response.text));
+  }
+}
+
+async function resumableUploadWithXhr(options: {
+  endpoint: string;
+  file: File;
+  objectName: string;
+  contentType: string;
+  accessToken: string;
+  anonKey: string;
+  upsert: boolean;
+  send?: typeof xhrUpload;
+}): Promise<void> {
+  const send = options.send ?? xhrUpload;
+  const created = await send({
+    url: options.endpoint,
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${options.accessToken}`,
+      apikey: options.anonKey,
+      "x-upsert": String(options.upsert),
+      "tus-resumable": "1.0.0",
+      "upload-length": String(options.file.size),
+      "upload-metadata": tusUploadMetadata({
+        bucketName: COMMUNITY_POST_IMAGES_BUCKET,
+        objectName: options.objectName,
+        contentType: options.contentType,
+        cacheControl: "604800",
+      }),
+    },
+    body: null,
+  });
+  if (created.status < 200 || created.status >= 300) {
+    throw new Error(storageErrorText(created.status, created.text));
+  }
+  if (!created.location) throw new Error("Resumable upload did not return a location.");
+  const location = new URL(created.location, options.endpoint).toString();
+
+  let offset = 0;
+  while (offset < options.file.size) {
+    const end = Math.min(options.file.size, offset + RESUMABLE_CHUNK_BYTES);
+    const response = await send({
+      url: location,
+      method: "PATCH",
+      headers: {
+        authorization: `Bearer ${options.accessToken}`,
+        apikey: options.anonKey,
+        "tus-resumable": "1.0.0",
+        "upload-offset": String(offset),
+        "content-type": "application/offset+octet-stream",
+      },
+      body: options.file.slice(offset, end),
+    });
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(storageErrorText(response.status, response.text));
+    }
+    const next = response.uploadOffset != null && response.uploadOffset !== "" ? Number(response.uploadOffset) : end;
+    offset = Number.isFinite(next) && next > offset ? next : end;
+  }
+}
+
+function isChunkUploadUnavailable(message: string): boolean {
+  return shouldRetryResumableWithStandardUpload(message) || message.toLowerCase().includes("load failed");
 }
 
 /** Upload a feed video straight to its final storage path. */
@@ -209,32 +342,46 @@ export async function uploadFeedVideoFile(
   path: string,
   source: File,
 ): Promise<void> {
-  const file = fileForFeedVideoUpload(source);
   const env = getSupabaseUrlAndAnonKey();
   const { data: sessionData } = await supabase.auth.getSession();
   const accessToken = sessionData.session?.access_token ?? "";
-  const useResumable = Boolean(env && accessToken && file.size >= RESUMABLE_MIN_BYTES);
 
   const attempt = async (upsert: boolean) => {
-    if (useResumable && env) {
+    if (env && accessToken) {
       try {
-        await resumableUploadFeedVideo({
-          endpoint: `${env.url}/storage/v1/upload/resumable`,
-          file,
-          bucket: COMMUNITY_POST_IMAGES_BUCKET,
-          objectName: path,
-          contentType: file.type || "video/mp4",
+        await uploadOriginalVideo({
+          supabaseUrl: env.url,
           accessToken,
           anonKey: env.anonKey,
+          objectPath: path,
+          file: source,
           upsert,
         });
         return;
       } catch (error) {
         const message = error instanceof Error ? error.message : "Upload failed";
-        if (!shouldRetryResumableWithStandardUpload(message)) throw new Error(message);
+        const retryInChunks = source.size >= RESUMABLE_MIN_BYTES && isChunkUploadUnavailable(message);
+        if (!retryInChunks) throw new Error(message);
       }
+      await resumableUploadWithXhr({
+        endpoint: `${env.url}/storage/v1/upload/resumable`,
+        file: source,
+        objectName: path,
+        contentType: feedVideoContentType(source),
+        accessToken,
+        anonKey: env.anonKey,
+        upsert,
+      });
+      return;
     }
-    await standardUpload(supabase, path, file, upsert);
+
+    const prepared = fileForFeedVideoUpload(source);
+    const { error } = await supabase.storage.from(COMMUNITY_POST_IMAGES_BUCKET).upload(path, prepared, {
+      cacheControl: "604800",
+      upsert,
+      contentType: prepared.type || "video/mp4",
+    });
+    if (error) throw new Error(error.message);
   };
 
   try {

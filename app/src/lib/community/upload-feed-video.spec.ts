@@ -3,9 +3,11 @@ import { describe, expect, it, vi } from "vitest";
 import {
   copyVideoFileForUpload,
   explainVideoUploadError,
+  feedVideoContentType,
   feedVideoStorageExt,
   fileForFeedVideoUpload,
   resumableUploadFeedVideo,
+  storageObjectUploadUrl,
   tusUploadMetadata,
 } from "@/lib/community/upload-feed-video";
 
@@ -31,9 +33,18 @@ describe("feed video upload", () => {
     if (copied.ownsBytes) expect(copied.file.size).toBe(original.size);
   });
 
+  it("uploads an iPhone clip to the normal storage object url as mp4", () => {
+    expect(feedVideoContentType(new File([new Uint8Array([1])], "IMG_1.MOV", { type: "video/quicktime" }))).toBe(
+      "video/mp4",
+    );
+    expect(storageObjectUploadUrl("https://example.supabase.co/", "user/post/video.mp4")).toBe(
+      "https://example.supabase.co/storage/v1/object/community_post_images/user/post/video.mp4",
+    );
+  });
   it("turns storage size and network failures into a clear reason", () => {
     expect(explainVideoUploadError("The object exceeded the maximum allowed size")).toMatch(/shorter clip/);
     expect(explainVideoUploadError("Failed to fetch")).toMatch(/stopped before it finished/);
+    expect(explainVideoUploadError("Load failed")).toMatch(/stopped before it finished/);
     expect(explainVideoUploadError("mime type video/quicktime is not supported")).toMatch(/video format/);
   });
 

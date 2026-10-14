@@ -30,7 +30,6 @@ import { isLikelyImageFile, pickPostImagesFromLibrary } from "@/lib/community/pi
 import { preparePostImageFiles } from "@/lib/community/prepare-post-image";
 import { captureVideoPosterJpeg, type PreparedPostVideo } from "@/lib/community/prepare-post-video";
 import { feedVideoTooLargeMessage, MAX_POST_VIDEO_SECONDS } from "@/lib/community/feed-video-limits";
-import { copyVideoFileForUpload } from "@/lib/community/upload-feed-video";
 import {
   beginFilePickerHold,
   clickHiddenFileInput,
@@ -238,24 +237,20 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
       return;
     }
 
-    // Copy the bytes before clearing the input. On iPhone, clearing the file
-    // input deletes the camera-roll file, so the later upload reads nothing and fails.
-    const copied = await copyVideoFileForUpload(picked);
-    if (copied.ownsBytes && videoInputRef.current) videoInputRef.current.value = "";
-    const stable = copied.file;
-
+    // Keep the camera-roll file on the input until the post finishes. Copying it
+    // into memory, or clearing the input, makes iPhone abort the upload.
     setSheetOpen(true);
 
-    const duration = await readVideoFileDurationSeconds(stable);
+    const duration = await readVideoFileDurationSeconds(picked);
     if (duration != null && duration > MAX_POST_VIDEO_SECONDS) {
-      setTrimSourceFile(stable);
+      setTrimSourceFile(picked);
       setTrimSheetOpen(true);
       return;
     }
 
-    acceptComposerVideo(stable, null);
-    const poster = await captureVideoPosterJpeg(stable, 0.12);
-    if (poster && acceptingVideoRef.current === stable) {
+    acceptComposerVideo(picked, null);
+    const poster = await captureVideoPosterJpeg(picked, 0.12);
+    if (poster && acceptingVideoRef.current === picked) {
       setComposerVideoPosterFile(poster);
     }
   }
