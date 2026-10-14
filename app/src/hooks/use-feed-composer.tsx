@@ -27,7 +27,6 @@ import {
 import { writePostAudiencePreference } from "@/lib/community/post-audience";
 import { defaultEventStartsAtLocal } from "@/lib/community/event-display";
 import { isLikelyImageFile, pickPostImagesFromLibrary } from "@/lib/community/pick-post-images";
-import { pickStoryVideoFromLibrary } from "@/lib/community/pick-story-video";
 import { preparePostImageFiles } from "@/lib/community/prepare-post-image";
 import { captureVideoPosterJpeg, type PreparedPostVideo } from "@/lib/community/prepare-post-video";
 import { feedVideoTooLargeMessage, MAX_POST_VIDEO_SECONDS } from "@/lib/community/feed-video-limits";
@@ -303,23 +302,9 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
   }
 
   async function pickVideoFromLibraryOnly() {
-    if (!Capacitor.isNativePlatform()) {
-      clickHiddenFileInput(videoInputRef.current);
-      return;
-    }
-    const endHold = beginFilePickerHold();
-    try {
-      const file = await pickStoryVideoFromLibrary();
-      if (file) await attachPickedVideo(file);
-    } catch (e) {
-      toast({
-        title: "Could not open your videos",
-        description: e instanceof Error ? e.message : "Try choosing the video again.",
-        variant: "destructive",
-      });
-    } finally {
-      endHold();
-    }
+    // Must run in this tap. Awaiting the camera plugin drops the gesture and, on
+    // the installed app, choosing a video from that plugin fails outright.
+    clickHiddenFileInput(videoInputRef.current);
   }
 
   function removeComposerImage(index: number) {
@@ -640,7 +625,7 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
             <input
               ref={videoInputRef}
               type="file"
-              accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.m4v,.webm"
+              accept="video/*"
               className={FILE_INPUT_HIDDEN_CLASS}
               id="feed-composer-video"
               disabled={videoDisabled}
