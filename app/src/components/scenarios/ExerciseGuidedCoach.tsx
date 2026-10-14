@@ -921,21 +921,17 @@ export function ExerciseGuidedCoach() {
 
     return (
       <div className="space-y-4 max-sm:space-y-3" data-testid="exercise-guided-coach-start">
-        <div className="relative overflow-hidden rounded-[1.75rem] border border-border/50 bg-card/95 shadow-sm">
-          <div
-            className="pointer-events-none absolute inset-0 bg-gradient-to-b from-emerald-500/[0.06] via-transparent to-muted/20"
-            aria-hidden
-          />
-          <Collapsible open={planWorkoutOpen} onOpenChange={setPlanWorkoutOpen} className="group relative z-10">
+        <div className="guide-tool-card">
+          <Collapsible open={planWorkoutOpen} onOpenChange={setPlanWorkoutOpen} className="group">
             <CollapsibleTrigger asChild>
               <button
                 type="button"
-                className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left outline-none transition-colors hover:bg-muted/20 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-5"
+                className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left outline-none transition-colors hover:bg-muted/20 sm:px-5"
                 data-testid="coach-plan-workout-trigger"
                 aria-expanded={planWorkoutOpen}
               >
                 <div className="flex min-w-0 items-center gap-3">
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 ring-1 ring-emerald-500/15 dark:text-emerald-400">
+                  <span className="guide-tool-icon">
                     <Sparkles className="h-5 w-5" aria-hidden />
                   </span>
                   <div className="min-w-0">
@@ -952,7 +948,7 @@ export function ExerciseGuidedCoach() {
             <CollapsibleContent>
               <div className="space-y-5 border-t border-border/40 px-4 pb-5 pt-4 sm:px-5">
                 <div className="space-y-2">
-                  <Label className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Type</Label>
+                  <Label className="text-xs font-medium text-muted-foreground">Type</Label>
                   <div className="grid grid-cols-2 gap-1.5">
                     {EXERCISE_TYPE_OPTIONS.map((o) => {
                       const active = startType === o.value;
@@ -980,9 +976,7 @@ export function ExerciseGuidedCoach() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                    Intensity
-                  </Label>
+                  <Label className="text-xs font-medium text-muted-foreground">Intensity</Label>
                   <div className="grid grid-cols-3 gap-1 rounded-2xl bg-muted/30 p-1" role="group" aria-label="Intensity">
                     {INTENSITY_OPTIONS.map((i) => {
                       const active = startIntensity === i;
@@ -1009,9 +1003,7 @@ export function ExerciseGuidedCoach() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                    Duration
-                  </Label>
+                  <Label className="text-xs font-medium text-muted-foreground">Duration</Label>
                   <div className="flex flex-wrap items-center gap-1.5">
                     {durationPresets.map((m) => (
                       <Button

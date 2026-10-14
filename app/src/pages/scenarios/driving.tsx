@@ -292,10 +292,10 @@ export default function DrivingScenarioPage() {
           />
         </div>
 
-        <GuideFrame>
+        <GuideFrame bare>
         {phase === "form" ? (
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
               <span>
                 Step {wizardStep + 1} of {FORM_WIZARD_STEPS}
               </span>
@@ -314,8 +314,8 @@ export default function DrivingScenarioPage() {
         ) : null}
 
         {phase === "form" ? (
-          <section className="space-y-4 overflow-hidden rounded-[1.35rem] border border-sky-500/20 bg-gradient-to-b from-sky-500/[0.07] via-card to-card p-4 shadow-none dark:border-sky-400/15 dark:from-sky-950/35 sm:p-5">
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          <section className="guide-tool-card space-y-4 p-4 sm:p-5">
+            <h2 className="text-xs font-medium text-muted-foreground">
               {STEP_TITLES[wizardStep]}
             </h2>
 
@@ -339,7 +339,7 @@ export default function DrivingScenarioPage() {
                   </div>
                 </div>
                 {!bgSkipped ? (
-                  <div className="space-y-3 rounded-2xl border border-border/50 bg-background/70 p-3 shadow-sm dark:bg-background/40">
+                  <div className="space-y-3">
                     {targetRangeLine ? (
                       <p className="text-xs text-muted-foreground">{targetRangeLine}</p>
                     ) : null}

@@ -397,7 +397,7 @@ export default function PumpFailurePage() {
         actions={<ScenarioCoachLink topic="pump-failure" />}
       />
 
-      <GuideFrame>
+      <GuideFrame bare>
       <PumpFailureEmergencyCollapsible
         regionFooter={regionFooter}
         open={emergencyOpen}

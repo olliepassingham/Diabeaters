@@ -1766,9 +1766,9 @@ export default function Travel() {
           <ScenarioCoachLink topic="travel" from="travel-active" q={activeCoachPrompt} />
         </header>
 
-        <GuideFrame>
+        <GuideFrame bare>
         <section
-          className="overflow-hidden rounded-[1.5rem] border border-sky-500/20 bg-gradient-to-br from-sky-500/[0.12] via-card to-card px-4 py-4"
+          className="guide-tool-card px-4 py-4"
           data-testid="travel-active-day-hero"
         >
           <div className="flex items-end justify-between gap-3">
@@ -2124,13 +2124,13 @@ export default function Travel() {
           }
         />
 
-        <GuideFrame>
+        <GuideFrame bare>
         {!holidayPrep ? (
           <section
-            className="overflow-hidden rounded-[1.75rem] border border-sky-500/20 bg-gradient-to-b from-sky-500/[0.12] via-card to-card px-5 pb-5 pt-6 shadow-[0_18px_40px_-28px_rgba(14,165,233,0.55)]"
+            className="guide-tool-card px-5 pb-5 pt-6"
             data-testid="travel-empty-hero"
           >
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500/25 to-cyan-500/10 text-sky-700 ring-1 ring-sky-500/25 dark:text-sky-200">
+            <div className="guide-tool-icon mx-auto">
               <Plane className="h-7 w-7" aria-hidden />
             </div>
             <h2 className="mt-4 text-center font-display text-2xl font-semibold tracking-tight text-foreground">
@@ -2151,7 +2151,7 @@ export default function Travel() {
           </section>
         ) : (
           <Card
-            className="overflow-hidden rounded-[1.75rem] border-sky-500/20 bg-gradient-to-b from-sky-500/[0.10] via-card to-card shadow-[0_18px_40px_-28px_rgba(14,165,233,0.45)]"
+            className="guide-tool-card"
             data-testid="card-travel-entry-hub"
           >
             <CardContent className="space-y-4 p-4 sm:p-5">
@@ -2475,7 +2475,7 @@ export default function Travel() {
           actions={<ScenarioCoachLink topic="travel" from="travel-setup" />}
         />
 
-        <GuideFrame>
+        <GuideFrame bare>
         {(holidayPrep || plan.destination.trim()) && (
           <div
             className="rounded-xl border border-border/50 bg-muted/15 px-3 py-2"
@@ -2517,16 +2517,16 @@ export default function Travel() {
           />
         </div>
 
-        <Card className="overflow-hidden rounded-2xl border-sky-500/20 bg-gradient-to-b from-sky-500/[0.07] via-card to-card shadow-none dark:border-sky-400/15 dark:from-sky-950/40">
+        <Card className="guide-tool-card">
           <CardHeader className="space-y-0 px-3.5 pb-2.5 pt-3.5">
             <div className="flex items-center gap-2.5">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500/20 to-indigo-500/10 text-sky-700 ring-1 ring-sky-500/20 dark:text-sky-200">
+              <span className="guide-tool-icon">
                 <Plane className="h-4 w-4" aria-hidden />
               </span>
               <CardTitle className="font-display text-base font-semibold tracking-tight">{INPUT_STEP_TITLES[travelWizardStep]}</CardTitle>
             </div>
           </CardHeader>
-          <CardContent className="space-y-4 border-t border-sky-500/10 px-3.5 pb-4 pt-4">
+          <CardContent className="space-y-4 border-t border-border/40 px-3.5 pb-4 pt-4">
             {travelWizardStep === 0 ? (
               <>
             <div className="space-y-1.5">
@@ -2883,8 +2883,8 @@ export default function Travel() {
         actions={<ScenarioCoachLink topic="travel" from="travel-results" />}
       />
 
-      <GuideFrame>
-      <div className="overflow-hidden rounded-2xl border border-sky-500/25 bg-gradient-to-br from-sky-500/[0.10] via-card to-card shadow-[0_12px_40px_-24px_rgba(14,165,233,0.45)]">
+      <GuideFrame bare>
+      <div className="guide-tool-card">
         <div className="px-3.5 pb-3.5 pt-3.5 sm:px-5">
           <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">Packed</p>
           <p className="mt-1 font-display text-[2.25rem] font-bold leading-none tabular-nums tracking-tight text-foreground">

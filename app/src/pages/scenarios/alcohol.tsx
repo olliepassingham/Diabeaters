@@ -1167,7 +1167,7 @@ export default function AlcoholScenarioPage() {
           />
         </div>
 
-        <GuideFrame>
+        <GuideFrame bare>
         {phase !== "result" ? (
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-base font-medium text-muted-foreground">

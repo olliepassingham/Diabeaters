@@ -71,7 +71,7 @@ export default function ScenarioExercisePage() {
         }
       />
 
-      <GuideFrame>
+      <GuideFrame bare>
         {/* The guided coach below already shows the active session's name, phase, and
             progress in its own header — a second summary card here duplicated that. */}
         {!active ? <ExerciseFuelCalculator /> : null}

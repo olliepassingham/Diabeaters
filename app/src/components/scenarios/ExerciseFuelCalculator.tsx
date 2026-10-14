@@ -402,7 +402,7 @@ export function ExerciseFuelCalculator() {
   const [result, setResult] = useState<ExerciseFuelCalculatorResult | null>(null);
   const [bgUnits, setBgUnits] = useState("mmol/L");
   const [isPump, setIsPump] = useState(false);
-  const [formOpen, setFormOpen] = useState(true);
+  const [formOpen, setFormOpen] = useState(false);
   const [extrasOpen, setExtrasOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
@@ -580,24 +580,17 @@ export function ExerciseFuelCalculator() {
 
   return (
     <div className="space-y-4">
-      <div
-        className="relative overflow-hidden rounded-[1.75rem] border border-border/50 bg-card/95 shadow-sm"
-        data-testid="exercise-fuel-calculator"
-      >
-        <div
-          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-primary/[0.05] via-transparent to-muted/20"
-          aria-hidden
-        />
-        <Collapsible open={formOpen} onOpenChange={setFormOpen} className="group relative z-10">
+      <div className="guide-tool-card" data-testid="exercise-fuel-calculator">
+        <Collapsible open={formOpen} onOpenChange={setFormOpen} className="group">
           <CollapsibleTrigger asChild>
             <button
               type="button"
-              className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left outline-none transition-colors hover:bg-muted/20 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-5"
+              className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left outline-none transition-colors hover:bg-muted/20 sm:px-5"
               data-testid="efc-collapsible-trigger"
               aria-expanded={formOpen}
             >
               <div className="flex min-w-0 items-center gap-3">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/15">
+                <span className="guide-tool-icon">
                   <Calculator className="h-5 w-5" aria-hidden />
                 </span>
                 <div className="min-w-0">
@@ -618,9 +611,7 @@ export function ExerciseFuelCalculator() {
           <CollapsibleContent>
             <div className="space-y-5 border-t border-border/40 px-4 pb-5 pt-4 sm:px-5">
               <div className="space-y-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                  Your session
-                </p>
+                <p className="text-xs font-medium text-muted-foreground">Your session</p>
 
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium text-muted-foreground">Activity</Label>
@@ -787,9 +778,7 @@ export function ExerciseFuelCalculator() {
 
               <div className="space-y-3 border-t border-border/40 pt-4">
                 <div className="flex items-center gap-1">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                    Food before exercise
-                  </p>
+                  <p className="text-xs font-medium text-muted-foreground">Food before exercise</p>
                   <InlineInfoHint
                     ariaLabel="How the carbs estimate works"
                     className="h-7 w-7 shrink-0"
@@ -975,7 +964,7 @@ export function ExerciseFuelCalculator() {
       {result && !hasActiveExercise ? (
         <div
           ref={resultRef}
-          className="scroll-mt-4 overflow-hidden rounded-[1.75rem] border border-border/50 bg-card/95 shadow-sm"
+          className="guide-tool-card scroll-mt-4"
           data-testid="efc-result"
         >
           <div className="space-y-2 border-b border-border/40 px-4 pb-3 pt-4 sm:px-5">

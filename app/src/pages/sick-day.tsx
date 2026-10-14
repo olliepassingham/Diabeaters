@@ -1405,7 +1405,7 @@ export default function SickDay() {
           }
         />
 
-        <GuideFrame>
+        <GuideFrame bare>
         {isExtended ? (
           <p
             className={cn(
@@ -2426,20 +2426,20 @@ export default function SickDay() {
         }
       />
 
-      <GuideFrame>
+      <GuideFrame bare>
       <div className="space-y-4">
         {!results ? (
           <>
-          <Card className="overflow-hidden rounded-[1.35rem] border-amber-500/20 bg-gradient-to-b from-amber-500/[0.07] via-card to-card shadow-none dark:border-amber-400/15 dark:from-amber-950/40">
+          <Card className="guide-tool-card">
             <CardHeader className="space-y-0 px-4 pb-3 pt-4 sm:px-5">
               <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-500/10 text-amber-700 ring-1 ring-amber-500/20 dark:text-amber-200">
+                <span className="guide-tool-icon">
                   <Thermometer className="h-5 w-5" aria-hidden />
                 </span>
                 <CardTitle className="font-display text-lg font-semibold tracking-tight">Your readings</CardTitle>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4 border-t border-amber-500/10 px-4 pb-4 pt-4 sm:px-5">
+            <CardContent className="space-y-4 border-t border-border/40 px-4 pb-4 pt-4 sm:px-5">
               <SickDayReadingsFields
                 severity={severity}
                 onSeverityChange={setSeverity}

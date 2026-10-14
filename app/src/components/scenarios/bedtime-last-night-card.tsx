@@ -47,16 +47,6 @@ function overnightChartPoints(insight: BedtimeOvernightInsight): CgmChartPoint[]
   }));
 }
 
-function toneForHeadline(headline: string) {
-  if (/low/i.test(headline)) {
-    return "border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-card to-card dark:from-amber-950/35";
-  }
-  if (/high|mixed|rose/i.test(headline)) {
-    return "border-orange-500/30 bg-gradient-to-br from-orange-500/8 via-card to-card dark:from-orange-950/30";
-  }
-  return "border-emerald-500/25 bg-gradient-to-br from-emerald-500/8 via-card to-card dark:from-emerald-950/30";
-}
-
 function tirToneClass(insight: BedtimeOvernightInsight): string {
   if (insight.stats.hadLow) return "text-amber-700 dark:text-amber-400";
   if (insight.stats.hadHigh) return "text-orange-700 dark:text-orange-400";
@@ -299,16 +289,12 @@ export function BedtimeLastNightCard({
   const canExpand = insight != null || (status !== "loading" && status !== "no_cgm" && Boolean(message));
   const showRefresh = Boolean(onRefresh) && status !== "no_cgm" && tirVersus === "last night";
 
-  const cardClassName = cn(
-    "overflow-hidden rounded-2xl border shadow-none",
-    insight ? toneForHeadline(insight.headline) : "border-border/60 bg-card",
-    className,
-  );
+  const cardClassName = cn("guide-tool-card shadow-none", className);
 
   const titleBlock = (
     <>
       <div
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground"
+        className="guide-tool-icon"
         aria-hidden
       >
         <Moon className="h-4 w-4" />

@@ -1195,3 +1195,41 @@
       0 16px 36px -28px rgb(120 72 24 / 0.38);
     padding: 0.85rem;
   }
+
+  /* One calm surface for a guide tool. No wash, no glow. */
+  :root:not(.dark) .guide-tool-card {
+    overflow: hidden;
+    border-radius: 1.35rem;
+    border: 1px solid rgb(148 112 72 / 0.16);
+    background: rgb(255 255 255);
+    box-shadow:
+      0 1px 2px rgb(80 48 16 / 0.04),
+      0 16px 36px -28px rgb(120 72 24 / 0.38);
+  }
+
+  .dark .guide-tool-card {
+    overflow: hidden;
+    border-radius: 1.35rem;
+    background: var(--surface-glass-bg);
+    -webkit-backdrop-filter: blur(var(--surface-glass-blur));
+    backdrop-filter: blur(var(--surface-glass-blur));
+    border: 1px solid var(--surface-glass-border);
+    box-shadow: var(--surface-glass-shadow);
+  }
+
+  .guide-tool-icon {
+    display: flex;
+    height: 2.75rem;
+    width: 2.75rem;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.9rem;
+    background: rgb(var(--color-primary) / 0.1);
+    color: rgb(var(--color-primary-dark));
+    box-shadow: inset 0 0 0 1px rgb(var(--color-primary) / 0.16);
+  }
+
+  .dark .guide-tool-icon {
+    color: rgb(var(--color-primary));
+  }

@@ -195,7 +195,7 @@ const BEDTIME_SECTION_INFO = {
 function BedtimeSectionTitle({ id, title, info }: { id: string; title: string; info: string }) {
   return (
     <div className="flex items-center gap-0.5">
-      <h3 id={id} className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+      <h3 id={id} className="text-xs font-medium text-muted-foreground">
         {title}
       </h3>
       <InlineInfoHint ariaLabel={`More about ${title}`} content={<p className="text-sm leading-snug">{info}</p>} className="h-7 w-7" />
@@ -1174,7 +1174,7 @@ export default function Bedtime() {
           </>
         }
       />
-      <GuideFrame>
+      <GuideFrame bare>
       {(scenarioState.sickDayActive || scenarioState.travelModeActive) && (
         <div className="flex flex-wrap gap-2" data-testid="container-active-scenarios">
           {scenarioState.sickDayActive && (
@@ -1233,19 +1233,19 @@ export default function Bedtime() {
 
       <Collapsible open={quickCheckOpen} onOpenChange={setQuickCheckOpen}>
         <Card
-          className="overflow-hidden rounded-[1.35rem] border-indigo-500/20 bg-gradient-to-b from-indigo-500/[0.07] via-card to-card shadow-none dark:border-indigo-400/15 dark:from-indigo-950/45 dark:via-card dark:to-card"
+          className="guide-tool-card"
           data-testid="card-bedtime-inputs"
         >
           <CollapsibleTrigger asChild>
             <button
               type="button"
-              className="w-full text-left transition-colors hover:bg-indigo-500/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:hover:bg-indigo-400/[0.04]"
+              className="w-full text-left transition-colors hover:bg-muted/20 focus-visible:outline-none"
               aria-label={quickCheckOpen ? "Collapse quick check" : "Expand quick check"}
               data-testid="button-bedtime-quick-check-toggle"
             >
               <div className="flex items-center gap-3 px-4 py-3.5 sm:px-5">
                 <div
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500/20 to-slate-500/10 text-indigo-700 ring-1 ring-indigo-500/20 dark:from-indigo-400/20 dark:to-slate-400/10 dark:text-indigo-200 dark:ring-indigo-400/20"
+                  className="guide-tool-icon"
                   aria-hidden
                 >
                   <Moon className="h-5 w-5" />
@@ -1272,10 +1272,10 @@ export default function Bedtime() {
           </CollapsibleTrigger>
 
           <CollapsibleContent>
-            <CardContent className="space-y-4 border-t border-indigo-500/10 px-4 pb-5 pt-4 sm:px-5">
+            <CardContent className="space-y-4 border-t border-border/40 px-4 pb-5 pt-4 sm:px-5">
               <section className="space-y-3" aria-labelledby="bedtime-section-glucose">
                 <BedtimeSectionTitle id="bedtime-section-glucose" title="Glucose now" info={BEDTIME_SECTION_INFO.glucose} />
-                <div className="space-y-3 rounded-2xl border border-border/50 bg-background/70 p-3 shadow-sm backdrop-blur-sm dark:bg-background/40">
+                <div className="space-y-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="current-bg" className="sr-only">
                       Current blood glucose
@@ -1376,7 +1376,7 @@ export default function Bedtime() {
                 <CollapsibleContent className="space-y-4 pt-3">
               <section className="space-y-3" aria-labelledby="bedtime-section-fuel">
                 <BedtimeSectionTitle id="bedtime-section-fuel" title="Food & insulin" info={BEDTIME_SECTION_INFO.foodInsulin} />
-                <div className="grid grid-cols-1 gap-2.5 rounded-2xl border border-border/50 bg-background/70 p-3 shadow-sm backdrop-blur-sm dark:bg-background/40 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                   <div className="space-y-1.5">
                     <Label htmlFor="hours-food" className="text-xs font-medium text-muted-foreground">
                       Since food
@@ -1448,7 +1448,7 @@ export default function Bedtime() {
 
               <section className="space-y-3" aria-labelledby="bedtime-section-sleep">
                 <BedtimeSectionTitle id="bedtime-section-sleep" title="Tonight" info={BEDTIME_SECTION_INFO.sleep} />
-                <div className="space-y-3 rounded-2xl border border-border/50 bg-background/70 p-3 shadow-sm backdrop-blur-sm dark:bg-background/40">
+                <div className="space-y-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="hours-sleep" className="text-xs font-medium text-muted-foreground">
                       Sleep in
