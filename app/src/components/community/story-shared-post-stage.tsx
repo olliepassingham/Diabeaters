@@ -130,8 +130,10 @@ function SharedFeedCard({
   const eventExtra = post.post_kind === "event" ? parseEventExtra(post.post_extra) : null;
   const pollExtra = post.post_kind === "poll" ? parsePollExtra(post.post_extra) : null;
   const topicLabel = communityTopicLabel(post.topic);
-  const contentNoteLabel = post.content_note ? communityContentNoteLabel(post.content_note) : null;
-  const contentNoteHint = post.content_note ? communityContentNoteHint(post.content_note) : null;
+  const visibleContentNote =
+    post.content_note && !(post.video_url && post.content_note === "experience-sharing") ? post.content_note : null;
+  const contentNoteLabel = visibleContentNote ? communityContentNoteLabel(visibleContentNote) : null;
+  const contentNoteHint = visibleContentNote ? communityContentNoteHint(visibleContentNote) : null;
   const previewLink = useMemo(() => getFirstWhitelistedFeedLink(post.body), [post.body]);
   const bodyText = (() => {
     const b = post.body.trim();
@@ -214,12 +216,7 @@ function SharedFeedCard({
       </div>
 
       {hasFeedVideo && post.video_url ? (
-        <FeedPostVideo path={post.video_url} posterPath={post.video_poster_url} priority topicLabel={topicLabel} />
-      ) : null}
-      {hasFeedVideo ? (
-        <div className="flex items-center gap-2 border-b border-border/30 px-3.5 py-2 text-[11px] text-muted-foreground sm:px-4">
-          <span className="min-w-0 flex-1 leading-snug">Peer experience — not medical advice or dosing guidance.</span>
-        </div>
+        <FeedPostVideo path={post.video_url} posterPath={post.video_poster_url} priority />
       ) : null}
       {hasFeedImages ? (
         <CommunityPostImageGrid

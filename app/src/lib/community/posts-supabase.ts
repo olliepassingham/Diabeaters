@@ -9,7 +9,6 @@ import { canEngageWithCommunityFeed, COMMUNITY_FEED_ENGAGE_REQUIRED_MESSAGE, get
 import { listFolloweeIdsForCurrentUser } from "./follows-supabase";
 import {
   isCommunityContentNoteId,
-  VIDEO_POST_DEFAULT_CONTENT_NOTE,
   type CommunityContentNoteId,
 } from "./content-notes";
 import {
@@ -956,8 +955,7 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
   const iErr = validateImageFiles(files);
   if (iErr) return { data: null, error: iErr };
 
-  const contentNote =
-    params.contentNote ?? (videoFile ? VIDEO_POST_DEFAULT_CONTENT_NOTE : null);
+  const contentNote = params.contentNote ?? null;
 
   const imageAltsForInsert = normalizeAltsForCount(params.imageAlts, files.length);
 

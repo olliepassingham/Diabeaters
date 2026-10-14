@@ -443,7 +443,6 @@ export function FeedWatchLearnPlayer({
                     {post.body.trim() ? (
                       <p className="line-clamp-3 text-sm leading-snug text-white/95">{post.body.trim()}</p>
                     ) : null}
-                    <p className="text-[11px] text-white/65">Peer experience — not medical advice.</p>
                     <Link
                       href={`/community/post/${encodeURIComponent(post.id)}`}
                       className="inline-flex text-[11px] font-medium text-white/80 underline-offset-2 hover:underline"

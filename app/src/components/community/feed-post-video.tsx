@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Maximize2, Play } from "lucide-react";
-import { FeedMediaLightbox } from "@/components/community/feed-media-lightbox";
+import { Loader2, Pause, Play, Volume2, VolumeX } from "lucide-react";
 import { APP_SCROLL_MAIN_ID } from "@/lib/app-scroll";
 import { claimActiveFeedVideo, releaseActiveFeedVideo } from "@/lib/feed-video-playback";
 import { getCachedPostMediaSignedUrl, getPostVideoSignedUrl } from "@/lib/community";
@@ -15,16 +14,26 @@ type Props = {
   className?: string;
   /** Start buffering immediately (first visible feed posts). */
   priority?: boolean;
-  /** Optional topic chip shown on the video surface. */
-  topicLabel?: string | null;
 };
 
-const PLAY_THRESHOLD = 0.6;
+const PLAY_THRESHOLD = 0.55;
 
-export function FeedPostVideo({ path, posterPath = null, className, priority = false, topicLabel = null }: Props) {
+function playFeedVideo(video: HTMLVideoElement, preferMuted: boolean): void {
+  video.muted = preferMuted;
+  void video.play().catch(() => {
+    video.muted = true;
+    void video.play().catch(() => {
+      /* Autoplay can still be blocked until the next tap. */
+    });
+  });
+}
+
+export function FeedPostVideo({ path, posterPath = null, className, priority = false }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const expandedVideoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const userPausedRef = useRef(false);
+  const [held, setHeld] = useState(false);
+  const flashTimerRef = useRef<number | null>(null);
   const [src, setSrc] = useState<string | null>(() => getCachedPostMediaSignedUrl(path));
   const [posterSrc, setPosterSrc] = useState<string | null>(() =>
     posterPath ? getCachedPostMediaSignedUrl(posterPath) : null,
@@ -32,9 +41,16 @@ export function FeedPostVideo({ path, posterPath = null, className, priority = f
   const [failed, setFailed] = useState(false);
   const [muted, setMuted] = useState(() => readFeedVideoMuted());
   const [playing, setPlaying] = useState(false);
-  const [expanded, setExpanded] = useState(false);
   const [playbackError, setPlaybackError] = useState(false);
   const [frame, setFrame] = useState<{ w: number; h: number } | null>(null);
+  const [progress, setProgress] = useState(0);
+  const [flash, setFlash] = useState<"play" | "pause" | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -43,6 +59,7 @@ export function FeedPostVideo({ path, posterPath = null, className, priority = f
     setFailed(false);
     setPlaybackError(false);
     setFrame(null);
+    setProgress(0);
     void getPostVideoSignedUrl(path).then((url) => {
       if (cancelled) return;
       if (url) setSrc(url);
@@ -73,29 +90,30 @@ export function FeedPostVideo({ path, posterPath = null, className, priority = f
   useEffect(() => {
     const el = containerRef.current;
     const video = videoRef.current;
-    if (!el || !src || !video || expanded) return;
+    if (!el || !src || !video) return;
 
     const scrollRoot = document.getElementById(APP_SCROLL_MAIN_ID);
 
     const observer = new IntersectionObserver(
       (entries) => {
         const entry = entries[0];
-        if (!entry || !videoRef.current) return;
-        const v = videoRef.current;
+        const current = videoRef.current;
+        if (!entry || !current) return;
         if (entry.isIntersecting && entry.intersectionRatio >= PLAY_THRESHOLD) {
-          claimActiveFeedVideo(v);
-          void v.play().catch(() => {
-            /* autoplay blocked */
-          });
+          if (userPausedRef.current) return;
+          claimActiveFeedVideo(current);
+          playFeedVideo(current, current.muted || readFeedVideoMuted());
         } else {
-          v.pause();
-          releaseActiveFeedVideo(v);
+          current.pause();
+          userPausedRef.current = false;
+          setHeld(false);
+          releaseActiveFeedVideo(current);
         }
       },
       {
         root: scrollRoot,
-        threshold: [0, PLAY_THRESHOLD, 1],
-        rootMargin: "0px 0px -8% 0px",
+        threshold: [0, 0.25, PLAY_THRESHOLD, 0.8, 1],
+        rootMargin: "0px",
       },
     );
 
@@ -104,41 +122,38 @@ export function FeedPostVideo({ path, posterPath = null, className, priority = f
       observer.disconnect();
       releaseActiveFeedVideo(video);
     };
-  }, [src, expanded]);
+  }, [src]);
 
-  useEffect(() => {
+  function showFlash(kind: "play" | "pause") {
+    setFlash(kind);
+    if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current);
+    flashTimerRef.current = window.setTimeout(() => setFlash(null), 650);
+  }
+
+  function togglePlay() {
     const video = videoRef.current;
     if (!video) return;
-    if (expanded) {
-      video.pause();
-      releaseActiveFeedVideo(video);
-      return;
-    }
-    const el = containerRef.current;
-    if (!el || !src) return;
-    const scrollRoot = document.getElementById(APP_SCROLL_MAIN_ID);
-    const rect = el.getBoundingClientRect();
-    const rootRect = scrollRoot?.getBoundingClientRect();
-    const visible =
-      rect.height > 0 &&
-      (rootRect
-        ? rect.top < rootRect.bottom && rect.bottom > rootRect.top
-        : rect.top < window.innerHeight && rect.bottom > 0);
-    if (visible) {
+    if (video.paused) {
+      userPausedRef.current = false;
+      setHeld(false);
       claimActiveFeedVideo(video);
-      void video.play().catch(() => {});
+      playFeedVideo(video, muted);
+      showFlash("play");
+    } else {
+      userPausedRef.current = true;
+      setHeld(true);
+      video.pause();
+      showFlash("pause");
     }
-  }, [expanded, src]);
+  }
 
-  useEffect(() => {
-    const ev = expandedVideoRef.current;
-    if (!expanded || !ev || !src) return;
-    ev.muted = muted;
-    void ev.play().catch(() => {});
-    return () => {
-      ev.pause();
-    };
-  }, [expanded, src, muted]);
+  function toggleMuted() {
+    const video = videoRef.current;
+    const next = !muted;
+    setMuted(next);
+    writeFeedVideoMuted(next);
+    if (video) video.muted = next;
+  }
 
   if (failed || playbackError) {
     return (
@@ -151,10 +166,7 @@ export function FeedPostVideo({ path, posterPath = null, className, priority = f
   if (!src && !posterSrc) {
     return (
       <div
-        className={cn(
-          "relative flex aspect-[4/5] max-h-[min(85vw,32rem)] w-full items-center justify-center bg-black/90",
-          className,
-        )}
+        className={cn("relative flex aspect-[4/5] max-h-[70dvh] w-full items-center justify-center bg-black", className)}
         aria-busy="true"
       >
         <Loader2 className="h-6 w-6 animate-spin text-white/70" aria-hidden />
@@ -163,77 +175,83 @@ export function FeedPostVideo({ path, posterPath = null, className, priority = f
   }
 
   return (
-    <>
-      <div
-        ref={containerRef}
-        className={cn("group relative w-full overflow-hidden bg-black", className)}
-        style={frame ? { aspectRatio: `${frame.w} / ${frame.h}`, maxHeight: "70dvh" } : { aspectRatio: "4 / 5", maxHeight: "70dvh" }}
-        data-testid="feed-post-video"
-      >
-        {src ? (
-          <video
-            ref={videoRef}
-            src={src}
-            poster={posterSrc ?? undefined}
-            muted={muted}
-            loop
-            playsInline
-            controls
-            preload={priority ? "auto" : "metadata"}
-            className="h-full w-full bg-black object-contain"
-            onLoadedMetadata={(event) => {
-              const v = event.currentTarget;
-              if (v.videoWidth > 0 && v.videoHeight > 0) {
-                setFrame({ w: v.videoWidth, h: v.videoHeight });
-              }
-            }}
-            onPlay={() => setPlaying(true)}
-            onPause={() => setPlaying(false)}
-            onVolumeChange={(event) => {
-              const next = event.currentTarget.muted;
-              setMuted(next);
-              writeFeedVideoMuted(next);
-            }}
-            onError={() => setPlaybackError(true)}
-          />
-        ) : (
-          <img src={posterSrc!} alt="" className="h-full w-full object-contain" />
-        )}
-        {topicLabel ? (
-          <span className="pointer-events-none absolute left-3 top-3 z-10 max-w-[70%] truncate rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
-            {topicLabel}
-          </span>
-        ) : !playing && src ? (
-          <span className="pointer-events-none absolute left-3 top-3 z-10 inline-flex items-center gap-1 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
-            <Play className="h-3.5 w-3.5 fill-current" aria-hidden />
-            Video
-          </span>
-        ) : null}
+    <div
+      ref={containerRef}
+      className={cn("relative w-full overflow-hidden bg-black", className)}
+      style={
+        frame
+          ? { aspectRatio: `${frame.w} / ${frame.h}`, maxHeight: "70dvh" }
+          : { aspectRatio: "4 / 5", maxHeight: "70dvh" }
+      }
+      data-testid="feed-post-video"
+    >
+      {src ? (
+        <video
+          ref={videoRef}
+          src={src}
+          poster={posterSrc ?? undefined}
+          muted={muted}
+          loop
+          playsInline
+          preload={priority ? "auto" : "metadata"}
+          className="h-full w-full bg-black object-contain"
+          onLoadedMetadata={(event) => {
+            const v = event.currentTarget;
+            if (v.videoWidth > 0 && v.videoHeight > 0) {
+              setFrame({ w: v.videoWidth, h: v.videoHeight });
+            }
+          }}
+          onTimeUpdate={(event) => {
+            const v = event.currentTarget;
+            if (!Number.isFinite(v.duration) || v.duration <= 0) return;
+            setProgress(Math.min(1, v.currentTime / v.duration));
+          }}
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+          onError={() => setPlaybackError(true)}
+        />
+      ) : (
+        <img src={posterSrc!} alt="" className="h-full w-full object-contain" />
+      )}
+
+      {src ? (
         <button
           type="button"
-          className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm"
-          onClick={() => setExpanded(true)}
-          aria-label="Watch video fullscreen"
-        >
-          <Maximize2 className="h-4 w-4" aria-hidden />
-        </button>
-      </div>
+          className="absolute inset-0 z-10"
+          aria-label={playing ? "Pause video" : "Play video"}
+          onClick={togglePlay}
+        />
+      ) : null}
 
-      <FeedMediaLightbox open={expanded} onOpenChange={setExpanded}>
-        {src ? (
-          <video
-            ref={expandedVideoRef}
-            src={src}
-            poster={posterSrc ?? undefined}
-            muted={muted}
-            loop
-            playsInline
-            controls
-            className="max-h-[85dvh] w-full object-contain"
-            onError={() => setPlaybackError(true)}
-          />
-        ) : null}
-      </FeedMediaLightbox>
-    </>
+      {flash || (held && !playing) ? (
+        <span className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-black/45 text-white">
+            {flash === "pause" ? (
+              <Pause className="h-7 w-7 fill-current" />
+            ) : (
+              <Play className="h-7 w-7 fill-current" />
+            )}
+          </span>
+        </span>
+      ) : null}
+
+      {src ? (
+        <button
+          type="button"
+          className="absolute bottom-3 right-3 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-black/45 text-white"
+          aria-label={muted ? "Unmute video" : "Mute video"}
+          aria-pressed={!muted}
+          onClick={toggleMuted}
+        >
+          {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+        </button>
+      ) : null}
+
+      {src ? (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-0.5 bg-white/25" aria-hidden>
+          <div className="h-full bg-white" style={{ width: `${progress * 100}%` }} />
+        </div>
+      ) : null}
+    </div>
   );
 }

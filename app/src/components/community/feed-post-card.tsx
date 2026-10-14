@@ -618,8 +618,6 @@ export function FeedPostCard({
   }
 
   const topicLabel = communityTopicLabel(post.topic);
-  const contentNoteLabel = post.content_note ? communityContentNoteLabel(post.content_note) : null;
-  const contentNoteHint = post.content_note ? communityContentNoteHint(post.content_note) : null;
   const bodyText = (() => {
     const b = post.body.trim();
     if (b.length === 0) return null;
@@ -630,6 +628,10 @@ export function FeedPostCard({
   const hasFeedImages = !eventExtra && !post.video_url && post.image_urls.length > 0;
   const hasFeedVideo = !eventExtra && Boolean(post.video_url);
   const isMediaFirst = hasFeedVideo || hasFeedImages;
+  const visibleContentNote =
+    post.content_note && !(hasFeedVideo && post.content_note === "experience-sharing") ? post.content_note : null;
+  const contentNoteLabel = visibleContentNote ? communityContentNoteLabel(visibleContentNote) : null;
+  const contentNoteHint = visibleContentNote ? communityContentNoteHint(visibleContentNote) : null;
   const canAddToStory = Boolean(onAddToStory && viewerId);
 
   const facepilePeople = useMemo(() => {
@@ -886,35 +888,7 @@ export function FeedPostCard({
       </div>
 
       {hasFeedVideo && post.video_url ? (
-        <FeedPostVideo
-          path={post.video_url}
-          posterPath={post.video_poster_url}
-          priority={mediaPriority}
-          topicLabel={topicLabel}
-        />
-      ) : null}
-      {hasFeedVideo ? (
-        <div
-          className="flex items-center gap-2 border-b border-border/30 px-3.5 py-2 text-[11px] text-muted-foreground sm:px-4"
-          data-testid="feed-post-video-safety"
-        >
-          <span className="min-w-0 flex-1 leading-snug">
-            Peer experience — not medical advice or dosing guidance.
-          </span>
-          {canReportPost ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-7 shrink-0 gap-1 rounded-full px-2 text-[11px] text-muted-foreground"
-              onClick={onReportPost}
-              data-testid="button-report-video-post"
-            >
-              <Flag className="h-3 w-3" aria-hidden />
-              Report
-            </Button>
-          ) : null}
-        </div>
+        <FeedPostVideo path={post.video_url} posterPath={post.video_poster_url} priority={mediaPriority} />
       ) : null}
 
       {hasFeedImages ? (
