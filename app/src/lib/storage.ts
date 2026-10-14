@@ -1073,6 +1073,11 @@ export interface BedtimeLog {
   sickDayActive: boolean;
   travelModeActive: boolean;
   correctionGiven: number | null;
+  /** Pump IOB entered for this check. Null when blank. */
+  pumpIobUnits?: number | null;
+  pumpRecentSiteChange?: boolean;
+  pumpDisconnectedRecently?: boolean;
+  pumpExerciseActivityOn?: boolean;
   notes: string;
   /** What action was suggested at the time of this check (correction/snack/none/etc). */
   actionSuggested?: BedtimeActionSuggested;

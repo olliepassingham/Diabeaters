@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { Lightbulb, Shuffle } from "lucide-react";
 
@@ -8,32 +8,44 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-import { CATEGORY_LABELS, TIPS, type Tip } from "@/components/dashboard/widgets/tipOfDayData";
+import { CATEGORY_LABELS, tipsForDelivery, type Tip } from "@/components/dashboard/widgets/tipOfDayData";
+import { storage, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
 
 type TipWithIndex = Tip & { idx: number };
 
-function pickRandomTipIndex(exclude?: number): number {
-  if (TIPS.length === 0) return 0;
-  if (TIPS.length === 1) return 0;
-  let idx = Math.floor(Math.random() * TIPS.length);
-  while (exclude != null && idx === exclude) idx = Math.floor(Math.random() * TIPS.length);
+function pickRandomTipIndex(length: number, exclude?: number): number {
+  if (length <= 1) return 0;
+  let idx = Math.floor(Math.random() * length);
+  while (exclude != null && idx === exclude) idx = Math.floor(Math.random() * length);
   return idx;
 }
 
 export default function TipsPage() {
-  const [randomIdx, setRandomIdx] = useState(() => pickRandomTipIndex());
+  const [deliveryMethod, setDeliveryMethod] = useState(
+    () => storage.getProfile()?.insulinDeliveryMethod,
+  );
+  const tips = useMemo(() => tipsForDelivery(deliveryMethod), [deliveryMethod]);
+  const [randomIdx, setRandomIdx] = useState(() =>
+    pickRandomTipIndex(tipsForDelivery(storage.getProfile()?.insulinDeliveryMethod).length),
+  );
+
+  useEffect(() => {
+    const onProfile = () => setDeliveryMethod(storage.getProfile()?.insulinDeliveryMethod);
+    window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
+    return () => window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
+  }, []);
 
   const tipsByCategory = useMemo(() => {
     const out = new Map<string, TipWithIndex[]>();
-    TIPS.forEach((t, idx) => {
+    tips.forEach((t, idx) => {
       const list = out.get(t.category) ?? [];
       list.push({ ...t, idx });
       out.set(t.category, list);
     });
     return out;
-  }, []);
+  }, [tips]);
 
-  const randomTip = TIPS[randomIdx] ?? TIPS[0];
+  const randomTip = tips[randomIdx] ?? tips[0];
 
   return (
     <PageShell variant="standard" className="space-y-6 py-4 md:py-8">
@@ -55,7 +67,7 @@ export default function TipsPage() {
               variant="outline"
               size="sm"
               className="min-h-11"
-              onClick={() => setRandomIdx((prev) => pickRandomTipIndex(prev))}
+              onClick={() => setRandomIdx((prev) => pickRandomTipIndex(tips.length, prev))}
             >
               <Shuffle className="h-4 w-4 mr-2" aria-hidden />
               Another

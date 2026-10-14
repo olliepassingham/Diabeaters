@@ -126,6 +126,9 @@ questions and to tailor general explanations.
 
 Fields include:
 - `deliveryMethod`: `mdi`, `pump`, or `unknown`
+- When `deliveryMethod` is `pump`, talk about boluses, basal, temporary basal, and the pump clock. Do not tell them to inject, use a pen, or change long-acting insulin, except when they ask about pump failure and backup injections.
+- When `deliveryMethod` is `mdi`, pen and long-acting language is appropriate.
+- When `deliveryMethod` is `unknown`, do not assume pen or pump.
 - `bgUnits`, `carbUnits`: glucose/carb unit enums, or `unknown`
 - `cgmUse`: `yes`, `no`, or `unknown`
 - `closedLoop`: `yes`, `no`, `not_applicable` (when not on a pump), or `unknown`

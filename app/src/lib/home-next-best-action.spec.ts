@@ -76,6 +76,17 @@ describe("resolveHomeNextBestAction", () => {
     expect(a.label.toLowerCase()).toMatch(/insulin/);
   });
 
+  it("talks about the pump clock instead of long-acting on a timezone shift", () => {
+    const a = resolveHomeNextBestAction({
+      ...base,
+      travelModeActive: true,
+      isPumpUser: true,
+      travelPromote: { promoted: true, label: "Insulin", reason: "insulin_shift" },
+    });
+    expect(a.subline.toLowerCase()).toMatch(/pump clock/);
+    expect(a.subline.toLowerCase()).not.toMatch(/long-acting/);
+  });
+
   it("uses the next appointment before a meal", () => {
     const a = resolveHomeNextBestAction({
       ...base,

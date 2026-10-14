@@ -105,6 +105,30 @@ describe("buildStatusBarModel", () => {
     expect(model.expandSections.some((s) => s.id === "travel" && s.canEnd)).toBe(true);
   });
 
+  it("uses pump clock wording on an outbound insulin shift", () => {
+    const model = buildStatusBarModel({
+      showCgm: false,
+      online: true,
+      travelModeActive: true,
+      travelDestination: "Spain",
+      travelStartDate: "2026-07-01",
+      travelEndDate: "2026-07-10",
+      timezoneHours: 7,
+      timezoneChange: "major",
+      packingIncomplete: false,
+      sickDayActive: false,
+      pumpFailureActive: false,
+      exerciseActive: false,
+      postExerciseEducational: false,
+      postExerciseSnoozed: false,
+      isPumpUser: true,
+      today: new Date("2026-07-01T12:00:00"),
+    });
+    const travel = model.expandSections.find((s) => s.id === "travel");
+    expect(travel?.subtitle?.toLowerCase()).toMatch(/pump clock/);
+    expect(travel?.subtitle?.toLowerCase()).not.toMatch(/long-acting|injection/);
+  });
+
   it("promotes exercise and sick into labeled segments", () => {
     const model = buildStatusBarModel({
       showCgm: false,

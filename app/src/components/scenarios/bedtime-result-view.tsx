@@ -43,6 +43,7 @@ export type BedtimeAction =
   | { kind: "correction"; data: BedtimeCorrectionData }
   | { kind: "dose_too_small"; currentBg: number; aimBg: number; bgUnits: string; rawDose: number; note: string }
   | { kind: "missing_isf" }
+  | { kind: "needs_pump_iob" }
   | { kind: "snack"; grams: number; reason: string }
   | { kind: "none" };
 
@@ -193,6 +194,19 @@ export function BedtimeResultView({
           <Button variant="link" size="sm" className="mt-1 h-auto px-0" asChild>
             <Link href="/settings/ratios">Open ratios settings</Link>
           </Button>
+        </div>
+      ) : null}
+
+      {result.action.kind === "needs_pump_iob" ? (
+        <div
+          className="rounded-2xl border border-amber-500/30 bg-amber-500/[0.06] px-4 py-3.5 text-sm dark:bg-amber-950/30"
+          data-testid="card-correction-needs-pump-iob"
+        >
+          <p className="font-medium text-foreground">Enter pump insulin on board</p>
+          <p className="mt-1 text-muted-foreground">
+            A bedtime correction is not estimated until you enter the insulin on board from the pump. A blank field is
+            not treated as zero.
+          </p>
         </div>
       ) : null}
 

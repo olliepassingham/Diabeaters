@@ -1,30 +1,43 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Lightbulb, RefreshCw } from "lucide-react";
 import { Link } from "wouter";
 import { WidgetCard } from "./WidgetCard";
 import type { DashboardWidgetLayoutProps } from "./types";
-import { TIPS, CATEGORY_LABELS, getTipIndex } from "./tipOfDayData";
+import { CATEGORY_LABELS, getTipIndex, tipsForDelivery } from "./tipOfDayData";
+import { storage, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
 import { WidgetHeaderIcon, widgetContentClass, widgetHeaderClass } from "./widget-header";
 
 export function TipOfDayWidget(_props: DashboardWidgetLayoutProps) {
-  const [tipIndex, setTipIndex] = useState(() => getTipIndex(new Date()));
+  const [deliveryMethod, setDeliveryMethod] = useState(
+    () => storage.getProfile()?.insulinDeliveryMethod,
+  );
+  const tips = useMemo(() => tipsForDelivery(deliveryMethod), [deliveryMethod]);
+  const [tipIndex, setTipIndex] = useState(() => getTipIndex(new Date(), tipsForDelivery(storage.getProfile()?.insulinDeliveryMethod).length));
   const [showRandom, setShowRandom] = useState(false);
 
-  const tip = TIPS[tipIndex] ?? TIPS[0]!;
+  useEffect(() => {
+    const onProfile = () => setDeliveryMethod(storage.getProfile()?.insulinDeliveryMethod);
+    window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
+    return () => window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
+  }, []);
+
+  const safeIndex = tips.length === 0 ? 0 : tipIndex % tips.length;
+  const tip = tips[safeIndex] ?? tips[0];
 
   const handleShuffle = () => {
+    if (tips.length <= 1) return;
     let newIndex: number;
     do {
-      newIndex = Math.floor(Math.random() * TIPS.length);
-    } while (newIndex === tipIndex && TIPS.length > 1);
+      newIndex = Math.floor(Math.random() * tips.length);
+    } while (newIndex === safeIndex);
     setTipIndex(newIndex);
     setShowRandom(true);
   };
 
   const handleResetToday = () => {
-    setTipIndex(getTipIndex(new Date()));
+    setTipIndex(getTipIndex(new Date(), tips.length));
     setShowRandom(false);
   };
 
@@ -56,10 +69,10 @@ export function TipOfDayWidget(_props: DashboardWidgetLayoutProps) {
       </CardHeader>
       <CardContent className={`${widgetContentClass} space-y-2`}>
         <p className="max-w-3xl text-sm leading-relaxed text-foreground/90 sm:text-base" data-testid="text-tip-content">
-          {tip.text}
+          {tip?.text}
         </p>
         <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-700/80 dark:text-amber-300/80" data-testid="text-tip-category">
-          {CATEGORY_LABELS[tip.category] || tip.category}
+          {tip ? CATEGORY_LABELS[tip.category] || tip.category : ""}
         </p>
       </CardContent>
     </WidgetCard>

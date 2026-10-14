@@ -20,7 +20,7 @@ import {
   type PreExerciseInsulinSuppressedReason,
   type PreExerciseMealCarbsSkipReason,
 } from "@/lib/exercise-reading-guidance";
-import { insulinRoundIncrement, roundInsulinUnits } from "@/lib/insulin-rounding";
+import { insulinRoundIncrement, roundInsulinUnits, subtractEnteredPumpIob } from "@/lib/insulin-rounding";
 import {
   getExerciseMealBolusPreview,
   type MealExerciseMeta,
@@ -69,6 +69,8 @@ export type ExerciseFuelCalculatorInput = {
   lastMealCarbsGrams?: number;
   /** Body weight/age drive how much a suggested top-up scales for a low reading (optional). */
   profile?: Partial<UserProfile>;
+  /** Units still working on the pump. Blank means the estimate does not subtract IOB. */
+  pumpIobUnits?: number | null;
 };
 
 export type ExerciseFuelInsulinResult = {
@@ -228,6 +230,38 @@ function startLabel(minutesUntilStart: number): string {
 }
 
 /** Plain-language session line for the plan card (no dose maths). */
+function applyPumpIobToFuel(
+  input: ExerciseFuelCalculatorInput,
+  insulin: ExerciseFuelInsulinResult | null,
+  preCorrection: ExercisePreCorrectionAdvice | null,
+): { insulin: ExerciseFuelInsulinResult | null; preCorrection: ExercisePreCorrectionAdvice | null } {
+  const iob = input.pumpIobUnits;
+  if (!input.isPump || iob == null || !Number.isFinite(iob) || iob <= 0) {
+    return { insulin, preCorrection };
+  }
+  const increment = insulinRoundIncrement(true);
+  const nextInsulin = insulin
+    ? (() => {
+        let remaining = iob;
+        const correctionTake = Math.min(insulin.correctionUnits, remaining);
+        remaining -= correctionTake;
+        const mealTake = Math.min(insulin.adjustedUnits, remaining);
+        const correctionUnits = subtractEnteredPumpIob(insulin.correctionUnits, correctionTake, increment);
+        const adjustedUnits = subtractEnteredPumpIob(insulin.adjustedUnits, mealTake, increment);
+        return {
+          ...insulin,
+          correctionUnits,
+          adjustedUnits,
+          totalUnits: roundInsulinUnits(adjustedUnits + correctionUnits, increment),
+        };
+      })()
+    : null;
+  const nextPre = preCorrection
+    ? { ...preCorrection, units: subtractEnteredPumpIob(preCorrection.units, iob, increment) }
+    : null;
+  return { insulin: nextInsulin, preCorrection: nextPre };
+}
+
 function sessionLabel(input: ExerciseFuelCalculatorInput): string {
   return `${intensityLabel(input.intensity)} ${activityLabel(input.exerciseType)} · ${input.durationMinutes} min · ${startLabel(input.minutesUntilStart)}`;
 }
@@ -894,7 +928,10 @@ export function computeExerciseFuelPlan(input: ExerciseFuelCalculatorInput): Exe
     }
   }
 
-  const preCorrection = computeStandalonePreCorrection(input, insulin);
+  const rawPreCorrection = computeStandalonePreCorrection(input, insulin);
+  const adjustedFuel = applyPumpIobToFuel(input, insulin, rawPreCorrection);
+  insulin = adjustedFuel.insulin;
+  const preCorrection = adjustedFuel.preCorrection;
 
   const headline = buildHeadline(
     input,

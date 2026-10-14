@@ -25,6 +25,8 @@ import {
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { closedLoopSafetyNote, usesClosedLoop } from "@/lib/closed-loop";
 import { getEffectiveTdd, hasConfiguredTdd } from "@/lib/tdd";
+import { insulinRoundIncrement, roundInsulinUnits } from "@/lib/insulin-rounding";
+import { parseOptionalBolusUnits } from "@/lib/meal-dose";
 import { parseRatioToGramsPerUnit, formatRatioForDisplay } from "@/lib/ratio-utils";
 import { GuideFrame, PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { ScenarioActiveCard } from "@/components/scenarios/ScenarioActiveCard";
@@ -81,10 +83,15 @@ type KetoneLevel = "none" | "trace" | "small" | "moderate" | "large";
 type SickDayCalcOptions = {
   /** When true, do not use the adult 1800÷TDD default if no correction factor is saved (under-18 with known age). */
   minorKnownAgeNoSavedIsf?: boolean;
+  isPump?: boolean;
+  /** Null when a pump user has not entered IOB. Zero means they entered none. */
+  pumpIobUnits?: number | null;
 };
 
 interface SickDayResults {
   correctionDose: number;
+  /** Pump correction is withheld until IOB is entered, so a blank field is not treated as zero. */
+  correctionNeedsPumpIob?: boolean;
   correctionExplanation: string;
   baseCorrectionDose: number;
   severityModifier: number;
@@ -238,13 +245,22 @@ function calculateSickDayRecommendations(
     correctionDose = maxSafeCorrection;
   }
   
-  // Round to whole units for pen dosing.
-  correctionDose = Math.round(correctionDose);
-  baseCorrectionDose = Math.round(baseCorrectionDose);
+  const isPump = !!opts.isPump;
+  const roundIncrement = insulinRoundIncrement(isPump);
+  const pumpIob = opts.pumpIobUnits;
+  const correctionNeedsPumpIob =
+    isPump && baseCorrectionDose > 0 && (pumpIob == null || !Number.isFinite(pumpIob));
 
-  // Build explanation
-  const correctionExplanation =
-    opts.minorKnownAgeNoSavedIsf && !hasTeamIsf
+  if (!correctionNeedsPumpIob && isPump && pumpIob != null && pumpIob > 0) {
+    correctionDose = Math.max(0, correctionDose - pumpIob);
+  }
+
+  correctionDose = correctionNeedsPumpIob ? 0 : roundInsulinUnits(correctionDose, roundIncrement);
+  baseCorrectionDose = roundInsulinUnits(baseCorrectionDose, roundIncrement);
+
+  const correctionExplanation = correctionNeedsPumpIob
+    ? "Enter insulin on board from the pump so this correction can subtract insulin still working."
+    : opts.minorKnownAgeNoSavedIsf && !hasTeamIsf
       ? "Correction dose is not estimated here: under-18 users should use the correction factor (ISF) from their diabetes team. Add it in Settings → Ratios, then run this planner again."
       : baseCorrectionDose > 0
         ? `Base: ${baseCorrectionDose}u × ${severityModifier} (safety) × ${bgZoneModifier} (BG zone) = ${correctionDose}u`
@@ -316,6 +332,25 @@ function calculateSickDayRecommendations(
       stackingWarning = "Do NOT give additional corrections for at least 4-5 hours. Insulin absorption is unpredictable during severe illness.";
       stackingWarningBrief = "No extra corrections for 4–5 hours";
       break;
+  }
+
+  if (opts.isPump) {
+    if (severity === "minor") {
+      basalAdjustment = "Consider a temporary basal about 10% higher if blood glucose runs high";
+      basalAdjustmentBrief = "Consider a temp basal up to ~10% more if BG runs high";
+    } else if (severity === "moderate") {
+      basalAdjustment = "Consider a temporary basal about 10-20% higher if blood glucose remains elevated";
+      basalAdjustmentBrief = "Consider a temp basal ~10–20% more if BG stays up";
+    } else if (severity === "severe") {
+      basalAdjustment = "Consider a temporary basal about 20% higher, but monitor closely for lows if unable to eat";
+      basalAdjustmentBrief = "Consider a temp basal ~20% more; watch for hypos if not eating";
+    }
+    stackingWarning = stackingWarning
+      ? `Check insulin on board on the pump. ${stackingWarning}`
+      : "Check insulin on board on the pump before another correction.";
+    stackingWarningBrief = stackingWarningBrief
+      ? `Check pump IOB. ${stackingWarningBrief}`
+      : "Check pump IOB before another correction";
   }
 
   // === KETONE-SPECIFIC GUIDANCE ===
@@ -391,6 +426,7 @@ function calculateSickDayRecommendations(
 
   return {
     correctionDose,
+    correctionNeedsPumpIob,
     correctionExplanation,
     baseCorrectionDose,
     severityModifier,
@@ -437,6 +473,7 @@ export default function SickDay() {
   const [settings, setSettings] = useState<UserSettings>({});
   const [tdd, setTdd] = useState("");
   const [bgLevel, setBgLevel] = useState("");
+  const [pumpIobInput, setPumpIobInput] = useState("");
   const [severity, setSeverity] = useState<string>("");
   const [ketoneLevel, setKetoneLevel] = useState<KetoneLevel | "">("");
   const [results, setResults] = useState<SickDayResults | null>(null);
@@ -1126,7 +1163,9 @@ export default function SickDay() {
     if (!hasConfiguredTdd(settings)) {
       toast({
         title: "TDD not configured",
-        description: "Set your total daily dose under Settings → Ratios, or enter short- and long-acting units under Personal & usage.",
+        description: isPumpUser
+          ? "Set your total daily dose under Settings → Ratios."
+          : "Set your total daily dose under Settings → Ratios, or enter short- and long-acting units under Personal & usage.",
         variant: "destructive",
       });
       return;
@@ -1169,7 +1208,7 @@ export default function SickDay() {
       ketoneLevel as KetoneLevel,
       settings,
       bgUnits,
-      { minorKnownAgeNoSavedIsf },
+      { minorKnownAgeNoSavedIsf, isPump: isPumpUser, pumpIobUnits: isPumpUser ? parseOptionalBolusUnits(pumpIobInput) : null },
     );
     
     if (isNaN(recommendations.correctionDose)) {
@@ -1228,10 +1267,14 @@ export default function SickDay() {
 
     const sickDayMultipliers: Record<string, { multiplier: number; reason: string }> = {
       insulin_short: { multiplier: severity === "severe" ? 1.3 : severity === "moderate" ? 1.2 : 1.1, reason: "Higher correction doses needed" },
-      insulin_long: { multiplier: 1.0, reason: "Keep basal dose consistent" },
+      insulin_long: isPumpUser
+        ? { multiplier: 1.0, reason: "Backup long-acting only if your pump-failure plan uses it" }
+        : { multiplier: 1.0, reason: "Keep basal dose consistent" },
       insulin_vial: { multiplier: severity === "severe" ? 1.3 : severity === "moderate" ? 1.2 : 1.1, reason: "Higher doses during illness" },
       insulin: { multiplier: severity === "severe" ? 1.3 : severity === "moderate" ? 1.2 : 1.1, reason: "Higher doses during illness" },
-      needle: { multiplier: severity === "severe" ? 1.5 : severity === "moderate" ? 1.3 : 1.1, reason: "More frequent injections for corrections" },
+      needle: isPumpUser
+        ? { multiplier: 1, reason: "Backup needles only if you switch to pens" }
+        : { multiplier: severity === "severe" ? 1.5 : severity === "moderate" ? 1.3 : 1.1, reason: "More frequent injections for corrections" },
       cgm: { multiplier: 1.0, reason: "No change - continuous monitoring" },
       infusion_set: { multiplier: severity === "severe" ? 1.3 : 1.0, reason: severity === "severe" ? "May need more frequent changes if site issues" : "No change expected" },
       reservoir: { multiplier: severity === "severe" ? 1.2 : 1.0, reason: severity === "severe" ? "Higher insulin use may require more refills" : "No change expected" },
@@ -1993,6 +2036,8 @@ export default function SickDay() {
               onCalculate={handleCalculate}
               idPrefix="active"
               cgm={sickDayCgmProps}
+              pumpIob={isPumpUser ? pumpIobInput : undefined}
+              onPumpIobChange={isPumpUser ? setPumpIobInput : undefined}
             />
 
             {/* Sick Day Journal Summary */}
@@ -2449,6 +2494,8 @@ export default function SickDay() {
                 onKetoneLevelChange={setKetoneLevel}
                 bgUnits={bgUnits}
                 cgm={sickDayCgmProps}
+                pumpIob={isPumpUser ? pumpIobInput : undefined}
+                onPumpIobChange={isPumpUser ? setPumpIobInput : undefined}
               />
               <SickDayTddField tdd={tdd} hasTdd={hasConfiguredTdd(settings)} />
               <Button
@@ -2517,6 +2564,8 @@ export default function SickDay() {
             bgUnits={bgUnits}
             onCalculate={handleCalculate}
             idPrefix="standalone"
+            pumpIob={isPumpUser ? pumpIobInput : undefined}
+            onPumpIobChange={isPumpUser ? setPumpIobInput : undefined}
             cgm={sickDayCgmProps}
           />
 

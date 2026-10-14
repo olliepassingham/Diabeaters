@@ -1,5 +1,6 @@
 import type { UserSettings } from "@/lib/storage";
-import { calculateMealDose, insulinRoundIncrement, type MealDoseResult } from "@/lib/meal-dose";
+import { calculateMealDose, insulinRoundIncrement, parseOptionalBolusUnits, type MealDoseResult } from "@/lib/meal-dose";
+import { roundInsulinUnits } from "@/lib/insulin-rounding";
 import {
   normalizeBgUnits,
   isBgLow,
@@ -23,6 +24,8 @@ export type AlcoholSituationInput = {
   /** breakfast | lunch | dinner | snack */
   mealType: string;
   isPump?: boolean;
+  /** Null when a pump user has not entered IOB. */
+  pumpIobUnits?: number | null;
 };
 
 export type AlcoholSituationLinks = {
@@ -181,6 +184,10 @@ export function buildAlcoholSituationOutcome(
 
     const increment = insulinRoundIncrement(!!input.isPump);
     const meal = calculateMealDose(carbs, input.mealType, settings, bgUnits, undefined, undefined, undefined, increment);
+    if (input.isPump && input.pumpIobUnits != null && Number.isFinite(input.pumpIobUnits) && input.pumpIobUnits > 0) {
+      meal.dose = roundInsulinUnits(Math.max(0, meal.dose - input.pumpIobUnits), increment);
+      meal.exactDose = Math.max(0, meal.exactDose - input.pumpIobUnits);
+    }
     if (meal.error === "no_ratios") {
       return {
         kind: "needs_ratios",
@@ -207,7 +214,9 @@ export function buildAlcoholSituationOutcome(
       kind: "estimate",
       meal,
       alcoholGuidance,
-      tips: [],
+      tips: input.isPump && (input.pumpIobUnits == null || !Number.isFinite(input.pumpIobUnits))
+        ? ["Enter insulin on board from the pump so this estimate can subtract insulin still working."]
+        : [],
       disclaimer: ESTIMATE_DISCLAIMER,
     };
   }

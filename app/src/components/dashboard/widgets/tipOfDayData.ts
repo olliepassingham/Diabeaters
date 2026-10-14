@@ -1,18 +1,24 @@
+import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
+
 export interface Tip {
   text: string;
   category: "supplies" | "food" | "exercise" | "daily" | "mental";
   tags?: string[];
+  /** Shown only for that delivery method. Shared tips omit this. */
+  audience?: "pen" | "pump";
 }
 
 export const TIPS: Tip[] = [
-  { text: "Rotate your injection sites regularly — using the same spot can cause hard lumps under the skin that affect insulin absorption.", category: "supplies", tags: ["injection"] },
-  { text: "Store opened insulin at room temperature — cold insulin from the fridge can sting more when injecting.", category: "supplies" },
+  { text: "Rotate your injection sites regularly — using the same spot can cause hard lumps under the skin that affect insulin absorption.", category: "supplies", tags: ["injection"], audience: "pen" },
+  { text: "Rotate infusion sites — using the same spot can cause hard lumps that affect how insulin is absorbed.", category: "supplies", tags: ["pump"], audience: "pump" },
+  { text: "Store opened insulin at room temperature — cold insulin from the fridge can sting more when injecting.", category: "supplies", audience: "pen" },
+  { text: "Store opened insulin at room temperature — insulin that is very cold can be less comfortable to wear.", category: "supplies", audience: "pump" },
   { text: "Keep a spare set of supplies in your bag, car, or at work — you never know when you might need them.", category: "supplies" },
   { text: "Check your CGM sensor adhesion daily — a loose sensor gives unreliable readings.", category: "supplies", tags: ["cgm"] },
   { text: "Set a reminder to reorder supplies a week before they run out — don't leave it until the last minute.", category: "supplies" },
   { text: "Always check your insulin hasn't expired — expired insulin can be much less effective.", category: "supplies" },
   { text: "Keep insulin away from direct sunlight and extreme heat — it can lose potency quickly.", category: "supplies" },
-  { text: "Carry a backup pen or syringe even if you use a pump — technology can fail at the worst times.", category: "supplies", tags: ["pump"] },
+  { text: "Carry a backup pen or syringe even if you use a pump — technology can fail at the worst times.", category: "supplies", tags: ["pump"], audience: "pump" },
 
   { text: "Weigh your food when you can — eyeballing portions often leads to underestimating carbs.", category: "food" },
   { text: "High-fat meals like pizza can cause a delayed blood sugar rise — consider splitting your dose.", category: "food" },
@@ -36,7 +42,8 @@ export const TIPS: Tip[] = [
   { text: "Heat can speed up insulin absorption — be mindful on hot days or after hot baths.", category: "daily" },
   { text: "Always carry medical ID — it speaks for you if you can't.", category: "daily" },
   { text: "Tell someone you trust how to use glucagon — it could save your life.", category: "daily" },
-  { text: "Flying across time zones? Adjust your long-acting insulin timing gradually — ask your diabetes team for a plan.", category: "daily", tags: ["travel"] },
+  { text: "Flying across time zones? Adjust your long-acting insulin timing gradually — ask your diabetes team for a plan.", category: "daily", tags: ["travel"], audience: "pen" },
+  { text: "Flying across time zones? Move the pump clock toward local time gradually — ask your diabetes team for a plan.", category: "daily", tags: ["travel", "pump"], audience: "pump" },
   { text: "Keep glucose tablets or sweets in every coat pocket and bag — hypos don't wait for convenience.", category: "daily" },
   { text: "If you're unwell, never stop taking your basal insulin — even if you're not eating. Contact your team if unsure.", category: "daily" },
   { text: "Hormones, sleep, and even the weather can affect blood sugar — some days there's no obvious reason for a high or low.", category: "daily" },
@@ -58,7 +65,16 @@ export const CATEGORY_LABELS: Record<string, string> = {
   mental: "Wellbeing",
 };
 
-export function getTipIndex(date: Date): number {
+export function tipsForDelivery(method: string | null | undefined): Tip[] {
+  const pump = isPumpDeliveryMethod(method);
+  return TIPS.filter((tip) => {
+    if (!tip.audience) return true;
+    return pump ? tip.audience === "pump" : tip.audience === "pen";
+  });
+}
+
+export function getTipIndex(date: Date, tipCount = TIPS.length): number {
   const daysSinceEpoch = Math.floor(date.getTime() / (1000 * 60 * 60 * 24));
-  return daysSinceEpoch % TIPS.length;
+  const count = Math.max(1, tipCount);
+  return daysSinceEpoch % count;
 }

@@ -45,6 +45,7 @@ import {
   type CarbSourceScenario,
 } from "@/lib/carb-source-preferences";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
+import { parseOptionalBolusUnits } from "@/lib/meal-dose";
 import {
   storage,
   DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT,
@@ -397,6 +398,7 @@ export function ExerciseFuelCalculator() {
   const [currentBg, setCurrentBg] = useState("");
   const [bgTrend, setBgTrend] = useState<ExerciseBgTrend | "">("");
   const [rapidInsulin2h, setRapidInsulin2h] = useState(false);
+  const [pumpIobInput, setPumpIobInput] = useState("");
   const [lastMealMins, setLastMealMins] = useState("");
   const [lastMealCarbs, setLastMealCarbs] = useState("");
   const [result, setResult] = useState<ExerciseFuelCalculatorResult | null>(null);
@@ -454,6 +456,7 @@ export function ExerciseFuelCalculator() {
       currentBg: Number.isFinite(bgParsed) ? bgParsed : undefined,
       bgTrend: bgTrend || null,
       rapidInsulinLast2h: rapidInsulin2h,
+      pumpIobUnits: isPump ? parseOptionalBolusUnits(pumpIobInput) : null,
       lastMealMinutesAgo: Number.isFinite(lastMins) ? lastMins : undefined,
       lastMealCarbsGrams: Number.isFinite(lastCarbs) ? lastCarbs : undefined,
       profile,
@@ -474,6 +477,7 @@ export function ExerciseFuelCalculator() {
     mealType,
     minutesUntilStart,
     profile,
+    pumpIobInput,
     rapidInsulin2h,
   ]);
 
@@ -520,6 +524,7 @@ export function ExerciseFuelCalculator() {
     mealType,
     minutesUntilStart,
     profile,
+    pumpIobInput,
     rapidInsulin2h,
   ]);
 
@@ -896,6 +901,22 @@ export function ExerciseFuelCalculator() {
                         data-testid="efc-rapid-insulin"
                       />
                     </div>
+                    {isPump ? (
+                      <div className="space-y-1.5 px-3.5 py-3">
+                        <Label htmlFor="efc-pump-iob" className="text-sm">
+                          Pump insulin on board
+                        </Label>
+                        <Input
+                          id="efc-pump-iob"
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="Units still working"
+                          value={pumpIobInput}
+                          onChange={(e) => setPumpIobInput(e.target.value)}
+                          data-testid="efc-pump-iob"
+                        />
+                      </div>
+                    ) : null}
                     <div className="flex items-center justify-between px-3.5 py-3">
                       <Label htmlFor="efc-fasted" className="cursor-pointer text-sm">
                         Training fasted

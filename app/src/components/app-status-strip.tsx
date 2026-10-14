@@ -26,10 +26,12 @@ import {
   type ScenarioState,
   type ActiveExerciseSession,
   type ExercisePhase,
+  DIABEATER_PROFILE_CHANGED_EVENT,
   DIABEATER_SCENARIO_STATE_CHANGED_EVENT,
   DIABEATER_POST_EXERCISE_NUDGE_CHANGED_EVENT,
   DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT,
 } from "@/lib/storage";
+import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { cn } from "@/lib/utils";
 import { formatExerciseElapsedShort } from "@/components/exercise-active-session-extras";
 import { getWorkoutElapsedMs, isExercisePaused } from "@/lib/exercise-session-timing";
@@ -154,6 +156,17 @@ export function AppStatusStrip() {
     !onSupporterGlucosePage &&
     Boolean(supporterBgPrefill?.fromCgm);
   const showCgmLiveChip = showPatientCgmLiveChip || showSupporterCgmLiveChip;
+  const [isPumpUser, setIsPumpUser] = useState(() =>
+    isPumpDeliveryMethod(storage.getProfile()?.insulinDeliveryMethod),
+  );
+
+  useEffect(() => {
+    const onProfile = () => {
+      setIsPumpUser(isPumpDeliveryMethod(storage.getProfile()?.insulinDeliveryMethod));
+    };
+    window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
+    return () => window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
+  }, []);
 
   useEffect(() => {
     if (!showCgmLiveChip) return;
@@ -345,6 +358,7 @@ export function AppStatusStrip() {
         exerciseTimerLabel: exercisePhaseTimerLabel,
         postExerciseEducational: !ex && showPostExerciseEducational && !postExerciseDismissed,
         postExerciseSnoozed: !ex && postExerciseSnoozed,
+        isPumpUser,
       }),
     [
       showCgmLiveChip,
@@ -365,6 +379,7 @@ export function AppStatusStrip() {
       showPostExerciseEducational,
       postExerciseDismissed,
       postExerciseSnoozed,
+      isPumpUser,
     ],
   );
 

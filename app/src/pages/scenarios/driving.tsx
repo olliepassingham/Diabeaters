@@ -14,6 +14,7 @@ import { DrivingResultCard } from "@/components/scenarios/driving-result-card";
 import { trackFeatureEngagement } from "@/components/discovery-prompts";
 import { storage, type UserProfile, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
+import { parseOptionalBolusUnits } from "@/lib/meal-dose";
 import { canShowDrivingReadiness } from "@/lib/user-age";
 import { normalizeBgUnits } from "@/lib/alcohol-night-tool";
 import { formatDrivingTargetRange, getRecentHypoForDriving } from "@/lib/driving-prefill";
@@ -100,6 +101,7 @@ export default function DrivingScenarioPage() {
   const [alertEnough, setAlertEnough] = useState<YesNo>("");
   const [treatmentInReach, setTreatmentInReach] = useState<YesNo>("");
   const [longJourney, setLongJourney] = useState(false);
+  const [pumpIobInput, setPumpIobInput] = useState("");
   const [wizardStep, setWizardStep] = useState(0);
 
   const formTopRef = useRef<HTMLDivElement>(null);
@@ -182,6 +184,7 @@ export default function DrivingScenarioPage() {
         alertEnough: alertEnough === "yes",
         treatmentInReach: treatmentInReach === "yes",
         longJourney,
+        pumpIobUnits: isPumpUser ? parseOptionalBolusUnits(pumpIobInput) : null,
       },
       profile.bgUnits,
       drivingContext,
@@ -305,12 +308,28 @@ export default function DrivingScenarioPage() {
         ) : null}
 
         {phase === "form" && isPumpUser ? (
-          <p
-            className="rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-xs leading-snug text-muted-foreground"
-            data-testid="alert-driving-pump"
-          >
-            <span className="font-medium text-foreground">Pump:</span> Check IOB and alarms before you drive.
-          </p>
+          <div className="space-y-3">
+            <p
+              className="rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-xs leading-snug text-muted-foreground"
+              data-testid="alert-driving-pump"
+            >
+              <span className="font-medium text-foreground">Pump:</span> Check IOB and alarms before you drive.
+            </p>
+            <div className="space-y-1.5">
+              <Label htmlFor="driving-pump-iob" className="text-xs font-medium text-muted-foreground">
+                Pump insulin on board
+              </Label>
+              <Input
+                id="driving-pump-iob"
+                type="text"
+                inputMode="decimal"
+                placeholder="Units still working"
+                value={pumpIobInput}
+                onChange={(e) => setPumpIobInput(e.target.value)}
+                data-testid="input-driving-pump-iob"
+              />
+            </div>
+          </div>
         ) : null}
 
         {phase === "form" ? (

@@ -135,6 +135,31 @@ describe("buildActiveTravelTodayFocus", () => {
     expect(focus.toLowerCase()).toMatch(/long-acting|local time|pump/);
   });
 
+  it("uses the pump clock after day two", () => {
+    const plan = {
+      ...basePlan,
+      timezoneChange: "major" as const,
+      timezoneHours: 6,
+      timezoneDirection: "east" as const,
+    };
+    const dayThree = buildActiveTravelTodayFocus({
+      ...baseInput,
+      dayNumber: 3,
+      isPumpUser: true,
+      plan,
+    });
+    const dayFive = buildActiveTravelTodayFocus({
+      ...baseInput,
+      dayNumber: 5,
+      isPumpUser: true,
+      plan,
+    });
+    expect(dayThree.toLowerCase()).toMatch(/pump clock/);
+    expect(dayThree.toLowerCase()).not.toMatch(/long-acting|injection/);
+    expect(dayFive.toLowerCase()).toMatch(/pump clock/);
+    expect(dayFive.toLowerCase()).not.toMatch(/long-acting|injection/);
+  });
+
   it("prioritises homebound insulin shift over outbound timezone copy", () => {
     const focus = buildActiveTravelTodayFocus({
       ...baseInput,

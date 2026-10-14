@@ -113,6 +113,9 @@ function resolveBedtimeAction(
   if (correction.status === "no_isf") {
     return { kind: "missing_isf" };
   }
+  if (correction.status === "needs_pump_iob") {
+    return { kind: "needs_pump_iob" };
+  }
   if (correction.status === "dose_too_small") {
     return {
       kind: "dose_too_small",
@@ -478,6 +481,10 @@ export default function Bedtime() {
       sickDayActive: scenarioState.sickDayActive,
       travelModeActive: scenarioState.travelModeActive,
       correctionGiven: correctionDose,
+      pumpIobUnits: isPumpUser ? pumpIobUnits : null,
+      pumpRecentSiteChange: isPumpUser ? pumpRecentSiteChange : undefined,
+      pumpDisconnectedRecently: isPumpUser ? pumpDisconnectedRecently : undefined,
+      pumpExerciseActivityOn: isPumpUser ? pumpExerciseActivityOn : undefined,
       notes: "",
       actionSuggested,
     };
@@ -988,6 +995,7 @@ export default function Bedtime() {
       recentHypos,
       sickDayActive: scenarioState.sickDayActive,
       pumpIobUnits: isPumpUser ? pumpIobUnits : null,
+      requirePumpIob: isPumpUser,
       roundIncrement,
     });
     const action = resolveBedtimeAction(correctionResult, personalized.snack);

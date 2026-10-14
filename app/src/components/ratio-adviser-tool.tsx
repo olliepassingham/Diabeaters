@@ -116,6 +116,7 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
 
   const [minorKnown, setMinorKnown] = useState(false);
   const [ratiosEditOpen, setRatiosEditOpen] = useState(false);
+  const isPumpUser = isPumpDeliveryMethod(storage.getProfile()?.insulinDeliveryMethod);
 
   const handleRatiosSaved = (updated: UserSettings) => {
     onSettingsUpdate?.(updated);
@@ -416,7 +417,11 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
               <Label htmlFor="tdd-input">Total Daily Dose (units)</Label>
               <InlineInfoHint
                 ariaLabel="What is TDD"
-                content="Your total daily dose is all insulin in a typical day — fast-acting (bolus) and long-acting (basal) combined."
+                content={
+                  isPumpUser
+                    ? "Your total daily dose is all insulin in a typical day — basal from the pump plus boluses."
+                    : "Your total daily dose is all insulin in a typical day — fast-acting (bolus) and long-acting (basal) combined."
+                }
               />
             </div>
             <Input
@@ -579,7 +584,7 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
 
   const units = bgUnit === "mg/dL" ? "mg/dL" : "mmol/L";
   const target = resolveUserTargetBgRange(settings, units);
-  const roundIncrement = insulinRoundIncrement(isPumpDeliveryMethod(storage.getProfile()?.insulinDeliveryMethod));
+  const roundIncrement = insulinRoundIncrement(isPumpUser);
   const selectedRatio = selectedMeal ? (settings[settingsRatioKey(selectedMeal)] as string | undefined) : undefined;
   const carbs = parseFloat(carbsInput.replace(",", "."));
   const bgNow = parseFloat(bgNowInput.replace(",", "."));

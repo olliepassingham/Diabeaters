@@ -24,6 +24,8 @@ export type DrivingReadinessInput = {
   alertEnough: boolean;
   treatmentInReach: boolean;
   longJourney: boolean;
+  /** Null when a pump user has not entered IOB. */
+  pumpIobUnits?: number | null;
 };
 
 export type DrivingReadinessContext = {
@@ -60,6 +62,17 @@ const LINKS_URGENT: DrivingReadinessLinks = { hypoHelp: true, helpNow: true, eme
 const LINKS_NONE: DrivingReadinessLinks = { hypoHelp: false, helpNow: false, emergencyCard: false };
 
 const HYPO_TREATMENT_GRAMS = 15;
+
+function withPumpIobReminder(lines: string[], input: DrivingReadinessInput, isPump: boolean): string[] {
+  if (!isPump) return lines;
+  if (input.pumpIobUnits == null || !Number.isFinite(input.pumpIobUnits)) {
+    return [...lines, "Check insulin on board on the pump before you set off."];
+  }
+  if (input.pumpIobUnits > 0) {
+    return [...lines, `Pump insulin on board is ${input.pumpIobUnits}u — factor that in before another bolus.`];
+  }
+  return lines;
+}
 
 function appendLongJourney(bullets: string[], longJourney: boolean): string[] {
   if (!longJourney) return bullets;
@@ -266,11 +279,17 @@ export function buildDrivingReadinessOutcome(
       doNow: [
         input.bgTrend === "falling"
           ? "Glucose may still be dropping — treat or snack if your team advises, then recheck before you go."
-          : "Consider a small correction or snack per your team’s plan, then recheck.",
+          : isPump && input.pumpIobUnits != null && input.pumpIobUnits > 0
+            ? `Pump still has ${input.pumpIobUnits}u working — a snack is safer than another bolus, then recheck.`
+            : "Consider a small correction or snack per your team’s plan, then recheck.",
       ],
-      beforeYouGo: appendLongJourney(
-        ["Keep treatment within reach and pull over if you feel any hypo symptoms."],
-        input.longJourney,
+      beforeYouGo: withPumpIobReminder(
+        appendLongJourney(
+          ["Keep treatment within reach and pull over if you feel any hypo symptoms."],
+          input.longJourney,
+        ),
+        input,
+        isPump,
       ),
       detailsForInfo: infoDetails,
       links: LINKS_HYPO,
@@ -283,13 +302,17 @@ export function buildDrivingReadinessOutcome(
       headline: "Use extra caution",
       lead: `Reading is below a typical comfort band for many drivers (${u === "mmol/L" ? "under 5.6" : "under 100"} ${u}) but above the app’s “low” cutoff.`,
       doNow: ["Consider a small carb top-up or recheck in 10–15 minutes if you feel unsure."],
-      beforeYouGo: appendLongJourney(
-        [
-          input.bgTrend === "falling"
-            ? "Trend is falling — delaying the journey or rechecking first is often wise."
-            : "Keep treatment within reach during the trip.",
-        ],
-        input.longJourney,
+      beforeYouGo: withPumpIobReminder(
+        appendLongJourney(
+          [
+            input.bgTrend === "falling"
+              ? "Trend is falling — delaying the journey or rechecking first is often wise."
+              : "Keep treatment within reach during the trip.",
+          ],
+          input.longJourney,
+        ),
+        input,
+        isPump,
       ),
       detailsForInfo: infoDetails,
       links: LINKS_HYPO,
@@ -301,10 +324,18 @@ export function buildDrivingReadinessOutcome(
     return outcome("caution", {
       headline: "Use extra caution",
       lead: "Your reading is in range, but glucose may still be heading down.",
-      doNow: ["Consider delaying the journey or rechecking in about 15 minutes."],
-      beforeYouGo: appendLongJourney(
-        ["Keep treatment within reach and pull over if you feel any hypo symptoms."],
-        input.longJourney,
+      doNow: [
+        input.pumpIobUnits != null && input.pumpIobUnits > 0 && isPump
+          ? `Pump still has ${input.pumpIobUnits}u working — a snack is safer than another bolus while glucose is heading down.`
+          : "Consider delaying the journey or rechecking in about 15 minutes.",
+      ],
+      beforeYouGo: withPumpIobReminder(
+        appendLongJourney(
+          ["Keep treatment within reach and pull over if you feel any hypo symptoms."],
+          input.longJourney,
+        ),
+        input,
+        isPump,
       ),
       detailsForInfo: infoDetails,
       links: LINKS_HYPO,
@@ -325,7 +356,7 @@ export function buildDrivingReadinessOutcome(
       headline: "Likely OK to drive",
       lead: "Based on what you entered — not medical or legal advice. Follow local rules and your clinic.",
       doNow: [],
-      beforeYouGo: appendLongJourney(beforeYouGo, input.longJourney),
+      beforeYouGo: withPumpIobReminder(appendLongJourney(beforeYouGo, input.longJourney), input, isPump),
       detailsForInfo: infoDetails,
       links: LINKS_NONE,
       readingSummary,

@@ -58,6 +58,8 @@ export type ResolveHomeNextBestActionInput = {
   glucoseNeedsHypoHelp?: boolean;
   /** True when the live reading is already on or under the low line. */
   glucoseIsLow?: boolean;
+  /** Pump users get clock wording instead of long-acting injection wording. */
+  isPumpUser?: boolean;
 };
 
 const MEAL_LABELS: Record<HomeMealMoment["slot"], string> = {
@@ -135,9 +137,13 @@ export function resolveHomeNextBestAction(input: ResolveHomeNextBestActionInput)
       input.travelPromote.reason === "packing"
         ? "A few packing items are still unchecked."
         : input.travelPromote.reason === "homebound" || input.travelPromote.reason === "return_day"
-          ? "Shift long-acting back toward home local time."
+          ? input.isPumpUser
+            ? "Shift the pump clock back toward home time."
+            : "Shift long-acting back toward home local time."
           : input.travelPromote.reason === "insulin_shift"
-            ? "Today’s long-acting clock is shifting — see Insulin times."
+            ? input.isPumpUser
+              ? "The pump clock is shifting toward local time."
+              : "Today’s long-acting clock is shifting — see Insulin times."
             : "Your trip is active — open travel for today’s focus.";
     return {
       id: "travel",

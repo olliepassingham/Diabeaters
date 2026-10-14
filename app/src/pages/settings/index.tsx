@@ -1586,7 +1586,8 @@ export default function Settings() {
 
   const handleSaveUsage = (opts?: { quietSuccess?: boolean }): boolean => {
     const longInjParsed = longActingInjectionsPerDay ? parseInt(longActingInjectionsPerDay, 10) : 0;
-    const newSettings: UserSettings = withReconciledTdd({
+    const pumpUser = isPumpDeliveryMethod(deliveryMethod);
+    const usageDraft: UserSettings = {
       ...settings,
       shortActingUnitsPerDay: shortActingUnitsPerDay ? parseInt(shortActingUnitsPerDay) : undefined,
       longActingUnitsPerDay: longActingUnitsPerDay ? parseInt(longActingUnitsPerDay) : undefined,
@@ -1605,15 +1606,20 @@ export default function Settings() {
       siteChangeDays: siteChangeDays ? parseInt(siteChangeDays) : undefined,
       reservoirChangeDays: reservoirChangeDays ? parseInt(reservoirChangeDays) : undefined,
       reservoirCapacity: reservoirCapacity ? parseInt(reservoirCapacity) : undefined,
-      unitsPerInsulinPen: Math.max(1, parseInt(unitsPerInsulinPen || String(UK_DEFAULT_UNITS_PER_INSULIN_PEN), 10) || UK_DEFAULT_UNITS_PER_INSULIN_PEN),
-      needlesPerBox: Math.max(1, parseInt(needlesPerBox || String(UK_DEFAULT_NEEDLES_PER_BOX), 10) || UK_DEFAULT_NEEDLES_PER_BOX),
+      unitsPerInsulinPen: pumpUser
+        ? settings.unitsPerInsulinPen
+        : Math.max(1, parseInt(unitsPerInsulinPen || String(UK_DEFAULT_UNITS_PER_INSULIN_PEN), 10) || UK_DEFAULT_UNITS_PER_INSULIN_PEN),
+      needlesPerBox: pumpUser
+        ? settings.needlesPerBox
+        : Math.max(1, parseInt(needlesPerBox || String(UK_DEFAULT_NEEDLES_PER_BOX), 10) || UK_DEFAULT_NEEDLES_PER_BOX),
       infusionSetsPerBox: infusionSetsPerBox ? Math.max(1, parseInt(infusionSetsPerBox)) : undefined,
       reservoirsPerBox: reservoirsPerBox ? Math.max(1, parseInt(reservoirsPerBox)) : undefined,
       insulinCartridgeUnits: insulinCartridgeUnits ? Math.max(1, parseInt(insulinCartridgeUnits)) : undefined,
       suppliesSmarterForecastEnabled,
-      usesClosedLoop: isPumpDeliveryMethod(deliveryMethod) ? usesClosedLoop : undefined,
-    });
-    const tddReconciled = newSettings.tdd != null && newSettings.tdd !== settings.tdd;
+      usesClosedLoop: pumpUser ? usesClosedLoop : undefined,
+    };
+    const newSettings: UserSettings = pumpUser ? usageDraft : withReconciledTdd(usageDraft);
+    const tddReconciled = !pumpUser && newSettings.tdd != null && newSettings.tdd !== settings.tdd;
     storage.saveSettings(newSettings);
     setSettings(newSettings);
     if (newSettings.tdd && newSettings.tdd > 0) {
@@ -1624,10 +1630,12 @@ export default function Settings() {
       void reschedulePumpChangeReminders();
     }
     const syncKeys = ["injectionsPerDay", "shortActingUnitsPerDay", "longActingUnitsPerDay"] as const;
-    for (const key of syncKeys) {
-      const val = newSettings[key] as number | undefined;
-      if (val && val > 0) {
-        storage.syncSettingsToSupplyUsage(key, val);
+    if (!pumpUser) {
+      for (const key of syncKeys) {
+        const val = newSettings[key] as number | undefined;
+        if (val && val > 0) {
+          storage.syncSettingsToSupplyUsage(key, val);
+        }
       }
     }
     if (!opts?.quietSuccess) {

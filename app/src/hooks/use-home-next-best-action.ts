@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  DIABEATER_PROFILE_CHANGED_EVENT,
   DIABEATER_SCENARIO_STATE_CHANGED_EVENT,
   storage,
   type ScenarioState,
 } from "@/lib/storage";
+import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import type { HealthStatus } from "@/lib/dashboard-health-status";
 import { getHomeMealMoment, homeMealDismissalKey } from "@/lib/home-meal-moment";
 import { useHomeBedtimePresence } from "@/components/home/HomeBedtimeMoment";
@@ -54,6 +56,9 @@ export function useHomeNextBestAction(options: {
     }
   });
   const bedtime = useHomeBedtimePresence();
+  const [isPumpUser, setIsPumpUser] = useState(() =>
+    isPumpDeliveryMethod(storage.getProfile()?.insulinDeliveryMethod),
+  );
   const cgmActive = isCgmPrefillActive();
   const { prefill: bgPrefill } = useBgPrefill({
     pollIntervalMs: cgmActive ? 5 * 60_000 : undefined,
@@ -71,10 +76,15 @@ export function useHomeNextBestAction(options: {
     const timer = window.setInterval(refresh, 60_000);
     window.addEventListener("focus", refresh);
     window.addEventListener(DIABEATER_SCENARIO_STATE_CHANGED_EVENT, refresh);
+    const onProfile = () => {
+      setIsPumpUser(isPumpDeliveryMethod(storage.getProfile()?.insulinDeliveryMethod));
+    };
+    window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
     return () => {
       window.clearInterval(timer);
       window.removeEventListener("focus", refresh);
       window.removeEventListener(DIABEATER_SCENARIO_STATE_CHANGED_EVENT, refresh);
+      window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
     };
   }, []);
 
@@ -175,6 +185,7 @@ export function useHomeNextBestAction(options: {
         showCoach,
         glucoseNeedsHypoHelp: attention === "low" || attention === "dropping",
         glucoseIsLow: attention === "low",
+        isPumpUser,
       }),
     [
       status,
@@ -191,6 +202,7 @@ export function useHomeNextBestAction(options: {
       hasCriticalSupply,
       showCoach,
       attention,
+      isPumpUser,
     ],
   );
 

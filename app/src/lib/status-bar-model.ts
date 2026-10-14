@@ -154,6 +154,8 @@ export type BuildStatusBarModelInput = {
   postExerciseEducational: boolean;
   postExerciseSnoozed: boolean;
   today?: Date;
+  /** Pump users get clock wording instead of long-acting injection wording. */
+  isPumpUser?: boolean;
 };
 
 export type StatusBarModel = {
@@ -242,9 +244,13 @@ export function buildStatusBarModel(input: BuildStatusBarModelInput): StatusBarM
         ? travel.reason === "packing"
           ? "Packing list still open"
           : travel.reason === "homebound" || travel.reason === "return_day"
-            ? "Shift long-acting back toward home time"
+            ? input.isPumpUser
+              ? "Shift the pump clock back toward home time"
+              : "Shift long-acting back toward home time"
             : travel.reason === "insulin_shift"
-              ? "Check Insulin times for today's local clock"
+              ? input.isPumpUser
+                ? "Check the pump clock for local time"
+                : "Check Insulin times for today's local clock"
               : undefined
         : "Trip active — open for plan and packing",
       href: "/scenarios/travel",

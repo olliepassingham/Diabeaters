@@ -55,7 +55,7 @@ import {
   type AlcoholSituationLinks,
   type AlcoholSituationOutcome,
 } from "@/lib/alcohol-situation-tool";
-import { getMealDoseRoundingGuide, type MealDoseResult } from "@/lib/meal-dose";
+import { getMealDoseRoundingGuide, parseOptionalBolusUnits, type MealDoseResult } from "@/lib/meal-dose";
 import { cn } from "@/lib/utils";
 import { BgTrendThreeButtons } from "@/components/bg-trend-three-buttons";
 import { CgmPrefillButton } from "@/components/cgm-prefill-button";
@@ -932,6 +932,7 @@ export default function AlcoholScenarioPage() {
   const [bgTrend, setBgTrend] = useState<AlcoholTrend>("unknown");
   const [intensity, setIntensity] = useState<AlcoholIntensity>("light");
   const [foodCarbsInput, setFoodCarbsInput] = useState("");
+  const [pumpIobInput, setPumpIobInput] = useState("");
   const [drinkCounts, setDrinkCounts] = useState<Record<string, number>>({});
   const [drinkLookupOpen, setDrinkLookupOpen] = useState(false);
   const [mealType, setMealType] = useState<string>("snack");
@@ -1049,6 +1050,9 @@ export default function AlcoholScenarioPage() {
         carbsG,
         mealType,
         isPump: isPumpDeliveryMethod(profile?.insulinDeliveryMethod),
+        pumpIobUnits: isPumpDeliveryMethod(profile?.insulinDeliveryMethod)
+          ? parseOptionalBolusUnits(pumpIobInput)
+          : null,
       },
     };
   };
@@ -1323,9 +1327,26 @@ export default function AlcoholScenarioPage() {
                       </span>
                     </div>
                   </div>
+                  {isPumpDeliveryMethod(profile?.insulinDeliveryMethod) ? (
+                    <div className="space-y-1.5">
+                      <Label htmlFor="alcohol-pump-iob" className="text-base font-semibold text-foreground">
+                        Pump insulin on board
+                      </Label>
+                      <Input
+                        id="alcohol-pump-iob"
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="Units still working"
+                        value={pumpIobInput}
+                        onChange={(e) => setPumpIobInput(e.target.value)}
+                        className="h-12 rounded-xl text-base"
+                        data-testid="input-alcohol-pump-iob"
+                      />
+                    </div>
+                  ) : null}
                   {sessionCarbsGrams > 0 || foodCarbsInput.trim() ? (
                     <p className="text-base font-semibold text-foreground" data-testid="alcohol-session-total">
-                      {sessionCarbsGrams}g to inject for
+                      {sessionCarbsGrams}g {isPumpDeliveryMethod(profile?.insulinDeliveryMethod) ? "to bolus for" : "to inject for"}
                       <span className="mt-1 block font-normal text-muted-foreground">
                         {drinkSummary.carbsGrams}g drinks · {foodCarbsGrams}g food
                       </span>

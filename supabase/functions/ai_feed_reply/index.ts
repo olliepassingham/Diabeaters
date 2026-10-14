@@ -394,7 +394,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: opProfile } = await admin
       .from("profiles")
-      .select("date_of_birth")
+      .select("date_of_birth, insulin_delivery_method")
       .eq("id", authorId)
       .maybeSingle();
 
@@ -402,11 +402,15 @@ Deno.serve(async (req: Request) => {
       opProfile && typeof (opProfile as { date_of_birth?: unknown }).date_of_birth === "string"
         ? (opProfile as { date_of_birth: string }).date_of_birth
         : null;
+    const deliveryMethod =
+      opProfile && typeof (opProfile as { insulin_delivery_method?: unknown }).insulin_delivery_method === "string"
+        ? (opProfile as { insulin_delivery_method: string }).insulin_delivery_method
+        : null;
 
     const gateContext = packContext({
       profile: {
         dateOfBirth: dob,
-        insulinDeliveryMethod: null,
+        insulinDeliveryMethod: deliveryMethod,
         bgUnits: null,
         diabetesOnsetDate: null,
       },

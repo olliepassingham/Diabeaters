@@ -90,7 +90,8 @@ export type BedtimeCorrectionResult =
       rawDose: number;
       note: string;
     }
-  | ({ status: "dose" } & BedtimeCorrectionSuggestion);
+  | ({ status: "dose" } & BedtimeCorrectionSuggestion)
+  | { status: "needs_pump_iob" };
 
 export function bedtimeTrendReduction(
   trend: BedtimeCorrectionTrend,
@@ -286,6 +287,8 @@ export function calculateBedtimeCorrectionDose(params: {
   sickDayActive: boolean;
   /** When set (pump users), subtract these units instead of using hours-since-insulin. */
   pumpIobUnits?: number | null;
+  /** When true, a blank pump IOB withholds the correction instead of treating it as zero. */
+  requirePumpIob?: boolean;
   roundIncrement?: number;
 }): BedtimeCorrectionResult {
   const {
@@ -302,6 +305,7 @@ export function calculateBedtimeCorrectionDose(params: {
     recentHypos,
     sickDayActive,
     pumpIobUnits,
+    requirePumpIob = false,
     roundIncrement = PEN_INSULIN_INCREMENT,
   } = params;
 
@@ -338,6 +342,10 @@ export function calculateBedtimeCorrectionDose(params: {
       aimBg: toDisplay(aimMmol),
       bgUnits,
     };
+  }
+
+  if (requirePumpIob && (pumpIobUnits == null || !Number.isFinite(pumpIobUnits))) {
+    return { status: "needs_pump_iob" };
   }
 
   const fullDose = simple.fullDoseRounded;

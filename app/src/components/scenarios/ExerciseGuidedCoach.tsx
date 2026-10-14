@@ -1605,13 +1605,9 @@ function PreQuestions({
         <YesNoToggle
           value={session.preRapidInsulin2h ?? null}
           onChange={(v) => {
-            const patch: Parameters<typeof update>[0] = {
+            update({
               preRapidInsulin2h: v === null ? undefined : v,
-            };
-            if (v === "no") {
-              patch.preChecklist = { ...session.preChecklist, basalAdjusted: true };
-            }
-            update(patch);
+            });
           }}
         />
       </FieldRow>

@@ -18,6 +18,7 @@ export type KetoneLevel = "none" | "trace" | "small" | "moderate" | "large";
 
 export type SickDayResultsViewModel = {
   correctionDose: number;
+  correctionNeedsPumpIob?: boolean;
   correctionExplanation: string;
   baseCorrectionDose: number;
   severityModifier: number;
@@ -108,6 +109,8 @@ export type SickDayReadingsFieldsProps = {
   bgUnits: string;
   idPrefix?: string;
   cgm?: SickDayCgmBgFieldProps;
+  pumpIob?: string;
+  onPumpIobChange?: (v: string) => void;
 };
 
 export function SickDayReadingsFields({
@@ -120,6 +123,8 @@ export function SickDayReadingsFields({
   bgUnits,
   idPrefix = "sickday",
   cgm,
+  pumpIob,
+  onPumpIobChange,
 }: SickDayReadingsFieldsProps) {
   const severityId = `${idPrefix}-severity`;
   const bgId = `${idPrefix}-bg`;
@@ -191,6 +196,25 @@ export function SickDayReadingsFields({
           />
         ) : null}
       </div>
+
+      {onPumpIobChange ? (
+        <div className="space-y-1.5">
+          <Label htmlFor={`${idPrefix}-pump-iob`} className="text-xs font-medium text-muted-foreground">
+            Pump insulin on board
+          </Label>
+          <Input
+            id={`${idPrefix}-pump-iob`}
+            type="text"
+            inputMode="decimal"
+            placeholder="From the pump"
+            value={pumpIob ?? ""}
+            onChange={(e) => onPumpIobChange(e.target.value)}
+            className="h-12 rounded-xl border-border/60 bg-background text-xl font-semibold tabular-nums tracking-tight shadow-none"
+            data-testid="input-sickday-pump-iob"
+          />
+          <p className="text-xs text-muted-foreground">Leave this blank and a correction number is not shown.</p>
+        </div>
+      ) : null}
 
       <div className="space-y-1.5">
         <Label id={ketoneId} className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
@@ -283,6 +307,8 @@ type SickDayUpdateReadingsCollapsibleProps = {
   onCalculate: () => void;
   idPrefix?: "standalone" | "active";
   cgm?: SickDayCgmBgFieldProps;
+  pumpIob?: string;
+  onPumpIobChange?: (v: string) => void;
 };
 
 export function SickDayUpdateReadingsCollapsible({
@@ -298,6 +324,8 @@ export function SickDayUpdateReadingsCollapsible({
   onCalculate,
   idPrefix = "standalone",
   cgm,
+  pumpIob,
+  onPumpIobChange,
 }: SickDayUpdateReadingsCollapsibleProps) {
   const summary =
     bgLevel && ketoneLevel && severity
@@ -345,6 +373,8 @@ export function SickDayUpdateReadingsCollapsible({
               bgUnits={bgUnits}
               idPrefix={idPrefix === "active" ? "update-active" : "update"}
               cgm={cgm}
+              pumpIob={pumpIob}
+              onPumpIobChange={onPumpIobChange}
             />
             <Button
               type="button"
@@ -458,10 +488,18 @@ export function SickDayResultsPanel({
         <div className="px-4 pb-4 pt-4 sm:px-5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                {results.correctionDose > 0 ? "Suggested correction" : "Your plan"}
-              </p>
-              {results.correctionDose > 0 ? (
+                <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                  {results.correctionNeedsPumpIob
+                    ? "Correction waiting"
+                    : results.correctionDose > 0
+                      ? "Suggested correction"
+                      : "Your plan"}
+                </p>
+              {results.correctionNeedsPumpIob ? (
+                <p className="mt-1 text-lg font-semibold tracking-tight text-foreground" data-testid="text-correction-needs-iob">
+                  Enter pump IOB
+                </p>
+              ) : results.correctionDose > 0 ? (
                 <p
                   className="mt-1 font-display text-[2.5rem] font-bold leading-none tabular-nums tracking-tight text-foreground"
                   data-testid="text-correction-dose"

@@ -280,7 +280,10 @@ function climateWeatherGuidance(plan: TravelPlan, isPumpUser: boolean): ClimateG
 
 type ClimateTimezonePhase = { label: string; text: string };
 
-function climateTimezoneGuidance(plan: TravelPlan): ClimateGuidanceSection & { phases: ClimateTimezonePhase[] } {
+function climateTimezoneGuidance(
+  plan: TravelPlan,
+  isPumpUser: boolean,
+): ClimateGuidanceSection & { phases: ClimateTimezonePhase[] } {
   const dir =
     plan.timezoneDirection === "east" ? "Travelling east" : plan.timezoneDirection === "west" ? "Travelling west" : "Time zone change";
 
@@ -294,36 +297,57 @@ function climateTimezoneGuidance(plan: TravelPlan): ClimateGuidanceSection & { p
       : plan.timezoneDirection === "west"
         ? [
             "Your day is longer — you may need an extra meal or bolus on travel day.",
-            "Some people keep long-acting on home time for day one, then shift slowly.",
+            isPumpUser
+              ? "Some people keep the pump on home time for day one, then move the clock slowly."
+              : "Some people keep long-acting on home time for day one, then shift slowly.",
             "Extra checks help while your body clock adjusts.",
           ]
         : [
-            "Shift meals and basal timing gradually toward local time.",
+            isPumpUser
+              ? "Shift meals and the pump clock gradually toward local time."
+              : "Shift meals and basal timing gradually toward local time.",
             "Check glucose more often for the first few days.",
             "Discuss major time changes with your diabetes team before you go.",
           ];
 
-  const phases: ClimateTimezonePhase[] = [
-    {
-      label: "Days 1–2",
-      text: "Check often; keep snacks handy. Long-acting may stay on home time at first if your team agrees.",
-    },
-    {
-      label: "Days 3–4",
-      text: "Move meals and basal toward local time in small steps (about 1–2 hours per day).",
-    },
-    {
-      label: "Day 5+",
-      text: "You should be on local routine — on your return travel day, Insulin times flips to a homebound schedule automatically.",
-    },
-  ];
+  const phases: ClimateTimezonePhase[] = isPumpUser
+    ? [
+        {
+          label: "Days 1–2",
+          text: "Check often; keep snacks handy. The pump can stay on home time at first if your team agrees.",
+        },
+        {
+          label: "Days 3–4",
+          text: "Move meals and the pump clock toward local time in small steps (about 1–2 hours per day).",
+        },
+        {
+          label: "Day 5+",
+          text: "You should be on local routine — on your return travel day, Insulin times flips to a homebound schedule automatically.",
+        },
+      ]
+    : [
+        {
+          label: "Days 1–2",
+          text: "Check often; keep snacks handy. Long-acting may stay on home time at first if your team agrees.",
+        },
+        {
+          label: "Days 3–4",
+          text: "Move meals and basal toward local time in small steps (about 1–2 hours per day).",
+        },
+        {
+          label: "Day 5+",
+          text: "You should be on local routine — on your return travel day, Insulin times flips to a homebound schedule automatically.",
+        },
+      ];
 
   return {
     title: `${dir} · ${plan.timezoneHours}h`,
     subtitle: "Shift timing gradually — rushing increases hypo and high risk.",
     bullets,
     phases,
-    callout: "Trips under 3 days: some people keep home basal times. Flexible insulins (e.g. degludec) may need less shifting — follow your own plan.",
+    callout: isPumpUser
+      ? "Trips under 3 days: some people keep the pump on home time. Follow the plan you agreed with your team."
+      : "Trips under 3 days: some people keep home basal times. Flexible insulins (e.g. degludec) may need less shifting — follow your own plan.",
   };
 }
 
@@ -1495,7 +1519,9 @@ export default function Travel() {
     });
     toast({
       title: "Travel mode on",
-      description: "Turned on for this trip. Check Insulin times for today’s local injection clock.",
+      description: isPumpUser
+        ? "Turned on for this trip. Check Insulin times for the pump clock."
+        : "Turned on for this trip. Check Insulin times for today’s local injection clock.",
     });
     void (async () => {
       const res = await invokeNotifyScenarioStarted({
@@ -2928,7 +2954,9 @@ export default function Travel() {
             <div className="min-w-0">
               <p className="text-sm font-semibold">Start when you leave</p>
               <p className="text-xs leading-snug text-muted-foreground">
-                Turn on at the airport or when you board — not weeks before. Then open Insulin for today’s local injection time.
+                {isPumpUser
+                  ? "Turn on at the airport or when you board — not weeks before. Then open Insulin for the pump clock."
+                  : "Turn on at the airport or when you board — not weeks before. Then open Insulin for today’s local injection time."}
               </p>
             </div>
             <Button size="sm" className="h-10 shrink-0 rounded-xl" onClick={() => handleActivateTravelMode()} data-testid="button-activate-travel">
@@ -3121,7 +3149,7 @@ export default function Travel() {
           ) : null}
           {/* Most-needed info first: when to take long-acting insulin, no scrolling required. */}
           {!isPumpUser && plan.timezoneChange !== "none" && (() => {
-            const tz = climateTimezoneGuidance(plan);
+            const tz = climateTimezoneGuidance(plan, false);
             return (
               <Card className="overflow-hidden rounded-[1.35rem] border-sky-500/25 shadow-none" data-testid="card-climate-basal-timing">
                 <CardHeader className="px-4 pb-2 pt-4">
@@ -3287,7 +3315,7 @@ export default function Travel() {
           })()}
 
           {plan.timezoneChange !== "none" && (() => {
-            const tz = climateTimezoneGuidance(plan);
+            const tz = climateTimezoneGuidance(plan, isPumpUser);
             return (
               <Card className="overflow-hidden rounded-[1.35rem] border-border/50 shadow-none">
                 <CardHeader className="px-4 pb-2 pt-4">

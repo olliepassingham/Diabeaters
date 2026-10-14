@@ -19,6 +19,19 @@ export function roundInsulinUnits(value: number, increment: number = PEN_INSULIN
   return Number(rounded.toFixed(places));
 }
 
+/**
+ * Subtract insulin on board the user typed from the pump.
+ * A blank or non-numeric value leaves the dose unchanged.
+ */
+export function subtractEnteredPumpIob(
+  dose: number,
+  pumpIobUnits: number | null | undefined,
+  increment: number = PUMP_INSULIN_INCREMENT,
+): number {
+  if (pumpIobUnits == null || !Number.isFinite(pumpIobUnits) || pumpIobUnits <= 0) return dose;
+  return roundInsulinUnits(Math.max(0, dose - pumpIobUnits), increment);
+}
+
 /** Display helper so 5.10u reads as 5.1 and 5.00 as 5. */
 export function formatInsulinUnits(value: number, increment: number = PEN_INSULIN_INCREMENT): string {
   const rounded = roundInsulinUnits(value, increment);
