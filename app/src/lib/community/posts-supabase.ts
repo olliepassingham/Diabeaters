@@ -32,6 +32,7 @@ import {
   getPostMediaSignedUrl,
   getPostMediaSignedUrls,
 } from "./post-media-signed-urls";
+import { explainVideoUploadError, feedVideoStorageExt, uploadFeedVideoFile } from "./upload-feed-video";
 import type { CommunityPostAudience } from "./post-audience";
 import type { CommunityPostAuthorPreview, CommunityPostCommentRow, CommunityPostRow } from "./types";
 import {
@@ -552,19 +553,29 @@ function extFromFile(f: File): string {
   return "jpg";
 }
 
-function extFromVideoFile(f: File): string {
-  const t = f.type.toLowerCase();
-  if (t.includes("webm")) return "webm";
-  if (t.includes("quicktime") || f.name.toLowerCase().endsWith(".mov")) return "mov";
-  return "mp4";
-}
-
-function videoContentType(file: File): string {
-  if (file.type.startsWith("video/")) return file.type;
-  const ext = extFromVideoFile(file);
-  if (ext === "mov") return "video/quicktime";
-  if (ext === "webm") return "video/webm";
-  return "video/mp4";
+async function insertCommunityPostReturning(
+  supabase: SupabaseNonNull,
+  payload: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  let body: Record<string, unknown> = { ...payload };
+  let lastMessage = "No row returned";
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { data, error } = await supabase.from("community_posts").insert(body).select("*").single();
+    if (!error && data) return data as Record<string, unknown>;
+    lastMessage = error?.message ?? lastMessage;
+    if (body.video_poster_url != null && /video_poster_url/i.test(lastMessage)) {
+      body = { ...body };
+      delete body.video_poster_url;
+      continue;
+    }
+    if (body.content_note != null && /content_note/i.test(lastMessage)) {
+      body = { ...body };
+      delete body.content_note;
+      continue;
+    }
+    throw new Error(lastMessage);
+  }
+  throw new Error(lastMessage);
 }
 
 function validateImageFiles(files: File[]): Error | null {
@@ -985,37 +996,32 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
 
   const pendingId = crypto.randomUUID();
   const pendingPaths: string[] = [];
-  let pendingVideoPath: string | null = null;
-  let pendingPosterPath: string | null = null;
+  let directVideoPath: string | null = null;
+  let directPosterPath: string | null = null;
+  let presetPostId: string | null = null;
   let postId: string | null = null;
   const movedDests: string[] = [];
 
   try {
     if (videoFile) {
-      const ext = extFromVideoFile(videoFile);
-      pendingVideoPath = `${uid}/pending/${pendingId}/video.${ext}`;
-      const { error: upErr } = await supabase.storage
-        .from(COMMUNITY_POST_IMAGES_BUCKET)
-        .upload(pendingVideoPath, videoFile, {
-          cacheControl: "604800",
-          upsert: false,
-          contentType: videoContentType(videoFile),
-        });
-      if (upErr) throw new Error(upErr.message);
+      // Upload straight to the final path. Moving a large phone video after a
+      // pending upload is a common failure, and the post then looks like it died
+      // after "Uploading…".
+      presetPostId = crypto.randomUUID();
+      const ext = feedVideoStorageExt(videoFile);
+      directVideoPath = `${uid}/${presetPostId}/video.${ext}`;
+      await uploadFeedVideoFile(supabase, directVideoPath, videoFile);
 
       if (videoPosterFile && videoPosterFile.size > 0) {
-        pendingPosterPath = `${uid}/pending/${pendingId}/poster.jpg`;
+        directPosterPath = `${uid}/${presetPostId}/poster.jpg`;
         const { error: posterErr } = await supabase.storage
           .from(COMMUNITY_POST_IMAGES_BUCKET)
-          .upload(pendingPosterPath, videoPosterFile, {
+          .upload(directPosterPath, videoPosterFile, {
             cacheControl: "604800",
             upsert: false,
             contentType: "image/jpeg",
           });
-        if (posterErr) {
-          // Poster is optional polish — continue without it if upload fails.
-          pendingPosterPath = null;
-        }
+        if (posterErr) directPosterPath = null;
       }
     }
 
@@ -1038,54 +1044,35 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
       body: params.body,
       /* Avoid publishing pending storage paths: we move() those objects away immediately, so any
        * feed/realtime read between move and DB update would sign URLs for paths that no longer exist.
-       * Standard media-only posts must reference media at insert time (CHECK constraint). */
+       * Standard media-only posts must reference media at insert time (CHECK constraint).
+       * Videos are uploaded to the final path first, so the row can point at them immediately. */
       image_urls:
         params.post_kind === "standard" && !params.body.trim() && files.length > 0 ? pendingPaths : [],
-      video_url:
-        params.post_kind === "standard" && !params.body.trim() && pendingVideoPath ? pendingVideoPath : null,
+      video_url: directVideoPath,
       topic: params.topic,
       post_kind: params.post_kind,
       post_extra: params.post_extra,
       mention_map: params.mention_map,
       mentioned_user_ids,
     };
+    if (presetPostId) insertPayload.id = presetPostId;
+    if (directPosterPath) insertPayload.video_poster_url = directPosterPath;
     if (imageAltsForInsert.some((s) => s.trim().length > 0)) {
       insertPayload.image_alt_texts = imageAltsForInsert;
     }
     if (contentNote) insertPayload.content_note = contentNote;
     if (params.audience === "followers") insertPayload.audience = "followers";
 
-    const { data, error } = await supabase.from("community_posts").insert(insertPayload).select("*").single();
+    const data = await insertCommunityPostReturning(supabase, insertPayload);
 
-    if (error) throw new Error(error.message);
-    if (!data) throw new Error("No row returned");
+    postId = String(data.id);
+    if (directVideoPath && files.length === 0) {
+      const out = mapPost(data);
+      fireMentionPushes(out.id);
+      return { data: await finalizeSinglePostRow(out), error: null };
+    }
 
-    postId = String((data as Record<string, unknown>).id);
     const finalPaths: string[] = [];
-    let finalVideoPath: string | null = null;
-    let finalPosterPath: string | null = null;
-
-    if (pendingVideoPath && videoFile) {
-      const ext = extFromVideoFile(videoFile);
-      finalVideoPath = `${uid}/${postId}/video.${ext}`;
-      const { error: mvErr } = await supabase.storage
-        .from(COMMUNITY_POST_IMAGES_BUCKET)
-        .move(pendingVideoPath, finalVideoPath);
-      if (mvErr) throw new Error(mvErr.message);
-      movedDests.push(finalVideoPath);
-    }
-
-    if (pendingPosterPath) {
-      finalPosterPath = `${uid}/${postId}/poster.jpg`;
-      const { error: mvPosterErr } = await supabase.storage
-        .from(COMMUNITY_POST_IMAGES_BUCKET)
-        .move(pendingPosterPath, finalPosterPath);
-      if (mvPosterErr) {
-        finalPosterPath = null;
-      } else {
-        movedDests.push(finalPosterPath);
-      }
-    }
 
     for (let i = 0; i < pendingPaths.length; i++) {
       const ext = extFromFile(files[i]!);
@@ -1097,30 +1084,16 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
     }
 
     const updatePayload: Record<string, unknown> = { image_urls: finalPaths };
-    if (finalVideoPath) {
-      updatePayload.video_url = finalVideoPath;
-    }
-    if (finalPosterPath) {
-      updatePayload.video_poster_url = finalPosterPath;
-    }
     if (imageAltsForInsert.some((s) => s.trim().length > 0)) {
       updatePayload.image_alt_texts = imageAltsForInsert;
     }
 
-    let { data: updated, error: updErr } = await supabase
+    const { data: updated, error: updErr } = await supabase
       .from("community_posts")
       .update(updatePayload)
       .eq("id", postId)
       .select("*")
       .single();
-
-    // Older databases may not have video_poster_url yet — retry without it.
-    if (updErr && finalPosterPath && /video_poster_url/i.test(updErr.message)) {
-      delete updatePayload.video_poster_url;
-      const retry = await supabase.from("community_posts").update(updatePayload).eq("id", postId).select("*").single();
-      updated = retry.data;
-      updErr = retry.error;
-    }
 
     if (updErr) throw new Error(updErr.message);
     if (!updated) throw new Error("Update returned no row");
@@ -1135,15 +1108,15 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
       ...new Set([
         ...pendingPaths,
         ...movedDests,
-        ...(pendingVideoPath ? [pendingVideoPath] : []),
-        ...(pendingPosterPath ? [pendingPosterPath] : []),
+        ...(directVideoPath ? [directVideoPath] : []),
+        ...(directPosterPath ? [directPosterPath] : []),
       ]),
     ];
     if (uniq.length > 0) {
       await supabase.storage.from(COMMUNITY_POST_IMAGES_BUCKET).remove(uniq);
     }
     const msg = e instanceof Error ? e.message : "Upload failed";
-    return { data: null, error: new Error(msg) };
+    return { data: null, error: new Error(videoFile ? explainVideoUploadError(msg) : msg) };
   }
 }
 
