@@ -13,7 +13,7 @@ import {
   Cookie,
 } from "lucide-react";
 import { Link } from "wouter";
-import { storage, UserSettings, ScenarioState, RatioFormat } from "@/lib/storage";
+import { storage, UserSettings, ScenarioState, RatioFormat, DIABEATER_SCENARIO_STATE_CHANGED_EVENT } from "@/lib/storage";
 import { parseRatioToGramsPerUnit, formatRatioForDisplay } from "@/lib/ratio-utils";
 import {
   applyStarterRatios,
@@ -94,18 +94,23 @@ export function RatioAdviserWidget(_props: DashboardWidgetLayoutProps) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      setSettings(storage.getSettings?.() ?? {});
-      setScenarioState(storage.getScenarioState?.() ?? { travelModeActive: false, sickDayActive: false });
-      const profile = storage.getProfile?.();
-      if (profile?.ratioFormat) setRatioFormat(profile.ratioFormat);
-      setCpSize(profile?.carbPortionSize);
-      setError(null);
-    } catch {
-      setError("Could not load ratios.");
-      setSettings({});
-      setScenarioState({ travelModeActive: false, sickDayActive: false });
-    }
+    const load = () => {
+      try {
+        setSettings(storage.getSettings?.() ?? {});
+        setScenarioState(storage.getScenarioState?.() ?? { travelModeActive: false, sickDayActive: false });
+        const profile = storage.getProfile?.();
+        if (profile?.ratioFormat) setRatioFormat(profile.ratioFormat);
+        setCpSize(profile?.carbPortionSize);
+        setError(null);
+      } catch {
+        setError("Could not load ratios.");
+        setSettings({});
+        setScenarioState({ travelModeActive: false, sickDayActive: false });
+      }
+    };
+    load();
+    window.addEventListener(DIABEATER_SCENARIO_STATE_CHANGED_EVENT, load);
+    return () => window.removeEventListener(DIABEATER_SCENARIO_STATE_CHANGED_EVENT, load);
   }, []);
 
   const handleUseStarterRatios = () => {
@@ -189,12 +194,13 @@ export function RatioAdviserWidget(_props: DashboardWidgetLayoutProps) {
       </CardHeader>
       <CardContent className={cn(widgetContentClass, "flex flex-col gap-2")}>
         {hasRatios ? (
-          <div className="grid grid-cols-2 gap-1.5">
+          <div className={scenario ? "flex flex-col" : "grid grid-cols-2 gap-1.5"}>
             {ratios.map((r, idx) => {
               const { base, adjusted } = displayRatio(r.value, ratioFormat, scenario?.factor, cpSize);
               const RowIcon = ratioRowIcon(r.label);
               const mt = r.label.toLowerCase();
-              const wideLast = lastRatioSpansFullRow && idx === ratios.length - 1;
+              const wideLast = !scenario && lastRatioSpansFullRow && idx === ratios.length - 1;
+              const showAdjusted = Boolean(scenario && adjusted);
 
               return (
                 <Link
@@ -206,29 +212,37 @@ export function RatioAdviserWidget(_props: DashboardWidgetLayoutProps) {
                 >
                   <div
                     className={cn(
-                      "pressable flex min-h-11 items-center gap-2 bg-transparent px-1.5 py-2 text-left transition-colors",
+                      "pressable flex items-center gap-3 bg-transparent px-1.5 text-left transition-colors",
+                      showAdjusted ? "min-h-[3.25rem] py-2.5" : "min-h-11 gap-2 py-2",
+                      showAdjusted && idx > 0 && "border-t border-border/40",
                       "hover:bg-sky-500/[0.04] dark:hover:bg-sky-950/15",
                     )}
                   >
                     <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-sky-500/10 dark:bg-sky-500/15">
-                      <RowIcon className="h-3 w-3 text-sky-600 dark:text-sky-400" aria-hidden />
+                      <RowIcon className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" aria-hidden />
                     </span>
-                    <span className="min-w-0 flex-1 truncate text-[11px] font-medium leading-none text-muted-foreground">
-                      {r.label}
-                    </span>
-                    {scenario && adjusted ? (
-                      <span className="shrink-0 text-right leading-none">
-                        <span className="mr-1 text-[0.6rem] tabular-nums text-muted-foreground line-through opacity-70">
-                          {base}
+                    {showAdjusted ? (
+                      <>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-medium leading-tight text-foreground">{r.label}</span>
+                          <span className="mt-0.5 block text-[11px] leading-tight text-muted-foreground">
+                            Usual{" "}
+                            <span className="tabular-nums line-through opacity-80">{base}</span>
+                          </span>
                         </span>
-                        <span className="text-sm font-bold tabular-nums text-amber-700 dark:text-amber-400">
+                        <span className="shrink-0 text-base font-bold tabular-nums leading-none text-amber-700 dark:text-amber-400">
                           {adjusted}
                         </span>
-                      </span>
+                      </>
                     ) : (
-                      <span className="shrink-0 text-sm font-bold tabular-nums leading-none tracking-tight text-foreground">
-                        {base}
-                      </span>
+                      <>
+                        <span className="min-w-0 flex-1 truncate text-[11px] font-medium leading-none text-muted-foreground">
+                          {r.label}
+                        </span>
+                        <span className="shrink-0 text-sm font-bold tabular-nums leading-none tracking-tight text-foreground">
+                          {base}
+                        </span>
+                      </>
                     )}
                   </div>
                 </Link>

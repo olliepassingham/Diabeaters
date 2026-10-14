@@ -150,6 +150,9 @@ export function HomeCommandHero({
 
   const activeExercise = storage.getActiveExercise();
   const pumpFailureActive = scenarioState.pumpFailureActive === true;
+  const sickDayAlreadyTheAction = scenarioState.sickDayActive && nextAction.id === "sick_day";
+  const showSickDayChip = scenarioState.sickDayActive && !sickDayAlreadyTheAction;
+  const showScenarioChips = showSickDayChip || Boolean(activeExercise) || pumpFailureActive || scenarioState.alcoholModeActive;
 
   const glucose = liveGlucose;
   const hasLiveBg = glucose != null;
@@ -204,12 +207,12 @@ export function HomeCommandHero({
           </div>
         </div>
 
-        {(scenarioState.sickDayActive || Boolean(activeExercise) || pumpFailureActive || scenarioState.alcoholModeActive) && (
+        {showScenarioChips && (
           <div
             className="mt-3 flex flex-wrap items-center gap-2 px-1"
             data-testid="home-active-scenario-chips"
           >
-            {scenarioState.sickDayActive ? (
+            {showSickDayChip ? (
               <Button asChild variant="secondary" size="sm" className="h-8 rounded-full px-3 text-xs font-semibold shadow-none">
                 <Link href="/scenarios/sick-day" data-testid="chip-active-sickday">
                   <AlertCircle className="mr-1.5 h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
@@ -244,7 +247,7 @@ export function HomeCommandHero({
           </div>
         )}
 
-        <div className={cn("mt-3.5", !(scenarioState.sickDayActive || activeExercise || pumpFailureActive || scenarioState.alcoholModeActive) && "mt-4")}>
+        <div className={cn("mt-3.5", !showScenarioChips && "mt-4")}>
           <HomeActionDock
             isUrgent={isUrgent}
             showCoach={showCoach}
