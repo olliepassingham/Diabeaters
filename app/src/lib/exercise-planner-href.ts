@@ -1,4 +1,4 @@
-import type { ActiveExerciseSession, ExerciseBgTrend, ExercisePhase } from "@/lib/storage";
+import type { ActiveExerciseSession, ExerciseBgTrend, ExerciseEffortShape, ExercisePhase } from "@/lib/storage";
 import { getWorkoutRemainingMs } from "@/lib/exercise-session-timing";
 
 /** Legacy `type=sports` links map to `field` after court/field split. */
@@ -62,6 +62,7 @@ export type ExercisePlannerHrefParams = {
   exerciseType: string;
   durationMinutes: number;
   intensity: string;
+  effortShape?: ExerciseEffortShape;
   routineId?: string;
   exerciseName?: string;
   /** When set, planner hydrates BG from matching active session */
@@ -80,6 +81,7 @@ export function buildExerciseScenarioPlannerHref(p: ExercisePlannerHrefParams): 
   q.set("type", p.exerciseType);
   q.set("duration", String(p.durationMinutes));
   q.set("intensity", p.intensity);
+  if (p.intensity === "intense" && p.effortShape === "max") q.set("effort", "max");
   if (p.routineId) q.set("routineId", p.routineId);
   if (p.exerciseName) q.set("name", p.exerciseName);
   if (p.sync) q.set("sync", p.sync);
@@ -91,13 +93,14 @@ export function buildExerciseScenarioPlannerHref(p: ExercisePlannerHrefParams): 
 
 /** Deep link to restart a recent workout in guided coach (BG/meal still entered fresh). */
 export function buildExerciseScenarioRepeatHref(
-  session: Pick<ExercisePlannerHrefParams, "exerciseType" | "durationMinutes" | "intensity" | "exerciseName" | "routineId">,
+  session: Pick<ExercisePlannerHrefParams, "exerciseType" | "durationMinutes" | "intensity" | "effortShape" | "exerciseName" | "routineId">,
   options?: { from?: ExercisePlannerHrefParams["from"] },
 ): string {
   return buildExerciseScenarioPlannerHref({
     exerciseType: session.exerciseType,
     durationMinutes: session.durationMinutes,
     intensity: session.intensity,
+    effortShape: session.effortShape,
     routineId: session.routineId,
     exerciseName: session.exerciseName,
     autoStart: true,
@@ -106,13 +109,14 @@ export function buildExerciseScenarioRepeatHref(
 }
 
 export function buildExerciseScenarioPlannerHrefFromSession(
-  session: Pick<ActiveExerciseSession, "exerciseType" | "durationMinutes" | "intensity" | "routineId" | "phase">,
+  session: Pick<ActiveExerciseSession, "exerciseType" | "durationMinutes" | "intensity" | "effortShape" | "routineId" | "phase">,
   options?: { syncActive?: boolean; from?: "widget" | "travel" },
 ): string {
   return buildExerciseScenarioPlannerHref({
     exerciseType: session.exerciseType,
     durationMinutes: session.durationMinutes,
     intensity: session.intensity,
+    effortShape: session.effortShape,
     routineId: session.routineId,
     sync: options?.syncActive ? "active" : undefined,
     phase: session.phase,

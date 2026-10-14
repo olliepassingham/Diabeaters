@@ -167,6 +167,27 @@ describe("calculateMealDose exercise meta modifiers", () => {
     expect(r.exerciseReduction).toBeGreaterThanOrEqual(40);
   });
 
+  it("treats an intense short max effort like moderate for the meal-insulin modifier", () => {
+    const steady = calculateMealDose(60, "snack", settingsWithSnackRatio, "mmol/L", "before", 1, {
+      exerciseType: "cardio",
+      intensity: "intense",
+      durationMinutes: 45,
+    });
+    const max = calculateMealDose(60, "snack", settingsWithSnackRatio, "mmol/L", "before", 1, {
+      exerciseType: "cardio",
+      intensity: "intense",
+      durationMinutes: 45,
+      effortShape: "max",
+    });
+    const moderate = calculateMealDose(60, "snack", settingsWithSnackRatio, "mmol/L", "before", 1, {
+      exerciseType: "cardio",
+      intensity: "moderate",
+      durationMinutes: 45,
+    });
+    expect(max.exerciseReduction).toBe(moderate.exerciseReduction);
+    expect(max.exerciseReduction).toBeLessThan(steady.exerciseReduction ?? 0);
+  });
+
   it("decreases post-exercise reduction for strength", () => {
     const r = calculateMealDose(60, "snack", settingsWithSnackRatio, "mmol/L", "after", 1, {
       exerciseType: "strength",

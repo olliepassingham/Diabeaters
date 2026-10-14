@@ -88,6 +88,7 @@ export async function registerExerciseCgmServerMonitor(session: ActiveExerciseSe
       exerciseType: session.exerciseType,
       durationMinutes: session.durationMinutes,
       intensity: session.intensity,
+      effortShape: session.effortShape,
       minutesUntilStart: 30,
       bgUnits,
       currentBg: bg,

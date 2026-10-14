@@ -84,6 +84,7 @@ import {
   type GuidedExerciseStartParams,
 } from "@/lib/exercise-guided-start";
 import { ExercisePumpTipsCard } from "@/components/scenarios/ExercisePumpTipsCard";
+import { ExerciseEffortShapeField } from "@/components/scenarios/exercise-effort-shape-field";
 import {
   ExerciseRoutineAdjustSheet,
   ExerciseRoutineAdjustTrigger,
@@ -99,6 +100,7 @@ import {
   type ActiveExerciseSession,
   type ExerciseBgTrend,
   type ExerciseEnvironmentChoice,
+  type ExerciseEffortShape,
   type ExerciseIntensity,
   type ExercisePhase,
   type ExerciseRoutine,
@@ -394,6 +396,7 @@ export function ExerciseGuidedCoach() {
   const [planWorkoutOpen, setPlanWorkoutOpen] = useState(true);
   const [startType, setStartType] = useState<ExerciseType>("cardio");
   const [startIntensity, setStartIntensity] = useState<ExerciseIntensity>("moderate");
+  const [startEffortShape, setStartEffortShape] = useState<ExerciseEffortShape>("steady");
   const [startDuration, setStartDuration] = useState<string>("45");
 
   // Pre / active / recovery local input state (mirrors active session for snappy controls)
@@ -521,6 +524,8 @@ export function ExerciseGuidedCoach() {
       if (intensity && (INTENSITY_OPTIONS as readonly string[]).includes(intensity)) {
         setStartIntensity(intensity as ExerciseIntensity);
       }
+      if (params.get("effort") === "max") setStartEffortShape("max");
+      else if (params.get("effort") === "steady") setStartEffortShape("steady");
       if (duration && /^\d{1,3}$/.test(duration)) setStartDuration(duration);
     }
   }, [search]);
@@ -551,6 +556,7 @@ export function ExerciseGuidedCoach() {
     const result = startGuidedExerciseSession({
       exerciseType: type as ExerciseType,
       intensity: intensity as ExerciseIntensity,
+      effortShape: params.get("effort") === "max" ? "max" : undefined,
       durationMinutes: duration,
       exerciseName,
       routineId,
@@ -815,6 +821,7 @@ export function ExerciseGuidedCoach() {
       {
         exerciseType: overrides?.exerciseType ?? session.exerciseType,
         intensity: overrides?.intensity ?? session.intensity,
+        effortShape: overrides?.effortShape,
         durationMinutes: overrides?.durationMinutes ?? session.durationMinutes,
         exerciseName: session.exerciseName,
       },
@@ -836,6 +843,7 @@ export function ExerciseGuidedCoach() {
       exerciseName: EXERCISE_TYPE_OPTIONS.find((o) => o.value === startType)?.label ?? "Exercise",
       exerciseType: startType,
       intensity: startIntensity,
+      effortShape: startIntensity === "intense" ? startEffortShape : undefined,
       durationMinutes: dur,
     });
   };
@@ -846,6 +854,7 @@ export function ExerciseGuidedCoach() {
       exerciseName: routine.name,
       exerciseType: overrides?.exerciseType ?? routine.exerciseType,
       intensity: overrides?.intensity ?? routine.intensity,
+      effortShape: overrides?.effortShape ?? routine.effortShape,
       durationMinutes: overrides?.durationMinutes ?? routine.durationMinutes,
     });
   };
@@ -855,6 +864,7 @@ export function ExerciseGuidedCoach() {
     storage.updateExerciseRoutine(adjustRoutine.id, {
       exerciseType: values.exerciseType,
       intensity: values.intensity,
+      effortShape: values.intensity === "intense" ? values.effortShape : undefined,
       durationMinutes: values.durationMinutes,
     });
     setRoutines(storage.getRecentExercises?.(8) ?? []);
@@ -1000,6 +1010,13 @@ export function ExerciseGuidedCoach() {
                       );
                     })}
                   </div>
+                  {startIntensity === "intense" ? (
+                    <ExerciseEffortShapeField
+                      value={startEffortShape}
+                      onChange={setStartEffortShape}
+                      testIdPrefix="button-start-effort"
+                    />
+                  ) : null}
                 </div>
 
                 <div className="space-y-2">

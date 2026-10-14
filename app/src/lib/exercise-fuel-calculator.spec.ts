@@ -11,6 +11,29 @@ const settings: UserSettings = {
 };
 
 describe("computeExerciseFuelPlan", () => {
+  it("says a short max effort can raise glucose and uses the moderate insulin band", () => {
+    const shared = {
+      exerciseType: "cardio" as const,
+      durationMinutes: 45,
+      minutesUntilStart: 30,
+      fasted: false,
+      mealCarbsGrams: 50,
+      mealType: "snack",
+      currentBg: 8.5,
+      bgTrend: "flat" as const,
+      bgUnits: "mmol/L",
+      settings,
+      isPump: false,
+    };
+    const steady = computeExerciseFuelPlan({ ...shared, intensity: "intense" });
+    const max = computeExerciseFuelPlan({ ...shared, intensity: "intense", effortShape: "max" });
+    const moderate = computeExerciseFuelPlan({ ...shared, intensity: "moderate" });
+    expect(max.bolusReductionBand).toBe(moderate.bolusReductionBand);
+    expect(max.bolusReductionBand).not.toBe(steady.bolusReductionBand);
+    expect(max.exerciseEffectNote).toMatch(/raise glucose/i);
+    expect(max.notes.join(" ")).toMatch(/climb/i);
+  });
+
   it("returns insulin units when meal carbs, ratios, and BG are provided", () => {
     const r = computeExerciseFuelPlan({
       exerciseType: "cardio",

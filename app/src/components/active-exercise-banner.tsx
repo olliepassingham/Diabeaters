@@ -263,6 +263,7 @@ function computeBannerExercisePlan(session: ActiveExerciseSession, bgUnits: stri
       exerciseType: session.exerciseType,
       durationMinutes: session.durationMinutes,
       intensity: session.intensity,
+      effortShape: session.effortShape,
       minutesUntilStart,
       bgUnits,
       currentBg: bg ?? undefined,

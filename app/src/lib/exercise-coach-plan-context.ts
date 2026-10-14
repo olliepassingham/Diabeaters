@@ -28,6 +28,7 @@ export function buildExercisePlanContextFromCoachSession(input: {
     exerciseType: session.exerciseType,
     durationMinutes: session.durationMinutes,
     intensity: session.intensity,
+    effortShape: session.effortShape,
     minutesUntilStart: minutesUntilStartFromSessionAge(session),
     bgUnits: input.bgUnits,
     hourOfDay: new Date().getHours(),

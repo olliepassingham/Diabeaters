@@ -1,4 +1,4 @@
-import type { ExerciseIntensity, ExerciseType } from "@/lib/storage";
+import type { ExerciseEffortShape, ExerciseIntensity, ExerciseType } from "@/lib/storage";
 
 export const EXERCISE_TYPE_OPTIONS: Array<{ value: ExerciseType; label: string }> = [
   { value: "cardio", label: "Cardio" },
@@ -15,6 +15,11 @@ export const EXERCISE_INTENSITY_OPTIONS: Array<{ value: ExerciseIntensity; label
   { value: "light", label: "Light" },
   { value: "moderate", label: "Moderate" },
   { value: "intense", label: "Intense" },
+];
+
+export const EXERCISE_EFFORT_SHAPE_OPTIONS: Array<{ value: ExerciseEffortShape; label: string }> = [
+  { value: "steady", label: "Steady hard effort" },
+  { value: "max", label: "Short max efforts" },
 ];
 
 export const EXERCISE_START_IN_OPTIONS = [0, 15, 30, 45, 60, 90, 120, 180] as const;

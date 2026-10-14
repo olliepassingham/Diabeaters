@@ -28,7 +28,15 @@ import {
 import type { ExercisePlanResult } from "@/lib/exercise-plan";
 import { computeActiveWorkoutFuelCarry } from "@/lib/exercise-readiness";
 import { parseRatioToGramsPerUnit } from "@/lib/ratio-utils";
-import type { ExerciseBgTrend, ExerciseIntensity, ExerciseType, UserProfile, UserSettings } from "@/lib/storage";
+import {
+  isShortMaxEffort,
+  type ExerciseBgTrend,
+  type ExerciseEffortShape,
+  type ExerciseIntensity,
+  type ExerciseType,
+  type UserProfile,
+  type UserSettings,
+} from "@/lib/storage";
 import { getEffectiveTdd } from "@/lib/tdd";
 
 export type { PreExerciseInsulinSuppressedReason, PreExerciseMealCarbsSkipReason };
@@ -53,6 +61,8 @@ export type ExerciseFuelCalculationBreakdown = {
 export type ExerciseFuelCalculatorInput = {
   exerciseType: ExerciseType;
   intensity: ExerciseIntensity;
+  /** Only applies when intensity is intense. */
+  effortShape?: ExerciseEffortShape;
   durationMinutes: number;
   minutesUntilStart: number;
   fasted: boolean;
@@ -162,6 +172,7 @@ function buildPlanContext(input: ExerciseFuelCalculatorInput): ExercisePlanConte
     exerciseType: input.exerciseType,
     durationMinutes: input.durationMinutes,
     intensity: input.intensity,
+    effortShape: input.effortShape,
     minutesUntilStart: Math.max(0, input.minutesUntilStart),
     bgUnits: input.bgUnits,
     hourOfDay: new Date().getHours(),
@@ -309,6 +320,7 @@ function sessionExerciseReductionPercent(input: ExerciseFuelCalculatorInput): nu
     exerciseType: input.exerciseType,
     intensity: input.intensity,
     durationMinutes: input.durationMinutes,
+    effortShape: input.effortShape,
   };
   const increment = insulinRoundIncrement(input.isPump);
   const preview = getExerciseMealBolusPreview(
@@ -396,6 +408,9 @@ function projectBgAfterMeal(
 
 function buildExerciseEffectNote(input: ExerciseFuelCalculatorInput, reductionPercent: number): string {
   const typeKey = input.exerciseType;
+  if (isShortMaxEffort(input.intensity, input.effortShape)) {
+    return `Short max efforts can raise glucose during the work, then drop afterwards — meal insulin reduced ${reductionPercent}% for ${intensityLabel(input.intensity)} ${activityLabel(input.exerciseType)}, ${input.durationMinutes} min.`;
+  }
   const typeEffects: Partial<Record<ExerciseType, string>> = {
     strength: "Strength training usually drops glucose less during the session",
     cardio: "Cardio tends to lower glucose during effort",
@@ -459,6 +474,7 @@ function computeKnownCarbsInsulin(
     exerciseType: input.exerciseType,
     intensity: input.intensity,
     durationMinutes: input.durationMinutes,
+    effortShape: input.effortShape,
   };
   const increment = insulinRoundIncrement(input.isPump);
   const preview = getExerciseMealBolusPreview(
@@ -584,6 +600,7 @@ function tryMealInsulinForBg(
     exerciseType: input.exerciseType,
     intensity: input.intensity,
     durationMinutes: input.durationMinutes,
+    effortShape: input.effortShape,
   };
   const increment = insulinRoundIncrement(input.isPump);
   const preview = getExerciseMealBolusPreview(
@@ -638,7 +655,11 @@ function tryMealInsulinForBg(
  * one for gentle sessions (yoga/light) where the same deficit is less urgent to fully close
  * before starting. Conservative — never below 0.8x or above 1.25x.
  */
-function lowBgTopUpIntensityFactor(intensity: ExerciseIntensity): number {
+function lowBgTopUpIntensityFactor(
+  intensity: ExerciseIntensity,
+  effortShape?: ExerciseEffortShape,
+): number {
+  if (isShortMaxEffort(intensity, effortShape)) return 1;
   if (intensity === "intense") return 1.25;
   if (intensity === "light") return 0.8;
   return 1;
@@ -661,6 +682,7 @@ function computeLowBgCarbTopUp(
   bgUnits: "mmol/L" | "mg/dL",
   profile: Partial<UserProfile> | undefined,
   intensity: ExerciseIntensity,
+  effortShape?: ExerciseEffortShape,
 ): number {
   const idealLow = preExerciseIdealLowBg(bgUnits);
   if (currentBg >= idealLow) return 0;
@@ -670,7 +692,7 @@ function computeLowBgCarbTopUp(
   const bgDifference = targetMmol - bgMmol;
   if (bgDifference <= 0) return 0;
 
-  const intensityFactor = lowBgTopUpIntensityFactor(intensity);
+  const intensityFactor = lowBgTopUpIntensityFactor(intensity, effortShape);
 
   if (hypoCalculatorRequiresExplicitWeight(profile?.dateOfBirth)) {
     return Math.round((10 * intensityFactor) / 5) * 5;
@@ -895,7 +917,13 @@ export function computeExerciseFuelPlan(input: ExerciseFuelCalculatorInput): Exe
     });
     if (carbsDecision.suggest) {
       if (input.currentBg != null && Number.isFinite(input.currentBg)) {
-        lowBgCarbTopUpGrams = computeLowBgCarbTopUp(input.currentBg, bgUnitsNormalized, input.profile, input.intensity);
+        lowBgCarbTopUpGrams = computeLowBgCarbTopUp(
+          input.currentBg,
+          bgUnitsNormalized,
+          input.profile,
+          input.intensity,
+          input.effortShape,
+        );
       }
       mealCarbs = preBufferGrams + lowBgCarbTopUpGrams;
     } else if (carbsDecision.skipReason) {

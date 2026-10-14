@@ -1,7 +1,7 @@
 import type { UserSettings } from "@/lib/storage";
 import { calculateDoseFromCarbs } from "@/lib/ratio-utils";
 import { getEffectiveTdd } from "@/lib/tdd";
-import type { ExerciseIntensity, ExerciseType } from "@/lib/storage";
+import { isShortMaxEffort, type ExerciseEffortShape, type ExerciseIntensity, type ExerciseType } from "@/lib/storage";
 import {
   PEN_INSULIN_INCREMENT,
   roundInsulinUnits,
@@ -112,6 +112,8 @@ export type MealExerciseMeta = {
   exerciseType: ExerciseType;
   intensity: ExerciseIntensity;
   durationMinutes: number;
+  /** Only applies when intensity is intense. */
+  effortShape?: ExerciseEffortShape;
 };
 
 function clamp(n: number, min: number, max: number): number {
@@ -131,7 +133,13 @@ function exerciseReductionDurationModifier(durationMinutes: number): number {
 
 function exerciseReductionModifier(meta: MealExerciseMeta | undefined): number {
   if (!meta) return 0;
-  const byIntensity = meta.intensity === "intense" ? 5 : meta.intensity === "light" ? -5 : 0;
+  const byIntensity = isShortMaxEffort(meta.intensity, meta.effortShape)
+    ? 0
+    : meta.intensity === "intense"
+      ? 5
+      : meta.intensity === "light"
+        ? -5
+        : 0;
   const byType =
     meta.exerciseType === "strength"
       ? -10

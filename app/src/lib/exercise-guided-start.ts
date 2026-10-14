@@ -1,12 +1,13 @@
 import { resetExerciseCgmAlertCooldown } from "@/lib/exercise-cgm-alerts";
 import { cancelExerciseReminders } from "@/lib/exercise-reminders";
 import { isStaleActiveExerciseSession, plannedWorkoutEndMs } from "@/lib/exercise-session-timing";
-import type { ActiveExerciseSession, ExerciseIntensity, ExerciseType } from "@/lib/storage";
+import type { ActiveExerciseSession, ExerciseEffortShape, ExerciseIntensity, ExerciseType } from "@/lib/storage";
 import { storage } from "@/lib/storage";
 
 export type GuidedExerciseStartParams = {
   exerciseType: ExerciseType;
   intensity: ExerciseIntensity;
+  effortShape?: ExerciseEffortShape;
   durationMinutes: number;
   exerciseName?: string;
   routineId?: string;
@@ -122,6 +123,7 @@ export function startGuidedExerciseSession(params: GuidedExerciseStartParams): G
     exerciseName,
     exerciseType: params.exerciseType,
     intensity: params.intensity,
+    effortShape: params.effortShape,
     durationMinutes,
   });
   const withDefaults = applyCoachDefaultsFromLastExercise(session);

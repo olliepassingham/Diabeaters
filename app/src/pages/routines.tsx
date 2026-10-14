@@ -14,9 +14,10 @@ import { CarbEstimatorSheet } from "@/components/carb-estimator-sheet";
 import { MealImpactCard } from "@/components/meal-impact-card";
 import { mealCompositionFromFoods, routineCarbFoodLines, routineFoodsFromSelections, selectionsFromRoutineFoods } from "@/lib/carb-estimator";
 import { computeMealImpact } from "@/lib/meal-impact";
-import { storage, Routine, RoutineCarbFood, RoutineMealType, RoutineOutcome, UserSettings, ExerciseRoutine, ExerciseType, ExerciseIntensity, DIABEATER_EXERCISE_OUTCOMES_CHANGED_EVENT } from "@/lib/storage";
+import { storage, Routine, RoutineCarbFood, RoutineMealType, RoutineOutcome, UserSettings, ExerciseRoutine, ExerciseType, ExerciseIntensity, type ExerciseEffortShape, DIABEATER_EXERCISE_OUTCOMES_CHANGED_EVENT } from "@/lib/storage";
 import { listRecentRepeatableExerciseSessions, type RecentRepeatableExerciseSession, filterRecentSessionsWithoutSavedRoutine } from "@/lib/exercise-session-repeat";
 import { EXERCISE_TYPE_OPTIONS, EXERCISE_INTENSITY_OPTIONS } from "@/lib/exercise-catalog";
+import { ExerciseEffortShapeField } from "@/components/scenarios/exercise-effort-shape-field";
 import { buildExerciseScenarioRepeatHref } from "@/lib/exercise-planner-href";
 import { format } from "date-fns";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
@@ -147,6 +148,7 @@ export function RoutinesContent() {
   const [exName, setExName] = useState("");
   const [exType, setExType] = useState<ExerciseType>("cardio");
   const [exIntensity, setExIntensity] = useState<ExerciseIntensity>("moderate");
+  const [exEffortShape, setExEffortShape] = useState<ExerciseEffortShape>("steady");
   const [exDuration, setExDuration] = useState("");
   const [exNotes, setExNotes] = useState("");
   const [recentWorkouts, setRecentWorkouts] = useState<RecentRepeatableExerciseSession[]>([]);
@@ -261,6 +263,7 @@ export function RoutinesContent() {
     setExName("");
     setExType("cardio");
     setExIntensity("moderate");
+    setExEffortShape("steady");
     setExDuration("");
     setExNotes("");
     setEditingExercise(null);
@@ -271,6 +274,7 @@ export function RoutinesContent() {
     setExName(routine.name);
     setExType(routine.exerciseType);
     setExIntensity(routine.intensity);
+    setExEffortShape(routine.intensity === "intense" && routine.effortShape === "max" ? "max" : "steady");
     setExDuration(routine.durationMinutes.toString());
     setExNotes(routine.notes || "");
     setIsExerciseAddOpen(true);
@@ -283,6 +287,7 @@ export function RoutinesContent() {
       name: exName,
       exerciseType: exType,
       intensity: exIntensity,
+      effortShape: exIntensity === "intense" && exEffortShape === "max" ? "max" : undefined,
       durationMinutes: parseInt(exDuration),
       notes: exNotes || undefined,
     };
@@ -323,6 +328,7 @@ export function RoutinesContent() {
           exerciseType: routine.exerciseType,
           durationMinutes: routine.durationMinutes,
           intensity: routine.intensity,
+          effortShape: routine.effortShape,
           exerciseName: routine.name,
           routineId: routine.id,
         },
@@ -1111,6 +1117,14 @@ export function RoutinesContent() {
                   </div>
                 </div>
 
+                {exIntensity === "intense" ? (
+                  <ExerciseEffortShapeField
+                    value={exEffortShape}
+                    onChange={setExEffortShape}
+                    testIdPrefix="button-exercise-effort"
+                  />
+                ) : null}
+
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="exercise-duration">Duration (minutes)</Label>
@@ -1170,7 +1184,9 @@ export function RoutinesContent() {
             {exerciseRoutines.map((routine) => {
               const metaParts = [
                 EXERCISE_TYPES.find((t) => t.value === routine.exerciseType)?.label,
-                EXERCISE_INTENSITIES.find((i) => i.value === routine.intensity)?.label,
+                routine.intensity === "intense" && routine.effortShape === "max"
+                  ? "Intense · short max"
+                  : EXERCISE_INTENSITIES.find((i) => i.value === routine.intensity)?.label,
                 `${routine.durationMinutes} min`,
                 routine.timesUsed > 0 ? `Used ${routine.timesUsed}x` : null,
               ].filter(Boolean);

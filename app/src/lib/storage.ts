@@ -1416,11 +1416,37 @@ export function migrateExerciseIntensity(raw: string | undefined | null): Exerci
   return "moderate";
 }
 
+/** How an intense session is shaped. Missing means a steady hard effort. */
+export type ExerciseEffortShape = "steady" | "max";
+
+export function migrateExerciseEffortShape(raw: unknown): ExerciseEffortShape | undefined {
+  if (raw === "steady" || raw === "max") return raw;
+  return undefined;
+}
+
+/** A sprint or max set only counts when the workout is already intense. */
+export function isShortMaxEffort(
+  intensity: ExerciseIntensity,
+  effortShape: ExerciseEffortShape | null | undefined,
+): boolean {
+  return intensity === "intense" && effortShape === "max";
+}
+
+/** Persist only the max choice. Steady and non-intense sessions stay unset. */
+export function effortShapeToStore(
+  intensity: ExerciseIntensity,
+  effortShape: ExerciseEffortShape | null | undefined,
+): ExerciseEffortShape | undefined {
+  return isShortMaxEffort(intensity, effortShape) ? "max" : undefined;
+}
+
 export interface ExerciseRoutine {
   id: string;
   name: string;
   exerciseType: ExerciseType;
   intensity: ExerciseIntensity;
+  /** Set only for an intense short max effort. Missing means a steady hard effort. */
+  effortShape?: ExerciseEffortShape;
   durationMinutes: number;
   notes?: string;
   timesUsed: number;
@@ -1466,6 +1492,8 @@ export interface ActiveExerciseSession {
   exerciseName: string;
   exerciseType: ExerciseType;
   intensity: ExerciseIntensity;
+  /** Set only for an intense short max effort. Missing means a steady hard effort. */
+  effortShape?: ExerciseEffortShape;
   durationMinutes: number;
   phase: ExercisePhase;
   startedAt: string;
@@ -4685,8 +4713,17 @@ export const storage = {
       const inten = migrateExerciseIntensity(r.intensity as string);
       const rawDur = Number(r.durationMinutes);
       const dur = Number.isFinite(rawDur) ? Math.max(5, Math.min(300, Math.round(rawDur))) : 45;
-      const next = { ...r, exerciseType: m, intensity: inten, durationMinutes: dur };
-      if (m !== r.exerciseType || inten !== r.intensity || !Number.isFinite(rawDur) || dur !== rawDur) dirty = true;
+      const shape = effortShapeToStore(inten, migrateExerciseEffortShape(r.effortShape));
+      const next = { ...r, exerciseType: m, intensity: inten, durationMinutes: dur, effortShape: shape };
+      if (
+        m !== r.exerciseType ||
+        inten !== r.intensity ||
+        !Number.isFinite(rawDur) ||
+        dur !== rawDur ||
+        (r.effortShape ?? undefined) !== shape
+      ) {
+        dirty = true;
+      }
       const tu = Number(r.timesUsed);
       if (!Number.isFinite(tu) || tu < 0) {
         dirty = true;
@@ -4838,12 +4875,14 @@ export const storage = {
       preEnvironments = [rawSession.preEnvironment];
     }
 
+    const effortShape = effortShapeToStore(intensity, migrateExerciseEffortShape(session.effortShape));
     const normalized: ActiveExerciseSession = {
       ...session,
       id,
       exerciseName,
       exerciseType,
       intensity,
+      effortShape,
       durationMinutes,
       recoveryMinutes,
       phase,
@@ -4884,6 +4923,7 @@ export const storage = {
     exerciseName: string;
     exerciseType: ExerciseType;
     intensity: ExerciseIntensity;
+    effortShape?: ExerciseEffortShape;
     durationMinutes: number;
     recoveryMinutes?: number;
   }): ActiveExerciseSession {
@@ -4899,6 +4939,7 @@ export const storage = {
       exerciseName: String(params.exerciseName ?? "").trim() || "Exercise",
       exerciseType,
       intensity,
+      effortShape: effortShapeToStore(intensity, params.effortShape),
       durationMinutes,
       phase: "pre",
       startedAt: new Date().toISOString(),

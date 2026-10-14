@@ -5,19 +5,24 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ExerciseEffortShapeField } from "@/components/scenarios/exercise-effort-shape-field";
 import { EXERCISE_INTENSITY_OPTIONS, EXERCISE_TYPE_OPTIONS } from "@/lib/exercise-catalog";
 import { clampExerciseDurationMinutes } from "@/lib/exercise-guided-start";
-import type { ExerciseIntensity, ExerciseRoutine, ExerciseType } from "@/lib/storage";
+import type { ExerciseEffortShape, ExerciseIntensity, ExerciseRoutine, ExerciseType } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 
 export type ExerciseRoutineAdjustValues = {
   exerciseType: ExerciseType;
   intensity: ExerciseIntensity;
+  effortShape: ExerciseEffortShape;
   durationMinutes: number;
 };
 
 /** Minimal shape the adjust sheet needs — a saved routine or a past session both qualify. */
-export type AdjustableExercise = Pick<ExerciseRoutine, "id" | "name" | "exerciseType" | "intensity" | "durationMinutes">;
+export type AdjustableExercise = Pick<
+  ExerciseRoutine,
+  "id" | "name" | "exerciseType" | "intensity" | "durationMinutes" | "effortShape"
+>;
 
 const DURATION_PRESETS = [20, 30, 45, 60, 75, 90] as const;
 
@@ -46,6 +51,7 @@ export function ExerciseRoutineAdjustSheet({
 }: ExerciseRoutineAdjustSheetProps) {
   const [exerciseType, setExerciseType] = useState<ExerciseType>("cardio");
   const [intensity, setIntensity] = useState<ExerciseIntensity>("moderate");
+  const [effortShape, setEffortShape] = useState<ExerciseEffortShape>("steady");
   const [duration, setDuration] = useState("45");
   const [durationError, setDurationError] = useState<string | null>(null);
 
@@ -53,6 +59,7 @@ export function ExerciseRoutineAdjustSheet({
     if (!open || !routine) return;
     setExerciseType(routine.exerciseType);
     setIntensity(routine.intensity);
+    setEffortShape(routine.intensity === "intense" && routine.effortShape === "max" ? "max" : "steady");
     setDuration(String(routine.durationMinutes));
     setDurationError(null);
   }, [open, routine]);
@@ -67,6 +74,8 @@ export function ExerciseRoutineAdjustSheet({
     !!routine &&
     (exerciseType !== routine.exerciseType ||
       intensity !== routine.intensity ||
+      (intensity === "intense" &&
+        effortShape !== (routine.effortShape === "max" ? "max" : "steady")) ||
       (parsedDuration != null && parsedDuration !== routine.durationMinutes) ||
       (parsedDuration == null && duration !== String(routine.durationMinutes)));
 
@@ -77,7 +86,7 @@ export function ExerciseRoutineAdjustSheet({
       return null;
     }
     setDurationError(null);
-    return { exerciseType, intensity, durationMinutes };
+    return { exerciseType, intensity, effortShape, durationMinutes };
   };
 
   if (!routine) return null;
@@ -166,6 +175,14 @@ export function ExerciseRoutineAdjustSheet({
               );
             })}
           </div>
+          {intensity === "intense" ? (
+            <ExerciseEffortShapeField
+              value={effortShape}
+              onChange={setEffortShape}
+              testIdPrefix="button-adjust-effort"
+              appearance="emerald"
+            />
+          ) : null}
         </div>
 
         <div className="space-y-2">

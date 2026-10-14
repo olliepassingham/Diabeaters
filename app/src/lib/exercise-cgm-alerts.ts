@@ -96,6 +96,7 @@ function exercisePlanForSession(session: ActiveExerciseSession, bgUnits: string)
     exerciseType: session.exerciseType,
     durationMinutes: session.durationMinutes,
     intensity: session.intensity,
+    effortShape: session.effortShape,
     minutesUntilStart: 30,
     bgUnits,
     currentBg: bg ?? undefined,

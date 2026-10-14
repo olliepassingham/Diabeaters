@@ -7,9 +7,11 @@ import type { ExerciseBgTrend } from "@/lib/storage";
 import type { UserSettings } from "@/lib/storage";
 import {
   closedLoopPrePumpLeadIn,
+  closedLoopPumpTipsForIntensity,
   resolveExercisePumpTips,
 } from "@/lib/exercise-closed-loop";
 import { usesClosedLoop } from "@/lib/closed-loop";
+import { isShortMaxEffort, type ExerciseEffortShape } from "@/lib/storage";
 
 export interface ExercisePlanResult {
   duration: number;
@@ -79,6 +81,11 @@ export interface ExercisePlanContext {
   exerciseType: string;
   durationMinutes: number;
   intensity: "light" | "moderate" | "intense";
+  /**
+   * Only read when intensity is intense. "max" is a sprint or max set: glucose can climb
+   * during the work, then fall later. Missing means a steady hard effort.
+   */
+  effortShape?: ExerciseEffortShape;
   /** Minutes until session starts (from "Starting in…"). */
   minutesUntilStart: number;
   bgUnits?: string;
@@ -495,6 +502,21 @@ function biasBolusReductionHigher(range: string): string {
   return `${newLo}-${newHi}%`;
 }
 
+function mixShortMaxPumpTips(
+  duringSession: ExercisePlanResult["pumpTips"],
+  recovery: ExercisePlanResult["pumpTips"],
+): ExercisePlanResult["pumpTips"] {
+  return {
+    pre: duringSession.pre,
+    during: [
+      "Glucose can climb during short max efforts, then fall later.",
+      ...duringSession.during,
+    ],
+    post: recovery.post,
+    recovery: recovery.recovery,
+  };
+}
+
 function pumpTipsForIntensity(intensity: "light" | "moderate" | "intense"): ExercisePlanResult["pumpTips"] {
   if (intensity === "light") {
     return {
@@ -533,9 +555,17 @@ export function calculateExercisePlan(
   const bgUnits = context.bgUnits || "mmol/L";
   const duration = Math.max(5, Math.min(300, Math.round(context.durationMinutes || 45)));
   const intensity = context.intensity;
+  const shortMax = isShortMaxEffort(intensity, context.effortShape);
+  const fuelKey: ExerciseIntensityKey = shortMax ? "moderate" : intensity;
   const typeKey = normalizeType(context.exerciseType);
 
-  let { preExerciseCarbs, duringCarbs, postExerciseCarbs, bolusReduction } = baseCarbsAndBolus(intensity, duration);
+  const duringPack = baseCarbsAndBolus(fuelKey, duration);
+  const recoveryPack = shortMax ? baseCarbsAndBolus(intensity, duration) : duringPack;
+  let preExerciseCarbs = duringPack.preExerciseCarbs;
+  let duringCarbs = duringPack.duringCarbs;
+  let postExerciseCarbs = recoveryPack.postExerciseCarbs;
+  let bolusReduction = duringPack.bolusReduction;
+  let postBolusReduction = recoveryPack.bolusReduction;
 
   // Fasted + harder effort: small bump to "if low" carb suggestion floor (not a meal replacement).
   if (context.nutritionContext === "fasted" && intensity !== "light") {
@@ -553,11 +583,12 @@ export function calculateExercisePlan(
     duringCarbs = Math.max(duringCarbs, 15);
   }
 
-  const typeAdjusted = applyExerciseTypeCarbAdjustments(typeKey, intensity, preExerciseCarbs, duringCarbs, postExerciseCarbs);
+  const typeAdjusted = applyExerciseTypeCarbAdjustments(typeKey, fuelKey, preExerciseCarbs, duringCarbs, postExerciseCarbs);
   preExerciseCarbs = typeAdjusted.pre;
   duringCarbs = typeAdjusted.during;
   postExerciseCarbs = typeAdjusted.post;
-  bolusReduction = applyExerciseTypeBolusAdjustments(typeKey, intensity, bolusReduction);
+  bolusReduction = applyExerciseTypeBolusAdjustments(typeKey, fuelKey, bolusReduction);
+  postBolusReduction = applyExerciseTypeBolusAdjustments(typeKey, intensity, postBolusReduction);
 
   // Deeper context (environment / sleep / alcohol / history) applied on top of type adjustments.
   const deeperMult = deeperContextCarbMultipliers(context);
@@ -577,6 +608,7 @@ export function calculateExercisePlan(
   // History-aware bolus reduction nudge: hypo-prone routines bias toward the higher end.
   if (context.historyBias?.hypoProne || context.historyBias?.typicalResponse === "dropped") {
     bolusReduction = biasBolusReductionHigher(bolusReduction);
+    postBolusReduction = biasBolusReductionHigher(postBolusReduction);
   }
 
   const idealStart = bgUnits === "mmol/L" ? "7-10" : "126-180";
@@ -741,6 +773,10 @@ export function calculateExercisePlan(
     preTips.push(`~${context.iobUnits}u insulin on board — activity can amplify its effect; keep treatment carbs within reach.`);
   }
 
+  if (shortMax) {
+    preTips.unshift("Glucose can climb during a short max effort. The drop to plan for comes afterwards.");
+  }
+
   const hist = context.historyBias;
   if (hist && hist.totalSessions >= 2) {
     if (hist.hypoProne) {
@@ -753,6 +789,9 @@ export function calculateExercisePlan(
   }
 
   const duringTips: string[] = [];
+  if (shortMax) {
+    duringTips.push("Short max efforts can raise glucose while you are working, then drop afterwards.");
+  }
   if (duringCarbs > 0) {
     duringTips.push(`Have ${duringCarbs}g fast-acting carbs ready`);
     duringTips.push("Take ~15g if BG starts dropping");
@@ -823,23 +862,37 @@ export function calculateExercisePlan(
     recoveryTips.unshift("Your routine has caused hypos before — keep treatment within reach for the next several hours, not just immediately after.");
   }
 
-  let pumpTips = pumpTipsForIntensity(intensity);
+  let pumpTips = shortMax
+    ? mixShortMaxPumpTips(pumpTipsForIntensity("moderate"), pumpTipsForIntensity("intense"))
+    : pumpTipsForIntensity(intensity);
   const closedLoop = usesClosedLoop(settings);
   if (!closedLoop && context.minutesUntilStart >= 90 && intensity !== "light") {
-    pumpTips.pre = [
-      `With ~${context.minutesUntilStart} min until start, you have time to start or adjust a temporary basal as discussed with your team.`,
-      ...pumpTips.pre,
-    ];
+    pumpTips = {
+      ...pumpTips,
+      pre: [
+        `With ~${context.minutesUntilStart} min until start, you have time to start or adjust a temporary basal as discussed with your team.`,
+        ...pumpTips.pre,
+      ],
+    };
   }
-  pumpTips = resolveExercisePumpTips(pumpTips, intensity, settings);
-  if (closedLoop) {
-    const leadIn = closedLoopPrePumpLeadIn(context.minutesUntilStart, intensity);
-    if (leadIn) {
-      pumpTips = { ...pumpTips, pre: [leadIn, ...pumpTips.pre] };
+  if (closedLoop && shortMax) {
+    pumpTips = mixShortMaxPumpTips(
+      closedLoopPumpTipsForIntensity("moderate"),
+      closedLoopPumpTipsForIntensity("intense"),
+    );
+    const leadIn = closedLoopPrePumpLeadIn(context.minutesUntilStart, "moderate");
+    if (leadIn) pumpTips = { ...pumpTips, pre: [leadIn, ...pumpTips.pre] };
+  } else {
+    pumpTips = resolveExercisePumpTips(pumpTips, intensity, settings);
+    if (closedLoop) {
+      const leadIn = closedLoopPrePumpLeadIn(context.minutesUntilStart, intensity);
+      if (leadIn) {
+        pumpTips = { ...pumpTips, pre: [leadIn, ...pumpTips.pre] };
+      }
     }
   }
 
-  const summaryParts = [`${duration} min`, intensity, displayType(typeKey)];
+  const summaryParts = [`${duration} min`, shortMax ? "intense short max" : intensity, displayType(typeKey)];
   if (context.nutritionContext) {
     const n = { fasted: "fasted", ate_recently: "after recent food", about_to_eat: "before a meal", snack_only: "light snack context" }[context.nutritionContext];
     summaryParts.push(`(${n})`);
@@ -871,7 +924,7 @@ export function calculateExercisePlan(
     post: {
       carbs: postExerciseCarbs,
       protein: "15-20g",
-      bolusReduction,
+      bolusReduction: postBolusReduction,
       snackIdeas: postSnack,
       timing: postTiming,
     },

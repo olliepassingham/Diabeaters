@@ -35,6 +35,7 @@ import {
   EXERCISE_TYPE_OPTIONS,
   exerciseStartInLabel,
 } from "@/lib/exercise-catalog";
+import { ExerciseEffortShapeField } from "@/components/scenarios/exercise-effort-shape-field";
 import {
   computeExerciseFuelPlan,
   type ExerciseFuelCalculatorResult,
@@ -51,6 +52,7 @@ import {
   DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT,
   DIABEATER_PROFILE_CHANGED_EVENT,
   type ExerciseBgTrend,
+  type ExerciseEffortShape,
   type ExerciseIntensity,
   type ExerciseType,
   type UserProfile,
@@ -388,6 +390,7 @@ function ExerciseFuelPlanDetails({
 export function ExerciseFuelCalculator() {
   const [exerciseType, setExerciseType] = useState<ExerciseType>("cardio");
   const [intensity, setIntensity] = useState<ExerciseIntensity>("moderate");
+  const [effortShape, setEffortShape] = useState<ExerciseEffortShape>("steady");
   const [duration, setDuration] = useState("45");
   const [minutesUntilStart, setMinutesUntilStart] = useState<number>(30);
   const [startInCustom, setStartInCustom] = useState("");
@@ -445,6 +448,7 @@ export function ExerciseFuelCalculator() {
     return computeExerciseFuelPlan({
       exerciseType,
       intensity,
+      effortShape: intensity === "intense" ? effortShape : undefined,
       durationMinutes,
       minutesUntilStart,
       fasted,
@@ -466,6 +470,7 @@ export function ExerciseFuelCalculator() {
     bgUnits,
     currentBg,
     duration,
+    effortShape,
     exerciseType,
     fasted,
     intensity,
@@ -515,6 +520,7 @@ export function ExerciseFuelCalculator() {
     bgUnits,
     currentBg,
     duration,
+    effortShape,
     exerciseType,
     fasted,
     intensity,
@@ -566,6 +572,7 @@ export function ExerciseFuelCalculator() {
   const sessionLine = useMemo(() => {
     const typeLabel = EXERCISE_TYPE_OPTIONS.find((o) => o.value === exerciseType)?.label ?? exerciseType;
     const intensityLabel = EXERCISE_INTENSITY_OPTIONS.find((o) => o.value === intensity)?.label ?? intensity;
+    const shapeLabel = intensity === "intense" && effortShape === "max" ? " · short max" : "";
     const start =
       minutesUntilStart <= 0
         ? "now"
@@ -574,8 +581,8 @@ export function ExerciseFuelCalculator() {
           : minutesUntilStart % 60 === 0
             ? `~${minutesUntilStart / 60}h`
             : `${minutesUntilStart}m`;
-    return `${intensityLabel} ${typeLabel} · ${duration} min · ${start}`;
-  }, [exerciseType, intensity, duration, minutesUntilStart]);
+    return `${intensityLabel}${shapeLabel} ${typeLabel} · ${duration} min · ${start}`;
+  }, [effortShape, exerciseType, intensity, duration, minutesUntilStart]);
 
   const collapsedSummary = useMemo(() => {
     if (formOpen) return null;
@@ -708,6 +715,13 @@ export function ExerciseFuelCalculator() {
                     </div>
                   </div>
                 </div>
+                {intensity === "intense" ? (
+                  <ExerciseEffortShapeField
+                    value={effortShape}
+                    onChange={setEffortShape}
+                    testIdPrefix="efc-effort"
+                  />
+                ) : null}
 
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium text-muted-foreground">Starting in</Label>

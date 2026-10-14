@@ -302,6 +302,40 @@ describe("calculateExercisePlan deeper context modifiers", () => {
   });
 });
 
+describe("short max efforts", () => {
+  const intense = {
+    ...baseCtx,
+    intensity: "intense" as const,
+    durationMinutes: 45,
+    exerciseType: "cardio",
+  };
+
+  it("uses the moderate drop band during a short max effort and keeps intense recovery", () => {
+    const steady = calculateExercisePlan(intense);
+    const max = calculateExercisePlan({ ...intense, effortShape: "max" });
+    const moderate = calculateExercisePlan({ ...intense, intensity: "moderate" });
+
+    expect(max.pre.bolusReduction).toBe(moderate.pre.bolusReduction);
+    expect(max.pre.bolusReduction).not.toBe(steady.pre.bolusReduction);
+    expect(max.during.carbsNeeded).toBe(moderate.during.carbsNeeded);
+    expect(max.post.carbs).toBe(steady.post.carbs);
+    expect(max.post.bolusReduction).toBe(steady.post.bolusReduction);
+    expect(max.pumpTips.pre.join(" ")).toBe(moderate.pumpTips.pre.join(" "));
+    expect(max.pumpTips.recovery.join(" ")).toBe(steady.pumpTips.recovery.join(" "));
+    expect(max.during.tips.join(" ")).toMatch(/raise glucose/i);
+    expect(max.recovery.tips.join(" ")).toMatch(/overnight|delayed/i);
+    expect(max.summary).toContain("short max");
+  });
+
+  it("ignores a max shape when the session is not intense", () => {
+    const plain = calculateExercisePlan({ ...baseCtx, intensity: "moderate" });
+    const marked = calculateExercisePlan({ ...baseCtx, intensity: "moderate", effortShape: "max" });
+    expect(marked.pre.bolusReduction).toBe(plain.pre.bolusReduction);
+    expect(marked.during.carbsNeeded).toBe(plain.during.carbsNeeded);
+    expect(marked.summary).not.toContain("short max");
+  });
+});
+
 describe("calculateExercisePlanFromMessage", () => {
   it("parses legacy message", () => {
     const r = calculateExercisePlanFromMessage("moderate cardio for 30 minutes", "mmol/L");

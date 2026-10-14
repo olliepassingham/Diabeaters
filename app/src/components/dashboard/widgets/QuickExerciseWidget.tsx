@@ -128,6 +128,7 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
       exerciseType: activeSession.exerciseType,
       durationMinutes: activeSession.durationMinutes,
       intensity: activeSession.intensity,
+      effortShape: activeSession.effortShape,
       minutesUntilStart: 0,
       bgUnits: u,
       currentBg: bg,
@@ -169,6 +170,7 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
       exerciseType: activeSession.exerciseType,
       durationMinutes: activeSession.durationMinutes,
       intensity: activeSession.intensity,
+      effortShape: activeSession.effortShape,
       minutesUntilStart: 0,
       bgUnits: u,
       currentBg: bg,
@@ -219,6 +221,7 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
         exerciseName: exercise.name,
         exerciseType: overrides?.exerciseType ?? exercise.exerciseType,
         intensity: overrides?.intensity ?? exercise.intensity,
+        effortShape: overrides?.effortShape ?? exercise.effortShape,
         durationMinutes: overrides?.durationMinutes ?? exercise.durationMinutes,
       });
       setActiveSession(session);
@@ -244,6 +247,7 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
     storage.updateExerciseRoutine(adjustRoutine.id, {
       exerciseType: values.exerciseType,
       intensity: values.intensity,
+      effortShape: values.intensity === "intense" ? values.effortShape : undefined,
       durationMinutes: values.durationMinutes,
     });
     setExercises(storage.getRecentExercises?.(compact ? 3 : 5) ?? []);
