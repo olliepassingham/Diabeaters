@@ -46,6 +46,7 @@ import {
   type CarbSourceScenario,
 } from "@/lib/carb-source-preferences";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
+import { getRapidInsulinDoses, rapidDoseWithinHours } from "@/lib/insulin-activity";
 import { parseOptionalBolusUnits } from "@/lib/meal-dose";
 import {
   storage,
@@ -497,6 +498,11 @@ export function ExerciseFuelCalculator() {
     window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, sync);
     return () => window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, sync);
   }, []);
+
+  useEffect(() => {
+    if (isPump) return;
+    if (rapidDoseWithinHours(getRapidInsulinDoses(), 2, Date.now())) setRapidInsulin2h(true);
+  }, [isPump]);
 
   useEffect(() => {
     const onActiveExercise = () => {

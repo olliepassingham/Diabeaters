@@ -30,6 +30,7 @@ import { Badge } from "@/components/ui/badge";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { MealCompositionBuilder } from "@/components/meal-composition-builder";
 import { MealDoseResultCard } from "@/components/meal-dose-result-card";
+import { recordRapidInsulinDose } from "@/lib/insulin-activity";
 import { CarbEstimatorSheet } from "@/components/carb-estimator-sheet";
 import { SplitDosePlanCard } from "@/components/split-dose-plan-card";
 
@@ -824,6 +825,12 @@ export default function Adviser() {
                     ? () => {
                         const confirmed = confirmMealTimelineEvent(mealTimelineEvent.id);
                         if (confirmed) setMealTimelineEvent(confirmed);
+                        if (!isPumpUser && !mealResult.error && mealResult.dose > 0) {
+                          recordRapidInsulinDose({
+                            units: mealResult.dose,
+                            label: plannedMealName ?? mealResult.mealType,
+                          });
+                        }
                       }
                     : undefined
                 }

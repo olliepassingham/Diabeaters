@@ -17,6 +17,15 @@ import {
 } from "@/lib/live-glucose-range";
 import { cn } from "@/lib/utils";
 
+export type InsulinChartSample = { timeMs: number; units: number };
+
+export type InsulinChartMark = {
+  id: string;
+  timeMs: number;
+  label: string;
+  tone: "taken" | "due";
+};
+
 type CgmGlucoseChartProps = {
   points: CgmChartPoint[];
   units: BgUnits;
@@ -26,6 +35,11 @@ type CgmGlucoseChartProps = {
   /** Optional educational near-future estimate, rendered as a subtle dashed extension of the trend line. */
   projection?: NearFutureProjectionResult | null;
   timelineEvents?: CgmTimelineEvent[];
+  /** Rapid-insulin estimate, drawn on its own scale over the glucose plot. */
+  insulinSeries?: InsulinChartSample[];
+  insulinMarks?: InsulinChartMark[];
+  /** Used when the insulin line needs to extend past the last glucose reading. */
+  xDomain?: { startMs: number; endMs: number };
   className?: string;
 };
 
@@ -50,6 +64,56 @@ function scaleY(value: number, min: number, max: number, innerHeight: number): n
   return PAD.top + innerHeight * (1 - ratio);
 }
 
+/** Keep the insulin estimate in the lower part of the plot so it is not read as a glucose value. */
+const INSULIN_BAND = 0.42;
+
+function clipActiveInsulin(samples: InsulinChartSample[]): InsulinChartSample[] {
+  const first = samples.findIndex((sample) => sample.units > 0.05);
+  if (first < 0) return [];
+  let last = first;
+  for (let i = samples.length - 1; i >= first; i--) {
+    if (samples[i]!.units > 0.05) {
+      last = i;
+      break;
+    }
+  }
+  const end = Math.min(samples.length - 1, last + 1);
+  return samples.slice(first, end + 1);
+}
+
+function InsulinEstimatePath({
+  samples,
+  peak,
+  startMs,
+  endMs,
+  width,
+  innerHeight,
+}: {
+  samples: InsulinChartSample[];
+  peak: number;
+  startMs: number;
+  endMs: number;
+  width: number;
+  innerHeight: number;
+}) {
+  const coords = clipActiveInsulin(samples)
+    .filter((sample) => sample.timeMs >= startMs && sample.timeMs <= endMs)
+    .map((sample) => ({
+      x: scaleXByTime(sample.timeMs, startMs, endMs, width),
+      y: PAD.top + innerHeight * (1 - INSULIN_BAND * (sample.units / peak)),
+    }));
+  if (coords.length < 2) return null;
+  const line = coords.map((point, index) => `${index === 0 ? "M" : "L"}${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ");
+  const baseline = PAD.top + innerHeight;
+  const area = `${line} L${coords[coords.length - 1]!.x.toFixed(1)},${baseline.toFixed(1)} L${coords[0]!.x.toFixed(1)},${baseline.toFixed(1)} Z`;
+  return (
+    <g data-testid="cgm-insulin-estimate">
+      <path d={area} fill="#d97706" fillOpacity={0.16} stroke="none" />
+      <path d={line} fill="none" stroke="#d97706" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+    </g>
+  );
+}
+
 function scaleXByTime(timeMs: number, startMs: number, endMs: number, width: number, offset = PAD.left): number {
   if (endMs <= startMs) return offset + width / 2;
   const ratio = (timeMs - startMs) / (endMs - startMs);
@@ -65,6 +129,9 @@ export function CgmGlucoseChart({
   overlays = [],
   projection,
   timelineEvents = [],
+  insulinSeries = [],
+  insulinMarks = [],
+  xDomain,
   className,
 }: CgmGlucoseChartProps) {
   const [selectedTimelineEventId, setSelectedTimelineEventId] = useState<string | null>(null);
@@ -84,8 +151,10 @@ export function CgmGlucoseChart({
     return chartYDomain(points, units, extras);
   }, [points, units, projection]);
 
-  const chartStartMs = points[0]?.timeMs ?? 0;
-  const chartEndMs = points[points.length - 1]?.timeMs ?? chartStartMs;
+  const chartStartMs = xDomain?.startMs ?? points[0]?.timeMs ?? 0;
+  const chartEndMs = xDomain?.endMs ?? points[points.length - 1]?.timeMs ?? chartStartMs;
+  const insulinPeak = insulinSeries.reduce((max, sample) => Math.max(max, sample.units), 0);
+  const showInsulin = insulinPeak > 0.05 || insulinMarks.length > 0;
   const visibleTimelineEvents = useMemo(
     () =>
       timelineEvents.filter(
@@ -211,7 +280,11 @@ export function CgmGlucoseChart({
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         className="h-auto w-full min-h-[200px] text-muted-foreground"
         role="img"
-        aria-label={`Glucose trend chart, ${points.length} readings`}
+        aria-label={
+          showInsulin
+            ? `Glucose and insulin estimate, ${points.length} readings`
+            : `Glucose trend chart, ${points.length} readings`
+        }
       >
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
@@ -290,6 +363,17 @@ export function CgmGlucoseChart({
             strokeDasharray="6 4"
           />
         ))}
+
+        {showInsulin && insulinPeak > 0.05 ? (
+          <InsulinEstimatePath
+            samples={insulinSeries}
+            peak={insulinPeak}
+            startMs={chartStartMs}
+            endMs={chartEndMs}
+            width={historyWidth}
+            innerHeight={innerHeight}
+          />
+        ) : null}
 
         {points.length > 1 && historyCoords.length > 1 ? (
           <path
@@ -420,6 +504,45 @@ export function CgmGlucoseChart({
             />
           );
         })}
+
+        {showInsulin
+          ? insulinMarks.map((mark) => {
+              const x = scaleXByTime(mark.timeMs, chartStartMs, chartEndMs, historyWidth);
+              const taken = mark.tone === "taken";
+              return (
+                <g key={mark.id} data-testid={`insulin-mark-${mark.id}`}>
+                  <title>{mark.label}</title>
+                  <line
+                    x1={x}
+                    y1={PAD.top + innerHeight - 18}
+                    x2={x}
+                    y2={PAD.top + innerHeight}
+                    stroke="#d97706"
+                    strokeWidth={2}
+                    strokeOpacity={taken ? 0.9 : 0.45}
+                  />
+                  <circle
+                    cx={x}
+                    cy={PAD.top + innerHeight - 22}
+                    r={7}
+                    fill={taken ? "#d97706" : "hsl(var(--background))"}
+                    stroke="#d97706"
+                    strokeWidth={1.25}
+                  />
+                  <text
+                    x={x}
+                    y={PAD.top + innerHeight - 19.5}
+                    textAnchor="middle"
+                    fontSize="7"
+                    fontWeight={700}
+                    fill={taken ? "#fff" : "#d97706"}
+                  >
+                    L
+                  </text>
+                </g>
+              );
+            })
+          : null}
 
         {visibleTimelineEvents.map((event) => {
           const x = scaleXByTime(event.timeMs, chartStartMs, chartEndMs, historyWidth);

@@ -9,7 +9,14 @@ import { convertGlucoseValue } from "@/lib/cgm/units";
 import type { BgUnits } from "@/lib/cgm/types";
 import { formatTargetBgInput } from "@/lib/hypo-context";
 import { resolveUserTargetBgRange } from "@/lib/target-bg-range";
-import { storage } from "@/lib/storage";
+import { storage, DIABEATER_PROFILE_CHANGED_EVENT, DIABEATER_SETTINGS_CHANGED_EVENT } from "@/lib/storage";
+import { isPenDeliveryMethod } from "@/lib/insulin-delivery-method";
+import {
+  buildHomeInsulinChart,
+  INSULIN_ACTIVITY_CHANGED_EVENT,
+  usualLongActingUnits,
+} from "@/lib/insulin-activity";
+import { InsulinChartControls } from "@/components/home/InsulinChartControls";
 import { useCgmHistory } from "@/hooks/use-cgm-history";
 import {
   getMealTimelineEvents,
@@ -111,10 +118,22 @@ export function HomeCgmGraph() {
   const [mealEvents, setMealEvents] = useState<MealTimelineEvent[]>(() =>
     getMealTimelineEvents(Date.now() - 12 * 60 * 60 * 1000),
   );
+  const [insulinTick, setInsulinTick] = useState(0);
+  const [penUser, setPenUser] = useState(() => isPenDeliveryMethod(storage.getProfile()?.insulinDeliveryMethod));
   const { units, connected, sourceLabel, loading, refresh } = history;
   const savedPoints = useMemo(() => localPoints(units), [units]);
   const points = history.points.length ? history.points : savedPoints;
   const target = useMemo(() => resolveUserTargetBgRange(storage.getSettings(), units), [units]);
+  const insulin = useMemo(() => {
+    const settings = storage.getSettings();
+    const times =
+      (settings.longActingInjectionsPerDay ?? 0) >= 2
+        ? [settings.basalInjectionTime, settings.basalInjectionTime2]
+        : [settings.basalInjectionTime];
+    return buildHomeInsulinChart(Date.now(), times);
+    // insulinTick refreshes after a dose is saved.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [insulinTick]);
 
   const latest = points[points.length - 1];
   const timelineEvents = useMemo(
@@ -135,9 +154,19 @@ export function HomeCgmGraph() {
     };
     window.addEventListener(MEAL_TIMELINE_CHANGED_EVENT, refreshMealEvents);
     window.addEventListener("focus", refreshMealEvents);
+    const refreshInsulin = () => {
+      setPenUser(isPenDeliveryMethod(storage.getProfile()?.insulinDeliveryMethod));
+      setInsulinTick((tick) => tick + 1);
+    };
+    window.addEventListener(INSULIN_ACTIVITY_CHANGED_EVENT, refreshInsulin);
+    window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, refreshInsulin);
+    window.addEventListener(DIABEATER_SETTINGS_CHANGED_EVENT, refreshInsulin);
     return () => {
       window.removeEventListener(MEAL_TIMELINE_CHANGED_EVENT, refreshMealEvents);
       window.removeEventListener("focus", refreshMealEvents);
+      window.removeEventListener(INSULIN_ACTIVITY_CHANGED_EVENT, refreshInsulin);
+      window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, refreshInsulin);
+      window.removeEventListener(DIABEATER_SETTINGS_CHANGED_EVENT, refreshInsulin);
     };
   }, []);
 
@@ -196,16 +225,34 @@ export function HomeCgmGraph() {
         </div>
       </div>
 
-      {points.length > 1 ? (
+      {points.length > 1 || (penUser && insulin.visible && insulin.xDomain) ? (
         <CgmGlucoseChart
           points={points}
           units={units}
           targetLow={target.low}
           targetHigh={target.high}
           timelineEvents={timelineEvents}
+          insulinSeries={penUser && insulin.visible ? insulin.series : undefined}
+          insulinMarks={penUser && insulin.visible ? insulin.marks : undefined}
+          xDomain={penUser && insulin.visible ? insulin.xDomain ?? undefined : undefined}
           className="-mx-1 w-[calc(100%+0.5rem)] [&_svg]:min-h-[220px] [&>p]:hidden"
         />
-      ) : (
+      ) : null}
+      {points.length <= 1 && penUser && insulin.visible && insulin.xDomain ? (
+        <p className="text-center text-xs text-muted-foreground">
+          {connected ? (
+            "Glucose readings will appear on this graph once they arrive."
+          ) : (
+            <>
+              <Link href="/settings/cgm" className="font-medium text-primary">
+                Connect your CGM
+              </Link>{" "}
+              to see glucose on this graph too.
+            </>
+          )}
+        </p>
+      ) : null}
+      {points.length > 1 || (penUser && insulin.visible && insulin.xDomain) ? null : (
         <Link
           href={connected ? "/tools/cgm-live" : "/settings/cgm"}
           className="group block"
@@ -225,6 +272,19 @@ export function HomeCgmGraph() {
           </div>
         </Link>
       )}
+
+      {penUser ? (
+        <InsulinChartControls
+          visible={insulin.visible}
+          hasDoses={insulin.hasDoses}
+          remaining={insulin.remaining}
+          runsOutLabel={insulin.runsOutLabel}
+          longActingUnits={usualLongActingUnits(
+            storage.getSettings().longActingUnitsPerDay,
+            storage.getSettings().longActingInjectionsPerDay,
+          )}
+        />
+      ) : null}
 
       {history.error && savedPoints.length > 1 ? (
         <p className="mt-1 text-center text-xs text-muted-foreground">

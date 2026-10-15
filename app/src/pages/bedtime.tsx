@@ -46,6 +46,7 @@ import {
   type UserProfile,
 } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
+import { getRapidInsulinDoses, hoursSinceLatestRapidDose } from "@/lib/insulin-activity";
 import { usesClosedLoop } from "@/lib/closed-loop";
 import { insulinRoundIncrement } from "@/lib/insulin-rounding";
 import { parseOptionalBolusUnits } from "@/lib/meal-dose";
@@ -419,6 +420,14 @@ export default function Bedtime() {
   }, []);
 
   const isPumpUser = isPumpDeliveryMethod(profile?.insulinDeliveryMethod);
+
+  useEffect(() => {
+    if (isPumpUser || hoursSinceInsulin) return;
+    const since = hoursSinceLatestRapidDose(getRapidInsulinDoses(), Date.now());
+    if (since == null || since > 8) return;
+    const bucket = since < 1 ? "0.5" : since < 1.5 ? "1" : since < 2.5 ? "2" : since < 3.5 ? "3" : "4";
+    setHoursSinceInsulin(bucket);
+  }, [isPumpUser, hoursSinceInsulin]);
   const loopOn = usesClosedLoop(userSettings);
   const roundIncrement = insulinRoundIncrement(isPumpUser);
 
