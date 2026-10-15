@@ -489,6 +489,35 @@
     }
   }
 
+  @keyframes status-mode-marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+
+  .status-mode-marquee {
+    animation-name: status-mode-marquee;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+    animation-delay: 1.4s;
+  }
+
+  .status-mode-marquee-viewport:hover .status-mode-marquee,
+  .status-mode-marquee-viewport:focus-within .status-mode-marquee,
+  .status-mode-marquee-viewport:active .status-mode-marquee {
+    animation-play-state: paused;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .status-mode-marquee {
+      animation: none !important;
+      transform: none !important;
+    }
+  }
+
   /* Home Ask Beatie — soft halo on wrapper so button shadow does not hide it */
   .coach-entry-glow {
     box-shadow:

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -123,6 +123,68 @@ function segmentTone(kind: StatusBarSegmentKind): string {
   if (kind === "pump") return "text-red-800 dark:text-red-200";
   if (kind === "offline") return "text-muted-foreground";
   return "text-foreground";
+}
+
+function prefersReducedMotion(): boolean {
+  return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+/** One fixed-width row. When the modes do not fit, they drift slowly so each one is readable. */
+function StatusModeMarquee({ children }: { children: ReactNode }) {
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const groupRef = useRef<HTMLDivElement>(null);
+  const [loopWidth, setLoopWidth] = useState(0);
+  const [reducedMotion, setReducedMotion] = useState(prefersReducedMotion);
+
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onChange = () => setReducedMotion(media.matches);
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
+
+  useLayoutEffect(() => {
+    const viewport = viewportRef.current;
+    const group = groupRef.current;
+    if (!viewport || !group) return;
+    const measure = () => {
+      const extra = group.offsetWidth - viewport.clientWidth;
+      const next = extra > 8 ? group.offsetWidth : 0;
+      setLoopWidth((current) => (Math.abs(current - next) < 12 ? current : next));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(viewport);
+    observer.observe(group);
+    return () => observer.disconnect();
+  }, [children]);
+
+  const looping = loopWidth > 0 && !reducedMotion;
+  const durationSeconds = Math.min(36, Math.max(12, loopWidth / 14));
+
+  return (
+    <div
+      ref={viewportRef}
+      className={cn(
+        "status-mode-marquee-viewport min-w-0 flex-1 overflow-hidden",
+        reducedMotion && loopWidth > 0 && "overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+      )}
+    >
+      <div
+        className={cn("flex w-max items-center", looping && "status-mode-marquee")}
+        style={looping ? { animationDuration: `${durationSeconds}s` } : undefined}
+      >
+        <div ref={groupRef} className="flex shrink-0 items-center pr-8">
+          {children}
+        </div>
+        {looping ? (
+          <div className="flex shrink-0 items-center pr-8" aria-hidden inert>
+            {children}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -491,12 +553,12 @@ export function AppStatusStrip() {
       <>
         <Icon className={cn("h-3.5 w-3.5 shrink-0", segmentTone(seg.kind))} aria-hidden />
         {seg.label ? (
-          <span className={cn("truncate text-xs font-semibold capitalize", segmentTone(seg.kind))}>{seg.label}</span>
+          <span className={cn("text-xs font-semibold capitalize", segmentTone(seg.kind))}>{seg.label}</span>
         ) : null}
       </>
     );
     const className = cn(
-      "inline-flex max-w-[7.5rem] items-center gap-1 rounded-md px-1 py-0.5 sm:max-w-[10rem]",
+      "inline-flex items-center gap-1 whitespace-nowrap rounded-md px-1 py-0.5",
       seg.promoted ? "bg-background/40" : "opacity-80",
     );
     if (seg.href) {
@@ -547,7 +609,7 @@ export function AppStatusStrip() {
         ) : null}
 
         {showCgmLiveChip ? (
-          <div className="min-w-0 shrink" data-testid="status-segment-bg">
+          <div className="shrink-0" data-testid="status-segment-bg">
             <CgmLiveBgChip
               embedded
               prefill={cgmPrefill}
@@ -564,14 +626,14 @@ export function AppStatusStrip() {
             {showCgmLiveChip || showLiveDot ? (
               <span className="h-4 w-px shrink-0 bg-border/70" aria-hidden />
             ) : null}
-            <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
-              {toolSegments.map((seg, i) => (
-                <span key={seg.kind} className="inline-flex items-center gap-1.5">
-                  {i > 0 ? <span className="h-3 w-px shrink-0 bg-border/50" aria-hidden /> : null}
+            <StatusModeMarquee>
+              {toolSegments.map((seg, index) => (
+                <span key={seg.kind} className="inline-flex items-center">
+                  {index > 0 ? <span className="mx-1.5 h-3 w-px shrink-0 bg-border/50" aria-hidden /> : null}
                   {renderSegment(seg)}
                 </span>
               ))}
-            </div>
+            </StatusModeMarquee>
           </>
         ) : (
           <div className="min-w-0 flex-1" />
