@@ -8,6 +8,7 @@ import {
   homeMealDismissalKey,
   type HomeMealSlot,
 } from "@/lib/home-meal-moment";
+import { mealCompositionFromFoods } from "@/lib/carb-estimator";
 import type { CarbCompositionHint } from "@/lib/carb-estimator-data";
 import type { HealthStatus } from "@/lib/dashboard-health-status";
 import { storage, type Routine } from "@/lib/storage";
@@ -24,6 +25,7 @@ function adviserHref(
   grams?: number,
   composition?: CarbCompositionHint | null,
   autoDose = false,
+  mealName?: string,
 ): string {
   const params = new URLSearchParams({ tab: "meal", mealTime: slot, from: "home" });
   if (grams != null) params.set("carbs", String(Math.round(grams)));
@@ -33,6 +35,8 @@ function adviserHref(
     if (composition.hasProtein) params.set("protein", "1");
     if (composition.hasFibre) params.set("fibre", "1");
   }
+  const name = mealName?.trim();
+  if (name) params.set("name", name.slice(0, 80));
   if (autoDose && grams != null) params.set("autoDose", "1");
   return `/adviser?${params.toString()}`;
 }
@@ -125,7 +129,16 @@ export function HomeMealMoment({
     } catch {
       // A storage failure should not block opening the adviser.
     }
-    setLocation(adviserHref(moment.slot, routine.carbEstimate));
+    dismiss();
+    setLocation(
+      adviserHref(
+        moment.slot,
+        routine.carbEstimate,
+        mealCompositionFromFoods(routine.carbFoods),
+        true,
+        routine.name,
+      ),
+    );
   };
 
   return (
@@ -205,6 +218,7 @@ export function HomeMealMoment({
             open
             onOpenChange={setEstimatorOpen}
             onConfirm={({ grams, compositionHint }) => {
+              dismiss();
               setLocation(adviserHref(moment.slot, grams, compositionHint, true));
             }}
           />

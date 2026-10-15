@@ -17,6 +17,8 @@ import { cn } from "@/lib/utils";
 
 export type MealDoseResultCardProps = {
   mealResult: MealDoseResult;
+  /** Saved routine name, when this result was opened from a usual meal. */
+  mealName?: string | null;
   mealImpact: MealImpactProfile | null;
   isPumpUser: boolean;
   mealTimelineStatus?: MealTimelineEventStatus;
@@ -38,13 +40,22 @@ export type MealDoseResultCardProps = {
   variant?: "inline" | "page";
 };
 
+function mealResultCaption(mealResult: MealDoseResult, mealName?: string | null): string {
+  const name = mealName?.trim();
+  return name
+    ? `${name} · ${mealResult.carbs}g · ${mealResult.mealType}`
+    : `${mealResult.carbs}g · ${mealResult.mealType}`;
+}
+
 function MealDoseHero({
   mealResult,
+  mealName,
   isPumpUser,
   isPage,
   usesLoop,
 }: {
   mealResult: MealDoseResult;
+  mealName?: string | null;
   isPumpUser: boolean;
   isPage: boolean;
   usesLoop: boolean;
@@ -88,7 +99,7 @@ function MealDoseHero({
           valueClassName={compactValue}
         >
           <p className="mt-2 text-sm text-muted-foreground">
-            {mealResult.carbs}g · {mealResult.mealType}
+            {mealResultCaption(mealResult, mealName)}
             {isPumpUser ? " · enter on pump" : ""}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
@@ -116,7 +127,7 @@ function MealDoseHero({
         valueClassName={compactValue}
       >
         <p className="mt-2 text-sm text-muted-foreground">
-          {mealResult.carbs}g · {mealResult.mealType}
+          {mealResultCaption(mealResult, mealName)}
         </p>
       </ScenarioResultHero>
       {isPumpUser ? <PumpMealActions loopNote={loopNote} /> : null}
@@ -149,6 +160,7 @@ function PumpMealActions({ loopNote }: { loopNote: string | null }) {
 
 export function MealDoseResultCard({
   mealResult,
+  mealName,
   mealImpact,
   isPumpUser,
   mealTimelineStatus,
@@ -218,7 +230,13 @@ export function MealDoseResultCard({
           </div>
         ) : (
           <>
-            <MealDoseHero mealResult={mealResult} isPumpUser={isPumpUser} isPage={isPage} usesLoop={usesLoop} />
+            <MealDoseHero
+              mealResult={mealResult}
+              mealName={mealName}
+              isPumpUser={isPumpUser}
+              isPage={isPage}
+              usesLoop={usesLoop}
+            />
             {mealTimelineStatus ? (
               <div
                 className="flex items-center gap-3 rounded-2xl bg-primary/[0.07] px-3 py-2.5"

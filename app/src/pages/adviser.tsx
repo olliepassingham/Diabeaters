@@ -246,6 +246,7 @@ export default function Adviser() {
   };
 
   const [mealCarbs, setMealCarbs] = useState("");
+  const [plannedMealName, setPlannedMealName] = useState<string | null>(null);
   const [carbUnit, setCarbUnit] = useState<"grams" | "cp">("grams");
   const [carbEstimatorOpen, setCarbEstimatorOpen] = useState(false);
   const [mealTime, setMealTime] = useState<string>(getInitialMealTime);
@@ -502,6 +503,7 @@ export default function Adviser() {
     carbOverride?: number,
     compositionOverride?: MealComposition,
     mealTimeOverride?: string,
+    mealName?: string | null,
   ) => {
     // Ignore non-numeric first args (e.g. a click SyntheticEvent if wired as onClick={handleQuickMealPlan}).
     const resolvedCarbOverride =
@@ -519,6 +521,8 @@ export default function Adviser() {
     }
     const composition = compositionOverride ?? mealComposition;
     const mealType = mealTimeOverride ?? mealTime;
+    const namedMeal = mealName?.trim();
+    setPlannedMealName(namedMeal ? namedMeal.slice(0, 80) : null);
     const { result, impact } = computeStoredMealDoseSuggestion({
       carbValue,
       mealTime: mealType,
@@ -560,7 +564,8 @@ export default function Adviser() {
       const composition = compositionFromSearchParams(params) ?? DEFAULT_MEAL_COMPOSITION;
       const mt = params.get("mealTime");
       const mealOk = mt === "breakfast" || mt === "lunch" || mt === "dinner" || mt === "snack";
-      handleQuickMealPlan(Math.round(carbs), composition, mealOk ? mt : undefined);
+      const mealName = params.get("name")?.trim() || null;
+      handleQuickMealPlan(Math.round(carbs), composition, mealOk ? mt : undefined, mealName);
     } catch {
       // Ignore malformed auto-dose links and leave the adviser editable.
     }
@@ -810,6 +815,7 @@ export default function Adviser() {
               </Button>
               <MealDoseResultCard
                 mealResult={mealResult}
+                mealName={plannedMealName}
                 mealImpact={mealResultImpact}
                 isPumpUser={isPumpUser}
                 mealTimelineStatus={mealTimelineEvent?.status}

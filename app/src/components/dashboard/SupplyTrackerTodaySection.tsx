@@ -481,7 +481,6 @@ export function TodayAtAGlanceContent(props: {
     !props.hideActivityHeader ||
     !hideVisibleGlanceBanner ||
     (showTravelCard && !props.hideTravelContext) ||
-    scenarioState.sickDayActive ||
     showSupplyAttentionRows ||
     (!props.hideBedtime && Boolean(morningBedtimeLog)) ||
     (!props.hideBedtime && isEvening);
@@ -585,12 +584,6 @@ export function TodayAtAGlanceContent(props: {
                 ) : null}
               </div>
             </Link>
-          </div>
-        ) : null}
-
-        {scenarioState.sickDayActive ? (
-          <div className="px-1 py-2 text-sm leading-snug text-orange-950 dark:text-orange-100">
-            Sick day — {scenarioState.sickDaySeverity || "moderate"} severity
           </div>
         ) : null}
 
