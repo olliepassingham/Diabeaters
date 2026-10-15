@@ -28,6 +28,7 @@ import { getEffectiveTdd, hasConfiguredTdd } from "@/lib/tdd";
 import { insulinRoundIncrement, roundInsulinUnits } from "@/lib/insulin-rounding";
 import { parseOptionalBolusUnits } from "@/lib/meal-dose";
 import { parseRatioToGramsPerUnit, formatRatioForDisplay } from "@/lib/ratio-utils";
+import { sickDayMealRatioAdjustment } from "@/lib/sick-day-meal-ratios";
 import { GuideFrame, PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { ScenarioActiveCard } from "@/components/scenarios/ScenarioActiveCard";
 import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
@@ -285,7 +286,7 @@ function calculateSickDayRecommendations(
     return formatRatioForDisplay(gpu || 10, ratioFmt, cpSize);
   };
 
-  let ratioMultiplier = 1;
+  const ratioMultiplier = sickDayMealRatioAdjustment(severity).multiplier;
   let basalAdjustment = "No change recommended";
   let basalAdjustmentBrief = "No change unless your team advises";
   let hydrationNote = "Drink plenty of sugar-free fluids";
@@ -302,7 +303,6 @@ function calculateSickDayRecommendations(
 
   switch (severity) {
     case "minor":
-      ratioMultiplier = 1.1; // 10% more insulin
       basalAdjustment = "Consider 10% increase if blood glucose runs high";
       basalAdjustmentBrief = "Consider up to ~10% more basal if BG runs high";
       monitoringFrequency = "Check blood glucose every 4-6 hours";
@@ -311,7 +311,6 @@ function calculateSickDayRecommendations(
       stackingWarningBrief = "Wait at least 3 hours between corrections";
       break;
     case "moderate":
-      ratioMultiplier = 1.2; // 20% more insulin
       basalAdjustment = "Consider 10-20% increase if blood glucose remains elevated";
       basalAdjustmentBrief = "Consider ~10–20% more basal if BG stays up";
       hydrationNote = "Stay well hydrated with sugar-free fluids. Consider electrolyte drinks.";
@@ -322,7 +321,6 @@ function calculateSickDayRecommendations(
       stackingWarningBrief = "Wait at least 4 hours between corrections";
       break;
     case "severe":
-      ratioMultiplier = 1.3; // 30% more insulin
       basalAdjustment = "Consider 20% increase, but monitor closely for lows if unable to eat";
       basalAdjustmentBrief = "Consider ~20% more basal; watch for hypos if not eating";
       hydrationNote = "Critical: Stay hydrated. If vomiting, seek medical attention immediately.";
@@ -1515,24 +1513,24 @@ export default function SickDay() {
         />
 
         <Tabs value={activeModeTab} onValueChange={(v) => setActiveModeTab(v as "now" | "checklist" | "log")} className="w-full">
-          <TabsList className="grid h-11 w-full grid-cols-3 gap-1 rounded-xl bg-muted/45 p-1">
+          <TabsList className="grid h-12 w-full grid-cols-3 gap-1 rounded-xl bg-muted/45 p-1">
             <TabsTrigger
               value="now"
-              className="rounded-lg text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              className="h-10 rounded-lg px-2 text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm"
               data-testid="tab-sickday-now"
             >
               Now
             </TabsTrigger>
             <TabsTrigger
               value="checklist"
-              className="rounded-lg text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              className="h-10 rounded-lg px-2 text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm"
               data-testid="tab-sickday-checklist"
             >
               Reminders
             </TabsTrigger>
             <TabsTrigger
               value="log"
-              className="rounded-lg text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              className="h-10 rounded-lg px-2 text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm"
               data-testid="tab-sickday-update"
             >
               Update
@@ -1669,19 +1667,16 @@ export default function SickDay() {
           </TabsContent>
 
           <TabsContent value="checklist" className="mt-4 space-y-4 animate-fade-in-up" data-testid="tabcontent-sickday-checklist">
-            <Card className="overflow-hidden rounded-[1.35rem] border-border/50 shadow-none">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-semibold">Reminders</CardTitle>
+            <Card className="overflow-hidden rounded-[1.35rem] border-border/50 shadow-none" data-testid="card-sickday-med-reminders">
+              <CardHeader className="px-4 pb-2 pt-4">
+                <CardTitle className="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                    <Pill className="h-5 w-5" aria-hidden />
+                  </span>
+                  Medication
+                </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <Card className="border-border/60" data-testid="card-sickday-med-reminders">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                      <Pill className="h-4 w-4 text-primary" />
-                      Medication
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
+              <CardContent className="space-y-5 px-4 pb-4">
                     <Dialog
                       open={medTakenAtOpen}
                       onOpenChange={(v) => {
@@ -1720,6 +1715,7 @@ export default function SickDay() {
                               step={60}
                               value={medTakenAtLocal}
                               onChange={(e) => setMedTakenAtLocal(e.target.value)}
+                              className="h-12 text-base"
                               data-testid="input-med-taken-at"
                             />
                             <p className="text-xs text-muted-foreground">
@@ -1743,11 +1739,11 @@ export default function SickDay() {
                       </DialogContent>
                     </Dialog>
 
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-4">
                       <div className="space-y-2">
-                        <Label className="text-sm">What did you take?</Label>
+                        <Label className="text-sm font-medium">What did you take?</Label>
                         <Select value={medPreset} onValueChange={(v) => setMedPreset(v as any)}>
-                          <SelectTrigger data-testid="select-med-preset">
+                          <SelectTrigger className="h-12 text-base" data-testid="select-med-preset">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -1762,14 +1758,15 @@ export default function SickDay() {
                             placeholder="Medication name"
                             value={medCustomName}
                             onChange={(e) => setMedCustomName(e.target.value)}
+                            className="h-12 text-base"
                             data-testid="input-med-custom-name"
                           />
                         )}
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-sm">Remind me again in</Label>
+                        <Label className="text-sm font-medium">Remind me again in</Label>
                         <Select value={medRepeat} onValueChange={setMedRepeat}>
-                          <SelectTrigger data-testid="select-med-repeat">
+                          <SelectTrigger className="h-12 text-base" data-testid="select-med-repeat">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -1791,36 +1788,36 @@ export default function SickDay() {
                             placeholder="Minutes"
                             value={medRepeatCustomMins}
                             onChange={(e) => setMedRepeatCustomMins(e.target.value)}
+                            className="h-12 text-base"
                             data-testid="input-med-repeat-custom"
                           />
                         )}
                       </div>
-                    </div>
-
-                    <div className="grid gap-3 sm:grid-cols-2">
                       <div className="space-y-2">
-                        <Label className="text-sm">Dose (optional)</Label>
+                        <Label className="text-sm font-medium">Dose (optional)</Label>
                         <Input
                           placeholder="e.g. 500mg, 2 tablets"
                           value={medDoseLabel}
                           onChange={(e) => setMedDoseLabel(e.target.value)}
+                          className="h-12 text-base"
                           data-testid="input-med-dose"
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-sm">Notes (optional)</Label>
+                        <Label className="text-sm font-medium">Notes (optional)</Label>
                         <Input
                           placeholder="e.g. with food"
                           value={medNotes}
                           onChange={(e) => setMedNotes(e.target.value)}
+                          className="h-12 text-base"
                           data-testid="input-med-notes"
                         />
                       </div>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="input-med-clock-start" className="text-sm">
-                        When did you take it? (starts the reminder clock)
+                      <Label htmlFor="input-med-clock-start" className="text-sm font-medium">
+                        When did you take it?
                       </Label>
                       <Input
                         id="input-med-clock-start"
@@ -1828,6 +1825,7 @@ export default function SickDay() {
                         step={60}
                         value={medClockStartLocal}
                         onChange={(e) => setMedClockStartLocal(e.target.value)}
+                        className="h-12 text-base"
                         data-testid="input-med-clock-start"
                       />
                       <p className="text-sm text-muted-foreground">
@@ -1835,7 +1833,7 @@ export default function SickDay() {
                       </p>
                     </div>
 
-                    <Button type="button" className="w-full" onClick={handleAddMedicationReminder} data-testid="button-add-med-reminder">
+                    <Button type="button" className="h-12 w-full text-base" onClick={handleAddMedicationReminder} data-testid="button-add-med-reminder">
                       Add reminder
                     </Button>
 
@@ -1847,36 +1845,31 @@ export default function SickDay() {
                             <div
                               key={e.id}
                               className={[
-                                "rounded-xl border px-3 py-3 space-y-2",
-                                dueMs <= 0 ? "border-amber-300 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20" : "border-border/60",
+                                "space-y-3 rounded-2xl border px-4 py-4",
+                                dueMs <= 0 ? "border-amber-300 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/20" : "border-border/60",
                               ].join(" ")}
                               data-testid={`med-reminder-${e.id}`}
                             >
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                  <p className="text-sm font-semibold text-foreground">
-                                    {e.name}
-                                    {e.doseLabel ? <span className="text-muted-foreground font-normal"> · {e.doseLabel}</span> : null}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {formatCountdownMs(dueMs)} · next due{" "}
-                                    {new Date(e.nextDueAtIso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}{" "}
-                                    <span className="block sm:inline sm:ml-1">(dose time + repeat)</span>
-                                  </p>
-                                </div>
-                                <Badge variant="secondary" className="text-xs">
-                                  every {e.repeatEveryMinutes >= 60 ? `${Math.round(e.repeatEveryMinutes / 60)}h` : `${e.repeatEveryMinutes}m`}
-                                </Badge>
+                              <div className="min-w-0">
+                                <p className="text-base font-semibold text-foreground">{e.name}</p>
+                                {e.doseLabel ? <p className="text-sm text-muted-foreground">{e.doseLabel}</p> : null}
+                                <p className="mt-1 text-sm text-muted-foreground">{formatCountdownMs(dueMs)}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  Next{" "}
+                                  {new Date(e.nextDueAtIso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                                  {" · every "}
+                                  {e.repeatEveryMinutes >= 60 ? `${Math.round(e.repeatEveryMinutes / 60)}h` : `${e.repeatEveryMinutes}m`}
+                                </p>
                               </div>
-                              {e.notes ? <p className="text-xs text-muted-foreground">{e.notes}</p> : null}
-                              <div className="flex flex-wrap gap-2">
-                                <Button size="sm" onClick={() => openMedicationTakenDialog(e.id)} data-testid={`button-med-taken-${e.id}`}>
+                              {e.notes ? <p className="text-sm text-muted-foreground">{e.notes}</p> : null}
+                              <div className="grid gap-2">
+                                <Button className="h-11 w-full" onClick={() => openMedicationTakenDialog(e.id)} data-testid={`button-med-taken-${e.id}`}>
                                   Taken
                                 </Button>
-                                <Button variant="outline" size="sm" onClick={() => handleSnoozeMedicationReminder(e.id, 30)} data-testid={`button-med-snooze-${e.id}`}>
+                                <Button variant="outline" className="h-11 w-full" onClick={() => handleSnoozeMedicationReminder(e.id, 30)} data-testid={`button-med-snooze-${e.id}`}>
                                   Snooze 30m
                                 </Button>
-                                <Button variant="ghost" size="sm" onClick={() => handleStopMedicationReminder(e.id)} data-testid={`button-med-stop-${e.id}`}>
+                                <Button variant="ghost" className="h-11 w-full" onClick={() => handleStopMedicationReminder(e.id)} data-testid={`button-med-stop-${e.id}`}>
                                   Stop
                                 </Button>
                               </div>
@@ -1931,9 +1924,9 @@ export default function SickDay() {
                           {recentTemps.length > 0 ? `${recentTemps.length} logged` : "No temperature logged yet"}
                         </span>
                       </div>
-                      <div className="grid gap-3 sm:grid-cols-3">
-                        <div className="sm:col-span-2 space-y-2">
-                          <Label htmlFor="input-sickday-temp" className="text-sm">Log temperature</Label>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="input-sickday-temp" className="text-sm font-medium">Log temperature</Label>
                           <Input
                             id="input-sickday-temp"
                             type="number"
@@ -1942,13 +1935,14 @@ export default function SickDay() {
                             placeholder={tempUnit === "c" ? "e.g. 38.2" : "e.g. 101.3"}
                             value={tempValue}
                             onChange={(e) => setTempValue(e.target.value)}
+                            className="h-12 text-base"
                             data-testid="input-sickday-temp"
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label className="text-sm">Unit</Label>
+                          <Label className="text-sm font-medium">Unit</Label>
                           <Select value={tempUnit} onValueChange={(v) => setTempUnit(v as "c" | "f")}>
-                            <SelectTrigger data-testid="select-sickday-temp-unit">
+                            <SelectTrigger className="h-12 text-base" data-testid="select-sickday-temp-unit">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -1958,7 +1952,7 @@ export default function SickDay() {
                           </Select>
                         </div>
                       </div>
-                      <Button type="button" variant="outline" className="w-full" onClick={handleLogTemperature} data-testid="button-log-temperature">
+                      <Button type="button" variant="outline" className="h-12 w-full text-base" onClick={handleLogTemperature} data-testid="button-log-temperature">
                         Log temperature
                       </Button>
 
@@ -1998,28 +1992,27 @@ export default function SickDay() {
                         </div>
                       )}
                     </div>
-                  </CardContent>
-                </Card>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="default"
-                    onClick={() => {
-                      setActiveModeTab("log");
-                      scrollToId("sickday-log");
-                    }}
-                    data-testid="button-log-check-from-checklist"
-                  >
-                    <Activity className="h-4 w-4 mr-2" />
-                    Log a check
-                  </Button>
-                  <Button variant="outline" asChild data-testid="button-open-help-now">
-                    <Link href="/help-now">Open Help now</Link>
-                  </Button>
-                </div>
               </CardContent>
             </Card>
+
+            <div className="grid gap-2">
+              <Button
+                type="button"
+                variant="default"
+                className="h-12 w-full text-base"
+                onClick={() => {
+                  setActiveModeTab("log");
+                  scrollToId("sickday-log");
+                }}
+                data-testid="button-log-check-from-checklist"
+              >
+                <Activity className="h-4 w-4 mr-2" />
+                Log a check
+              </Button>
+              <Button variant="outline" className="h-12 w-full text-base" asChild data-testid="button-open-help-now">
+                <Link href="/help-now">Open Help now</Link>
+              </Button>
+            </div>
           </TabsContent>
 
           <TabsContent value="log" className="mt-4 space-y-4 animate-fade-in-up" data-testid="tabcontent-sickday-update">

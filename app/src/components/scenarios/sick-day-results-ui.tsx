@@ -576,7 +576,7 @@ export function SickDayResultsPanel({
           <p className="text-sm font-semibold text-foreground">Meal ratios</p>
           <p className="text-sm font-semibold tabular-nums text-muted-foreground">×{results.ratioMultiplier}</p>
         </div>
-        <div className="grid grid-cols-2 gap-1.5">
+        <div className="flex flex-col">
           {(
             [
               { label: "Breakfast", ratio: results.breakfastRatio, original: results.originalBreakfastRatio, testId: "breakfast" },
@@ -584,13 +584,24 @@ export function SickDayResultsPanel({
               { label: "Dinner", ratio: results.dinnerRatio, original: results.originalDinnerRatio, testId: "dinner" },
               { label: "Snacks", ratio: results.snackRatio, original: results.originalSnackRatio, testId: "snack" },
             ] as const
-          ).map((row) => (
+          ).map((row, idx) => (
             <div
               key={row.label}
-              className="flex min-h-9 items-center gap-1.5 rounded-lg border border-border/70 bg-background/70 px-2 py-1.5"
+              className={cn(
+                "flex min-h-[3.25rem] items-center gap-3 py-2.5",
+                idx > 0 && "border-t border-border/40",
+              )}
             >
-              <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-muted-foreground">{row.label}</span>
-              <span className="shrink-0 text-sm font-bold tabular-nums" data-testid={`text-${row.testId}-ratio`}>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium leading-tight text-foreground">{row.label}</span>
+                <span className="mt-0.5 block text-[11px] leading-tight text-muted-foreground">
+                  Usual <span className="tabular-nums line-through opacity-80">{row.original}</span>
+                </span>
+              </span>
+              <span
+                className="shrink-0 text-base font-bold tabular-nums leading-none text-amber-700 dark:text-amber-400"
+                data-testid={`text-${row.testId}-ratio`}
+              >
                 {row.ratio}
               </span>
             </div>

@@ -25,13 +25,13 @@ import { WidgetCard } from "./WidgetCard";
 import type { DashboardWidgetLayoutProps } from "./types";
 import { cn } from "@/lib/utils";
 import { HomeCardEmpty } from "@/components/home/home-ui";
+import { sickDayMealRatioAdjustment } from "@/lib/sick-day-meal-ratios";
 import { WidgetHeaderIcon, widgetContentClass, widgetHeaderClass } from "./widget-header";
 
 function getScenarioFactor(scenarioState: ScenarioState): { factor: number; label: string; icon: typeof Pill } | null {
   if (scenarioState.sickDayActive) {
-    const severity = scenarioState.sickDaySeverity || "moderate";
-    const factor = severity === "mild" ? 0.9 : severity === "severe" ? 0.8 : 0.85;
-    return { factor, label: "Sick day", icon: Pill };
+    const adjustment = sickDayMealRatioAdjustment(scenarioState.sickDaySeverity);
+    return { factor: adjustment.gramsPerUnitFactor, label: "Sick day", icon: Pill };
   }
   if (scenarioState.travelModeActive) {
     const plan = storage.getTravelPlan();

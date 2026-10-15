@@ -58,6 +58,7 @@ import type { RatioFormat } from "@/lib/storage";
 import { InfoTooltip } from "@/components/info-tooltip";
 import { seedDefaultTargetBgRangeIfNeeded } from "@/lib/starter-target-range";
 import { formatTargetBgRangeLabel, targetBgRangeInputValues } from "@/lib/target-bg-range";
+import { sickDayMealRatioAdjustment } from "@/lib/sick-day-meal-ratios";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 
 interface ScenarioAdjustment {
@@ -72,23 +73,17 @@ function getActiveAdjustments(scenarioState: ScenarioState): ScenarioAdjustment[
   const adjustments: ScenarioAdjustment[] = [];
 
   if (scenarioState.sickDayActive) {
-    const severity = scenarioState.sickDaySeverity || "moderate";
-    let factor: number;
-    let desc: string;
-    if (severity === "mild") {
-      factor = 0.9;
-      desc = "Mild illness — insulin resistance may increase slightly. Your body may need a little more insulin per gram of carb than usual.";
-    } else if (severity === "severe") {
-      factor = 0.8;
-      desc = "Severe illness — insulin resistance often increases noticeably. Monitor closely and contact your diabetes team if blood sugars remain high.";
-    } else {
-      factor = 0.85;
-      desc = "Moderate illness — insulin resistance usually increases. You may need somewhat more insulin per gram of carb.";
-    }
+    const adjustment = sickDayMealRatioAdjustment(scenarioState.sickDaySeverity);
+    const desc =
+      adjustment.severity === "minor"
+        ? "Minor illness — meal insulin is planned about 10% higher than your usual ratios."
+        : adjustment.severity === "severe"
+          ? "Severe illness — meal insulin is planned about 30% higher than your usual ratios. Monitor closely and contact your diabetes team if blood sugars remain high."
+          : "Moderate illness — meal insulin is planned about 20% higher than your usual ratios.";
     adjustments.push({
-      label: `Sick day (${severity})`,
+      label: `Sick day (${adjustment.severity})`,
       description: desc,
-      factor,
+      factor: adjustment.gramsPerUnitFactor,
       icon: Pill,
       color: "text-amber-600 dark:text-amber-400",
     });
@@ -158,8 +153,7 @@ function getAdjustedRatio(baseRatio: string | undefined, factor: number, ratioFo
   const grams = parseRatioToGramsPerUnit(baseRatio);
   if (grams === null) return null;
   const clamped = clampFactor(factor);
-  const adjustedGrams = Math.round(grams * clamped * 10) / 10;
-  return formatRatioForDisplay(adjustedGrams, ratioFormat, cpSize);
+  return formatRatioForDisplay(grams * clamped, ratioFormat, cpSize);
 }
 
 function getMealIcon(meal: string) {
