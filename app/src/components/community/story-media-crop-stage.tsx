@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
-import { cropImageAreaToJpeg } from "@/lib/image-crop";
+import { cropStoryFrameToJpeg } from "@/lib/image-crop";
 import { STORY_STAGE_CLASS } from "@/lib/community/story-frame";
 import { cn } from "@/lib/utils";
 
@@ -14,6 +14,9 @@ import { cn } from "@/lib/utils";
 export const STORY_CROP_ASPECT = 9 / 16;
 const STORY_OUTPUT_W = 1080;
 const STORY_OUTPUT_H = 1920;
+/** Below 1 shrinks the photo with a plain letterbox behind it. */
+const STORY_MIN_ZOOM = 0.35;
+const STORY_MAX_ZOOM = 3;
 
 type StoryMediaCropStageProps = {
   imageUrl: string;
@@ -50,7 +53,7 @@ export function StoryMediaCropStage({
     setSaving(true);
     let cropped: File;
     try {
-      cropped = await cropImageAreaToJpeg(imageUrl, croppedAreaPixels, {
+      cropped = await cropStoryFrameToJpeg(imageUrl, croppedAreaPixels, {
         width: STORY_OUTPUT_W,
         height: STORY_OUTPUT_H,
         fileName: `story-${Date.now()}.jpg`,
@@ -97,10 +100,13 @@ export function StoryMediaCropStage({
               image={imageUrl}
               crop={crop}
               zoom={zoom}
+              minZoom={STORY_MIN_ZOOM}
+              maxZoom={STORY_MAX_ZOOM}
               aspect={STORY_CROP_ASPECT}
               cropShape="rect"
               showGrid={false}
               objectFit="contain"
+              restrictPosition={false}
               onCropChange={setCrop}
               onZoomChange={setZoom}
               onCropComplete={onCropComplete}
@@ -114,15 +120,17 @@ export function StoryMediaCropStage({
       </div>
 
       <div className="space-y-3 px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 [padding-left:max(1.25rem,env(safe-area-inset-left))] [padding-right:max(1.25rem,env(safe-area-inset-right))]">
-        <p className="text-center text-[13px] text-white/70">Drag to move · pinch or slide to zoom</p>
+        <p className="text-center text-[13px] text-white/70">
+          Drag to move · zoom out for the full photo on a black background
+        </p>
         <div className="space-y-2">
           <Label htmlFor="story-crop-zoom" className="sr-only">
             Zoom
           </Label>
           <Slider
             id="story-crop-zoom"
-            min={1}
-            max={3}
+            min={STORY_MIN_ZOOM}
+            max={STORY_MAX_ZOOM}
             step={0.01}
             value={[zoom]}
             disabled={disabled}

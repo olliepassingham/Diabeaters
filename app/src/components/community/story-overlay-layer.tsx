@@ -60,40 +60,47 @@ export function StoryOverlayLayer({
 
   return (
     <div className={cn("pointer-events-none absolute inset-0", className)} aria-hidden={!interactive}>
-      {overlays.map((overlay) => (
-        <div
-          key={overlay.id}
-          className={cn(
-            "absolute max-w-[85%] -translate-x-1/2 -translate-y-1/2 text-center",
-            interactive && "pointer-events-auto touch-none px-2 py-1.5",
-            interactive && selectedOverlayId === overlay.id && "rounded-lg ring-2 ring-white/70",
-          )}
-          style={{ left: `${overlay.x * 100}%`, top: `${overlay.y * 100}%` }}
-          onPointerDown={
-            interactive && onOverlayPointerDown
-              ? (e) => {
-                  e.stopPropagation();
-                  onOverlayPointerDown(overlay.id, e);
-                }
-              : undefined
-          }
-          onClick={
-            interactive && onOverlayClick
-              ? (e) => {
-                  e.stopPropagation();
-                  onOverlayClick(overlay.id);
-                }
-              : undefined
-          }
-        >
-          <span
-            className={storyOverlayClassName(overlay.style, overlay.color, overlay.font)}
-            style={storyOverlayInlineStyle(overlay.color, overlay.font)}
+      {overlays.map((overlay) => {
+        const multiline = overlay.text.includes("\n");
+        return (
+          <div
+            key={overlay.id}
+            className={cn(
+              "absolute -translate-x-1/2 -translate-y-1/2 text-center",
+              multiline ? "max-w-[92%]" : "max-w-none",
+              interactive && "pointer-events-auto touch-none px-2 py-1.5",
+              interactive && selectedOverlayId === overlay.id && "rounded-lg ring-2 ring-white/70",
+            )}
+            style={{ left: `${overlay.x * 100}%`, top: `${overlay.y * 100}%` }}
+            onPointerDown={
+              interactive && onOverlayPointerDown
+                ? (e) => {
+                    e.stopPropagation();
+                    onOverlayPointerDown(overlay.id, e);
+                  }
+                : undefined
+            }
+            onClick={
+              interactive && onOverlayClick
+                ? (e) => {
+                    e.stopPropagation();
+                    onOverlayClick(overlay.id);
+                  }
+                : undefined
+            }
           >
-            {overlay.text}
-          </span>
-        </div>
-      ))}
+            <span
+              className={cn(
+                storyOverlayClassName(overlay.style, overlay.color, overlay.font),
+                multiline ? "whitespace-pre-wrap break-words" : "whitespace-nowrap",
+              )}
+              style={storyOverlayInlineStyle(overlay.color, overlay.font)}
+            >
+              {overlay.text}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -26,6 +26,13 @@ type Props = {
 };
 
 const TAP_MOVE_PX = 8;
+/** Keep text nearly edge-to-edge so placement feels free, not forced. */
+const POS_MIN = 0.04;
+const POS_MAX = 0.96;
+
+function clampStoryPos(value: number): number {
+  return Math.min(POS_MAX, Math.max(POS_MIN, value));
+}
 
 export function StoryOverlayEditor({
   overlays,
@@ -144,8 +151,8 @@ export function StoryOverlayEditor({
     const rect = container.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return null;
     return {
-      x: Math.min(0.86, Math.max(0.14, (clientX - rect.left) / rect.width)),
-      y: Math.min(0.74, Math.max(0.2, (clientY - rect.top) / rect.height)),
+      x: clampStoryPos((clientX - rect.left) / rect.width),
+      y: clampStoryPos((clientY - rect.top) / rect.height),
     };
   }
 
@@ -155,7 +162,7 @@ export function StoryOverlayEditor({
     const overlay: StoryOverlay = {
       id: crypto.randomUUID(),
       text: "",
-      x: 0.5,
+      x: point.x,
       y: point.y,
       style: newTextStyle,
       color: newTextColor,
@@ -184,7 +191,8 @@ export function StoryOverlayEditor({
   }
 
   function onOverlayPointerDown(overlayId: string, e: ReactPointerEvent) {
-    if (editingId) return;
+    // Allow dragging the active text while editing so placement stays free.
+    if (editingId && editingId !== overlayId) return;
     const overlay = overlays.find((o) => o.id === overlayId);
     if (!overlay) return;
     dragMoved.current = false;
@@ -206,16 +214,21 @@ export function StoryOverlayEditor({
   function onPointerMove(e: ReactPointerEvent) {
     const drag = dragRef.current;
     const container = containerRef.current;
-    if (!drag || !container || editingId) return;
+    if (!drag || !container) return;
     const dxPx = e.clientX - drag.startX;
     const dyPx = e.clientY - drag.startY;
     if (Math.hypot(dxPx, dyPx) > TAP_MOVE_PX) dragMoved.current = true;
     if (!dragMoved.current) return;
     const rect = container.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return;
-    const x = Math.min(0.86, Math.max(0.14, drag.originX + dxPx / rect.width));
-    const y = Math.min(0.74, Math.max(0.18, drag.originY + dyPx / rect.height));
+    const x = clampStoryPos(drag.originX + dxPx / rect.width);
+    const y = clampStoryPos(drag.originY + dyPx / rect.height);
     updateOverlay(drag.id, { x, y });
+    // Keep drag origin tied to finger so continuous moves stay smooth.
+    drag.startX = e.clientX;
+    drag.startY = e.clientY;
+    drag.originX = x;
+    drag.originY = y;
   }
 
   function onPointerUp() {
@@ -274,13 +287,24 @@ export function StoryOverlayEditor({
       {editing ? (
         <>
           <div
-            className="absolute z-[4] w-[86%] max-w-md -translate-x-1/2 -translate-y-1/2"
+            className="absolute z-[4] w-max max-w-[min(96vw,42rem)] -translate-x-1/2 -translate-y-1/2"
             style={{ left: `${editing.x * 100}%`, top: editingTop() }}
             onClick={(e) => e.stopPropagation()}
-            onPointerDown={(e) => e.stopPropagation()}
+            onPointerDown={(e) => {
+              // Drag the text block to reposition while editing (not from the caret itself).
+              if (e.target === inputRef.current || (e.target as HTMLElement).closest?.("[data-story-text]")) {
+                e.stopPropagation();
+                return;
+              }
+              e.stopPropagation();
+              onOverlayPointerDown(editing.id, e);
+            }}
           >
             <div
-              className={cn("relative text-center", storyOverlayClassName(editing.style, editing.color, editing.font))}
+              className={cn(
+                "relative cursor-grab text-center active:cursor-grabbing",
+                storyOverlayClassName(editing.style, editing.color, editing.font),
+              )}
               style={storyOverlayInlineStyle(editing.color, editing.font)}
             >
               {!draftText ? (
@@ -297,7 +321,8 @@ export function StoryOverlayEditor({
                 data-story-text
                 suppressContentEditableWarning
                 className={cn(
-                  "relative min-h-[1.3em] w-full whitespace-pre-wrap break-words text-center outline-none select-text",
+                  "relative min-h-[1.3em] min-w-[3ch] text-center outline-none select-text",
+                  draftText.includes("\n") ? "whitespace-pre-wrap break-words" : "whitespace-nowrap",
                   editing.color === "black" ? "caret-black" : "caret-white",
                 )}
                 style={{ WebkitUserSelect: "text", userSelect: "text" }}
@@ -322,6 +347,9 @@ export function StoryOverlayEditor({
                 }}
               />
             </div>
+            <p className="mt-2 text-center text-[11px] font-medium text-white/70">
+              Drag outside the text to move · Enter for a new line
+            </p>
           </div>
           <div className="absolute inset-x-0 top-[max(0.75rem,env(safe-area-inset-top))] z-[5] flex flex-col items-center gap-2 px-3">
             <div className="flex items-center justify-center gap-2">
