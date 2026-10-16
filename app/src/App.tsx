@@ -24,7 +24,6 @@ import { AlcoholReminderPoller } from "@/components/alcohol-reminder-poller";
 import { PumpFailureReminderPoller } from "@/components/pump-failure-reminder-poller";
 import { ExerciseCgmAlertPoller } from "@/components/exercise-cgm-alert-poller";
 import { ExerciseCgmServerMonitorSync } from "@/components/exercise-cgm-server-monitor-sync";
-import { SupporterCgmShareSync } from "@/components/supporter-cgm-share-sync";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -1259,7 +1258,6 @@ function UnverifiedAccountShell({
       {!suppressClinicalPollers ? <PumpFailureReminderPoller /> : null}
       {!suppressClinicalPollers ? <ExerciseCgmAlertPoller /> : null}
       {!suppressClinicalPollers ? <ExerciseCgmServerMonitorSync /> : null}
-      {!suppressClinicalPollers ? <SupporterCgmShareSync /> : null}
       <AppShellBackdrop tone="rich" />
       <AppTopBar
         isCarer={isCarerMode}
@@ -1528,7 +1526,6 @@ function AuthenticatedShell() {
         {!suppressClinicalPollers ? <PumpFailureReminderPoller /> : null}
         {!suppressClinicalPollers ? <ExerciseCgmAlertPoller /> : null}
       {!suppressClinicalPollers ? <ExerciseCgmServerMonitorSync /> : null}
-      {!suppressClinicalPollers ? <SupporterCgmShareSync /> : null}
       </DeferredAfterFirstPaint>
       <AppShellBackdrop tone="rich" />
       <AppTopBar
