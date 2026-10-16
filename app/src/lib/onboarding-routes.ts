@@ -42,11 +42,11 @@ export function buildOnboardingSteps(opts: {
 }): OnboardingWizardStep[] {
   if (opts.upgradeFlow) return ["details", "disclaimer", "first_win"];
   if (opts.showCommunityPath) return ["welcome", "region", "disclaimer", "first_win"];
-  // Patient and dual-role ("both"): region + disclaimer only, then Home with starter defaults.
-  // Struggle / details / first_win are skipped so new Type 1 users see value immediately.
+  // Patient and dual-role ("both"): name first, then region + disclaimer, then Home.
+  // Struggle / details / first_win stay skipped so new Type 1 users see value quickly.
   void opts.showBothPath;
   void opts.minimalSetup;
-  return ["region", "disclaimer"];
+  return ["welcome", "region", "disclaimer"];
 }
 
 const POST_ROUTES: Record<OnboardingStruggleKey, string> = {

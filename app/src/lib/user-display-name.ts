@@ -9,6 +9,14 @@ export function isEmailLike(value: string | null | undefined): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t);
 }
 
+/** Real display name for profiles / onboarding (not empty, not an email). */
+export function isValidDisplayName(value: string | null | undefined): boolean {
+  const t = value?.trim() ?? "";
+  if (t.length < 2) return false;
+  if (isEmailLike(t)) return false;
+  return true;
+}
+
 export type UserDisplayNameInput = {
   cloudFullName?: string | null;
   localName?: string | null;
@@ -21,6 +29,11 @@ export function resolveUserDisplayName(input: UserDisplayNameInput): string {
     if (!isEmailLike(value)) return value;
   }
   return "";
+}
+
+/** True when neither cloud nor local storage has a usable display name. */
+export function needsDisplayName(input: UserDisplayNameInput): boolean {
+  return !isValidDisplayName(resolveUserDisplayName(input));
 }
 
 /** Write a validated display name into local profile storage. */

@@ -24,6 +24,7 @@ import { AlcoholReminderPoller } from "@/components/alcohol-reminder-poller";
 import { PumpFailureReminderPoller } from "@/components/pump-failure-reminder-poller";
 import { ExerciseCgmAlertPoller } from "@/components/exercise-cgm-alert-poller";
 import { ExerciseCgmServerMonitorSync } from "@/components/exercise-cgm-server-monitor-sync";
+import { SupporterCgmShareSync } from "@/components/supporter-cgm-share-sync";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -111,10 +112,12 @@ import { AppointmentReminderPoller } from "@/components/appointment-reminder-pol
 import { BedtimeReminderPoller } from "@/components/bedtime-reminder-poller";
 import { PumpChangeReminderPoller } from "@/components/pump-change-reminder-poller";
 import { BedtimeReminderPromptDialog } from "@/components/bedtime-reminder-prompt-dialog";
+import { DisplayNamePromptDialog } from "@/components/display-name-prompt-dialog";
 import { HypoCheckInRespondHost } from "@/components/hypo-check-in-respond-host";
 import { ExerciseModeOverlay } from "@/components/exercise-mode-overlay";
 import { cancelAllBedtimeReminders, rescheduleBedtimeReminders } from "@/lib/bedtime-reminders";
 import { useBedtimeReminderPromptAfterOnboarding } from "@/hooks/use-bedtime-reminder-prompt-after-onboarding";
+import { useDisplayNamePrompt } from "@/hooks/use-display-name-prompt";
 import { SupplyLowNotifyPoller } from "@/components/supply-low-notify-poller";
 import { NativeAppBadgeSync } from "@/components/native-app-badge-sync";
 import { NativeNavBackHandler } from "@/components/native-nav-back-handler";
@@ -1256,6 +1259,7 @@ function UnverifiedAccountShell({
       {!suppressClinicalPollers ? <PumpFailureReminderPoller /> : null}
       {!suppressClinicalPollers ? <ExerciseCgmAlertPoller /> : null}
       {!suppressClinicalPollers ? <ExerciseCgmServerMonitorSync /> : null}
+      {!suppressClinicalPollers ? <SupporterCgmShareSync /> : null}
       <AppShellBackdrop tone="rich" />
       <AppTopBar
         isCarer={isCarerMode}
@@ -1297,6 +1301,9 @@ function AuthenticatedShell() {
   const iosNotifPrompt = useNativeLocalNotificationPermissionPrompt(!suppressClinicalPollers);
   const { bedtimeReminderPromptOpen, setBedtimeReminderPromptOpen } =
     useBedtimeReminderPromptAfterOnboarding(!suppressClinicalPollers);
+  const { open: displayNamePromptOpen, setOpen: setDisplayNamePromptOpen } = useDisplayNamePrompt(
+    Boolean(user?.id) && pathOnly !== "/onboarding" && pathOnly !== "/community/setup",
+  );
 
   const handleLogout = async () => {
     clearCarerClientSessionKeys();
@@ -1486,6 +1493,7 @@ function AuthenticatedShell() {
 
   return (
     <AskAnythingProvider defaultAudience={isCarerMode ? "supporter" : "patient"}>
+      <DisplayNamePromptDialog open={displayNamePromptOpen} onOpenChange={setDisplayNamePromptOpen} />
       {slimUnverifiedAccount ? (
         <UnverifiedAccountShell
           isCarerMode={isCarerMode}
@@ -1520,6 +1528,7 @@ function AuthenticatedShell() {
         {!suppressClinicalPollers ? <PumpFailureReminderPoller /> : null}
         {!suppressClinicalPollers ? <ExerciseCgmAlertPoller /> : null}
       {!suppressClinicalPollers ? <ExerciseCgmServerMonitorSync /> : null}
+      {!suppressClinicalPollers ? <SupporterCgmShareSync /> : null}
       </DeferredAfterFirstPaint>
       <AppShellBackdrop tone="rich" />
       <AppTopBar

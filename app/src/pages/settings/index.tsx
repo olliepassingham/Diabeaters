@@ -55,7 +55,7 @@ import { ClinicalWarningHint } from "@/components/clinical-warning";
 import { PageHeader, PageShell } from "@/components/layout";
 import { useAuth } from "@/lib/auth-context";
 import { profileQueryKey, updateProfile, useProfile } from "@/lib/profile";
-import { isEmailLike, resolveUserDisplayName } from "@/lib/user-display-name";
+import { isEmailLike, isValidDisplayName, resolveUserDisplayName } from "@/lib/user-display-name";
 import {
   formatWeightInputFromKg,
   getBodyWeightKgFromProfile,
@@ -1333,10 +1333,12 @@ export default function Settings() {
     const base = profile ?? storage.getProfile();
     if (!base) return { ok: false };
     const nameTrim = userDisplayName.trim();
-    if (nameTrim && isEmailLike(nameTrim)) {
+    if (!isValidDisplayName(nameTrim)) {
       toast({
-        title: "Use your real name",
-        description: "Your name cannot be an email address. Help now shows this to bystanders.",
+        title: "Add your name",
+        description: isEmailLike(nameTrim)
+          ? "Your name cannot be an email address. Help now shows this to bystanders."
+          : "Enter at least 2 characters so people know who you are.",
         variant: "destructive",
       });
       return { ok: false };
@@ -1393,18 +1395,16 @@ export default function Settings() {
 
     let cloud: Awaited<ReturnType<typeof syncClinicalPrefsToCloud>> = { error: null };
     if (user?.id) {
-      if (nameTrim) {
-        const nameCloud = await updateProfile({ id: user.id, full_name: nameTrim });
-        if (nameCloud.error) {
-          toast({
-            title: "Saved on this device",
-            description: `Could not sync your name: ${nameCloud.error.message}`,
-            variant: "destructive",
-          });
-          return { ok: false };
-        }
-        void queryClient.invalidateQueries({ queryKey: profileQueryKey(user.id) });
+      const nameCloud = await updateProfile({ id: user.id, full_name: nameTrim });
+      if (nameCloud.error) {
+        toast({
+          title: "Saved on this device",
+          description: `Could not sync your name: ${nameCloud.error.message}`,
+          variant: "destructive",
+        });
+        return { ok: false };
       }
+      void queryClient.invalidateQueries({ queryKey: profileQueryKey(user.id) });
       cloud = await syncClinicalPrefsToCloud(user.id);
       if (weightChanged) {
         const dosing = await syncDosingPrefsToCloud(user.id);

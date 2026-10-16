@@ -77,6 +77,7 @@ import {
   regionDefaults,
 } from "@/lib/region";
 import { syncRegionToCloud } from "@/lib/clinical-prefs-cloud-sync";
+import { isValidDisplayName } from "@/lib/user-display-name";
 import {
   ONBOARDING_SCROLL_MAIN_ID,
   OnboardingBackdrop,
@@ -325,18 +326,10 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("upgrade") === "1") {
       return "details";
     }
-    // Community keeps its short welcome → region → disclaimer → first_win flow.
-    // Session path may be empty after email verify; metadata is applied via accountPath below.
-    if (getOnboardingAccountPath() === "community") return "welcome";
-    return "region";
+    // Name first for community, patient, and dual-role. Upgrade skips welcome.
+    return "welcome";
   });
 
-  useEffect(() => {
-    if (upgradeFlow || !showCommunityPath) return;
-    if (currentStep === "region" && steps[0] === "welcome") {
-      setCurrentStep("welcome");
-    }
-  }, [upgradeFlow, showCommunityPath, currentStep, steps]);
   const [data, setData] = useState<OnboardingData>({
     name: "",
     diabetesType: "type1",
@@ -552,7 +545,15 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     setPrimaryAppRole("community");
     if (getOnboardingAccountPath() == null) setOnboardingAccountPath("community");
     if (user?.id) {
-      const fullName = data.name.trim() ? data.name.trim() : null;
+      const fullName = isValidDisplayName(data.name) ? data.name.trim() : null;
+      if (!fullName) {
+        toast({
+          title: "Add your name",
+          description: "A display name is required to finish setup.",
+          variant: "destructive",
+        });
+        return;
+      }
       const { error } = await upsertProfile({
         id: user.id,
         onboarding_complete: true,
@@ -628,11 +629,19 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       );
     }
     if (user?.id) {
-      const fullName = data.name.trim() ? data.name.trim() : null;
+      const fullName = isValidDisplayName(data.name) ? data.name.trim() : null;
+      if (!upgradeFlow && !fullName) {
+        toast({
+          title: "Add your name",
+          description: "A display name is required to finish setup.",
+          variant: "destructive",
+        });
+        return;
+      }
       const { error } = await upsertProfile({
         id: user.id,
         onboarding_complete: true,
-        full_name: fullName,
+        ...(fullName ? { full_name: fullName } : {}),
         account_type: "patient",
         primary_app_role: "patient",
       });
@@ -690,15 +699,22 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
 
   const canProceed = (): boolean => {
     switch (currentStep) {
-      case "welcome": return true;
-      case "care_context": return data.careContext !== null;
-      case "struggle": return data.struggle !== null;
-      case "region": return data.region === "UK" || data.region === "US" || data.region === "OTHER";
+      case "welcome":
+        return isValidDisplayName(data.name);
+      case "care_context":
+        return data.careContext !== null;
+      case "struggle":
+        return data.struggle !== null;
+      case "region":
+        return data.region === "UK" || data.region === "US" || data.region === "OTHER";
       case "details":
         return upgradeFlow || data.struggle !== null;
-      case "disclaimer": return data.hasAcceptedDisclaimer;
-      case "first_win": return true;
-      default: return true;
+      case "disclaimer":
+        return data.hasAcceptedDisclaimer;
+      case "first_win":
+        return true;
+      default:
+        return true;
     }
   };
 
@@ -919,15 +935,23 @@ function WelcomeStep({
 
       <OnboardingCard contentClassName="space-y-6 pt-6 pb-6">
           <div className="space-y-2">
-            <Label htmlFor="welcome-name" className="text-base">What should we call you?</Label>
+            <Label htmlFor="welcome-name" className="text-base">
+              What should we call you? <span className="text-destructive">*</span>
+            </Label>
             <Input
               id="welcome-name"
               value={data.name}
               onChange={(e) => updateData("name", e.target.value)}
               placeholder="Your first name"
               className="text-center text-lg"
+              autoComplete="nickname"
+              required
+              aria-required
               data-testid="input-onboarding-name"
             />
+            <p className="text-center text-xs text-muted-foreground">
+              Required — this is how you show up in the app and community.
+            </p>
           </div>
 
           {!communityFlow ? (

@@ -9,7 +9,7 @@ import {
 } from "@/lib/onboarding-routes";
 
 describe("buildOnboardingSteps", () => {
-  it("builds patient essentials path (region + disclaimer only)", () => {
+  it("builds patient essentials path (name → region → disclaimer)", () => {
     expect(
       buildOnboardingSteps({
         upgradeFlow: false,
@@ -17,7 +17,7 @@ describe("buildOnboardingSteps", () => {
         showBothPath: false,
         minimalSetup: false,
       }),
-    ).toEqual(["region", "disclaimer"]);
+    ).toEqual(["welcome", "region", "disclaimer"]);
   });
 
   it("uses the same essentials path for both / dual-role and ignores minimalSetup", () => {
@@ -28,7 +28,7 @@ describe("buildOnboardingSteps", () => {
         showBothPath: true,
         minimalSetup: true,
       }),
-    ).toEqual(["region", "disclaimer"]);
+    ).toEqual(["welcome", "region", "disclaimer"]);
   });
 
   it("keeps community and upgrade flows unchanged", () => {
