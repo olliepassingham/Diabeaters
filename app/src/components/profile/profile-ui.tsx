@@ -541,12 +541,8 @@ export function ProfileBioPreview({
 }) {
   const trimmed = bio?.trim();
   const useRelaxed = relaxed && !compact;
-  const clampClass =
-    compact && !useRelaxed && trimmed
-      ? "line-clamp-2"
-      : useRelaxed && trimmed
-        ? "line-clamp-3"
-        : null;
+  const clampLines = compact && !useRelaxed && trimmed ? 2 : useRelaxed && trimmed ? 3 : null;
+  const clampClass = clampLines === 2 ? "line-clamp-2" : clampLines === 3 ? "line-clamp-3" : null;
   const [expanded, setExpanded] = useState(false);
   const bioRef = useRef<HTMLParagraphElement>(null);
   const [canExpand, setCanExpand] = useState(false);
@@ -557,19 +553,42 @@ export function ProfileBioPreview({
 
   useEffect(() => {
     const el = bioRef.current;
-    if (!el || !clampClass) {
+    if (!el || !clampClass || !trimmed) {
       setCanExpand(false);
       return;
     }
+
     const measure = () => {
       if (expanded) return;
-      setCanExpand(el.scrollHeight > el.clientHeight + 1);
+      // iOS / WebKit often reports equal scroll/client height while line-clamp
+      // still paints an ellipsis — compare full height with clamp temporarily off.
+      const prevWebkitLineClamp = el.style.webkitLineClamp;
+      const prevDisplay = el.style.display;
+      const prevOverflow = el.style.overflow;
+      const clampedHeight = el.getBoundingClientRect().height;
+      el.style.webkitLineClamp = "unset";
+      el.style.display = "block";
+      el.style.overflow = "visible";
+      const fullHeight = el.scrollHeight;
+      el.style.webkitLineClamp = prevWebkitLineClamp;
+      el.style.display = prevDisplay;
+      el.style.overflow = prevOverflow;
+      const overflows = fullHeight > clampedHeight + 1;
+      // Fallback when measurement is flaky but the copy is clearly longer than a couple of lines.
+      const likelyLong =
+        trimmed.length > (clampLines === 3 ? 110 : 70) || trimmed.includes("\n");
+      setCanExpand(overflows || likelyLong);
     };
+
     measure();
     const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
     ro?.observe(el);
-    return () => ro?.disconnect();
-  }, [trimmed, clampClass, expanded, livingWithLine]);
+    window.addEventListener("resize", measure);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [trimmed, clampClass, clampLines, expanded, livingWithLine]);
 
   const bioClass = cn(
     useRelaxed ? "text-xs sm:text-sm leading-snug" : compact ? "text-xs sm:text-sm leading-snug" : "text-sm leading-snug",
@@ -577,9 +596,11 @@ export function ProfileBioPreview({
     !expanded && clampClass,
   );
 
+  const expandable = Boolean(trimmed && clampClass && (canExpand || expanded));
+
   return (
     <div className="min-w-0">
-      {trimmed && clampClass && (canExpand || expanded) ? (
+      {expandable ? (
         <button
           type="button"
           className="w-full min-w-0 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -590,7 +611,7 @@ export function ProfileBioPreview({
           <p ref={bioRef} className={bioClass}>
             {trimmed}
           </p>
-          <span className="mt-0.5 block text-[11px] font-medium text-muted-foreground">
+          <span className="mt-0.5 block text-[11px] font-semibold text-primary">
             {expanded ? "Show less" : "More"}
           </span>
         </button>

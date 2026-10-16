@@ -497,7 +497,7 @@ export default function CommunityProfilePage() {
 
             {profileBio || livingWithLine ? (
               <ProfileBioPreview
-                compact
+                relaxed
                 bio={profileBio}
                 livingWithLine={livingWithLine}
                 emptyLabel={isBeatieProfile ? BEATIE_FEED_BOT_DEFAULT_BIO : "No bio yet."}
