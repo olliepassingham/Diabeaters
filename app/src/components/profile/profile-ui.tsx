@@ -1,4 +1,5 @@
 import type { ChangeEvent, ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { BadgeCheck, Camera, Clock3, Loader2, ShieldAlert, HeartHandshake } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -309,6 +310,85 @@ export function ProfileDisplayName({
   );
 }
 
+/**
+ * Name + @handle on one compact line. Tap to expand when truncated so long
+ * org names stay readable without widening the profile card.
+ */
+export function ProfileNameHandleRow({
+  name,
+  handle,
+  size = "sm",
+  testId,
+}: {
+  name: string;
+  handle?: string | null;
+  size?: "default" | "sm";
+  testId?: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const textRef = useRef<HTMLSpanElement>(null);
+  const [canExpand, setCanExpand] = useState(false);
+  const cleaned = handle?.replace(/^@/, "").trim() || "";
+
+  useEffect(() => {
+    setExpanded(false);
+  }, [name, cleaned]);
+
+  useEffect(() => {
+    const el = textRef.current;
+    if (!el) return;
+    const measure = () => {
+      if (expanded) return;
+      setCanExpand(el.scrollWidth > el.clientWidth + 1);
+    };
+    measure();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
+    ro?.observe(el);
+    return () => ro?.disconnect();
+  }, [name, cleaned, expanded]);
+
+  const nameClass = cn(
+    "font-display font-semibold tracking-tight text-foreground",
+    size === "sm" ? "text-base leading-tight sm:text-lg" : "text-lg leading-tight sm:text-xl",
+  );
+
+  const content = (
+    <span
+      ref={textRef}
+      className={cn(
+        "min-w-0",
+        expanded ? "whitespace-normal break-words" : "block truncate",
+      )}
+    >
+      <span className={nameClass}>{name}</span>
+      {cleaned ? (
+        <span className="text-sm font-normal text-muted-foreground"> @{cleaned}</span>
+      ) : null}
+    </span>
+  );
+
+  if (!canExpand && !expanded) {
+    return (
+      <div className="min-w-0" data-testid={testId}>
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className="min-w-0 max-w-full rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      aria-expanded={expanded}
+      title={expanded ? "Hide full name" : "Show full name"}
+      data-testid={testId}
+      onClick={() => setExpanded((v) => !v)}
+    >
+      {content}
+    </button>
+  );
+}
+
 export function ProfileHandle({ handle, missingHref }: { handle?: string | null; missingHref?: string }) {
   if (handle) {
     return <span className="text-sm text-muted-foreground truncate">@{handle.replace(/^@/, "")}</span>;
@@ -461,22 +541,69 @@ export function ProfileBioPreview({
 }) {
   const trimmed = bio?.trim();
   const useRelaxed = relaxed && !compact;
+  const clampClass =
+    compact && !useRelaxed && trimmed
+      ? "line-clamp-2"
+      : useRelaxed && trimmed
+        ? "line-clamp-3"
+        : null;
+  const [expanded, setExpanded] = useState(false);
+  const bioRef = useRef<HTMLParagraphElement>(null);
+  const [canExpand, setCanExpand] = useState(false);
+
+  useEffect(() => {
+    setExpanded(false);
+  }, [trimmed]);
+
+  useEffect(() => {
+    const el = bioRef.current;
+    if (!el || !clampClass) {
+      setCanExpand(false);
+      return;
+    }
+    const measure = () => {
+      if (expanded) return;
+      setCanExpand(el.scrollHeight > el.clientHeight + 1);
+    };
+    measure();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
+    ro?.observe(el);
+    return () => ro?.disconnect();
+  }, [trimmed, clampClass, expanded, livingWithLine]);
+
+  const bioClass = cn(
+    useRelaxed ? "text-xs sm:text-sm leading-snug" : compact ? "text-xs sm:text-sm leading-snug" : "text-sm leading-snug",
+    trimmed ? "whitespace-pre-wrap text-foreground/90" : "italic text-muted-foreground",
+    !expanded && clampClass,
+  );
+
   return (
     <div className="min-w-0">
-      <p
-        className={cn(
-          useRelaxed ? "text-xs sm:text-sm leading-snug" : compact ? "text-xs sm:text-sm leading-snug" : "text-sm leading-snug",
-          trimmed ? "whitespace-pre-wrap text-foreground/90" : "italic text-muted-foreground",
-          compact && !useRelaxed && trimmed && "line-clamp-2",
-          useRelaxed && trimmed && "line-clamp-3",
-        )}
-      >
-        {trimmed || emptyLabel}
-      </p>
+      {trimmed && clampClass && (canExpand || expanded) ? (
+        <button
+          type="button"
+          className="w-full min-w-0 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-expanded={expanded}
+          title={expanded ? "Show less" : "Show full bio"}
+          onClick={() => setExpanded((v) => !v)}
+        >
+          <p ref={bioRef} className={bioClass}>
+            {trimmed}
+          </p>
+          <span className="mt-0.5 block text-[11px] font-medium text-muted-foreground">
+            {expanded ? "Show less" : "More"}
+          </span>
+        </button>
+      ) : (
+        <p ref={bioRef} className={bioClass}>
+          {trimmed || emptyLabel}
+        </p>
+      )}
       {livingWithLine ? (
         <p
           className={cn(
-            "text-muted-foreground truncate",
+            "text-muted-foreground",
+            expanded ? "whitespace-normal break-words" : "truncate",
             useRelaxed ? "text-xs mt-1.5" : compact ? "text-[11px] mt-0.5" : "text-xs mt-1",
           )}
         >

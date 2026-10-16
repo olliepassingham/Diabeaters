@@ -21,11 +21,10 @@ import {
 import {
   ProfileAvatarTile,
   ProfileBioPreview,
-  ProfileDisplayName,
   ProfileFollowStats,
-  ProfileHandle,
   ProfileHeroCard,
   ProfileMutedCard,
+  ProfileNameHandleRow,
   ProfileSectionHeading,
   ProfileSupportedPersonBadge,
 } from "@/components/profile/profile-ui";
@@ -445,13 +444,15 @@ export default function CommunityProfilePage() {
               </div>
               <div className="min-w-0 flex-1 space-y-1">
                 <div className="flex items-start justify-between gap-1">
-                  <div className="flex min-w-0 items-baseline gap-1.5">
-                    <div className="min-w-0">
-                      <ProfileDisplayName size="sm" name={displayName} />
-                    </div>
-                    {profile.public_handle ? <ProfileHandle handle={profile.public_handle} /> : null}
+                  <div className="flex min-w-0 flex-1 items-start gap-1.5">
+                    <ProfileNameHandleRow
+                      size="sm"
+                      name={displayName}
+                      handle={profile.public_handle}
+                      testId="public-profile-name-handle"
+                    />
                     {isSelf && !profile.is_public ? (
-                      <span className="inline-flex rounded-full border border-amber-500/35 bg-amber-500/[0.08] px-1.5 py-0 text-[10px] font-medium text-amber-950 dark:text-amber-100">
+                      <span className="mt-0.5 inline-flex shrink-0 rounded-full border border-amber-500/35 bg-amber-500/[0.08] px-1.5 py-0 text-[10px] font-medium text-amber-950 dark:text-amber-100">
                         Hidden
                       </span>
                     ) : null}
