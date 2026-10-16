@@ -460,7 +460,7 @@ export default function Dashboard() {
                 key={w.id}
                 data-testid={`widget-container-${w.type}`}
                 className={cn(
-                  "home-widget-section w-full self-start empty:hidden md:px-2",
+                  "home-widget-section w-full self-start empty:hidden",
                   (isMobile || w.size === "full") && "md:col-span-2",
                 )}
               >

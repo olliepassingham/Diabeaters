@@ -354,9 +354,26 @@
       radial-gradient(ellipse 90% 22% at 94% 91%, rgb(139 92 246 / 0.05), transparent 72%);
   }
 
+  /* Full-bleed optional widgets — same horizontal span as supply runway. */
   .home-widget-section {
     position: relative;
-    padding: 0 0.25rem 0.1rem;
+    margin-left: -1rem;
+    margin-right: -1rem;
+    width: calc(100% + 2rem);
+    padding: 0.15rem 0 0.35rem;
+    border-bottom: 1px solid rgb(var(--color-border) / 0.45);
+  }
+
+  .home-widget-section:last-child {
+    border-bottom-width: 0;
+  }
+
+  @media (min-width: 768px) {
+    .home-widget-section {
+      margin-left: -1.5rem;
+      margin-right: -1.5rem;
+      width: calc(100% + 3rem);
+    }
   }
 
   @media (hover: hover) and (pointer: fine) {

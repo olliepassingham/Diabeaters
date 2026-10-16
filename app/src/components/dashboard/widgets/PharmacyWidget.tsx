@@ -52,7 +52,7 @@ export function PharmacyWidget(_props: DashboardWidgetLayoutProps) {
           </Link>
           <Link
             href="/settings/pharmacy"
-            className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+            className="inline-flex items-center gap-1 text-xs font-medium text-primary no-underline transition-opacity hover:opacity-80"
             data-testid="link-pharmacy-widget-edit"
           >
             Edit <ChevronRight className="h-3.5 w-3.5" aria-hidden />
@@ -61,7 +61,7 @@ export function PharmacyWidget(_props: DashboardWidgetLayoutProps) {
       </CardHeader>
       <CardContent className={cn(widgetContentClass, "pt-0")}>
         {!pharmacy ? (
-          <div className="flex items-center justify-between gap-3 py-3">
+          <div className="flex items-center justify-between gap-3 py-1">
             <div className="min-w-0">
               <p className="text-sm font-medium text-foreground">Add your pharmacy</p>
               <p className="text-xs text-muted-foreground">Save opening hours for realistic collect‑by dates.</p>
@@ -71,7 +71,7 @@ export function PharmacyWidget(_props: DashboardWidgetLayoutProps) {
             </Button>
           </div>
         ) : (
-          <div className="flex items-center justify-between gap-3 py-3">
+          <div className="flex items-center justify-between gap-3 py-1">
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-foreground">{pharmacy.name}</p>
               {pharmacy.addressLine ? (

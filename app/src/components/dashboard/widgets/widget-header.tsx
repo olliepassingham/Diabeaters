@@ -12,15 +12,16 @@ export function WidgetHeaderIcon({
   return (
     <div
       className={cn(
-        "flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 shadow-[0_6px_18px_-8px_currentColor] ring-1 ring-primary/10",
+        "flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 ring-1 ring-primary/10",
         className,
       )}
       aria-hidden
     >
-      <Icon className="h-4 w-4 text-primary" />
+      <Icon className="h-3.5 w-3.5 text-primary" />
     </div>
   );
 }
 
-export const widgetHeaderClass = "p-3 pb-2 md:p-4 md:pb-2";
-export const widgetContentClass = "p-3 pt-0 md:px-4 md:pb-4";
+/** Match home runway horizontal inset (main px-4 / md:px-6). */
+export const widgetHeaderClass = "px-4 pb-1.5 pt-2 md:px-6";
+export const widgetContentClass = "px-4 pb-2.5 pt-0 md:px-6";

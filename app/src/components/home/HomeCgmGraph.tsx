@@ -259,7 +259,7 @@ export function HomeCgmGraph() {
         >
           <EmptyCgmChart units={units} targetLow={target.low} targetHigh={target.high} />
           <div className="-mt-1 space-y-1.5 text-center">
-            <p className="text-sm font-semibold text-primary group-hover:underline">
+            <p className="text-sm font-semibold text-primary transition-opacity group-hover:opacity-80">
               {connected && loading ? "Loading your glucose" : connected ? "Waiting for the first readings" : "Connect your CGM"}
             </p>
             <p className="mx-auto max-w-[20rem] text-xs leading-snug text-muted-foreground">

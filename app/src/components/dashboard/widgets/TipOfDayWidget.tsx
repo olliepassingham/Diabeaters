@@ -49,7 +49,7 @@ export function TipOfDayWidget(_props: DashboardWidgetLayoutProps) {
             <WidgetHeaderIcon icon={Lightbulb} className="bg-amber-500/10 ring-amber-500/15 [&_svg]:text-amber-500 dark:[&_svg]:text-amber-400" />
             <Link
               href="/tools/tips"
-              className="rounded-md underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
+              className="rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
               aria-label="Open all tips"
             >
               <CardTitle className="text-base font-semibold leading-tight text-foreground">Tip of the day</CardTitle>

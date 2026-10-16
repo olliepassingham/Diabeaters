@@ -2,15 +2,15 @@ import { useMemo } from "react";
 import { ChevronRight, Package } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import { SupplyRunwayFill } from "@/components/visualizations/supply-runway-fill";
 import { storage, type Supply } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 
 const CHART_MAX_DAYS = 90;
 
-function toneClasses(status: "critical" | "low" | "ok"): string {
-  if (status === "critical") return "bg-red-500 shadow-red-500/25";
-  if (status === "low") return "bg-amber-500 shadow-amber-500/25";
-  return "bg-emerald-500 shadow-emerald-500/20";
+function daysLabel(days: number): string {
+  if (days > CHART_MAX_DAYS) return "90+d";
+  return `${days}d`;
 }
 
 export function HomeSupplyGraph({ supplies }: { supplies: Supply[] }) {
@@ -20,7 +20,7 @@ export function HomeSupplyGraph({ supplies }: { supplies: Supply[] }) {
         .map((s) => ({
           supply: s,
           days: storage.getDaysRemaining(s),
-          status: storage.getSupplyStatus(s),
+          status: storage.getSupplyStatus(s) as "critical" | "low" | "ok",
         }))
         .filter((entry) => entry.days < 999)
         .sort((a, b) => a.days - b.days)
@@ -29,99 +29,105 @@ export function HomeSupplyGraph({ supplies }: { supplies: Supply[] }) {
   );
 
   const shortest = plotted[0] ?? null;
+  const tone =
+    shortest?.status === "critical"
+      ? "critical"
+      : shortest?.status === "low"
+        ? "low"
+        : "ok";
 
   return (
     <section
-      className="py-6"
+      className={cn(
+        "animate-fade-in-up py-1",
+        // Break out of main px-4 / md:px-6 so the runway spans the phone width.
+        "-mx-4 w-[calc(100%+2rem)] md:-mx-6 md:w-[calc(100%+3rem)]",
+      )}
       data-testid="home-supply-graph"
       aria-labelledby="home-supply-title"
     >
-      <div className="mb-4 flex items-start justify-between gap-3 px-1">
-        <div>
-          <div className="flex items-center gap-2">
-            <Package className="h-4 w-4 text-cyan-600 dark:text-cyan-400" aria-hidden />
-            <h2
-              id="home-supply-title"
-              className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
-            >
-              Supply runway
-            </h2>
-          </div>
-          {shortest ? (
-            <p className="mt-2 font-display text-3xl font-semibold leading-none tracking-tight tabular-nums">
-              {shortest.days}
-              <span className="ml-1.5 text-sm font-medium text-muted-foreground">
-                {shortest.days === 1 ? "day shortest" : "days shortest"}
-              </span>
-            </p>
-          ) : (
-            <p className="mt-2 text-sm text-muted-foreground">
-              {supplies.length ? "Add usage details for runway estimates" : "No supplies tracked yet"}
-            </p>
-          )}
-        </div>
-        <Button asChild variant="ghost" size="icon" className="h-10 w-10 rounded-full">
-          <Link href="/supplies" aria-label="Open Supply Tracker">
-            <ChevronRight className="h-4 w-4" aria-hidden />
-          </Link>
-        </Button>
-      </div>
-
-      {plotted.length ? (
-        <div className="space-y-3 px-1">
-          <div className="ml-[7.75rem] flex justify-between text-[10px] tabular-nums text-muted-foreground/70">
-            <span>0</span>
-            <span>30d</span>
-            <span>60d</span>
-            <span>90d+</span>
-          </div>
-          {plotted.map(({ supply, days, status }) => {
-            const left = Math.min(100, Math.max(1.5, (days / CHART_MAX_DAYS) * 100));
-            return (
-              <Link
-                key={supply.id}
-                href={`/supplies?supply=${encodeURIComponent(supply.id)}`}
-                className="group grid min-h-9 grid-cols-[7rem_1fr] items-center gap-3"
+      <div
+        className={cn(
+          "border-y border-border/40 bg-muted/20 px-4 py-2.5 dark:bg-muted/10 md:px-6",
+          tone === "critical" && "border-red-500/25 bg-red-500/[0.05] dark:bg-red-950/20",
+          tone === "low" && "border-amber-500/25 bg-amber-500/[0.05] dark:bg-amber-950/15",
+        )}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              <Package className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+              <h2
+                id="home-supply-title"
+                className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
               >
-                <span className="truncate text-xs font-medium text-foreground/85">{supply.name}</span>
-                <span className="relative h-px bg-border/60">
-                  <span
-                    className="absolute inset-y-[-4px] w-px bg-border/30"
-                    style={{ left: "33.333%" }}
-                    aria-hidden
-                  />
-                  <span
-                    className="absolute inset-y-[-4px] w-px bg-border/30"
-                    style={{ left: "66.666%" }}
-                    aria-hidden
-                  />
-                  <span
-                    className={cn(
-                      "absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full shadow-[0_0_12px_2px] transition-transform group-hover:scale-125",
-                      toneClasses(status),
-                    )}
-                    style={{ left: `${left}%` }}
-                    aria-hidden
-                  />
-                  <span
-                    className="absolute -top-4 -translate-x-1/2 text-[10px] font-semibold tabular-nums text-foreground"
-                    style={{ left: `${left}%` }}
-                  >
-                    {days > CHART_MAX_DAYS ? "90+" : days}d
+                Supply runway
+              </h2>
+            </div>
+            {shortest ? (
+              <div className="mt-1 flex min-w-0 items-baseline gap-2">
+                <p className="font-display text-xl font-semibold leading-none tracking-tight tabular-nums text-foreground">
+                  {shortest.days > CHART_MAX_DAYS ? "90+" : shortest.days}
+                  <span className="ml-1 text-xs font-medium text-muted-foreground">
+                    {shortest.days === 1 ? "day shortest" : "days shortest"}
                   </span>
-                </span>
-              </Link>
-            );
-          })}
+                </p>
+                <p className="min-w-0 truncate text-xs text-muted-foreground">{shortest.supply.name}</p>
+              </div>
+            ) : (
+              <p className="mt-1 text-sm text-muted-foreground">
+                {supplies.length ? "Add usage details for runway estimates" : "No supplies tracked yet"}
+              </p>
+            )}
+          </div>
+          <Button asChild variant="ghost" size="icon" className="h-8 w-8 shrink-0 rounded-full">
+            <Link href="/supplies" aria-label="Open Supply Tracker">
+              <ChevronRight className="h-4 w-4" aria-hidden />
+            </Link>
+          </Button>
         </div>
-      ) : (
-        <Link
-          href="/supplies"
-          className="flex min-h-20 items-center justify-center border-y border-dashed border-border/40 text-sm text-primary"
-        >
-          Open Supply Tracker
-        </Link>
-      )}
+
+        {plotted.length ? (
+          <ul className="mt-2 space-y-2">
+            {plotted.map(({ supply, days, status }) => {
+              const fillPercent =
+                days > CHART_MAX_DAYS ? 100 : Math.min(100, Math.max(2, (days / CHART_MAX_DAYS) * 100));
+              return (
+                <li key={supply.id}>
+                  <Link
+                    href={`/supplies?supply=${encodeURIComponent(supply.id)}`}
+                    className="block rounded-lg py-0.5 transition-colors hover:bg-background/35"
+                  >
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="min-w-0 truncate text-xs font-medium text-foreground/90">
+                        {supply.name}
+                      </span>
+                      <span
+                        className={cn(
+                          "shrink-0 text-[11px] font-semibold tabular-nums",
+                          status === "critical" && "text-red-600 dark:text-red-400",
+                          status === "low" && "text-amber-700 dark:text-amber-400",
+                          status === "ok" && "text-muted-foreground",
+                        )}
+                      >
+                        {daysLabel(days)}
+                      </span>
+                    </div>
+                    <SupplyRunwayFill fillPercent={fillPercent} status={status} className="mt-1 h-1.5" />
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <Link
+            href="/supplies"
+            className="mt-2 flex min-h-10 items-center justify-center rounded-xl border border-dashed border-border/50 text-sm font-medium text-primary"
+          >
+            Open Supply Tracker
+          </Link>
+        )}
+      </div>
     </section>
   );
 }

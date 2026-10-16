@@ -501,7 +501,7 @@ export function TodayAtAGlanceContent(props: {
         {supplyShortcutHidden ? (
           <Link
             href="/supplies"
-            className="text-[11px] font-medium text-primary underline-offset-2 hover:underline"
+            className="text-[11px] font-medium text-primary no-underline transition-opacity hover:opacity-80"
             data-testid="link-today-open-supplies"
           >
             Open tracker

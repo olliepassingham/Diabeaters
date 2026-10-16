@@ -59,7 +59,7 @@ export function CommunityQuickPostWidget(_props: DashboardWidgetLayoutProps) {
           footer={
             !composer.hasFeedHandle ? (
               <p className="mt-2 text-xs text-muted-foreground">
-                <Link href="/account#profile" className="font-medium text-primary underline-offset-4 hover:underline">
+                <Link href="/account#profile" className="font-medium text-primary transition-opacity hover:opacity-80">
                   Open Profile
                 </Link>{" "}
                 to choose your @handle (required to post).
