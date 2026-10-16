@@ -52,6 +52,7 @@ import {
   type SickDayVerdictViewModel,
 } from "@/components/scenarios/sick-day-results-ui";
 import { CgmPrefillButton } from "@/components/cgm-prefill-button";
+import { SickDayLiveBgStrip } from "@/components/scenarios/SickDayLiveBgStrip";
 import { useAutoCgmBgField } from "@/hooks/use-auto-cgm-bg-field";
 import { cancelSickDayMedReminder, scheduleSickDayMedReminder } from "@/lib/sick-day-med-reminders";
 import { SICK_DAY_MEDS_CHANGED_EVENT } from "@/lib/sick-day-med-actions";
@@ -524,6 +525,8 @@ export default function SickDay() {
     bgValue: bgLevel,
     onApplyBg: setBgLevel,
     autoApplyKey: pageHydrated ? "sickday-readings" : undefined,
+    // Keep live strip fresh while sick day is open — does not auto-change dose advice.
+    pollIntervalMs: pageHydrated ? 2 * 60_000 : undefined,
   });
 
   const journalCgm = useAutoCgmBgField({
@@ -1538,6 +1541,23 @@ export default function SickDay() {
           </TabsList>
 
           <TabsContent value="now" className="mt-4 space-y-4 animate-fade-in-up" data-testid="tabcontent-sickday-now">
+            <SickDayLiveBgStrip
+              prefill={readingsCgm.prefill}
+              loading={readingsCgm.loading}
+              loggedBg={bgLevel}
+              bgUnits={bgUnits}
+              onUpdateReadings={() => {
+                setActiveModeTab("log");
+                setUpdateReadingsOpen(true);
+                scrollToSickDayPageTop();
+              }}
+              onFocusKetones={() => {
+                setActiveModeTab("log");
+                setUpdateReadingsOpen(true);
+                scrollToId("sickday-log");
+              }}
+            />
+
             <div id="sickday-now-recommendations" className="space-y-3">
               {results ? (
                 <>
@@ -1622,7 +1642,10 @@ export default function SickDay() {
                       {
                         icon: Droplets,
                         title: "Check more often",
-                        body: results.monitoringBrief || results.monitoringFrequency,
+                        body:
+                          results?.monitoringBrief ||
+                          results?.monitoringFrequency ||
+                          "Check blood glucose more often while you are unwell.",
                       },
                       {
                         icon: Activity,
@@ -1632,7 +1655,7 @@ export default function SickDay() {
                       {
                         icon: Heart,
                         title: "Stay hydrated",
-                        body: results.hydrationBrief || results.hydrationNote,
+                        body: results?.hydrationBrief || results?.hydrationNote || "Sip fluids regularly.",
                       },
                       ...(isPumpUser
                         ? [{
