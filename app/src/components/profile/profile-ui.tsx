@@ -1,11 +1,11 @@
-import type { ReactNode } from "react";
+import type { ChangeEvent, ReactNode } from "react";
 import { Link } from "wouter";
-import { BadgeCheck, Camera, Clock3, Loader2, ShieldAlert } from "lucide-react";
+import { BadgeCheck, Camera, Clock3, Loader2, ShieldAlert, HeartHandshake } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { HomeSectionHeading } from "@/components/home/home-ui";
+import { prepareFileInputForPicker } from "@/lib/click-hidden-file-input";
 import { cn } from "@/lib/utils";
 import type { PublicProfileSupportedPerson } from "@/lib/profile";
-import { HeartHandshake } from "lucide-react";
 
 export const profileHeroCardClass =
   "dashboard-card-hover animate-soft-in overflow-hidden border border-primary/15 bg-gradient-to-br from-primary/[0.06] via-transparent to-transparent shadow-md ring-1 ring-border/25 dark:border-primary/18 dark:from-primary/[0.09]";
@@ -91,6 +91,13 @@ type ProfileAvatarTileProps = {
   onImageError?: () => void;
   /** Opens file picker / upload flow; mutually exclusive with `href`. */
   onClick?: () => void;
+  /**
+   * Prefer this over `onClick` on phones. A real file-input overlay keeps the
+   * iOS user gesture (same pattern as feed comment photos). Async Camera picks
+   * often look like “nothing happens”.
+   */
+  onFileChange?: (event: ChangeEvent<HTMLInputElement>) => void;
+  accept?: string;
   disabled?: boolean;
   busy?: boolean;
   actionLabel?: string;
@@ -113,12 +120,15 @@ export function ProfileAvatarTile({
   framed = true,
   onImageError,
   onClick,
+  onFileChange,
+  accept = "image/*,image/heic,image/heif,.heic,.heif",
   disabled = false,
   busy = false,
   actionLabel = "Change profile photo",
 }: ProfileAvatarTileProps) {
   const showImage = Boolean(imageUrl);
-  const interactive = Boolean(onClick) && !href;
+  const filePicker = Boolean(onFileChange) && !href;
+  const interactive = (Boolean(onClick) || filePicker) && !href;
   const imgAlt = interactive ? "" : alt;
   const circle = shape === "circle";
   const shapeClass = circle ? "rounded-full" : "rounded-2xl";
@@ -172,7 +182,32 @@ export function ProfileAvatarTile({
     );
   }
 
-  if (interactive) {
+  if (filePicker && onFileChange) {
+    return (
+      <div
+        className={cn(
+          "group relative shrink-0",
+          shapeClass,
+          (disabled || busy) && "cursor-not-allowed opacity-80",
+        )}
+        data-testid={testId ?? "avatar-change"}
+        aria-busy={busy || undefined}
+      >
+        {inner}
+        <input
+          type="file"
+          accept={accept}
+          disabled={disabled || busy}
+          aria-label={busy ? "Uploading profile photo" : actionLabel}
+          className={cn("file-input-overlay", shapeClass)}
+          onClick={(e) => prepareFileInputForPicker(e.currentTarget)}
+          onChange={onFileChange}
+        />
+      </div>
+    );
+  }
+
+  if (interactive && onClick) {
     return (
       <button
         type="button"

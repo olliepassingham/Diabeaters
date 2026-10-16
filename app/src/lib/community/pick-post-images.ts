@@ -89,10 +89,10 @@ async function pickViaGetPhotoBase64(): Promise<File | null> {
 /**
  * Open the photo library for a feed/edit attach.
  *
- * Native: Capacitor Camera (same path stories use). Reading gallery `webPath`
- * via `fetch` used to throw "Load failed" — that is fixed in fileFromGalleryMedia.
- * HTML file inputs on iPhone can open a Photo Library sheet whose thumbnails
- * never load, so they are a last-resort fallback only.
+ * Prefer a real file-input overlay in the UI (same pattern as comment photos).
+ * When a fallback input is provided, click it immediately so the iOS user
+ * gesture is preserved. Capacitor Camera is only used when there is no input —
+ * never await permissions before opening the picker.
  */
 export async function pickPostImagesFromLibrary(
   currentCount: number,
@@ -106,10 +106,20 @@ export async function pickPostImagesFromLibrary(
     return [];
   }
 
+  // Prefer the HTML file input while the tap gesture is still live. Awaiting
+  // Camera permissions / chooseFromGallery first drops the gesture on iOS and
+  // looks like “nothing happens” (same bug as profile photo).
+  if (fallbackInput) {
+    clickHiddenFileInput(fallbackInput);
+    return [];
+  }
+
   const endHold = beginFilePickerHold();
   const restore = unlockSystemPickerPointerEvents();
   try {
-    await ensurePhotosPermission();
+    // Do not await permission before opening — PHPicker often works without it,
+    // and the await kills the user-gesture chain when callers forget a fallback.
+    void ensurePhotosPermission();
 
     try {
       const multi = await pickViaChooseFromGallery(currentCount, remaining);
@@ -125,10 +135,6 @@ export async function pickPostImagesFromLibrary(
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error ?? "");
       if (/cancel/i.test(message) || isGalleryPickerCancel(error)) return [];
-      if (fallbackInput) {
-        clickHiddenFileInput(fallbackInput);
-        return [];
-      }
       throw error instanceof Error ? error : new Error("Couldn't open your photos.");
     }
   } finally {
@@ -147,10 +153,16 @@ export async function pickSinglePhoto(
     return null;
   }
 
+  // Same as multi-pick: keep the tap gesture by using the file input first.
+  if (fallbackInput && source === CameraSource.Photos) {
+    clickHiddenFileInput(fallbackInput);
+    return null;
+  }
+
   const endHold = beginFilePickerHold();
   const restore = unlockSystemPickerPointerEvents();
   try {
-    if (source === CameraSource.Photos) await ensurePhotosPermission();
+    if (source === CameraSource.Photos) void ensurePhotosPermission();
     const photo = await Camera.getPhoto({
       source,
       resultType: CameraResultType.Base64,
@@ -161,6 +173,10 @@ export async function pickSinglePhoto(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error ?? "");
     if (/cancel/i.test(message)) return null;
+    if (fallbackInput) {
+      clickHiddenFileInput(fallbackInput);
+      return null;
+    }
     throw error instanceof Error ? error : new Error(message || "Couldn't open that photo");
   } finally {
     restore();

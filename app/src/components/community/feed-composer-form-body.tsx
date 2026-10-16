@@ -46,8 +46,12 @@ export type FeedComposerFormBodyProps = {
   removeComposerVideo: () => void;
   composerImageAlts: string[];
   setComposerImageAlts: Dispatch<SetStateAction<string[]>>;
-  pickImagesFromLibraryOnly: () => Promise<void>;
-  pickVideoFromLibraryOnly: () => Promise<void>;
+  /**
+   * Must open the picker in this same tap (no await). Uses the portal-mounted
+   * file input — overlays inside the sheet can miss `change` under backdrop-filter.
+   */
+  pickImagesFromLibraryOnly: () => void;
+  pickVideoFromLibraryOnly: () => void;
   onPollModeClick: () => void;
   onEventModeClick: () => void;
   composerCanSubmit: boolean;
@@ -272,7 +276,7 @@ export function FeedComposerFormBody({
                   type="button"
                   className="flex h-24 w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-border/70 bg-muted/20 text-sm text-muted-foreground"
                   disabled={submitting || !user || !canComposeToFeed || composerFiles.length >= MAX_POST_IMAGES}
-                  onClick={() => void pickImagesFromLibraryOnly()}
+                  onClick={pickImagesFromLibraryOnly}
                   data-vaul-no-drag
                 >
                   <ImagePlus className="h-4 w-4" aria-hidden />
@@ -555,7 +559,7 @@ export function FeedComposerFormBody({
             composerFiles.length >= MAX_POST_IMAGES ||
             Boolean(composerVideoFile)
           }
-          onClick={() => void pickImagesFromLibraryOnly()}
+          onClick={pickImagesFromLibraryOnly}
           aria-label={composerPostKind === "event" ? "Add a cover photo" : "Add photos to post"}
         >
           <ImagePlus className="h-5 w-5" />

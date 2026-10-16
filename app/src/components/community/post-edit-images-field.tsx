@@ -1,9 +1,9 @@
 import { ImagePlus, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { FILE_INPUT_HIDDEN_CLASS } from "@/lib/click-hidden-file-input";
+import { prepareFileInputForPicker } from "@/lib/click-hidden-file-input";
 import { MAX_POST_IMAGES } from "@/lib/community";
+import { cn } from "@/lib/utils";
 import type { usePostEditImages } from "@/hooks/use-post-edit-images";
 
 type PostEditImages = ReturnType<typeof usePostEditImages>;
@@ -22,7 +22,6 @@ export function PostEditImagesField({ images, disabled = false }: Props) {
     canAddMore,
     removeAt,
     onPickFromInput,
-    pickFromLibrary,
     setAltAt,
   } = images;
 
@@ -67,27 +66,29 @@ export function PostEditImagesField({ images, disabled = false }: Props) {
         <p className="text-xs text-muted-foreground">No photos yet. Add one below.</p>
       )}
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        multiple
-        className={FILE_INPUT_HIDDEN_CLASS}
-        disabled={disabled || !canAddMore}
-        onChange={(e) => onPickFromInput(e.target.files)}
-      />
-
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="h-9 rounded-xl"
-        disabled={disabled || !canAddMore}
-        onClick={() => void pickFromLibrary()}
+      <label
+        className={cn(
+          "relative inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-input bg-background px-3 text-sm font-medium shadow-sm",
+          (disabled || !canAddMore) && "pointer-events-none opacity-50",
+        )}
       >
-        <ImagePlus className="mr-2 h-4 w-4" aria-hidden />
-        {canAddMore ? "Add photos" : "Photo limit reached"}
-      </Button>
+        <ImagePlus className="pointer-events-none h-4 w-4" aria-hidden />
+        <span className="pointer-events-none">{canAddMore ? "Add photos" : "Photo limit reached"}</span>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,image/heic,image/heif,.heic,.heif"
+          multiple
+          disabled={disabled || !canAddMore}
+          aria-label={canAddMore ? "Add photos" : "Photo limit reached"}
+          className="file-input-overlay rounded-xl"
+          onClick={(e) => prepareFileInputForPicker(e.currentTarget)}
+          onChange={(e) => {
+            onPickFromInput(e.target.files);
+            e.target.value = "";
+          }}
+        />
+      </label>
 
       {previews.length > 0 ? (
         <div className="max-h-40 space-y-2 overflow-y-auto rounded-xl border border-border/50 bg-muted/10 p-3">

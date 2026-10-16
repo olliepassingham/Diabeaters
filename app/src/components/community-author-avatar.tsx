@@ -41,9 +41,7 @@ export function CommunityAuthorAvatar({
         <AvatarImage
           src={imageSrc}
           alt=""
-          className={cn(
-            useFallbackPresentation && "object-cover object-center",
-          )}
+          className={cn(useFallbackPresentation && "object-cover object-center")}
         />
       ) : null}
       <AvatarFallback className={cn("bg-muted font-medium", fallbackClass)}>{initial}</AvatarFallback>

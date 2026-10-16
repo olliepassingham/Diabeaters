@@ -51,7 +51,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { CommunityPeopleSheet } from "@/components/community/community-people-sheet";
 import { MentionTextarea } from "@/components/community/mention-textarea";
-import { armSystemPickerPointerUnlock } from "@/lib/click-hidden-file-input";
+import { prepareFileInputForPicker } from "@/lib/click-hidden-file-input";
 import { isLikelyImageFile } from "@/lib/community/pick-post-images";
 import { MAX_POST_IMAGE_BYTES } from "@/lib/community/posts-supabase";
 import { renderBodyWithMentions } from "@/components/community/render-body-with-mentions";
@@ -1122,8 +1122,8 @@ export function FeedPostCard({
                   aria-label="Attach photo"
                   data-testid="input-comment-photo"
                   className="file-input-overlay"
-                  onClick={() => {
-                    armSystemPickerPointerUnlock();
+                  onClick={(e) => {
+                    prepareFileInputForPicker(e.currentTarget);
                   }}
                   onChange={(e) => {
                     const f = e.target.files?.[0];

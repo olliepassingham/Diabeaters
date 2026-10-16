@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { filesFromImageInput, pickPostImagesFromLibrary } from "@/lib/community/pick-post-images";
+import { filesFromImageInput } from "@/lib/community/pick-post-images";
 import { preparePostImageFiles } from "@/lib/community/prepare-post-image";
 import { getPostImageSignedUrls, MAX_POST_IMAGES } from "@/lib/community";
 
@@ -130,20 +130,6 @@ export function usePostEditImages() {
     [appendFiles, totalCount],
   );
 
-  const pickFromLibrary = useCallback(async () => {
-    if (!canAddMore) return;
-    try {
-      const picked = await pickPostImagesFromLibrary(totalCount, fileInputRef.current);
-      if (picked.length > 0) await appendFiles(picked);
-    } catch (e) {
-      toast({
-        title: "Could not open Photos",
-        description: e instanceof Error ? e.message : "Try selecting from your camera roll.",
-        variant: "destructive",
-      });
-    }
-  }, [appendFiles, canAddMore, toast, totalCount]);
-
   const setAltAt = useCallback((index: number, value: string) => {
     setImageAlts((prev) => {
       const next = [...prev];
@@ -169,7 +155,6 @@ export function usePostEditImages() {
     reset,
     removeAt,
     onPickFromInput,
-    pickFromLibrary,
     setAltAt,
     hasBodyOrImages,
   };

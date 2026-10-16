@@ -29,8 +29,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useDoubleTap } from "@/hooks/use-double-tap";
 import { useToast } from "@/hooks/use-toast";
 import { hapticLight } from "@/lib/haptics";
-import { FILE_INPUT_HIDDEN_CLASS } from "@/lib/click-hidden-file-input";
-import { pickSingleImageFromLibrary } from "@/lib/community/pick-post-images";
+import { prepareFileInputForPicker } from "@/lib/click-hidden-file-input";
 import { useAuth } from "@/lib/auth-context";
 import {
   dmThreadQueryKey,
@@ -793,19 +792,6 @@ export default function CommunityThreadPage() {
             Messaging is unavailable because one of you has blocked the other.
           </p>
         ) : null}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          className={FILE_INPUT_HIDDEN_CLASS}
-          aria-hidden
-          tabIndex={-1}
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) setPendingImage(f);
-            e.target.value = "";
-          }}
-        />
         {previewUrl ? (
           <div className="mb-2.5 flex items-start gap-2 rounded-2xl border border-border/50 bg-muted/30 p-2">
             <img src={previewUrl} alt="" className="max-h-28 rounded-xl object-cover shadow-sm" />
@@ -815,22 +801,28 @@ export default function CommunityThreadPage() {
           </div>
         ) : null}
         <div className="text-composer-shell rounded-[1.35rem] pl-1.5">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-11 w-11 shrink-0 rounded-full text-muted-foreground hover:text-foreground"
-            disabled={sending || !user || messagingBlocked}
-            aria-label="Attach photo"
-            onClick={() => {
-              void (async () => {
-                const picked = await pickSingleImageFromLibrary(fileInputRef.current);
-                if (picked) setPendingImage(picked);
-              })();
-            }}
+          <label
+            className={cn(
+              "relative mb-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground",
+              (sending || !user || messagingBlocked) && "pointer-events-none opacity-50",
+            )}
           >
-            <ImagePlus className="h-5 w-5" strokeWidth={1.75} />
-          </Button>
+            <ImagePlus className="pointer-events-none h-5 w-5" strokeWidth={1.75} aria-hidden />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,image/heic,image/heif,.heic,.heif"
+              disabled={sending || !user || messagingBlocked}
+              aria-label="Attach photo"
+              className="file-input-overlay"
+              onClick={(e) => prepareFileInputForPicker(e.currentTarget)}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) setPendingImage(f);
+                e.target.value = "";
+              }}
+            />
+          </label>
           <Textarea
             ref={composerRef}
             rows={1}

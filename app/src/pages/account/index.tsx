@@ -8,8 +8,6 @@ import { useAuth } from "@/lib/auth-context";
 import { upsertProfile, updateProfile, useProfile } from "@/lib/profile";
 import { getSupabase } from "@/lib/supabase";
 import { uploadProfileAvatar } from "@/lib/storage-profile";
-import { FILE_INPUT_HIDDEN_CLASS } from "@/lib/click-hidden-file-input";
-import { pickSingleImageFromLibrary } from "@/lib/community/pick-post-images";
 import {
   ProfileActionGrid,
   ProfileAvatarTile,
@@ -22,6 +20,7 @@ import {
   ProfileSectionHeading,
   ProfileVerifiedBadge,
 } from "@/components/profile/profile-ui";
+import { ProfileAvatarCropDialog } from "@/components/profile/profile-avatar-crop-dialog";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useResolvedProfileImageUrl } from "@/hooks/use-resolved-profile-image-url";
@@ -99,7 +98,7 @@ export default function Account() {
     avatarLoadErrorToastShown.current = false;
   }, [avatarPath]);
   const [uploadSubmitting, setUploadSubmitting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [avatarCropUrl, setAvatarCropUrl] = useState<string | null>(null);
   const [accountDeletionOpen, setAccountDeletionOpen] = useState(false);
   const [accountDeletionAlternativesOpen, setAccountDeletionAlternativesOpen] = useState(false);
   const [accountDeletionSubmitBusy, setAccountDeletionSubmitBusy] = useState(false);
@@ -277,22 +276,27 @@ export default function Account() {
     }
   }
 
-  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    await uploadAvatarFile(file);
+  function closeAvatarCrop() {
+    setAvatarCropUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
   }
 
-  async function uploadAvatarFile(file: File) {
+  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
     setUploadSubmitting(true);
-    let toUpload: File = file;
-    const isHeic =
-      file.type === "image/heic" ||
-      file.type === "image/heif" ||
-      file.name.toLowerCase().endsWith(".heic") ||
-      file.name.toLowerCase().endsWith(".heif");
-    if (isHeic) {
-      try {
+    try {
+      let previewFile: File = file;
+      const isHeic =
+        file.type === "image/heic" ||
+        file.type === "image/heif" ||
+        file.name.toLowerCase().endsWith(".heic") ||
+        file.name.toLowerCase().endsWith(".heif");
+      if (isHeic) {
         const converted = (await heic2any({
           blob: file,
           toType: "image/jpeg",
@@ -300,57 +304,53 @@ export default function Account() {
         })) as Blob | Blob[];
         const blob = Array.isArray(converted) ? converted[0] : converted;
         if (!blob) throw new Error("No image data returned");
-
         const base = file.name.replace(/\.(heic|heif)$/i, "") || "avatar";
-        toUpload = new File([blob], `${base}.jpg`, { type: "image/jpeg" });
-      } catch (err) {
-        setUploadSubmitting(false);
-        toast({
-          title: "Upload failed",
-          description:
-            err instanceof Error
-              ? `Could not convert HEIC photo to JPEG. ${err.message}`
-              : "Could not convert HEIC photo to JPEG.",
-          variant: "destructive",
-        });
-        return;
+        previewFile = new File([blob], `${base}.jpg`, { type: "image/jpeg" });
       }
+      const url = URL.createObjectURL(previewFile);
+      setAvatarCropUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return url;
+      });
+    } catch (err) {
+      toast({
+        title: "Couldn't open that photo",
+        description:
+          err instanceof Error
+            ? err.message
+            : "Try another photo, or convert HEIC to JPEG first.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadSubmitting(false);
     }
+  }
 
-    const uploadResult = await uploadProfileAvatar(toUpload);
-    if (uploadResult.error) {
-      setUploadSubmitting(false);
+  async function uploadAvatarFile(file: File) {
+    setUploadSubmitting(true);
+    try {
+      const uploadResult = await uploadProfileAvatar(file);
+      if (uploadResult.error) {
+        throw new Error(uploadResult.error.message);
+      }
+      const path = uploadResult.path;
+      if (!path) throw new Error("No path returned.");
+      const { error } = await updateProfile({ id: userId, avatar_url: path });
+      if (error) throw new Error(error.message);
+      closeAvatarCrop();
+      setAvatarPath(path);
+      void refresh();
+      toast({ title: "Avatar updated", description: "Your photo has been saved." });
+    } catch (err) {
       toast({
         title: "Upload failed",
-        description: uploadResult.error.message,
+        description: err instanceof Error ? err.message : "Couldn't save that photo.",
         variant: "destructive",
       });
-      return;
-    }
-    const path = uploadResult.path;
-    if (!path) {
+      throw err;
+    } finally {
       setUploadSubmitting(false);
-      toast({
-        title: "Upload failed",
-        description: "No path returned.",
-        variant: "destructive",
-      });
-      return;
     }
-    const { error } = await updateProfile({ id: userId, avatar_url: path });
-    setUploadSubmitting(false);
-    if (error) {
-      toast({
-        title: "Profile update failed",
-        description: error.message,
-        variant: "destructive",
-      });
-      return;
-    }
-    setAvatarPath(path);
-    void refresh();
-    toast({ title: "Avatar updated", description: "Your photo has been saved." });
-    if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   const settingsName = storage.getProfile()?.name?.trim() ?? "";
@@ -477,12 +477,7 @@ export default function Account() {
               alt="Profile photo"
               testId={showAvatarImage ? "avatar-preview" : "avatar-placeholder"}
               onImageError={() => setAvatarImgFailed(true)}
-              onClick={() => {
-                void (async () => {
-                  const picked = await pickSingleImageFromLibrary(fileInputRef.current);
-                  if (picked) await uploadAvatarFile(picked);
-                })();
-              }}
+              onFileChange={handleAvatarUpload}
               disabled={uploadSubmitting}
               busy={uploadSubmitting}
             />
@@ -526,17 +521,6 @@ export default function Account() {
               <Link href="/mode">{modeSwitchLabel}</Link>
             </Button>
           ) : null}
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className={FILE_INPUT_HIDDEN_CLASS}
-            id="avatar-file"
-            onChange={handleAvatarUpload}
-            disabled={uploadSubmitting}
-            aria-label="Choose profile photo"
-          />
 
           {!inSupporterSession && !isCommunityAccount && (
             <Button variant="outline" size="sm" className="col-span-2 h-11" asChild>
@@ -822,6 +806,16 @@ export default function Account() {
         people={followListRows}
         loading={followListLoading}
         error={followListError}
+      />
+
+      <ProfileAvatarCropDialog
+        open={Boolean(avatarCropUrl)}
+        imageUrl={avatarCropUrl}
+        busy={uploadSubmitting}
+        onOpenChange={(open) => {
+          if (!open && !uploadSubmitting) closeAvatarCrop();
+        }}
+        onConfirm={(file) => uploadAvatarFile(file)}
       />
     </PageShell>
   );
