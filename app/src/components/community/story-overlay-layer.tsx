@@ -3,10 +3,12 @@ import { cn } from "@/lib/utils";
 import {
   STORY_TEXT_COLORS,
   STORY_TEXT_FONTS,
+  STORY_TEXT_SIZES,
   type StoryOverlay,
   type StoryOverlayStyle,
   type StoryTextColor,
   type StoryTextFont,
+  type StoryTextSize,
 } from "@/lib/community/stories-supabase";
 
 export function storyOverlayClassName(
@@ -15,28 +17,41 @@ export function storyOverlayClassName(
   font: StoryTextFont = "classic",
 ): string {
   const face =
-    font === "serif" ? "italic" : font === "mono" ? "text-[1.2rem] font-medium tracking-tight" : "font-bold";
+    font === "serif" ? "italic" : font === "mono" ? "font-medium tracking-tight" : "font-bold";
   if (style === "pill") {
     return cn(
-      "rounded-full px-3.5 py-2 text-xl font-semibold backdrop-blur-md",
+      "inline-block max-w-full rounded-[1.15rem] px-3.5 py-2 font-semibold backdrop-blur-md",
       color === "black" ? "bg-white/90" : "bg-black/55",
       face,
     );
   }
   return cn(
-    "text-[1.65rem] leading-tight tracking-tight",
+    "inline-block max-w-full tracking-tight",
     face,
     color === "black"
       ? "drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]"
-      : "drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]",
+      : "drop-shadow-[0_2px_10px_rgba(0,0,0,0.88)]",
   );
 }
 
-export function storyOverlayInlineStyle(color: StoryTextColor, font: StoryTextFont): CSSProperties {
+export function storyOverlayInlineStyle(
+  color: StoryTextColor,
+  font: StoryTextFont,
+  size: StoryTextSize = "m",
+  style: StoryOverlayStyle = "shadow",
+): CSSProperties {
+  const scale = STORY_TEXT_SIZES.find((s) => s.id === size) ?? STORY_TEXT_SIZES[1]!;
   return {
     color: STORY_TEXT_COLORS.find((c) => c.id === color)?.hex ?? "#FFFFFF",
     fontFamily: STORY_TEXT_FONTS.find((f) => f.id === font)?.family,
+    fontSize: style === "pill" ? scale.pillFontSize : scale.fontSize,
+    lineHeight: scale.lineHeight,
   };
+}
+
+/** Single line until the author presses Enter — intentional breaks only. */
+export function storyOverlayWhitespaceClass(text: string): string {
+  return text.includes("\n") ? "whitespace-pre-wrap break-words text-center" : "whitespace-nowrap";
 }
 
 type StoryOverlayLayerProps = {
@@ -67,7 +82,7 @@ export function StoryOverlayLayer({
             key={overlay.id}
             className={cn(
               "absolute -translate-x-1/2 -translate-y-1/2 text-center",
-              multiline ? "max-w-[92%]" : "max-w-none",
+              multiline ? "max-w-[88%]" : "max-w-[min(96%,42rem)]",
               interactive && "pointer-events-auto touch-none px-2 py-1.5",
               interactive && selectedOverlayId === overlay.id && "rounded-lg ring-2 ring-white/70",
             )}
@@ -92,9 +107,9 @@ export function StoryOverlayLayer({
             <span
               className={cn(
                 storyOverlayClassName(overlay.style, overlay.color, overlay.font),
-                multiline ? "whitespace-pre-wrap break-words" : "whitespace-nowrap",
+                storyOverlayWhitespaceClass(overlay.text),
               )}
-              style={storyOverlayInlineStyle(overlay.color, overlay.font)}
+              style={storyOverlayInlineStyle(overlay.color, overlay.font, overlay.size, overlay.style)}
             >
               {overlay.text}
             </span>

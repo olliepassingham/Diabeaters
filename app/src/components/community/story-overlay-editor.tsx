@@ -1,15 +1,23 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { flushSync } from "react-dom";
-import { Check } from "lucide-react";
-import { StoryOverlayLayer, storyOverlayClassName, storyOverlayInlineStyle } from "@/components/community/story-overlay-layer";
+import { Check, Minus, Plus } from "lucide-react";
+import {
+  StoryOverlayLayer,
+  storyOverlayClassName,
+  storyOverlayInlineStyle,
+  storyOverlayWhitespaceClass,
+} from "@/components/community/story-overlay-layer";
 import {
   MAX_STORY_OVERLAY_TEXT_LENGTH,
   STORY_TEXT_COLORS,
   STORY_TEXT_FONTS,
+  STORY_TEXT_SIZES,
+  stepStoryTextSize,
   type StoryOverlay,
   type StoryOverlayStyle,
   type StoryTextColor,
   type StoryTextFont,
+  type StoryTextSize,
 } from "@/lib/community/stories-supabase";
 import { cn } from "@/lib/utils";
 
@@ -60,6 +68,7 @@ export function StoryOverlayEditor({
 
   const editing = overlays.find((o) => o.id === editingId) ?? null;
   editingIdRef.current = editingId;
+  const sizeMeta = STORY_TEXT_SIZES.find((s) => s.id === (editing?.size ?? "m")) ?? STORY_TEXT_SIZES[1]!;
 
   useEffect(() => {
     onEditingChange?.(editingId != null);
@@ -121,8 +130,9 @@ export function StoryOverlayEditor({
     const id = editingIdRef.current;
     if (!id) return;
     editingIdRef.current = null;
-    const text = draftText.trim().slice(0, MAX_STORY_OVERLAY_TEXT_LENGTH);
-    if (!text) onChange(overlays.filter((o) => o.id !== id));
+    // Preserve intentional blank lines; only trim outer edges.
+    const text = draftText.replace(/^\n+|\n+$/g, "").slice(0, MAX_STORY_OVERLAY_TEXT_LENGTH);
+    if (!text.trim()) onChange(overlays.filter((o) => o.id !== id));
     else updateOverlay(id, { text });
     setEditingId(null);
     setDraftText("");
@@ -143,6 +153,16 @@ export function StoryOverlayEditor({
   function setTextFont(font: StoryTextFont) {
     if (!editing) return;
     updateOverlay(editing.id, { font });
+  }
+
+  function setTextSize(size: StoryTextSize) {
+    if (!editing) return;
+    updateOverlay(editing.id, { size });
+  }
+
+  function nudgeTextSize(delta: -1 | 1) {
+    if (!editing) return;
+    updateOverlay(editing.id, { size: stepStoryTextSize(editing.size, delta) });
   }
 
   function pointInStage(clientX: number, clientY: number): { x: number; y: number } | null {
@@ -167,6 +187,7 @@ export function StoryOverlayEditor({
       style: newTextStyle,
       color: newTextColor,
       font: "classic",
+      size: "m",
     };
     flushSync(() => {
       onChange([...overlays, overlay]);
@@ -184,8 +205,8 @@ export function StoryOverlayEditor({
     if (keyboardInset < 80 || !containerRef.current) return `${editing.y * 100}%`;
     const height = containerRef.current.clientHeight;
     const natural = editing.y * height;
-    const minCenter = 72;
-    const maxCenter = height - keyboardInset - 28;
+    const minCenter = 88;
+    const maxCenter = height - keyboardInset - 36;
     const lifted = Math.max(minCenter, Math.min(natural, maxCenter));
     return `${lifted}px`;
   }
@@ -242,6 +263,8 @@ export function StoryOverlayEditor({
     }
   }
 
+  const multilineDraft = draftText.includes("\n");
+
   return (
     <div
       ref={containerRef}
@@ -268,7 +291,12 @@ export function StoryOverlayEditor({
           addTextAt(e.clientX, e.clientY);
         }}
       />
-      {editing ? <div className="pointer-events-none absolute inset-0 z-[2] bg-black/35" aria-hidden /> : null}
+      {editing ? (
+        <div
+          className="pointer-events-none absolute inset-0 z-[2] bg-gradient-to-b from-black/55 via-black/25 to-black/45"
+          aria-hidden
+        />
+      ) : null}
       <StoryOverlayLayer
         overlays={overlays.filter((o) => o.id !== editingId && o.text.trim())}
         interactive={!editingId}
@@ -287,7 +315,10 @@ export function StoryOverlayEditor({
       {editing ? (
         <>
           <div
-            className="absolute z-[4] w-max max-w-[min(96vw,42rem)] -translate-x-1/2 -translate-y-1/2"
+            className={cn(
+              "absolute z-[4] -translate-x-1/2 -translate-y-1/2",
+              multilineDraft ? "w-[min(88%,22rem)] max-w-[88%]" : "w-max max-w-[min(96%,42rem)]",
+            )}
             style={{ left: `${editing.x * 100}%`, top: editingTop() }}
             onClick={(e) => e.stopPropagation()}
             onPointerDown={(e) => {
@@ -305,10 +336,14 @@ export function StoryOverlayEditor({
                 "relative cursor-grab text-center active:cursor-grabbing",
                 storyOverlayClassName(editing.style, editing.color, editing.font),
               )}
-              style={storyOverlayInlineStyle(editing.color, editing.font)}
+              style={storyOverlayInlineStyle(editing.color, editing.font, editing.size, editing.style)}
             >
               {!draftText ? (
-                <span className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-50" aria-hidden>
+                <span
+                  className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-45"
+                  aria-hidden
+                  style={{ fontSize: sizeMeta.fontSize, lineHeight: sizeMeta.lineHeight }}
+                >
                   Type something
                 </span>
               ) : null}
@@ -321,8 +356,8 @@ export function StoryOverlayEditor({
                 data-story-text
                 suppressContentEditableWarning
                 className={cn(
-                  "relative min-h-[1.3em] min-w-[3ch] text-center outline-none select-text",
-                  draftText.includes("\n") ? "whitespace-pre-wrap break-words" : "whitespace-nowrap",
+                  "relative min-h-[1.2em] min-w-[3ch] text-center outline-none select-text",
+                  storyOverlayWhitespaceClass(draftText),
                   editing.color === "black" ? "caret-black" : "caret-white",
                 )}
                 style={{ WebkitUserSelect: "text", userSelect: "text" }}
@@ -341,21 +376,20 @@ export function StoryOverlayEditor({
                 }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
+                    // Opt-in line breaks only — never auto-wrap into paragraphs for the author.
                     e.preventDefault();
                     document.execCommand("insertLineBreak");
                   }
                 }}
               />
             </div>
-            <p className="mt-2 text-center text-[11px] font-medium text-white/70">
-              Drag outside the text to move · Enter for a new line
-            </p>
           </div>
-          <div className="absolute inset-x-0 top-[max(0.75rem,env(safe-area-inset-top))] z-[5] flex flex-col items-center gap-2 px-3">
-            <div className="flex items-center justify-center gap-2">
+
+          <div className="absolute inset-x-0 top-[max(0.65rem,env(safe-area-inset-top))] z-[5] flex flex-col items-center gap-2.5 px-3">
+            <div className="flex w-full max-w-md items-center justify-between gap-2">
               <button
                 type="button"
-                className="h-11 rounded-full bg-white/15 px-4 text-sm font-semibold text-white backdrop-blur-md active:scale-95"
+                className="h-10 rounded-full bg-white/12 px-3.5 text-[13px] font-semibold tracking-wide text-white/95 backdrop-blur-xl ring-1 ring-white/15 active:scale-95"
                 onPointerDown={(e) => e.preventDefault()}
                 onClick={toggleStyle}
               >
@@ -363,7 +397,7 @@ export function StoryOverlayEditor({
               </button>
               <button
                 type="button"
-                className="inline-flex h-11 items-center gap-1 rounded-full bg-white px-4 text-sm font-semibold text-black active:scale-95"
+                className="inline-flex h-10 items-center gap-1.5 rounded-full bg-white px-4 text-[13px] font-semibold tracking-wide text-black shadow-[0_8px_28px_rgba(0,0,0,0.35)] active:scale-95"
                 onPointerDown={(e) => e.preventDefault()}
                 onClick={commitEdit}
               >
@@ -371,14 +405,59 @@ export function StoryOverlayEditor({
                 Done
               </button>
             </div>
-            <div className="flex max-w-full gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+
+            <div className="flex items-center gap-1 rounded-full bg-black/45 p-1 backdrop-blur-xl ring-1 ring-white/12">
+              <button
+                type="button"
+                className="flex h-9 w-9 items-center justify-center rounded-full text-white active:scale-95 disabled:opacity-35"
+                aria-label="Smaller text"
+                disabled={editing.size === "s"}
+                onPointerDown={(e) => e.preventDefault()}
+                onClick={() => nudgeTextSize(-1)}
+              >
+                <Minus className="h-4 w-4" />
+              </button>
+              <div className="flex items-end gap-0.5 px-1 pb-0.5" aria-hidden>
+                <span className="text-[11px] font-semibold leading-none text-white/55">A</span>
+                <span className="text-[17px] font-bold leading-none text-white">{sizeMeta.label}</span>
+              </div>
+              <button
+                type="button"
+                className="flex h-9 w-9 items-center justify-center rounded-full text-white active:scale-95 disabled:opacity-35"
+                aria-label="Larger text"
+                disabled={editing.size === "xl"}
+                onPointerDown={(e) => e.preventDefault()}
+                onClick={() => nudgeTextSize(1)}
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+              <div className="mx-0.5 h-5 w-px bg-white/15" aria-hidden />
+              {STORY_TEXT_SIZES.map((size) => (
+                <button
+                  key={size.id}
+                  type="button"
+                  className={cn(
+                    "h-9 min-w-9 rounded-full px-2 text-[12px] font-semibold tracking-wide active:scale-95",
+                    editing.size === size.id ? "bg-white text-black" : "text-white/80",
+                  )}
+                  aria-label={`Text size ${size.label}`}
+                  aria-pressed={editing.size === size.id}
+                  onPointerDown={(e) => e.preventDefault()}
+                  onClick={() => setTextSize(size.id)}
+                >
+                  {size.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex max-w-full gap-1.5 overflow-x-auto rounded-full bg-black/35 p-1 backdrop-blur-xl ring-1 ring-white/10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {STORY_TEXT_FONTS.map((font) => (
                 <button
                   key={font.id}
                   type="button"
                   className={cn(
-                    "h-10 shrink-0 rounded-full px-3 text-sm active:scale-95",
-                    editing.font === font.id ? "bg-white text-black" : "bg-black/40 text-white backdrop-blur-md",
+                    "h-9 shrink-0 rounded-full px-3.5 text-[13px] active:scale-95",
+                    editing.font === font.id ? "bg-white text-black" : "text-white/90",
                   )}
                   style={{ fontFamily: font.family }}
                   aria-pressed={editing.font === font.id}
@@ -389,14 +468,15 @@ export function StoryOverlayEditor({
                 </button>
               ))}
             </div>
-            <div className="flex gap-2">
+
+            <div className="flex items-center gap-2 rounded-full bg-black/35 px-2.5 py-1.5 backdrop-blur-xl ring-1 ring-white/10">
               {STORY_TEXT_COLORS.map((color) => (
                 <button
                   key={color.id}
                   type="button"
                   className={cn(
-                    "h-8 w-8 shrink-0 rounded-full border border-white/30 active:scale-95",
-                    editing.color === color.id && "ring-2 ring-white ring-offset-2 ring-offset-black/40",
+                    "h-7 w-7 shrink-0 rounded-full border border-white/25 active:scale-95",
+                    editing.color === color.id && "ring-2 ring-white ring-offset-2 ring-offset-black/50",
                   )}
                   style={{ backgroundColor: color.hex }}
                   aria-label={color.label}
@@ -406,6 +486,10 @@ export function StoryOverlayEditor({
                 />
               ))}
             </div>
+
+            <p className="max-w-[18rem] text-center text-[11px] font-medium leading-snug text-white/65">
+              Drag outside the text to move · Enter for a new line
+            </p>
           </div>
         </>
       ) : null}

@@ -243,7 +243,18 @@ export function StoryCreateSheet({
     const credit = prefillOverlayText?.trim().slice(0, MAX_STORY_OVERLAY_TEXT_LENGTH);
     setOverlays(
       credit
-        ? [{ id: crypto.randomUUID(), text: credit, x: 0.5, y: 0.72, style: "pill", color: "white", font: "classic" }]
+        ? [
+            {
+              id: crypto.randomUUID(),
+              text: credit,
+              x: 0.5,
+              y: 0.72,
+              style: "pill" as const,
+              color: "white" as const,
+              font: "classic" as const,
+              size: "m" as const,
+            },
+          ]
         : [],
     );
     setPreview((prev) => {
@@ -392,7 +403,6 @@ export function StoryCreateSheet({
             imageUrl={cropSourceUrl}
             onCancel={() => {
               clearCropSource();
-              if (!hasMedia) onOpenChange(false);
             }}
             onConfirm={(cropped) => {
               clearCropSource();
@@ -486,25 +496,25 @@ export function StoryCreateSheet({
             {!textEditing && overlays.every((o) => !o.text.trim()) ? (
               <p
                 className={cn(
-                  "pointer-events-none absolute inset-x-0 z-10 px-16 text-center text-[13px] font-medium tracking-wide",
+                  "pointer-events-none absolute inset-x-0 z-10 px-14 text-center text-[13px] font-medium tracking-wide",
                   linkedPostId
                     ? "bottom-[max(5.75rem,calc(env(safe-area-inset-bottom)+4.75rem))] text-muted-foreground"
-                    : "bottom-[max(5.5rem,calc(env(safe-area-inset-bottom)+4.5rem))] text-white/75 drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]",
+                    : "bottom-[max(5.5rem,calc(env(safe-area-inset-bottom)+4.5rem))] text-white/80 drop-shadow-[0_1px_6px_rgba(0,0,0,0.85)]",
                 )}
               >
-                {linkedPostId ? "Tap to add text" : "Tap the photo to add text"}
+                {linkedPostId ? "Tap to add text" : "Tap anywhere to add text"}
               </p>
             ) : null}
 
             {!textEditing ? (
-              <div className="absolute inset-x-0 bottom-0 z-20 flex items-end justify-between gap-3 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]">
+              <div className="absolute inset-x-0 bottom-0 z-20 flex items-end justify-between gap-3 px-4 pb-[max(1.1rem,env(safe-area-inset-bottom))] [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]">
                 <button
                   type="button"
                   className={cn(
-                    "flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-md active:scale-95",
+                    "flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-xl active:scale-95",
                     linkedPostId
                       ? "bg-card text-foreground shadow-sm ring-1 ring-border/60"
-                      : "bg-black/45 text-white",
+                      : "bg-black/50 text-white ring-1 ring-white/10",
                   )}
                   aria-label="Change photo or video"
                   onClick={reset}
@@ -514,12 +524,12 @@ export function StoryCreateSheet({
                 <span className="flex-1" />
                 <Button
                   type="button"
-                  className="h-11 rounded-full px-5 text-sm font-semibold shadow-lg active:scale-95"
+                  className="h-11 rounded-full px-6 text-sm font-semibold shadow-[0_10px_30px_rgba(0,0,0,0.35)] active:scale-95"
                   disabled={!file || busy}
                   onClick={() => void handlePost()}
                 >
                   {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="mr-1.5 h-4 w-4" aria-hidden />}
-                  {busy ? "Sharing" : "Share"}
+                  {busy ? "Sharing…" : "Share story"}
                 </Button>
               </div>
             ) : null}
@@ -551,10 +561,10 @@ export function StoryCreateSheet({
                 Feed
               </button>
             </div>
-            <div className="px-5 pb-1 pt-2">
-              <h1 className="font-display text-[1.7rem] font-semibold tracking-tight">New story</h1>
+            <div className="px-5 pb-1 pt-3">
+              <h1 className="font-display text-[1.85rem] font-semibold tracking-tight">New story</h1>
               <p className="mt-1.5 max-w-[22rem] text-[15px] leading-snug text-muted-foreground">
-                People who follow you can see it for 24 hours.
+                Add a photo or video, then style your text. Followers see it for 24 hours.
               </p>
             </div>
             <div className="mt-5 flex flex-col gap-2.5 px-4">

@@ -10,13 +10,14 @@ import { COMMUNITY_POST_IMAGES_BUCKET, MAX_POST_VIDEO_BYTES } from "./posts-supa
 export const STORY_TTL_MS = 24 * 60 * 60 * 1000;
 export const MAX_STORY_BYTES = MAX_POST_VIDEO_BYTES;
 export const MAX_STORY_CAPTION_LENGTH = 200;
-export const MAX_STORY_OVERLAY_TEXT_LENGTH = 100;
+export const MAX_STORY_OVERLAY_TEXT_LENGTH = 160;
 export const MAX_STORY_OVERLAYS = 1;
 
 export type CommunityStoryMediaKind = "video" | "image";
 export type StoryOverlayStyle = "shadow" | "pill";
 export type StoryTextColor = "white" | "black" | "yellow" | "orange" | "pink" | "sky" | "green";
 export type StoryTextFont = "classic" | "modern" | "serif" | "mono";
+export type StoryTextSize = "s" | "m" | "l" | "xl";
 export type StoryReactionKind = "heart" | "support" | "celebrate";
 
 export const STORY_TEXT_COLORS: { id: StoryTextColor; label: string; hex: string }[] = [
@@ -36,6 +37,22 @@ export const STORY_TEXT_FONTS: { id: StoryTextFont; label: string; family: strin
   { id: "mono", label: "Mono", family: "ui-monospace, SFMono-Regular, Menlo, monospace" },
 ];
 
+/** Discrete sizes — user picks scale; line breaks stay opt-in via Enter. */
+export const STORY_TEXT_SIZES: {
+  id: StoryTextSize;
+  label: string;
+  /** Display size for shadow / plain text. */
+  fontSize: string;
+  /** Slightly tighter for pill backgrounds. */
+  pillFontSize: string;
+  lineHeight: number;
+}[] = [
+  { id: "s", label: "S", fontSize: "1.15rem", pillFontSize: "1.05rem", lineHeight: 1.25 },
+  { id: "m", label: "M", fontSize: "1.55rem", pillFontSize: "1.35rem", lineHeight: 1.22 },
+  { id: "l", label: "L", fontSize: "1.95rem", pillFontSize: "1.65rem", lineHeight: 1.18 },
+  { id: "xl", label: "XL", fontSize: "2.45rem", pillFontSize: "2rem", lineHeight: 1.12 },
+];
+
 export type StoryOverlay = {
   id: string;
   text: string;
@@ -46,6 +63,7 @@ export type StoryOverlay = {
   style: StoryOverlayStyle;
   color: StoryTextColor;
   font: StoryTextFont;
+  size: StoryTextSize;
 };
 
 function storyTextColor(raw: unknown): StoryTextColor {
@@ -54,6 +72,20 @@ function storyTextColor(raw: unknown): StoryTextColor {
 
 function storyTextFont(raw: unknown): StoryTextFont {
   return STORY_TEXT_FONTS.some((f) => f.id === raw) ? (raw as StoryTextFont) : "classic";
+}
+
+function storyTextSize(raw: unknown): StoryTextSize {
+  return STORY_TEXT_SIZES.some((s) => s.id === raw) ? (raw as StoryTextSize) : "m";
+}
+
+export function storyTextSizeIndex(size: StoryTextSize): number {
+  const i = STORY_TEXT_SIZES.findIndex((s) => s.id === size);
+  return i >= 0 ? i : 1;
+}
+
+export function stepStoryTextSize(size: StoryTextSize, delta: -1 | 1): StoryTextSize {
+  const next = Math.min(STORY_TEXT_SIZES.length - 1, Math.max(0, storyTextSizeIndex(size) + delta));
+  return STORY_TEXT_SIZES[next]?.id ?? "m";
 }
 
 export type CommunityStoryRow = {
@@ -130,6 +162,7 @@ export function parseStoryOverlays(raw: unknown): StoryOverlay[] {
       style,
       color: storyTextColor(o.color),
       font: storyTextFont(o.font),
+      size: storyTextSize(o.size),
     });
     if (out.length >= MAX_STORY_OVERLAYS) break;
   }
