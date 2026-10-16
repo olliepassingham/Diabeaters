@@ -15,6 +15,7 @@ export type HomeNextBestActionId =
   | "sick_day"
   | "pump_failure"
   | "travel"
+  | "pump_site_change"
   | "bedtime"
   | "appointment"
   | "meal"
@@ -60,6 +61,8 @@ export type ResolveHomeNextBestActionInput = {
   glucoseIsLow?: boolean;
   /** Pump users get clock wording instead of long-acting injection wording. */
   isPumpUser?: boolean;
+  /** Infusion set or reservoir change due today (or overdue). */
+  pumpChangeDue?: "infusion_set" | "reservoir" | null;
 };
 
 const MEAL_LABELS: Record<HomeMealMoment["slot"], string> = {
@@ -150,6 +153,19 @@ export function resolveHomeNextBestAction(input: ResolveHomeNextBestActionInput)
       label: travelLabel,
       subline: travelSub,
       href: "/scenarios/travel",
+      kind: "link",
+    };
+  }
+
+  if (input.isPumpUser && input.pumpChangeDue) {
+    const setDue = input.pumpChangeDue === "infusion_set";
+    return {
+      id: "pump_site_change",
+      label: setDue ? "Log set change" : "Log reservoir change",
+      subline: setDue
+        ? "Your infusion set is due — mark it when you change."
+        : "Your reservoir is due — mark it when you change.",
+      href: "/#home-pump-care",
       kind: "link",
     };
   }

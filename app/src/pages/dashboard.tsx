@@ -38,6 +38,7 @@ import { HomeMetaBadge } from "@/components/home/home-ui";
 import { HomeCommandHero } from "@/components/home/HomeCommandHero";
 import { HomeTodayPulse } from "@/components/home/HomeTodayPulse";
 import { HomeCgmGraph } from "@/components/home/HomeCgmGraph";
+import { HomePumpCare } from "@/components/home/HomePumpCare";
 import { HomeMealMoment } from "@/components/home/HomeMealMoment";
 import { HomeSupplyGraph } from "@/components/home/HomeSupplyGraph";
 import { HomeNextUp } from "@/components/home/HomeNextUp";
@@ -388,6 +389,8 @@ export default function Dashboard() {
         ) : null}
 
         {!isCommunityDash ? <HomeCgmGraph /> : null}
+
+        {!isCommunityDash ? <HomePumpCare /> : null}
 
         {!isCommunityDash ? <HomeNextUp suppressActionId={homeNextAction.id} /> : null}
 

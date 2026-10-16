@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   DIABEATER_PROFILE_CHANGED_EVENT,
   DIABEATER_SCENARIO_STATE_CHANGED_EVENT,
+  DIABEATER_SUPPLIES_CHANGED_EVENT,
   storage,
   type ScenarioState,
 } from "@/lib/storage";
@@ -27,6 +28,7 @@ import {
   resolveTravelPromote,
 } from "@/lib/status-bar-model";
 import { timezoneChangeFromHours } from "@/lib/travel-insulin-clock";
+import { getPumpCareSnapshot } from "@/lib/pump-supplies";
 
 const DISMISSED_MEAL_MOMENT_KEY = "diabeater_home_meal_moment_dismissed";
 
@@ -59,6 +61,7 @@ export function useHomeNextBestAction(options: {
   const [isPumpUser, setIsPumpUser] = useState(() =>
     isPumpDeliveryMethod(storage.getProfile()?.insulinDeliveryMethod),
   );
+  const [pumpCareTick, setPumpCareTick] = useState(0);
   const cgmActive = isCgmPrefillActive();
   const { prefill: bgPrefill } = useBgPrefill({
     pollIntervalMs: cgmActive ? 5 * 60_000 : undefined,
@@ -79,12 +82,15 @@ export function useHomeNextBestAction(options: {
     const onProfile = () => {
       setIsPumpUser(isPumpDeliveryMethod(storage.getProfile()?.insulinDeliveryMethod));
     };
+    const onSupplies = () => setPumpCareTick((n) => n + 1);
     window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
+    window.addEventListener(DIABEATER_SUPPLIES_CHANGED_EVENT, onSupplies);
     return () => {
       window.clearInterval(timer);
       window.removeEventListener("focus", refresh);
       window.removeEventListener(DIABEATER_SCENARIO_STATE_CHANGED_EVENT, refresh);
       window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
+      window.removeEventListener(DIABEATER_SUPPLIES_CHANGED_EVENT, onSupplies);
     };
   }, []);
 
@@ -130,7 +136,16 @@ export function useHomeNextBestAction(options: {
     } catch {
       return false;
     }
-  }, [status, scenarioState]);
+  }, [status, scenarioState, pumpCareTick]);
+
+  const pumpChangeDue = useMemo(() => {
+    if (!isPumpUser) return null;
+    try {
+      return getPumpCareSnapshot(storage.getSupplies()).dueSoonKind;
+    } catch {
+      return null;
+    }
+  }, [isPumpUser, pumpCareTick, now]);
 
   const bedtimeDue =
     bedtime.visible && bedtime.mode === "evening" && bedtime.checkedTonight === false;
@@ -186,6 +201,7 @@ export function useHomeNextBestAction(options: {
         glucoseNeedsHypoHelp: attention === "low" || attention === "dropping",
         glucoseIsLow: attention === "low",
         isPumpUser,
+        pumpChangeDue,
       }),
     [
       status,
@@ -197,6 +213,7 @@ export function useHomeNextBestAction(options: {
       travelPromote,
       bedtimeDue,
       nextAppointment,
+      pumpChangeDue,
       mealMoment,
       mealDismissed,
       hasCriticalSupply,

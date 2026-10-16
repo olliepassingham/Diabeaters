@@ -76,6 +76,29 @@ describe("resolveHomeNextBestAction", () => {
     expect(a.label.toLowerCase()).toMatch(/insulin/);
   });
 
+  it("promotes a due set change for pump users ahead of a meal", () => {
+    const a = resolveHomeNextBestAction({
+      ...base,
+      isPumpUser: true,
+      pumpChangeDue: "infusion_set",
+      mealMoment: { slot: "lunch", title: "Planning lunch?", timeLabel: "Midday" },
+    });
+    expect(a.id).toBe("pump_site_change");
+    expect(a.label).toBe("Log set change");
+    expect(a.href).toBe("/#home-pump-care");
+  });
+
+  it("does not promote set change when travel urgency is active", () => {
+    const a = resolveHomeNextBestAction({
+      ...base,
+      isPumpUser: true,
+      pumpChangeDue: "reservoir",
+      travelModeActive: true,
+      travelPromote: { promoted: true, label: "Pack", reason: "packing" },
+    });
+    expect(a.id).toBe("travel");
+  });
+
   it("talks about the pump clock instead of long-acting on a timezone shift", () => {
     const a = resolveHomeNextBestAction({
       ...base,

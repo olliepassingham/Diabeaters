@@ -5,7 +5,7 @@ import {
   starterCgmSupplyRow,
   STARTER_SUPPLY_NOTE,
 } from "@/lib/starter-supply-shared";
-import { storage, type Supply } from "@/lib/storage";
+import { getSupplyIncrement, storage, type Supply } from "@/lib/storage";
 
 export const PUMP_SUPPLIES_SEEDED_KEY = "diabeaters_pump_supplies_seeded_v1";
 
@@ -211,6 +211,124 @@ export function seedPumpSuppliesIfNeeded(opts: PumpSupplySeedOptions = {}): { se
   markPumpSuppliesSeeded();
   markStarterCgmSeeded();
   return { seeded: true, count };
+}
+
+export type PumpCareKind = "infusion_set" | "reservoir";
+
+export type PumpCareItem = {
+  id: string;
+  kind: PumpCareKind;
+  /** Days until the next change; 0 = due or overdue. Null when no active start date. */
+  daysLeft: number | null;
+  dueToday: boolean;
+  changeButtonLabel: string;
+  dueCaption: string;
+};
+
+export type PumpCareSnapshot = {
+  setupIncomplete: boolean;
+  set: PumpCareItem | null;
+  reservoir: PumpCareItem | null;
+  /** Prefer infusion set when both are due. */
+  dueSoonKind: PumpCareKind | null;
+  stockLine: string | null;
+};
+
+function formatPumpStockLine(
+  supplies: Supply[],
+  getAdjustedQuantity: (s: Supply) => number,
+  getIncrement: (type: Supply["type"]) => { amount: number; label: string },
+): string | null {
+  const parts: string[] = [];
+  for (const kind of ["infusion_set", "reservoir"] as const) {
+    const row = supplies.find((s) => s.type === kind);
+    if (!row) continue;
+    const qty = Math.max(0, Math.floor(getAdjustedQuantity(row)));
+    const { amount, label } = getIncrement(kind);
+    const noun = kind === "infusion_set" ? "sets" : "reservoirs";
+    if (amount > 1) {
+      const boxes = Math.floor(qty / amount);
+      if (boxes > 0) {
+        parts.push(`${boxes} ${label}${boxes === 1 ? "" : "es"} of ${noun}`);
+        continue;
+      }
+    }
+    parts.push(`${qty} ${noun}`);
+  }
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
+function toPumpCareItem(
+  supply: Supply,
+  kind: PumpCareKind,
+  info: { daysLeft: number; isExpired: boolean } | null,
+): PumpCareItem {
+  const daysLeft = info ? Math.max(0, info.daysLeft) : null;
+  const dueToday = daysLeft != null && daysLeft <= 1;
+  const changeButtonLabel =
+    kind === "infusion_set"
+      ? dueToday
+        ? "Changed set"
+        : "Changed early"
+      : dueToday
+        ? "Changed reservoir"
+        : "Changed early";
+  const dueCaption =
+    daysLeft == null
+      ? "Set a start date in Supply Tracker"
+      : dueToday
+        ? "Change due today"
+        : `${daysLeft} day${daysLeft === 1 ? "" : "s"} left`;
+  return {
+    id: supply.id,
+    kind,
+    daysLeft,
+    dueToday,
+    changeButtonLabel,
+    dueCaption,
+  };
+}
+
+/**
+ * Home pump-care strip model: set/reservoir due, stock line, and whether setup is missing.
+ * Pure against injected readers so unit tests do not need a full storage mock.
+ */
+export function getPumpCareSnapshot(
+  supplies: Supply[],
+  readers: {
+    getActiveItemInfo: (supply: Supply) => { daysLeft: number; isExpired: boolean } | null;
+    getAdjustedQuantity: (supply: Supply) => number;
+    getSupplyIncrement: (type: Supply["type"]) => { amount: number; label: string };
+  } = {
+    getActiveItemInfo: (s) => storage.getActiveItemInfo(s),
+    getAdjustedQuantity: (s) => storage.getAdjustedQuantity(s),
+    getSupplyIncrement: (type) => getSupplyIncrement(type),
+  },
+): PumpCareSnapshot {
+  const setRow = supplies.find((s) => s.type === "infusion_set") ?? null;
+  const reservoirRow = supplies.find((s) => s.type === "reservoir") ?? null;
+  const setupIncomplete = !setRow && !reservoirRow;
+
+  const set = setRow
+    ? toPumpCareItem(setRow, "infusion_set", readers.getActiveItemInfo(setRow))
+    : null;
+  const reservoir = reservoirRow
+    ? toPumpCareItem(reservoirRow, "reservoir", readers.getActiveItemInfo(reservoirRow))
+    : null;
+
+  let dueSoonKind: PumpCareKind | null = null;
+  if (set?.dueToday) dueSoonKind = "infusion_set";
+  else if (reservoir?.dueToday) dueSoonKind = "reservoir";
+
+  return {
+    setupIncomplete,
+    set,
+    reservoir,
+    dueSoonKind,
+    stockLine: setupIncomplete
+      ? null
+      : formatPumpStockLine(supplies, readers.getAdjustedQuantity, readers.getSupplyIncrement),
+  };
 }
 
 export function pumpSetupCompletion(profile: ReturnType<typeof storage.getProfile>, supplies: Supply[]): {
