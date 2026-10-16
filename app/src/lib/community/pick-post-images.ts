@@ -44,13 +44,55 @@ function fileFromCameraBase64(base64: string | undefined, format: string | undef
   return new File([bytes], `photo-${Date.now()}.${ext}`, { type });
 }
 
+async function ensurePhotosPermission(): Promise<void> {
+  try {
+    const current = await Camera.checkPermissions();
+    if (current.photos === "granted" || current.photos === "limited") return;
+    await Camera.requestPermissions({ permissions: ["photos"] });
+  } catch {
+    /* Picker may still work (PHPicker) even if this request fails. */
+  }
+}
+
+async function pickViaChooseFromGallery(currentCount: number, remaining: number): Promise<File[]> {
+  const res = await Camera.chooseFromGallery({
+    mediaType: MediaTypeSelection.Photo,
+    allowMultipleSelection: remaining > 1,
+    limit: remaining,
+    quality: 90,
+    includeMetadata: true,
+    presentationStyle: "fullscreen",
+  });
+  const photos = (res?.results ?? []).filter((item) => item.type !== MediaType.Video);
+  if (photos.length === 0) return [];
+
+  const newFiles: File[] = [];
+  for (const photo of photos) {
+    const file = await fileFromGalleryMedia(photo, "photo");
+    if (!file || !isLikelyImageFile(file)) continue;
+    newFiles.push(file);
+    if (currentCount + newFiles.length >= MAX_POST_IMAGES) break;
+  }
+  return newFiles;
+}
+
+async function pickViaGetPhotoBase64(): Promise<File | null> {
+  const photo = await Camera.getPhoto({
+    source: CameraSource.Photos,
+    resultType: CameraResultType.Base64,
+    quality: 90,
+    correctOrientation: true,
+  });
+  return fileFromCameraBase64(photo.base64String, photo.format);
+}
+
 /**
  * Open the photo library for a feed/edit attach.
  *
- * Prefer the hidden `<input type="file">` whenever one is provided. On the
- * installed iPhone app, `Camera.chooseFromGallery` often throws "Load failed"
- * (same class of bug as feed video — opening the plugin after await loses the
- * user gesture / fails outright). The file input must be clicked in this tap.
+ * Native: Capacitor Camera (same path stories use). Reading gallery `webPath`
+ * via `fetch` used to throw "Load failed" — that is fixed in fileFromGalleryMedia.
+ * HTML file inputs on iPhone can open a Photo Library sheet whose thumbnails
+ * never load, so they are a last-resort fallback only.
  */
 export async function pickPostImagesFromLibrary(
   currentCount: number,
@@ -59,43 +101,36 @@ export async function pickPostImagesFromLibrary(
   const remaining = Math.max(0, MAX_POST_IMAGES - currentCount);
   if (remaining <= 0) return [];
 
-  if (fallbackInput) {
-    clickHiddenFileInput(fallbackInput);
-    return [];
-  }
-
   if (!Capacitor.isNativePlatform()) {
+    clickHiddenFileInput(fallbackInput);
     return [];
   }
 
   const endHold = beginFilePickerHold();
   const restore = unlockSystemPickerPointerEvents();
   try {
-    const res = await Camera.chooseFromGallery({
-      mediaType: MediaTypeSelection.Photo,
-      allowMultipleSelection: remaining > 1,
-      limit: remaining,
-      quality: 90,
-      includeMetadata: true,
-      presentationStyle: "fullscreen",
-    });
-    const photos = (res?.results ?? []).filter((item) => item.type !== MediaType.Video);
-    if (photos.length === 0) return [];
+    await ensurePhotosPermission();
 
-    const newFiles: File[] = [];
-    for (const photo of photos) {
-      const file = await fileFromGalleryMedia(photo, "photo");
-      if (!file || !isLikelyImageFile(file)) continue;
-      newFiles.push(file);
-      if (currentCount + newFiles.length >= MAX_POST_IMAGES) break;
+    try {
+      const multi = await pickViaChooseFromGallery(currentCount, remaining);
+      if (multi.length > 0) return multi;
+    } catch (error) {
+      if (isGalleryPickerCancel(error)) return [];
+      /* Fall through to getPhoto Base64 — more reliable on some iPhones. */
     }
-    if (newFiles.length === 0) {
-      throw new Error("Couldn't read that photo. Try choosing it again.");
+
+    try {
+      const single = await pickViaGetPhotoBase64();
+      return single ? [single] : [];
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error ?? "");
+      if (/cancel/i.test(message) || isGalleryPickerCancel(error)) return [];
+      if (fallbackInput) {
+        clickHiddenFileInput(fallbackInput);
+        return [];
+      }
+      throw error instanceof Error ? error : new Error("Couldn't open your photos.");
     }
-    return newFiles;
-  } catch (error) {
-    if (isGalleryPickerCancel(error)) return [];
-    throw error instanceof Error ? error : new Error("Couldn't open your photos.");
   } finally {
     restore();
     endHold();
@@ -115,6 +150,7 @@ export async function pickSinglePhoto(
   const endHold = beginFilePickerHold();
   const restore = unlockSystemPickerPointerEvents();
   try {
+    if (source === CameraSource.Photos) await ensurePhotosPermission();
     const photo = await Camera.getPhoto({
       source,
       resultType: CameraResultType.Base64,

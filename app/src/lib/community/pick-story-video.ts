@@ -30,13 +30,49 @@ export function imageFileMeta(format: string | undefined): { ext: string; type: 
   return { ext: "jpg", type: "image/jpeg" };
 }
 
+/**
+ * Read bytes from a Capacitor gallery/camera URL.
+ * On iPhone, `fetch(capacitor://…)` often throws "Load failed" for camera-roll
+ * paths — XMLHttpRequest can still load them (same lesson as feed video upload).
+ */
+export async function blobFromNativeMediaUrl(src: string): Promise<Blob | null> {
+  const url = src.trim();
+  if (!url) return null;
+
+  try {
+    const viaXhr = await new Promise<Blob>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("GET", url);
+      xhr.responseType = "blob";
+      xhr.onload = () => {
+        const ok = xhr.status === 0 || (xhr.status >= 200 && xhr.status < 300);
+        if (ok && xhr.response) resolve(xhr.response as Blob);
+        else reject(new Error(`HTTP ${xhr.status || "error"}`));
+      };
+      xhr.onerror = () => reject(new Error("Load failed"));
+      xhr.send();
+    });
+    if (viaXhr.size > 0) return viaXhr;
+  } catch {
+    /* Fall through to fetch. */
+  }
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    return blob.size > 0 ? blob : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Read a gallery item into a File. Uses webPath, then the native URI. */
 export async function fileFromGalleryMedia(item: MediaResult, namePrefix: string): Promise<File | null> {
   const src = item.webPath?.trim() || (item.uri ? Capacitor.convertFileSrc(item.uri) : "");
   if (!src) return null;
-  const response = await fetch(src);
-  if (!response.ok) return null;
-  const blob = await response.blob();
+  const blob = await blobFromNativeMediaUrl(src);
+  if (!blob) return null;
   const format = item.metadata?.format || blob.type;
   if (item.type === MediaType.Video || blob.type.startsWith("video/")) {
     const meta = storyVideoFileMeta(format);

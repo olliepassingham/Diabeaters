@@ -132,9 +132,17 @@ export function usePostEditImages() {
 
   const pickFromLibrary = useCallback(async () => {
     if (!canAddMore) return;
-    // Opens the hidden file input in this tap (Camera.chooseFromGallery Load failed on iPhone).
-    await pickPostImagesFromLibrary(totalCount, fileInputRef.current);
-  }, [canAddMore, totalCount]);
+    try {
+      const picked = await pickPostImagesFromLibrary(totalCount, fileInputRef.current);
+      if (picked.length > 0) await appendFiles(picked);
+    } catch (e) {
+      toast({
+        title: "Could not open Photos",
+        description: e instanceof Error ? e.message : "Try selecting from your camera roll.",
+        variant: "destructive",
+      });
+    }
+  }, [appendFiles, canAddMore, toast, totalCount]);
 
   const setAltAt = useCallback((index: number, value: string) => {
     setImageAlts((prev) => {

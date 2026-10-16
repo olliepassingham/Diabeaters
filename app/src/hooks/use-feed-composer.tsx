@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { Capacitor } from "@capacitor/core";
 import { useToast } from "@/hooks/use-toast";
 import { useCommunityTopicOrder } from "@/hooks/use-community-topic-order";
 import type { ComposerPostKind, FeedComposerFormBodyProps } from "@/components/community/feed-composer-form-body";
@@ -266,10 +267,37 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
   }
 
   async function pickImagesFromLibraryOnly() {
-    // Must run in this tap — same as video. Awaiting Camera.chooseFromGallery on
-    // the installed iPhone app throws "Load failed" / drops the gesture.
-    setSheetOpen(true);
-    clickHiddenFileInput(fileInputRef.current);
+    // Native: Capacitor Camera (stories path). HTML file input is last resort —
+    // on some iPhones it opens a Photo Library whose thumbnails never load.
+    const endHold = Capacitor.isNativePlatform() ? beginFilePickerHold() : () => {};
+    try {
+      setSheetOpen(true);
+      const newFiles = await pickPostImagesFromLibrary(composerFiles.length, fileInputRef.current);
+      if (newFiles.length === 0) return;
+      setComposerFiles((prev) => [...prev, ...newFiles].slice(0, MAX_POST_IMAGES));
+      const prepared = await preparePostImageFiles(newFiles);
+      if (prepared.error || prepared.files.length === 0) {
+        toast({
+          title: "Photos couldn't be attached",
+          description: prepared.error?.message || "Try choosing the photo again.",
+          variant: "destructive",
+        });
+        setComposerFiles((prev) => prev.filter((f) => !newFiles.includes(f)));
+        return;
+      }
+      setComposerFiles((prev) => {
+        const kept = prev.filter((f) => !newFiles.includes(f));
+        return [...kept, ...prepared.files].slice(0, MAX_POST_IMAGES);
+      });
+    } catch (e) {
+      toast({
+        title: "Could not open Photos",
+        description: e instanceof Error ? e.message : "Try choosing the photo again.",
+        variant: "destructive",
+      });
+    } finally {
+      endHold();
+    }
   }
 
   async function pickVideoFromLibraryOnly() {
@@ -582,7 +610,7 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*,.heic,.heif"
+              accept="image/*"
               multiple
               className={FILE_INPUT_HIDDEN_CLASS}
               id="feed-composer-images"
