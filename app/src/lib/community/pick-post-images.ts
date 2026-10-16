@@ -44,7 +44,14 @@ function fileFromCameraBase64(base64: string | undefined, format: string | undef
   return new File([bytes], `photo-${Date.now()}.${ext}`, { type });
 }
 
-/** Native photo library picker; on web, triggers the hidden file input instead. */
+/**
+ * Open the photo library for a feed/edit attach.
+ *
+ * Prefer the hidden `<input type="file">` whenever one is provided. On the
+ * installed iPhone app, `Camera.chooseFromGallery` often throws "Load failed"
+ * (same class of bug as feed video — opening the plugin after await loses the
+ * user gesture / fails outright). The file input must be clicked in this tap.
+ */
 export async function pickPostImagesFromLibrary(
   currentCount: number,
   fallbackInput?: HTMLInputElement | null,
@@ -52,8 +59,12 @@ export async function pickPostImagesFromLibrary(
   const remaining = Math.max(0, MAX_POST_IMAGES - currentCount);
   if (remaining <= 0) return [];
 
-  if (!Capacitor.isNativePlatform()) {
+  if (fallbackInput) {
     clickHiddenFileInput(fallbackInput);
+    return [];
+  }
+
+  if (!Capacitor.isNativePlatform()) {
     return [];
   }
 
@@ -64,8 +75,6 @@ export async function pickPostImagesFromLibrary(
       mediaType: MediaTypeSelection.Photo,
       allowMultipleSelection: remaining > 1,
       limit: remaining,
-      // JPEG so HEIC camera-roll photos can be resized in the page. Fullscreen
-      // avoids the popover that ignores the first tap.
       quality: 90,
       includeMetadata: true,
       presentationStyle: "fullscreen",

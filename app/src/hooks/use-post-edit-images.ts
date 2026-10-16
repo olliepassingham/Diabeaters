@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Capacitor } from "@capacitor/core";
 import { useToast } from "@/hooks/use-toast";
-import { clickHiddenFileInput } from "@/lib/click-hidden-file-input";
 import { filesFromImageInput, pickPostImagesFromLibrary } from "@/lib/community/pick-post-images";
 import { preparePostImageFiles } from "@/lib/community/prepare-post-image";
 import { getPostImageSignedUrls, MAX_POST_IMAGES } from "@/lib/community";
@@ -134,22 +132,9 @@ export function usePostEditImages() {
 
   const pickFromLibrary = useCallback(async () => {
     if (!canAddMore) return;
-    try {
-      const picked = await pickPostImagesFromLibrary(totalCount, fileInputRef.current);
-      if (picked.length > 0) {
-        await appendFiles(picked);
-        return;
-      }
-    } catch (e) {
-      if (!Capacitor.isNativePlatform()) return;
-      toast({
-        title: "Could not open Photos",
-        description: e instanceof Error ? e.message : "Try selecting from your camera roll.",
-        variant: "destructive",
-      });
-      clickHiddenFileInput(fileInputRef.current);
-    }
-  }, [appendFiles, canAddMore, toast, totalCount]);
+    // Opens the hidden file input in this tap (Camera.chooseFromGallery Load failed on iPhone).
+    await pickPostImagesFromLibrary(totalCount, fileInputRef.current);
+  }, [canAddMore, totalCount]);
 
   const setAltAt = useCallback((index: number, value: string) => {
     setImageAlts((prev) => {

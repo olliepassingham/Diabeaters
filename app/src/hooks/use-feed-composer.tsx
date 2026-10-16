@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Capacitor } from "@capacitor/core";
 import { useToast } from "@/hooks/use-toast";
 import { useCommunityTopicOrder } from "@/hooks/use-community-topic-order";
 import type { ComposerPostKind, FeedComposerFormBodyProps } from "@/components/community/feed-composer-form-body";
@@ -267,39 +266,10 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
   }
 
   async function pickImagesFromLibraryOnly() {
-    // Nested hold: keep the sheet open while Camera returns AND while we compress/apply.
-    const endHold = Capacitor.isNativePlatform() ? beginFilePickerHold() : () => {};
-    try {
-      const newFiles = await pickPostImagesFromLibrary(composerFiles.length, fileInputRef.current);
-      if (newFiles.length > 0) {
-        setSheetOpen(true);
-        setComposerFiles((prev) => [...prev, ...newFiles].slice(0, MAX_POST_IMAGES));
-        const prepared = await preparePostImageFiles(newFiles);
-        if (prepared.error) {
-          toast({
-            title: "Photo too large",
-            description: prepared.error.message,
-            variant: "destructive",
-          });
-        }
-        setComposerFiles((prev) => {
-          const kept = prev.filter((f) => !newFiles.includes(f));
-          return [...kept, ...prepared.files].slice(0, MAX_POST_IMAGES);
-        });
-        // Native path returned files — safe to reset the fallback input.
-        if (fileInputRef.current) fileInputRef.current.value = "";
-      }
-      // Web path: pickPostImagesFromLibrary only clicks the input and returns [].
-      // Do not clear the input here — that races the system picker and drops the first selection.
-    } catch (e) {
-      toast({
-        title: "Could not open Photos",
-        description: e instanceof Error ? e.message : "Try choosing the photo again.",
-        variant: "destructive",
-      });
-    } finally {
-      endHold();
-    }
+    // Must run in this tap — same as video. Awaiting Camera.chooseFromGallery on
+    // the installed iPhone app throws "Load failed" / drops the gesture.
+    setSheetOpen(true);
+    clickHiddenFileInput(fileInputRef.current);
   }
 
   async function pickVideoFromLibraryOnly() {
