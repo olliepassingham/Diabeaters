@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
+import { cropImageAreaToJpeg } from "@/lib/image-crop";
 
 const OUTPUT_EDGE_PX = 1024;
 
@@ -23,47 +24,6 @@ type ProfileAvatarCropDialogProps = {
   onOpenChange: (open: boolean) => void;
   onConfirm: (file: File) => void | Promise<void>;
 };
-
-async function cropImageToSquareJpeg(imageSrc: string, crop: Area): Promise<File> {
-  const image = await loadImage(imageSrc);
-  const canvas = document.createElement("canvas");
-  canvas.width = OUTPUT_EDGE_PX;
-  canvas.height = OUTPUT_EDGE_PX;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Could not prepare image");
-
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, OUTPUT_EDGE_PX, OUTPUT_EDGE_PX);
-  ctx.drawImage(
-    image,
-    crop.x,
-    crop.y,
-    crop.width,
-    crop.height,
-    0,
-    0,
-    OUTPUT_EDGE_PX,
-    OUTPUT_EDGE_PX,
-  );
-
-  const blob = await new Promise<Blob | null>((resolve) => {
-    canvas.toBlob((b) => resolve(b), "image/jpeg", 0.92);
-  });
-  if (!blob) throw new Error("Could not save cropped photo");
-  return new File([blob], `avatar-${Date.now()}.jpg`, {
-    type: "image/jpeg",
-    lastModified: Date.now(),
-  });
-}
-
-function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("Could not read image"));
-    img.src = src;
-  });
-}
 
 export function ProfileAvatarCropDialog({
   open,
@@ -95,7 +55,12 @@ export function ProfileAvatarCropDialog({
     setSaving(true);
     let cropped: File;
     try {
-      cropped = await cropImageToSquareJpeg(imageUrl, croppedAreaPixels);
+      cropped = await cropImageAreaToJpeg(imageUrl, croppedAreaPixels, {
+        width: OUTPUT_EDGE_PX,
+        height: OUTPUT_EDGE_PX,
+        fileName: `avatar-${Date.now()}.jpg`,
+        background: "#ffffff",
+      });
     } catch (err) {
       setSaving(false);
       toast({

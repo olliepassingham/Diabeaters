@@ -7,6 +7,7 @@ import heic2any from "heic2any";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Button } from "@/components/ui/button";
 import { StoryCameraCapture } from "@/components/community/story-camera-capture";
+import { StoryMediaCropStage } from "@/components/community/story-media-crop-stage";
 import { StoryOverlayEditor } from "@/components/community/story-overlay-editor";
 import { StorySharedPostStage } from "@/components/community/story-shared-post-stage";
 import { useToast } from "@/hooks/use-toast";
@@ -178,6 +179,7 @@ export function StoryCreateSheet({
   const systemStoryPicker = nativeApp || isIosDevice();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [cropSourceUrl, setCropSourceUrl] = useState<string | null>(null);
   const [overlays, setOverlays] = useState<StoryOverlay[]>([]);
   const [busy, setBusy] = useState(false);
   const [textEditing, setTextEditing] = useState(false);
@@ -187,10 +189,18 @@ export function StoryCreateSheet({
   const hasMediaRef = useRef(hasMedia);
   hasMediaRef.current = hasMedia;
 
+  function clearCropSource() {
+    setCropSourceUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+  }
+
   function reset() {
     setFile(null);
     if (preview) URL.revokeObjectURL(preview);
     setPreview(null);
+    clearCropSource();
     setOverlays([]);
     setTextEditing(false);
     setLinkedPostId(null);
@@ -288,6 +298,17 @@ export function StoryCreateSheet({
     void applyPickedFile(picked);
   }
 
+  function commitStoryMedia(next: File, options?: { keepOverlays?: boolean; keepLinkedPost?: boolean }) {
+    if (preview) URL.revokeObjectURL(preview);
+    setFile(next);
+    setPreview(URL.createObjectURL(next));
+    if (!options?.keepOverlays) setOverlays([]);
+    if (!options?.keepLinkedPost) setLinkedPostId(null);
+    if (photoInputRef.current) photoInputRef.current.value = "";
+    if (videoInputRef.current) videoInputRef.current.value = "";
+    onOpenChange(true);
+  }
+
   async function applyPickedFile(f: File) {
     let next = f;
     if (isHeicFile(f)) {
@@ -302,9 +323,15 @@ export function StoryCreateSheet({
         return;
       }
     }
-    if (preview) URL.revokeObjectURL(preview);
-    setFile(next);
-    setPreview(URL.createObjectURL(next));
+
+    // Photos get a pan/zoom fit step first. Videos skip straight to the editor.
+    if (next.type.startsWith("video/")) {
+      commitStoryMedia(next);
+      return;
+    }
+
+    clearCropSource();
+    setCropSourceUrl(URL.createObjectURL(next));
     setOverlays([]);
     setLinkedPostId(null);
     if (photoInputRef.current) photoInputRef.current.value = "";
@@ -355,6 +382,28 @@ export function StoryCreateSheet({
           document.body,
         )
       : null;
+
+  if (cropSourceUrl && typeof document !== "undefined") {
+    return (
+      <>
+        {fileInputs}
+        {createPortal(
+          <StoryMediaCropStage
+            imageUrl={cropSourceUrl}
+            onCancel={() => {
+              clearCropSource();
+              if (!hasMedia) onOpenChange(false);
+            }}
+            onConfirm={(cropped) => {
+              clearCropSource();
+              commitStoryMedia(cropped);
+            }}
+          />,
+          document.body,
+        )}
+      </>
+    );
+  }
 
   if (hasMedia && preview && typeof document !== "undefined") {
     return (
