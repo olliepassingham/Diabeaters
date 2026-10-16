@@ -26,6 +26,7 @@ import {
   type CommunityPostKind,
 } from "./post-kinds";
 import { isLikelyImageFile } from "./pick-post-images";
+import { explainImageUploadError, preparePostImageFiles } from "./prepare-post-image";
 import { buildMentionsForPost } from "./post-mentions";
 import {
   getPostMediaSignedUrl,
@@ -546,10 +547,39 @@ async function enrichComments(comments: CommunityPostCommentRow[]): Promise<Comm
 
 function extFromFile(f: File): string {
   const n = f.name.toLowerCase();
-  if (n.endsWith(".png")) return "png";
-  if (n.endsWith(".webp")) return "webp";
-  if (n.endsWith(".gif")) return "gif";
+  const t = (f.type || "").toLowerCase();
+  if (n.endsWith(".png") || t === "image/png") return "png";
+  if (n.endsWith(".webp") || t === "image/webp") return "webp";
+  if (n.endsWith(".gif") || t === "image/gif") return "gif";
   return "jpg";
+}
+
+function contentTypeForImageUpload(f: File): string {
+  const ext = extFromFile(f);
+  if (ext === "png") return "image/png";
+  if (ext === "webp") return "image/webp";
+  if (ext === "gif") return "image/gif";
+  return "image/jpeg";
+}
+
+/** Upload one feed image with a single retry — phone networks drop mid-post often. */
+async function uploadFeedImageFile(
+  supabase: SupabaseNonNull,
+  path: string,
+  file: File,
+): Promise<void> {
+  const contentType = contentTypeForImageUpload(file);
+  let lastMessage = "Upload failed";
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const { error } = await supabase.storage.from(COMMUNITY_POST_IMAGES_BUCKET).upload(path, file, {
+      cacheControl: "604800",
+      upsert: attempt > 0,
+      contentType,
+    });
+    if (!error) return;
+    lastMessage = error.message || lastMessage;
+  }
+  throw new Error(explainImageUploadError(lastMessage));
 }
 
 async function insertCommunityPostReturning(
@@ -992,20 +1022,16 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
     return { data: await finalizeSinglePostRow(out), error: null };
   }
 
-  const pendingId = crypto.randomUUID();
-  const pendingPaths: string[] = [];
+  // Upload media straight to the final path (same reliability fix as feed video).
+  // Pending upload + move was a common phone failure: Post looked stuck or the photo vanished.
+  const presetPostId = crypto.randomUUID();
+  const directImagePaths: string[] = [];
   let directVideoPath: string | null = null;
   let directPosterPath: string | null = null;
-  let presetPostId: string | null = null;
   let postId: string | null = null;
-  const movedDests: string[] = [];
 
   try {
     if (videoFile) {
-      // Upload straight to the final path. Moving a large phone video after a
-      // pending upload is a common failure, and the post then looks like it died
-      // after "Uploading…".
-      presetPostId = crypto.randomUUID();
       const ext = feedVideoStorageExt(videoFile);
       directVideoPath = `${uid}/${presetPostId}/video.${ext}`;
       await uploadFeedVideoFile(supabase, directVideoPath, videoFile);
@@ -1024,28 +1050,18 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
     }
 
     for (let i = 0; i < files.length; i++) {
-      const ext = extFromFile(files[i]!);
-      const path = `${uid}/pending/${pendingId}/${i}.${ext}`;
-      const { error: upErr } = await supabase.storage
-        .from(COMMUNITY_POST_IMAGES_BUCKET)
-        .upload(path, files[i]!, {
-          cacheControl: "604800",
-          upsert: false,
-          contentType: files[i]!.type || undefined,
-        });
-      if (upErr) throw new Error(upErr.message);
-      pendingPaths.push(path);
+      const file = files[i]!;
+      const ext = extFromFile(file);
+      const path = `${uid}/${presetPostId}/${i}.${ext}`;
+      await uploadFeedImageFile(supabase, path, file);
+      directImagePaths.push(path);
     }
 
     const insertPayload: Record<string, unknown> = {
       author_id: uid,
       body: params.body,
-      /* Avoid publishing pending storage paths: we move() those objects away immediately, so any
-       * feed/realtime read between move and DB update would sign URLs for paths that no longer exist.
-       * Standard media-only posts must reference media at insert time (CHECK constraint).
-       * Videos are uploaded to the final path first, so the row can point at them immediately. */
-      image_urls:
-        params.post_kind === "standard" && !params.body.trim() && files.length > 0 ? pendingPaths : [],
+      id: presetPostId,
+      image_urls: directImagePaths,
       video_url: directVideoPath,
       topic: params.topic,
       post_kind: params.post_kind,
@@ -1053,7 +1069,6 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
       mention_map: params.mention_map,
       mentioned_user_ids,
     };
-    if (presetPostId) insertPayload.id = presetPostId;
     if (directPosterPath) insertPayload.video_poster_url = directPosterPath;
     if (imageAltsForInsert.some((s) => s.trim().length > 0)) {
       insertPayload.image_alt_texts = imageAltsForInsert;
@@ -1062,40 +1077,8 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
     if (params.audience === "followers") insertPayload.audience = "followers";
 
     const data = await insertCommunityPostReturning(supabase, insertPayload);
-
     postId = String(data.id);
-    if (directVideoPath && files.length === 0) {
-      const out = mapPost(data);
-      fireMentionPushes(out.id);
-      return { data: await finalizeSinglePostRow(out), error: null };
-    }
-
-    const finalPaths: string[] = [];
-
-    for (let i = 0; i < pendingPaths.length; i++) {
-      const ext = extFromFile(files[i]!);
-      const dest = `${uid}/${postId}/${i}.${ext}`;
-      const { error: mvErr } = await supabase.storage.from(COMMUNITY_POST_IMAGES_BUCKET).move(pendingPaths[i]!, dest);
-      if (mvErr) throw new Error(mvErr.message);
-      finalPaths.push(dest);
-      movedDests.push(dest);
-    }
-
-    const updatePayload: Record<string, unknown> = { image_urls: finalPaths };
-    if (imageAltsForInsert.some((s) => s.trim().length > 0)) {
-      updatePayload.image_alt_texts = imageAltsForInsert;
-    }
-
-    const { data: updated, error: updErr } = await supabase
-      .from("community_posts")
-      .update(updatePayload)
-      .eq("id", postId)
-      .select("*")
-      .single();
-
-    if (updErr) throw new Error(updErr.message);
-    if (!updated) throw new Error("Update returned no row");
-    const out = mapPost(updated as Record<string, unknown>);
+    const out = mapPost(data);
     fireMentionPushes(out.id);
     return { data: await finalizeSinglePostRow(out), error: null };
   } catch (e) {
@@ -1104,8 +1087,7 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
     }
     const uniq = [
       ...new Set([
-        ...pendingPaths,
-        ...movedDests,
+        ...directImagePaths,
         ...(directVideoPath ? [directVideoPath] : []),
         ...(directPosterPath ? [directPosterPath] : []),
       ]),
@@ -1114,7 +1096,10 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
       await supabase.storage.from(COMMUNITY_POST_IMAGES_BUCKET).remove(uniq);
     }
     const msg = e instanceof Error ? e.message : "Upload failed";
-    return { data: null, error: new Error(videoFile ? explainVideoUploadError(msg) : msg) };
+    return {
+      data: null,
+      error: new Error(videoFile ? explainVideoUploadError(msg) : explainImageUploadError(msg)),
+    };
   }
 }
 
@@ -1284,8 +1269,16 @@ export async function insertCommunityComment(
   if (!gate.ok) return { data: null, error: gate.error };
 
   const trimmed = body.trim();
-  const file = options?.imageFile ?? null;
+  let file = options?.imageFile ?? null;
   if (file) {
+    const prepared = await preparePostImageFiles([file]);
+    if (prepared.error || prepared.files.length === 0) {
+      return {
+        data: null,
+        error: prepared.error ?? new Error("Couldn't prepare that photo. Try choosing it again."),
+      };
+    }
+    file = prepared.files[0]!;
     const v = validateImageFiles([file]);
     if (v) return { data: null, error: v };
   }
@@ -1299,13 +1292,13 @@ export async function insertCommunityComment(
   if (file) {
     const ext = extFromFile(file);
     const path = `${uid}/comment/${postId}/${crypto.randomUUID()}.${ext}`;
-    const { error: upErr } = await supabase.storage.from(COMMUNITY_POST_IMAGES_BUCKET).upload(path, file, {
-      cacheControl: "3600",
-      upsert: false,
-      contentType: file.type || undefined,
-    });
-    if (upErr) return { data: null, error: new Error(upErr.message) };
-    imagePath = path;
+    try {
+      await uploadFeedImageFile(supabase, path, file);
+      imagePath = path;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Upload failed";
+      return { data: null, error: new Error(explainImageUploadError(msg)) };
+    }
   }
 
   const insertPayload: Record<string, unknown> = {
@@ -1453,7 +1446,7 @@ export async function updateCommunityPost(
   const existingVideo =
     typeof ex.video_url === "string" && ex.video_url.trim().length > 0 ? ex.video_url.trim() : null;
   const keepPaths = options?.keepImagePaths ?? existingImgs;
-  const addFiles = options?.addImageFiles ?? [];
+  let addFiles = options?.addImageFiles ?? [];
 
   if (existingVideo && (addFiles.length > 0 || keepPaths.length > 0)) {
     return { data: null, error: new Error("Video posts cannot include photos.") };
@@ -1463,6 +1456,19 @@ export async function updateCommunityPost(
     if (!existingImgs.includes(path)) {
       return { data: null, error: new Error("Invalid image reference.") };
     }
+  }
+
+  if (addFiles.length > 0) {
+    const prepared = await preparePostImageFiles(addFiles);
+    if (prepared.error || prepared.files.length !== addFiles.length) {
+      return {
+        data: null,
+        error:
+          prepared.error ??
+          new Error("Couldn't prepare every photo. Try choosing them again, then save."),
+      };
+    }
+    addFiles = prepared.files;
   }
 
   const fileErr = validateImageFiles(addFiles);
@@ -1485,12 +1491,7 @@ export async function updateCommunityPost(
       const f = addFiles[i]!;
       const ext = extFromFile(f);
       const dest = `${uid}/${postId}/${Date.now()}-${i}.${ext}`;
-      const { error: upErr } = await supabase.storage.from(COMMUNITY_POST_IMAGES_BUCKET).upload(dest, f, {
-        cacheControl: "3600",
-        upsert: false,
-        contentType: f.type || undefined,
-      });
-      if (upErr) throw new Error(upErr.message);
+      await uploadFeedImageFile(supabase, dest, f);
       uploadedPaths.push(dest);
     }
 
@@ -1531,7 +1532,7 @@ export async function updateCommunityPost(
       await supabase.storage.from(COMMUNITY_POST_IMAGES_BUCKET).remove(uploadedPaths);
     }
     const msg = e instanceof Error ? e.message : "Could not update post.";
-    return { data: null, error: new Error(msg) };
+    return { data: null, error: new Error(explainImageUploadError(msg)) };
   }
 }
 

@@ -3,6 +3,7 @@ import { Capacitor } from "@capacitor/core";
 import { useToast } from "@/hooks/use-toast";
 import { clickHiddenFileInput } from "@/lib/click-hidden-file-input";
 import { filesFromImageInput, pickPostImagesFromLibrary } from "@/lib/community/pick-post-images";
+import { preparePostImageFiles } from "@/lib/community/prepare-post-image";
 import { getPostImageSignedUrls, MAX_POST_IMAGES } from "@/lib/community";
 
 export type PostEditImagePreview = {
@@ -101,19 +102,31 @@ export function usePostEditImages() {
     setImageAlts((prev) => prev.filter((_, i) => i !== index));
   }, [keptPaths.length]);
 
-  const appendFiles = useCallback((files: File[]) => {
+  const appendFiles = useCallback(async (files: File[]) => {
     if (files.length === 0) return;
+    const room = MAX_POST_IMAGES - keptPaths.length - newFiles.length;
+    if (room <= 0) return;
+    const sliced = files.slice(0, room);
+    const prepared = await preparePostImageFiles(sliced);
+    if (prepared.error || prepared.files.length === 0) {
+      toast({
+        title: "Photos couldn't be attached",
+        description: prepared.error?.message || "Try choosing the photo again.",
+        variant: "destructive",
+      });
+      return;
+    }
     setNewFiles((prev) => {
-      const room = MAX_POST_IMAGES - keptPaths.length - prev.length;
-      if (room <= 0) return prev;
-      return [...prev, ...files.slice(0, room)];
+      const left = MAX_POST_IMAGES - keptPaths.length - prev.length;
+      if (left <= 0) return prev;
+      return [...prev, ...prepared.files.slice(0, left)];
     });
-  }, [keptPaths.length]);
+  }, [keptPaths.length, newFiles.length, toast]);
 
   const onPickFromInput = useCallback(
     (files: FileList | null) => {
       const picked = filesFromImageInput(files, totalCount);
-      appendFiles(picked);
+      void appendFiles(picked);
       if (fileInputRef.current) fileInputRef.current.value = "";
     },
     [appendFiles, totalCount],
@@ -124,7 +137,7 @@ export function usePostEditImages() {
     try {
       const picked = await pickPostImagesFromLibrary(totalCount, fileInputRef.current);
       if (picked.length > 0) {
-        appendFiles(picked);
+        await appendFiles(picked);
         return;
       }
     } catch (e) {

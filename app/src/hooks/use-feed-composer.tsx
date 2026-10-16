@@ -480,20 +480,19 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
       let imageFiles = composerFiles;
       if (imageFiles.length > 0) {
         const prepared = await preparePostImageFiles(imageFiles);
-        imageFiles = prepared.files;
-        if (prepared.error) {
-          const canContinueWithoutPhotos =
-            Boolean(composer.trim()) || Boolean(composerVideoFile) || imageFiles.length > 0;
+        if (prepared.error || prepared.files.length !== imageFiles.length) {
+          // Never post text-only when the user attached photos — that looks like a failed upload.
           toast({
-            title: imageFiles.length > 0 ? "Some photos skipped" : "Photos couldn't be attached",
-            description: prepared.error.message,
+            title: "Photos couldn't be attached",
+            description:
+              prepared.error?.message ||
+              "Couldn't prepare every photo. Try choosing them again, then post.",
             variant: "destructive",
           });
-          if (!canContinueWithoutPhotos) return;
+          return;
         }
-        if (imageFiles.length !== composerFiles.length) {
-          setComposerFiles(imageFiles);
-        }
+        imageFiles = prepared.files;
+        setComposerFiles(imageFiles);
       }
 
       setSubmitStatusLabel(
