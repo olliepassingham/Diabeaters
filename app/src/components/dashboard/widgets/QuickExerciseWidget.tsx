@@ -206,10 +206,11 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
       }
 
       const sc = storage.getScenarioState();
-      if (sc.sickDayActive) {
+      // Match Exercise guide: hard-block severe only. Minor/moderate can still start.
+      if (sc.sickDayActive && sc.sickDaySeverity === "severe") {
         toast({
           title: "Sick day mode is active",
-          description: "Exercise may not be recommended when unwell. End sick day mode or follow your care team's guidance.",
+          description: "Severe illness — focus on rest. End sick day mode to start a session.",
           variant: "destructive",
         });
         return;
@@ -229,9 +230,13 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
       setAdjustRoutine(null);
 
       setLocation(EXERCISE_GUIDE_HREF);
+      const sickDayCaution =
+        sc.sickDayActive && sc.sickDaySeverity !== "severe"
+          ? " Sick day is on — monitor BG more closely."
+          : "";
       toast({
         title: `${exercise.name} ready`,
-        description: "Continue in the Exercise guide — check BG and start when you're ready.",
+        description: `Continue in the Exercise guide — check BG and start when you're ready.${sickDayCaution}`,
       });
     } catch {
       toast({
