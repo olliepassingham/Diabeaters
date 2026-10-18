@@ -68,6 +68,12 @@ verify_jwt = false
 [functions.exercise_cgm_monitor_cron]
 verify_jwt = false
 
+[functions.supporter_cgm_share]
+verify_jwt = false
+
+[functions.supporter_cgm_share_cron]
+verify_jwt = false
+
 # AI Coach: user JWT verified at the gateway (default). Handler also validates with auth.getUser.
 [functions.ai_coach]
 verify_jwt = true

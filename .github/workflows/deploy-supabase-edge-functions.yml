@@ -62,6 +62,8 @@ jobs:
             notify_push_test
             exercise_cgm_monitor
             exercise_cgm_monitor_cron
+            supporter_cgm_share
+            supporter_cgm_share_cron
           )
           FAILED=0
           for fn in "${FUNCTIONS[@]}"; do

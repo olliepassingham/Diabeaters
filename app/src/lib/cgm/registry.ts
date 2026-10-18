@@ -229,6 +229,7 @@ export async function connectDexcomShareCgm(input: {
     dexcomSharePassword: password,
     dexcomShareServer: input.server,
   });
+  void import("@/lib/supporter-cgm-share").then((mod) => mod.syncSupporterCgmShare());
 
   return { ok: true, sampleMgDl: result.reading.valueMgDl };
 }
@@ -242,6 +243,7 @@ export async function disconnectDexcomShareCgm(): Promise<void> {
     dexcomShareUsername: undefined,
     dexcomSharePassword: undefined,
   });
+  void import("@/lib/supporter-cgm-share").then((mod) => mod.syncSupporterCgmShare());
 }
 
 export async function connectLibreLinkUpCgm(input: {

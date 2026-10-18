@@ -22,6 +22,7 @@ import {
 } from "../_shared/exercise-cgm-alert-eval.ts";
 import { deliverPushToTokenRows, mobilePushDeliveryConfigured } from "../_shared/deliver-push.ts";
 import { fetchLatestPushTokensForUserId } from "../_shared/push-token-query.ts";
+import { pollSupporterCgmShares } from "../_shared/supporter-cgm-share-poll.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -288,6 +289,13 @@ Deno.serve(async (req: Request) => {
       if (result.error) errors += 1;
     }
 
+    let supporterGlucose: { polled: number; updated: number; cleared: number; errors: number } | null = null;
+    try {
+      supporterGlucose = await pollSupporterCgmShares(admin, cryptoSecret);
+    } catch (shareErr) {
+      console.error("[exercise_cgm_monitor_cron] supporter glucose", shareErr);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -295,6 +303,7 @@ Deno.serve(async (req: Request) => {
         polled,
         alerted,
         errors,
+        supporter_glucose: supporterGlucose,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );

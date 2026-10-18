@@ -4,7 +4,8 @@ import type { BgPrefillResult } from "@/lib/cgm/prefill";
 import { fetchLiveGlucoseForLinkedPatient } from "@/lib/carers";
 import type { CloudPatientLiveGlucoseRow } from "@/lib/carers.types";
 
-const SUPPORTER_LIVE_POLL_MS = 5 * 60_000;
+/** Re-read the shared snapshot often. The server refreshes Dexcom in the background. */
+const SUPPORTER_LIVE_POLL_MS = 60_000;
 
 export function useSupporterLiveBg(patientId: string | null, enabled: boolean): {
   prefill: BgPrefillResult | null;

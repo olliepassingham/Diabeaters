@@ -45,6 +45,7 @@ describe("setActiveUserIdForLocalStorage", () => {
     setActiveUserIdForLocalStorage("user-a");
     seedPatientProfile("Alex");
     localStorage.setItem("diabeaters_mdi_supplies_seeded_v1", "1");
+    localStorage.setItem("diabeaters_cgm_prefs_v1", "{\"dexcomSharePassword\":\"secret\"}");
 
     setActiveUserIdForLocalStorage(null);
     setActiveUserIdForLocalStorage("user-b");
@@ -52,6 +53,7 @@ describe("setActiveUserIdForLocalStorage", () => {
     expect(storage.getProfile()).toBeNull();
     expect(localStorage.getItem("diabeater_onboarding_completed")).toBeNull();
     expect(localStorage.getItem("diabeaters_mdi_supplies_seeded_v1")).toBeNull();
+    expect(localStorage.getItem("diabeaters_cgm_prefs_v1")).toBeNull();
     expect(localStorage.getItem(LAST_LOCAL_USER_ID_KEY)).toBe("user-b");
   });
 

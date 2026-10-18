@@ -18,6 +18,7 @@ import {
 import type { CarerInviteRow, CarerLinkWithProfile, CarerScopes } from "@/lib/carers.types";
 import { DEFAULT_CARER_SCOPES } from "@/lib/carers.types";
 import { invalidateLiveGlucoseShareCache } from "@/lib/cgm/live-glucose-sync";
+import { syncSupporterCgmShare } from "@/lib/supporter-cgm-share";
 import { carerScopePresetSummary } from "@/lib/carer-scopes-by-age";
 import { getAgeBand } from "@/lib/user-age";
 import { getSupabase } from "@/lib/supabase";
@@ -275,6 +276,7 @@ export default function FamilyCarersPage() {
     }
     toast({ title: "Supporter removed", description: "They can no longer open your shared view." });
     await refresh();
+    void syncSupporterCgmShare();
   };
 
   const applyPrivacyToAll = async (patch: Partial<CarerScopes>, key: string) => {
@@ -289,7 +291,10 @@ export default function FamilyCarersPage() {
         title: "Privacy updated",
         description: "This applies to everyone you have linked for now.",
       });
-      if (key === "live_glucose") invalidateLiveGlucoseShareCache();
+      if (key === "live_glucose") {
+        invalidateLiveGlucoseShareCache();
+        void syncSupporterCgmShare();
+      }
       await refresh();
     } catch (e) {
       toast({
