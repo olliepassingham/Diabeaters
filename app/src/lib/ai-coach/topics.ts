@@ -24,7 +24,7 @@ const TOPIC_CONFIG: Record<
   general: {
     label: "General",
     emptyHint:
-      `Ask a general question about type 1 diabetes, or ask how to prepare for a clinic visit. ${AI_ASSISTANT_NAME} cannot suggest doses or interpret CGM trends as treatment instructions.`,
+      `Ask a general question about diabetes, or ask how to prepare for a clinic visit. ${AI_ASSISTANT_NAME} cannot suggest doses, Type 2 management plans, or interpret CGM trends as treatment instructions.`,
     starters: [
       "What should I bring to a routine diabetes clinic appointment?",
       "How can I describe glucose patterns to my team without focusing on exact numbers?",
@@ -34,11 +34,11 @@ const TOPIC_CONFIG: Record<
   community: {
     label: "Community & learning",
     emptyHint:
-      "General type 1 education for exploring the community — not personal dosing advice. Helpful if you're new, connecting with others, or brushing up on basics.",
+      "General diabetes education for exploring the community — not personal dosing advice. Helpful if you're new, connecting with others, or brushing up on basics.",
     starters: [
       "What is hypoglycaemia in simple, educational terms?",
-      "How can I talk about type 1 diabetes with friends or at work?",
-      "What is dawn phenomenon in broad, educational terms?",
+      "How can I talk about diabetes with friends or at work?",
+      "How can I explain type 1 versus type 2 when people get them confused?",
     ],
   },
   exercise: {

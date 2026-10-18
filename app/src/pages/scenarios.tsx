@@ -7,12 +7,19 @@ import { Moon, Thermometer, Plane, Dumbbell, Syringe, Wine, Car } from "lucide-r
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { storage, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
+import { hasInsulinClinicalTools } from "@/lib/insulin-clinical-access";
 import { pumpSetupCompletion } from "@/lib/pump-supplies";
 import { canShowAlcoholScenarios, canShowDrivingReadiness } from "@/lib/user-age";
 import { PageShell } from "@/components/layout";
 import { OfflineDeviceNotice } from "@/components/offline-device-notice";
 import { DobUnknownNotice } from "@/components/dob-unknown-notice";
 import { hapticLight } from "@/lib/haptics";
+
+const INSULIN_SCENARIO_HREFS = new Set([
+  "/scenarios/exercise",
+  "/scenarios/bedtime",
+  "/scenarios/sick-day",
+]);
 
 type ScenarioCardDef = {
   href: string;
@@ -60,8 +67,12 @@ const SCENARIO_CARDS: ScenarioCardDef[] = [
   },
 ];
 
-function scenarioCardsForProfile(dateOfBirth: string | undefined): ScenarioCardDef[] {
+function scenarioCardsForProfile(
+  dateOfBirth: string | undefined,
+  insulinClinical: boolean,
+): ScenarioCardDef[] {
   return SCENARIO_CARDS.filter((c) => {
+    if (!insulinClinical && INSULIN_SCENARIO_HREFS.has(c.href)) return false;
     if (c.href === "/scenarios/alcohol" && !canShowAlcoholScenarios(dateOfBirth)) return false;
     if (c.href === "/scenarios/driving" && !canShowDrivingReadiness(dateOfBirth)) return false;
     return true;
@@ -86,9 +97,10 @@ function ScenarioCard({ href, icon, title, description }: ScenarioCardDef) {
 export default function Scenarios() {
   const [location, setLocation] = useLocation();
   const search = useSearch();
-  const [visibleScenarioCards, setVisibleScenarioCards] = useState<ScenarioCardDef[]>(() =>
-    scenarioCardsForProfile(storage.getProfile()?.dateOfBirth),
-  );
+  const [visibleScenarioCards, setVisibleScenarioCards] = useState<ScenarioCardDef[]>(() => {
+    const profile = storage.getProfile();
+    return scenarioCardsForProfile(profile?.dateOfBirth, hasInsulinClinicalTools(profile));
+  });
 
   useEffect(() => {
     trackFeatureEngagement("scenarios");
@@ -100,8 +112,9 @@ export default function Scenarios() {
   );
   useEffect(() => {
     const profile = storage.getProfile();
-    setShowPumpFailureCard(isPumpDeliveryMethod(profile?.insulinDeliveryMethod));
-    setVisibleScenarioCards(scenarioCardsForProfile(profile?.dateOfBirth));
+    const insulinClinical = hasInsulinClinicalTools(profile);
+    setShowPumpFailureCard(insulinClinical && isPumpDeliveryMethod(profile?.insulinDeliveryMethod));
+    setVisibleScenarioCards(scenarioCardsForProfile(profile?.dateOfBirth, insulinClinical));
     const pumpReady = pumpSetupCompletion(profile, storage.getSupplies()).tracksBackup;
     setPumpFailureCardDescription(
       pumpReady ? "Triage steps if delivery stops" : "Set up backup pens first",
@@ -111,8 +124,9 @@ export default function Scenarios() {
   useEffect(() => {
     const onProfile = () => {
       const profile = storage.getProfile();
-      setShowPumpFailureCard(isPumpDeliveryMethod(profile?.insulinDeliveryMethod));
-      setVisibleScenarioCards(scenarioCardsForProfile(profile?.dateOfBirth));
+      const insulinClinical = hasInsulinClinicalTools(profile);
+      setShowPumpFailureCard(insulinClinical && isPumpDeliveryMethod(profile?.insulinDeliveryMethod));
+      setVisibleScenarioCards(scenarioCardsForProfile(profile?.dateOfBirth, insulinClinical));
       const pumpReady = pumpSetupCompletion(profile, storage.getSupplies()).tracksBackup;
       setPumpFailureCardDescription(
         pumpReady ? "Triage steps if delivery stops" : "Set up backup pens first",

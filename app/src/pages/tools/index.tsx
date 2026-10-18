@@ -39,6 +39,7 @@ import { useOffline } from "@/hooks/use-offline";
 import { filterOfflineCloudTools } from "@/lib/offline-app-gate";
 import { OfflineDeviceNotice } from "@/components/offline-device-notice";
 import { hasLiveCgmCredentials, readCgmPreferences } from "@/lib/cgm/preferences";
+import { hasInsulinClinicalTools } from "@/lib/insulin-clinical-access";
 import { hapticLight } from "@/lib/haptics";
 
 type ToolDef = {
@@ -146,14 +147,24 @@ const PATIENT_TOOLS: ToolDef[] = [
   },
 ];
 
+const TYPE2_HIDDEN_TOOL_IDS = new Set([
+  "insulin-calculator",
+  "correction-helper",
+  "supply-tracker",
+]);
+
 function patientToolsForHub(): ToolDef[] {
+  const profile = storage.getProfile();
+  const insulinTools = hasInsulinClinicalTools(profile);
   const coach: ToolDef | undefined = isAiCoachEnabled
     ? {
         id: "ai-coach",
         href: "/coach",
         icon: MessageCircle,
         title: AI_ASSISTANT_NAME,
-        description: "Educational chat about type 1 diabetes",
+        description: insulinTools
+          ? "Educational chat about type 1 diabetes"
+          : "Educational chat about diabetes — not personal dosing advice",
       }
     : undefined;
   const cgmLive: ToolDef | undefined = hasLiveCgmCredentials(readCgmPreferences())
@@ -165,7 +176,10 @@ function patientToolsForHub(): ToolDef[] {
         description: "Near-live CGM chart, this device only",
       }
     : undefined;
-  const tools = coach ? [coach, ...PATIENT_TOOLS] : [...PATIENT_TOOLS];
+  const baseTools = insulinTools
+    ? PATIENT_TOOLS
+    : PATIENT_TOOLS.filter((t) => !TYPE2_HIDDEN_TOOL_IDS.has(t.id));
+  const tools = coach ? [coach, ...baseTools] : [...baseTools];
   return cgmLive ? [cgmLive, ...tools] : tools;
 }
 

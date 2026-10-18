@@ -55,6 +55,14 @@ export default function Welcome() {
     goPatientOnboarding();
   };
 
+  const onType2 = () => {
+    clearOnboardingAccountPath();
+    setOnboardingAccountPath("type2");
+    setPrimaryAppRole("patient");
+    setPendingPatient();
+    goPatientOnboarding();
+  };
+
   const onBoth = () => {
     clearOnboardingAccountPath();
     setOnboardingAccountPath("both");
@@ -99,7 +107,7 @@ export default function Welcome() {
               Who is this for?
             </h1>
             <p className="text-pretty text-base leading-relaxed text-muted-foreground">
-              Choose one to get started — you can change later in Account.
+              Pick the option that matches you — Type 1 and Type 2 are different homes.
             </p>
           </div>
         </div>
@@ -118,12 +126,33 @@ export default function Welcome() {
               <Users className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-base font-semibold leading-snug text-foreground">For me (Type 1)</span>
+              <span className="block text-base font-semibold leading-snug text-foreground">For me — Type 1</span>
               <span className="mt-0.5 block text-sm leading-snug text-muted-foreground">
-                Your dashboard, meals, travel, hypos
+                Insulin tools, meals, hypos, travel
               </span>
             </span>
             <ArrowRight className="mt-1 h-5 w-5 shrink-0 text-primary/70 transition-transform group-hover:translate-x-0.5 sm:mt-0" aria-hidden />
+          </button>
+
+          <button
+            type="button"
+            onClick={onType2}
+            className={cn(
+              "pressable group flex w-full items-start gap-3.5 rounded-[1.35rem] border border-teal-500/25 bg-gradient-to-b from-teal-500/[0.08] via-card to-card px-4 py-3.5 text-left shadow-sm sm:items-center sm:py-4",
+              "active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            )}
+            data-testid="welcome-type2"
+          >
+            <span className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-teal-500/15 text-teal-700 dark:text-teal-300 sm:mt-0 sm:h-12 sm:w-12">
+              <Users className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-base font-semibold leading-snug text-foreground">For me — Type 2</span>
+              <span className="mt-0.5 block text-sm leading-snug text-muted-foreground">
+                Glucose, learning, community — not insulin dosing
+              </span>
+            </span>
+            <ArrowRight className="mt-1 h-5 w-5 shrink-0 text-teal-700/70 transition-transform group-hover:translate-x-0.5 dark:text-teal-300/70 sm:mt-0" aria-hidden />
           </button>
 
           <button
@@ -139,9 +168,11 @@ export default function Welcome() {
               <HeartHandshake className="h-5 w-5" aria-hidden />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold leading-snug text-foreground">For someone I support</span>
+              <span className="block text-sm font-semibold leading-snug text-foreground">
+                I support someone with Type 1
+              </span>
               <span className="mt-0.5 block text-sm leading-snug text-muted-foreground">
-                See what they choose to share, and use the feed
+                See what they share — Type 1 only, not Type 2
               </span>
             </span>
             <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform group-hover:translate-x-0.5 sm:mt-0" aria-hidden />
@@ -162,7 +193,7 @@ export default function Welcome() {
             <span className="min-w-0 flex-1">
               <span className="block text-sm font-semibold leading-snug text-foreground">Just exploring / community</span>
               <span className="mt-0.5 block text-xs leading-snug text-muted-foreground sm:text-sm">
-                Feed and learning — not full clinical tools
+                Feed and learning without a clinical home
               </span>
             </span>
             <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform group-hover:translate-x-0.5 sm:mt-0" aria-hidden />
@@ -181,9 +212,11 @@ export default function Welcome() {
               <Sparkles className="h-4 w-4" aria-hidden />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold leading-snug text-foreground">Both — Type 1 and I support someone</span>
+              <span className="block text-sm font-semibold leading-snug text-foreground">
+                Type 1 and I support someone
+              </span>
               <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
-                Start with your tools; link a supporter later
+                Your Type 1 tools + link a supporter later
               </span>
             </span>
             <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground/60 sm:mt-0" aria-hidden />
@@ -191,8 +224,9 @@ export default function Welcome() {
         </div>
 
         <p className="mt-5 px-1 text-center text-xs leading-relaxed text-muted-foreground" data-testid="welcome-not-sure">
-          Not sure? If you live with Type 1 day to day, choose <span className="font-medium text-foreground">For me</span>.
-          If you only help someone else, choose supporter.
+          Not sure? Type 1 day to day → <span className="font-medium text-foreground">For me — Type 1</span>.
+          Type 2 → <span className="font-medium text-foreground">For me — Type 2</span>.
+          Only helping someone with Type 1 → supporter.
         </p>
 
         <div className="mt-auto space-y-3 pt-8">

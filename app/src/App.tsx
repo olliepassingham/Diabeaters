@@ -101,6 +101,7 @@ import {
   onboardingAccountPathFromUserMetadata,
   setActiveAppMode,
 } from "@/lib/carer-session";
+import { hasInsulinClinicalTools, isInsulinClinicalPath } from "@/lib/insulin-clinical-access";
 import { AnimatedRouteOutlet } from "@/components/animated-route-outlet";
 import { CommunityFeatureGate } from "@/components/community-feature-gate";
 import { PatientOnboardingGate } from "@/components/patient-onboarding-gate";
@@ -610,6 +611,16 @@ function PatientRouteGuard({ children }: { children: React.ReactNode }) {
     if (!isCarerMode && !isCommunityMode && (hasCarerIntent() || hasPendingCarer())) {
       if (isCommunityPath(pathOnly)) return;
       setLocation("/community/setup");
+      return;
+    }
+    // Type 2 patient shell: block insulin dosing / pump deep links.
+    if (
+      !isCarerMode &&
+      !isCommunityMode &&
+      isInsulinClinicalPath(pathOnly) &&
+      !hasInsulinClinicalTools(storage.getProfile())
+    ) {
+      setLocation("/tools");
     }
   }, [loading, isCarerMode, isCommunityMode, pathOnly, setLocation, user?.id]);
 
@@ -626,6 +637,14 @@ function PatientRouteGuard({ children }: { children: React.ReactNode }) {
     !isCommunityMode &&
     (hasCarerIntent() || hasPendingCarer()) &&
     !isCommunityPath(pathOnly)
+  ) {
+    return null;
+  }
+  if (
+    !isCarerMode &&
+    !isCommunityMode &&
+    isInsulinClinicalPath(pathOnly) &&
+    !hasInsulinClinicalTools(storage.getProfile())
   ) {
     return null;
   }

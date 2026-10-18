@@ -36,7 +36,7 @@ export const EXISTING_SUPPORTER_ON_COMMUNITY_PATH_TOAST: PostLoginToastMessage =
 /** True when /welcome sent the user down the User (patient) path on this device. */
 export function isUserWelcomePathChosen(): boolean {
   const path = getOnboardingAccountPath();
-  if (path === "patient" || path === "both") return true;
+  if (path === "patient" || path === "type2" || path === "both") return true;
   return getPrimaryAppRole() === "patient";
 }
 

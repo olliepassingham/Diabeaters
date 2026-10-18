@@ -42,6 +42,9 @@ function isExplicitUserModeSession(
   const path = getOnboardingAccountPath();
   if (path === "community" || path === "supporter") return false;
 
+  // Type 2 path has no insulin bedtime planner.
+  if (path === "type2") return false;
+
   if (path === "patient" || path === "both") {
     return !isCarerSessionMode(hasCarerLink, activeMode);
   }

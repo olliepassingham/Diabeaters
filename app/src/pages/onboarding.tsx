@@ -311,7 +311,13 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   }, [user]);
   const showBothPath = accountPath === "both";
   const showCommunityPath = accountPath === "community";
+  const showType2Path = accountPath === "type2";
   const [minimalSetup, setMinimalSetup] = useState(false);
+
+  useEffect(() => {
+    if (!showType2Path) return;
+    setData((prev) => (prev.diabetesType === "type2" ? prev : { ...prev, diabetesType: "type2" }));
+  }, [showType2Path]);
   const steps: Step[] = useMemo(
     () =>
       buildOnboardingSteps({
@@ -332,7 +338,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
 
   const [data, setData] = useState<OnboardingData>({
     name: "",
-    diabetesType: "type1",
+    diabetesType: accountPath === "type2" ? "type2" : "type1",
     careContext: null,
     struggle: getInitialOnboardingStruggle(),
     insulinDeliveryMethod: "pen",
@@ -407,17 +413,18 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
 
   const handleSaveProfile = () => {
     const prev = storage.getProfile();
+    const type2 = showType2Path || data.diabetesType === "type2";
     storage.saveProfile({
       name: data.name,
       email: "",
       bgUnits: data.bgUnits,
       carbUnits: data.carbUnits,
-      diabetesType: data.diabetesType || "type1",
+      diabetesType: type2 ? "type2" : data.diabetesType || "type1",
       insulinDeliveryMethod:
         data.insulinDeliveryMethod === "injections"
           ? "pen"
           : data.insulinDeliveryMethod || "pen",
-      usingInsulin: true,
+      usingInsulin: type2 ? false : true,
       hasAcceptedDisclaimer: data.hasAcceptedDisclaimer,
       dateOfBirth: normalizeDateOfBirthInput(data.dateOfBirth) ?? "",
       ratioFormat: prev?.ratioFormat,
@@ -595,25 +602,29 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     }
 
     handleSaveProfile();
-    seedPatientFirstRunDefaultsIfNeeded({
-      tdd: data.tdd ? parseFloat(data.tdd) : undefined,
-      siteChangeDays: data.siteChangeDays ? parseInt(data.siteChangeDays, 10) : undefined,
-      reservoirChangeDays: data.reservoirChangeDays ? parseInt(data.reservoirChangeDays, 10) : undefined,
-      reservoirCapacity: data.reservoirCapacity ? parseInt(data.reservoirCapacity, 10) : undefined,
-    });
-    if (isPumpDeliveryMethod(data.insulinDeliveryMethod)) {
-      void reschedulePumpChangeReminders();
+    if (!showType2Path && data.diabetesType !== "type2") {
+      seedPatientFirstRunDefaultsIfNeeded({
+        tdd: data.tdd ? parseFloat(data.tdd) : undefined,
+        siteChangeDays: data.siteChangeDays ? parseInt(data.siteChangeDays, 10) : undefined,
+        reservoirChangeDays: data.reservoirChangeDays ? parseInt(data.reservoirChangeDays, 10) : undefined,
+        reservoirCapacity: data.reservoirCapacity ? parseInt(data.reservoirCapacity, 10) : undefined,
+      });
+      if (isPumpDeliveryMethod(data.insulinDeliveryMethod)) {
+        void reschedulePumpChangeReminders();
+      }
+      markBedtimeReminderPromptPending();
     }
     localStorage.setItem("diabeater_onboarding_completed", "true");
     recordOnboardingFinishedAt();
-    markBedtimeReminderPromptPending();
     const previousAccountPath = getOnboardingAccountPath();
     const hadSupporterMarkers =
       previousAccountPath === "supporter" ||
       previousAccountPath === "both" ||
       isPersistedSupporterAccount();
     setPrimaryAppRole("patient");
-    if (previousAccountPath !== "both") {
+    if (previousAccountPath === "type2") {
+      setOnboardingAccountPath("type2");
+    } else if (previousAccountPath !== "both") {
       setOnboardingAccountPath(previousAccountPath === "supporter" ? "both" : previousAccountPath ?? "patient");
     }
     if (upgradeFlow) {
@@ -926,9 +937,11 @@ function WelcomeStep({
           <p className="mx-auto max-w-sm text-pretty text-lg leading-relaxed text-muted-foreground">
             {communityFlow
               ? "Feed and learning — explore Tools and the community without full clinical tools."
-              : showBothPath
-                ? "We’ll set up your own tools first, then you can link Supporter access in a couple of taps."
-                : "You’ll leave with the one thing you care about most working for you — less guessing, more living."}
+              : data.diabetesType === "type2"
+                ? "We’ll set up your Type 2 home — learning and community, without insulin dosing tools."
+                : showBothPath
+                  ? "We’ll set up your own tools first, then you can link Supporter access in a couple of taps."
+                  : "You’ll leave with the one thing you care about most working for you — less guessing, more living."}
           </p>
         </div>
       </div>
@@ -954,7 +967,17 @@ function WelcomeStep({
             </p>
           </div>
 
-          {!communityFlow ? (
+          {!communityFlow && data.diabetesType === "type2" ? (
+            <div
+              className="rounded-xl border border-teal-500/25 bg-teal-500/[0.06] px-3 py-2.5 text-left text-sm text-muted-foreground"
+              data-testid="onboarding-diabetes-type2-note"
+            >
+              <span className="font-medium text-foreground">Type 2</span>
+              {" — "}
+              home, learning, and community. Insulin dosing tools stay off for this path.
+            </div>
+          ) : null}
+          {!communityFlow && data.diabetesType !== "type2" ? (
           <div className="space-y-2">
             <div className="flex items-center gap-1">
               <Label className="text-base">Diabetes type</Label>
@@ -962,7 +985,8 @@ function WelcomeStep({
                 ariaLabel="About diabetes type"
                 content={
                   <p>
-                    Diabeaters is built for Type&nbsp;1 diabetes management (insulin, carbs, and daily planning).
+                    This path is for Type&nbsp;1 diabetes management (insulin, carbs, and daily planning).
+                    Choose Type&nbsp;2 on the welcome screen if that is you.
                   </p>
                 }
               />

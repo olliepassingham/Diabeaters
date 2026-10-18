@@ -40,6 +40,7 @@ function onboardingPathForProfile(
   }
   if (hasCarerLink && isPatient) return "both";
   if (cloudRole === "carer" && hasCarerLink) return "supporter";
+  if (metadataAccountPath === "type2") return "type2";
   if (isPatient || cloudRole === "patient") return "patient";
   // No cloud patient/role signal yet (null profile or brand-new row) — durable signup
   // metadata wins. Never invent "patient" from leftover localStorage of a previous account.
@@ -55,7 +56,7 @@ function primaryRoleForProfile(
   const path = onboardingPathForProfile(profile, hasCarerLink, metadataAccountPath);
   if (path === "community") return "community";
   if (path === "supporter") return "carer";
-  if (path === "both" || path === "patient") return "patient";
+  if (path === "both" || path === "patient" || path === "type2") return "patient";
   return cloudPrimaryAppRoleFromProfile(profile);
 }
 

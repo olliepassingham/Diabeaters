@@ -118,7 +118,7 @@ export const DASHBOARD_WIDGET_REGISTRY: DashboardWidgetDefinition[] = [
   {
     id: "tip-of-day",
     label: "Tip of the day",
-    description: "A practical type 1 reminder — shuffle for another tip anytime.",
+    description: "A practical diabetes reminder — shuffle for another tip anytime.",
     defaultEnabled: true,
     defaultSize: "full",
     component: TipOfDayWidget,

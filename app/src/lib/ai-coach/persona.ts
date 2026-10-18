@@ -12,14 +12,24 @@ export function coachPageTitle(audience: "patient" | "supporter"): string {
 }
 
 /** Short context line shown in a card under the coach page title. */
-export function coachPageSubtitle(audience: "patient" | "supporter"): string {
-  return audience === "supporter"
-    ? "Useful education for people supporting someone with type 1 diabetes in the UK. Not personal medical advice for you or for them."
-    : "Useful educational answers from your logs and Diabeaters tools. Not medical advice — no insulin doses, ratios, or glucose targets.";
+export function coachPageSubtitle(
+  audience: "patient" | "supporter",
+  opts?: { diabetesType?: string | null },
+): string {
+  if (audience === "supporter") {
+    return "Useful education for people supporting someone with type 1 diabetes in the UK. Not personal medical advice for you or for them.";
+  }
+  if (opts?.diabetesType === "type2") {
+    return "Useful educational answers about diabetes in the UK. Not medical advice — Type 2 management plans and dosing are out of scope.";
+  }
+  return "Useful educational answers from your logs and Diabeaters tools. Not medical advice — no insulin doses, ratios, or glucose targets.";
 }
 
 /** One-line lead for the patient coach header on small screens (full text in details). */
-export function coachPatientHeaderLead(): string {
+export function coachPatientHeaderLead(opts?: { diabetesType?: string | null }): string {
+  if (opts?.diabetesType === "type2") {
+    return "UK · Education only — not Type 2 management plans or dosing. Tap below for topic & full disclaimer.";
+  }
   return "UK · Education first — not medical advice or dosing. Tap below for topic & full disclaimer.";
 }
 

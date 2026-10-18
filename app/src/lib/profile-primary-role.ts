@@ -66,7 +66,7 @@ export async function finalizeSupporterLinkCloudSync(userId: string | undefined)
   applySupporterAccountRoleAfterLink();
 
   const path = getOnboardingAccountPath();
-  if ((path === "patient" || path === "both") && getPrimaryAppRole() !== "patient") {
+  if ((path === "patient" || path === "type2" || path === "both") && getPrimaryAppRole() !== "patient") {
     setPrimaryAppRole("patient");
   }
 

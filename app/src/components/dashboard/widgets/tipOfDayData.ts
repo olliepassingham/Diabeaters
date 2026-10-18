@@ -51,10 +51,10 @@ export const TIPS: Tip[] = [
 
   { text: "Diabetes burnout is real — it's okay to have days where you do the minimum. Just don't stop completely.", category: "mental" },
   { text: "You don't need perfect numbers to be doing a good job — aim for progress, not perfection.", category: "mental" },
-  { text: "Talking to others with Type 1 can help — you're not the only one dealing with this.", category: "mental" },
+  { text: "Talking to others with diabetes can help — you're not the only one dealing with this.", category: "mental" },
   { text: "It's okay to feel frustrated by diabetes — acknowledging it is the first step to managing it.", category: "mental" },
   { text: "Celebrate the small wins — a good day in range, remembering supplies, or trying a new meal. They all count.", category: "mental" },
-  { text: "Ask for help when you need it — from your diabetes team, family, or fellow Type 1s. Nobody manages this alone.", category: "mental" },
+  { text: "Ask for help when you need it — from your diabetes team, family, or others living with diabetes. Nobody manages this alone.", category: "mental" },
 ];
 
 export const CATEGORY_LABELS: Record<string, string> = {

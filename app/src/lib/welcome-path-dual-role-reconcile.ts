@@ -31,7 +31,7 @@ async function isDualRolePatientSupporter(userId: string): Promise<boolean> {
   if (cloudPrimaryAppRoleFromProfile(profile) === "carer") return false;
   if (localIndicatesPatientAccount()) return true;
   const path = getOnboardingAccountPath();
-  if (path === "patient" || path === "both") return true;
+  if (path === "patient" || path === "type2" || path === "both") return true;
   if (profileIndicatesExistingPatientAccount(profile)) return true;
   if (cloudPrimaryAppRoleFromProfile(profile) === "patient") return true;
   return false;

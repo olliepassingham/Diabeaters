@@ -134,9 +134,13 @@ export default function HelpNow() {
           data-testid="help-now-diabetes-type"
         >
           <p className="font-display text-[1.65rem] font-black uppercase leading-none tracking-tight text-red-700 sm:text-3xl">
-            Type 1 Diabetes
+            {profile?.diabetesType === "type2"
+              ? "Type 2 Diabetes"
+              : profile?.diabetesType === "gestational"
+                ? "Gestational Diabetes"
+                : "Type 1 Diabetes"}
           </p>
-          {profile?.usingInsulin || isPumpUser ? (
+          {(profile?.usingInsulin || isPumpUser) && profile?.diabetesType !== "type2" ? (
             <p className="mt-1.5 flex items-center justify-center gap-1.5 text-sm font-bold uppercase tracking-wider text-red-600">
               <Syringe className="h-4 w-4 shrink-0" aria-hidden />
               Insulin dependent

@@ -169,11 +169,12 @@ export function applyClinicalPrefsFromCloudRow(row: ProfileRow | null): void {
   if (row.account_type === "patient") {
     const lp = storage.getProfile();
     if (lp?.accountType === "community") {
+      const keepType2 = lp.diabetesType === "type2";
       storage.saveProfile({
         ...lp,
         accountType: "patient",
-        usingInsulin: true,
-        diabetesType: lp.diabetesType === "none" ? "type1" : lp.diabetesType,
+        usingInsulin: keepType2 ? false : true,
+        diabetesType: keepType2 ? "type2" : lp.diabetesType === "none" ? "type1" : lp.diabetesType,
       });
     }
   }

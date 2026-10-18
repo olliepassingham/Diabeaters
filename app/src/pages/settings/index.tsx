@@ -78,6 +78,7 @@ import { getSupabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSupporterSession } from "@/hooks/use-supporter-session";
 import { getOnboardingAccountPath } from "@/lib/carer-session";
+import { hasInsulinClinicalTools } from "@/lib/insulin-clinical-access";
 import { SettingsAppearanceRoute } from "./appearance";
 import { SettingsUsageRoute } from "./usage";
 import { SettingsNotificationsRoute } from "./notifications";
@@ -1071,6 +1072,7 @@ export default function Settings() {
   const [usesClosedLoop, setUsesClosedLoop] = useState(false);
   
   const isCommunityAccount = profile?.accountType === "community";
+  const insulinClinical = hasInsulinClinicalTools(profile);
   const hidePatientClinicalHub = inSupporterSession || isCommunityAccount;
   const showAccountTypeGroup = isCommunityAccount || showSupporterPatientUpgrade;
 
@@ -1223,8 +1225,12 @@ export default function Settings() {
       (pathOnly === "/settings/usage" || pathOnly === "/settings/ratios" || pathOnly === "/settings/pharmacy" || pathOnly === "/settings/carb-sources")
     ) {
       setLocation("/settings");
+      return;
     }
-  }, [hidePatientClinicalHub, pathOnly, setLocation]);
+    if (!insulinClinical && pathOnly === "/settings/ratios") {
+      setLocation("/settings");
+    }
+  }, [hidePatientClinicalHub, insulinClinical, pathOnly, setLocation]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -2168,23 +2174,33 @@ export default function Settings() {
         ) : null}
 
         {!hidePatientClinicalHub && (
-        <SettingsHubGroup title="Personal & clinical">
+        <SettingsHubGroup title={insulinClinical ? "Personal & clinical" : "Personal"}>
             <SettingsHubNavLink
               href="/settings/usage"
-              label="Personal info & usage"
-              description="Units, habits, and supply forecasts"
+              label={insulinClinical ? "Personal info & usage" : "Personal info"}
+              description={
+                insulinClinical
+                  ? "Units, habits, and supply forecasts"
+                  : "Name, units, and region — insulin supply tools are off for Type 2"
+              }
               icon={Activity}
             />
-            <SettingsHubNavLink
-              href="/settings/ratios"
-              label="Ratios"
-              description="TDD, targets, correction factor, meal ratios"
-              icon={Syringe}
-            />
+            {insulinClinical ? (
+              <SettingsHubNavLink
+                href="/settings/ratios"
+                label="Ratios"
+                description="TDD, targets, correction factor, meal ratios"
+                icon={Syringe}
+              />
+            ) : null}
             <SettingsHubNavLink
               href="/settings/carb-sources"
               label="Carb sources"
-              description="Name your gels, drinks, and tablets — used in hypo and exercise advice"
+              description={
+                insulinClinical
+                  ? "Name your gels, drinks, and tablets — used in hypo and exercise advice"
+                  : "Name your gels, drinks, and tablets"
+              }
               icon={Cookie}
             />
             <SettingsHubNavLink

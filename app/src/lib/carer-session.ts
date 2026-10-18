@@ -43,7 +43,7 @@ export function clearPersistedAccountRoleMarkers(): void {
 function primaryRoleFromOnboardingPath(path: OnboardingAccountPath): PrimaryAppRole | null {
   if (path === "supporter") return "carer";
   if (path === "community") return "community";
-  if (path === "patient" || path === "both") return "patient";
+  if (path === "patient" || path === "type2" || path === "both") return "patient";
   return null;
 }
 
@@ -52,7 +52,25 @@ export type ActiveAppMode = "patient" | "carer" | "community";
 /** Chosen on /welcome: drives default session mode when the account can use both User and Supporter. */
 export type PrimaryAppRole = "patient" | "carer" | "community";
 
-export type OnboardingAccountPath = "patient" | "supporter" | "both" | "community";
+/** `type2` = patient shell without insulin clinical tools. */
+export type OnboardingAccountPath = "patient" | "type2" | "supporter" | "both" | "community";
+
+const ONBOARDING_ACCOUNT_PATHS: readonly OnboardingAccountPath[] = [
+  "patient",
+  "type2",
+  "supporter",
+  "both",
+  "community",
+];
+
+export function isOnboardingAccountPath(raw: unknown): raw is OnboardingAccountPath {
+  return typeof raw === "string" && (ONBOARDING_ACCOUNT_PATHS as readonly string[]).includes(raw);
+}
+
+/** Patient-style onboarding (Type 1 or Type 2) — not community or supporter-only. */
+export function isPatientStyleOnboardingPath(path: OnboardingAccountPath | null | undefined): boolean {
+  return path === "patient" || path === "type2" || path === "both";
+}
 
 function emitModeChanged(mode: ActiveAppMode | null) {
   try {
@@ -171,7 +189,7 @@ export function setOnboardingAccountPath(path: OnboardingAccountPath): void {
 export function getOnboardingAccountPath(): OnboardingAccountPath | null {
   try {
     const raw = sessionStorage.getItem(ONBOARDING_ACCOUNT_PATH_KEY);
-    if (raw === "patient" || raw === "supporter" || raw === "both" || raw === "community") return raw;
+    if (isOnboardingAccountPath(raw)) return raw;
   } catch {
     // ignore
   }
@@ -189,8 +207,7 @@ export function onboardingAccountPathFromUserMetadata(
   user: { user_metadata?: Record<string, unknown> | null } | null | undefined,
 ): OnboardingAccountPath | null {
   const raw = user?.user_metadata?.onboarding_account_path;
-  if (raw === "patient" || raw === "supporter" || raw === "both" || raw === "community") return raw;
-  return null;
+  return isOnboardingAccountPath(raw) ? raw : null;
 }
 
 export function clearOnboardingAccountPath(): void {
@@ -231,7 +248,7 @@ export function getPrimaryAppRole(): PrimaryAppRole | null {
 /** Account created as supporter-only on /welcome — no User Mode or mode switcher. */
 export function isSupporterOnlyAccount(): boolean {
   const path = getOnboardingAccountPath();
-  if (path === "patient" || path === "both") return false;
+  if (path === "patient" || path === "type2" || path === "both") return false;
   /**
    * Supporter choice and a cloud carer role win over a previous account's Type 1
    * profile left on this phone. That leftover profile must not turn this login into User mode.
@@ -260,7 +277,7 @@ export function markDualRolePatientAfterLink(): void {
 /** Dual-role accounts (patient + linked supporter) can swap User / Supporter mode. */
 export function canSwitchAppMode(): boolean {
   const path = getOnboardingAccountPath();
-  if (path === "supporter") return false;
+  if (path === "supporter" || path === "type2") return false;
   if (path === "patient" || path === "both") return true;
   return getPrimaryAppRole() === "patient";
 }
@@ -269,7 +286,7 @@ export function canSwitchAppMode(): boolean {
 export function isCommunityOnlyAccount(): boolean {
   const path = getOnboardingAccountPath();
   if (path === "community") return true;
-  if (path === "patient" || path === "both" || path === "supporter") return false;
+  if (path === "patient" || path === "type2" || path === "both" || path === "supporter") return false;
   return getPrimaryAppRole() === "community";
 }
 
@@ -302,7 +319,8 @@ export function applySupporterAccountRoleAfterLink(): void {
     return;
   }
   const path = getOnboardingAccountPath();
-  const explicitPatient = path === "patient" || path === "both" || getPrimaryAppRole() === "patient";
+  const explicitPatient =
+    path === "patient" || path === "type2" || path === "both" || getPrimaryAppRole() === "patient";
   const cloud = getCachedCloudPrimaryAppRole();
   if (!explicitPatient && (path === "supporter" || cloud === "carer" || getPrimaryAppRole() === "carer")) {
     keepSupporterOnlyAfterLink();
@@ -312,7 +330,8 @@ export function applySupporterAccountRoleAfterLink(): void {
     markDualRolePatientAfterLink();
     return;
   }
-  if (path === "patient" || path === "both") {
+  if (path === "patient" || path === "type2" || path === "both") {
+    // Type 2 does not become dual-role supporter in this version.
     if (path === "patient") setOnboardingAccountPath("both");
     if (getPrimaryAppRole() == null) setPrimaryAppRole("patient");
     clearPersistedSupporterAccount();

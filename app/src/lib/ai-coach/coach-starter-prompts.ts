@@ -31,7 +31,7 @@ const STARTER_COUNT = 3;
 const STARTER_POOLS: Record<CoachTopicSlug, StarterEntry[]> = {
   community: [
     { text: "What is hypoglycaemia in simple, educational terms?" },
-    { text: "How can I talk about type 1 diabetes with friends or at work?" },
+    { text: "How can I talk about diabetes with friends or at work?" },
     { text: "What is dawn phenomenon in broad, educational terms?", boost: ["morning"] },
     { text: "What's useful to know before a first diabetes clinic appointment?", boost: ["morning", "afternoon"] },
     { text: "What questions help when I'm still learning diabetes vocabulary?", boost: ["afternoon"] },

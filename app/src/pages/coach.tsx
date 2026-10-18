@@ -23,15 +23,28 @@ import type { CoachAudience, CoachResponse, CoachTurn } from "@/lib/ai-coach/typ
 import { buildCoachStarterContext, pickCoachStarterPrompts } from "@/lib/ai-coach/coach-starter-prompts";
 import { describeCoachProfileVisibility } from "@/lib/ai-coach/contextSummary";
 import { syncClinicalPrefsToCloud } from "@/lib/clinical-prefs-cloud-sync";
-import { defaultCoachTopicForSession, getCoachTopicConfig, normalizeCoachTopicParam } from "@/lib/ai-coach/topics";
+import {
+  defaultCoachTopicForSession,
+  getCoachTopicConfig,
+  normalizeCoachTopicParam,
+  type CoachTopicSlug,
+} from "@/lib/ai-coach/topics";
 import {
   AI_ASSISTANT_NAME,
   coachPageSubtitle,
   coachPageTitle,
   coachSupporterTopicScopeHint,
 } from "@/lib/ai-coach/persona";
+import { isType2Patient } from "@/lib/insulin-clinical-access";
 import { recordLastInteraction } from "@/lib/last-interaction";
 import { cn } from "@/lib/utils";
+
+const TYPE2_BLOCKED_COACH_TOPICS = new Set<CoachTopicSlug>([
+  "exercise",
+  "sick-day",
+  "bedtime",
+  "pump-failure",
+]);
 
 function normalizeAudience(raw: string | null | undefined): CoachAudience {
   if (raw == null) return "patient";
@@ -157,7 +170,11 @@ function CoachDisclaimerFooter({
         </span>
       </summary>
       <div className="space-y-2 border-t border-border/40 px-3 pb-3 pt-2">
-        <p>{coachPageSubtitle(isSupporter ? "supporter" : "patient")}</p>
+        <p>
+          {coachPageSubtitle(isSupporter ? "supporter" : "patient", {
+            diabetesType: storage.getProfile()?.diabetesType,
+          })}
+        </p>
         {effectiveTopic !== "general" && topicHint ? (
           <p>
             <span className="font-medium text-foreground">Topic · {topicLabel}</span>
@@ -213,10 +230,13 @@ export default function CoachPage() {
     [isCarer, activeMode, profile?.account_type],
   );
   const topicSlug = useMemo(() => normalizeCoachTopicParam(new URLSearchParams(search).get("topic")), [search]);
-  const effectiveTopic = useMemo(
-    () => topicSlug ?? defaultCoachTopicForSession({ isSupporter, isCommunityMode }),
-    [topicSlug, isSupporter, isCommunityMode],
-  );
+  const effectiveTopic = useMemo(() => {
+    const raw = topicSlug ?? defaultCoachTopicForSession({ isSupporter, isCommunityMode });
+    if (!isSupporter && isType2Patient(storage.getProfile()) && TYPE2_BLOCKED_COACH_TOPICS.has(raw)) {
+      return "general";
+    }
+    return raw;
+  }, [topicSlug, isSupporter, isCommunityMode]);
   const topicCfg = useMemo(() => getCoachTopicConfig(effectiveTopic), [effectiveTopic]);
   const starterContext = useMemo(() => buildCoachStarterContext(), []);
   const displayedStarters = useMemo(

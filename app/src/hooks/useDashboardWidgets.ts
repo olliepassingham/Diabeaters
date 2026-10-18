@@ -1,8 +1,11 @@
 import { useCallback, useMemo, useState } from "react";
-import type { WidgetSize, WidgetType } from "@/lib/storage";
+import { storage, type WidgetSize, type WidgetType } from "@/lib/storage";
 import { DASHBOARD_WIDGET_BY_ID, DASHBOARD_WIDGET_REGISTRY } from "@/config/dashboard-widgets";
 import type { DashboardWidgetComponentProps } from "@/config/dashboard-widgets";
 import type { ComponentType } from "react";
+import { hasInsulinClinicalTools } from "@/lib/insulin-clinical-access";
+
+const TYPE2_HIDDEN_WIDGETS = new Set<WidgetType>(["ratio-adviser", "quick-exercise"]);
 
 const STORAGE_KEY = "diabeaters_dashboard_widgets";
 const LEGACY_STORAGE_KEY = "diabeater_dashboard_widgets";
@@ -255,8 +258,10 @@ export function useDashboardWidgets() {
   const orderedPlacements = useMemo(() => normaliseOrders(placements), [placements]);
 
   const activeWidgets: ActiveDashboardWidget[] = useMemo(() => {
+    const insulinClinical = hasInsulinClinicalTools(storage.getProfile());
     return orderedPlacements
       .filter((p) => p.enabled)
+      .filter((p) => insulinClinical || !TYPE2_HIDDEN_WIDGETS.has(p.id))
       .map((p) => {
         const def = DASHBOARD_WIDGET_BY_ID.get(p.id);
         if (!def?.component) return null;
