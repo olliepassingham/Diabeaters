@@ -38,11 +38,14 @@ describe("Type2Home", () => {
     expect(storage.getProfile()?.diabetesType).toBe("type2");
   });
 
-  it("renders care kit essentials without the old tile grid", () => {
+  it("renders supply runway and care essentials without the hero box or tile grid", () => {
     storage.saveProfile({ ...baseProfile(), diabetesType: "type2", usingInsulin: false });
     render(<Type2Home profile={storage.getProfile()} displayName="Alex Demo" />);
     expect(screen.getByTestId("type2-home")).not.toBeNull();
-    expect(screen.getByTestId("type2-home-supplies")).not.toBeNull();
+    expect(screen.getByTestId("type2-home-greeting")).not.toBeNull();
+    expect(screen.queryByTestId("type2-home-hero")).toBeNull();
+    expect(screen.getByTestId("home-supply-graph")).not.toBeNull();
+    expect(screen.queryByTestId("type2-home-supplies")).toBeNull();
     expect(screen.getByTestId("type2-home-appointments")).not.toBeNull();
     expect(screen.getByTestId("type2-home-emergency")).not.toBeNull();
     expect(screen.getByTestId("type2-home-ask-beatie")).not.toBeNull();
@@ -50,3 +53,4 @@ describe("Type2Home", () => {
     expect(screen.queryByText(/connect your cgm/i)).toBeNull();
   });
 });
+
