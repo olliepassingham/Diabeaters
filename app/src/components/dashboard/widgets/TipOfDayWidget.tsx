@@ -5,20 +5,20 @@ import { Lightbulb, RefreshCw } from "lucide-react";
 import { Link } from "wouter";
 import { WidgetCard } from "./WidgetCard";
 import type { DashboardWidgetLayoutProps } from "./types";
-import { CATEGORY_LABELS, getTipIndex, tipsForDelivery } from "./tipOfDayData";
-import { storage, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
+import { CATEGORY_LABELS, getTipIndex, tipsForProfile } from "./tipOfDayData";
+import { storage, DIABEATER_PROFILE_CHANGED_EVENT, type UserProfile } from "@/lib/storage";
 import { WidgetHeaderIcon, widgetContentClass, widgetHeaderClass } from "./widget-header";
 
 export function TipOfDayWidget(_props: DashboardWidgetLayoutProps) {
-  const [deliveryMethod, setDeliveryMethod] = useState(
-    () => storage.getProfile()?.insulinDeliveryMethod,
+  const [profile, setProfile] = useState<UserProfile | null>(() => storage.getProfile());
+  const tips = useMemo(() => tipsForProfile(profile), [profile]);
+  const [tipIndex, setTipIndex] = useState(() =>
+    getTipIndex(new Date(), tipsForProfile(storage.getProfile()).length),
   );
-  const tips = useMemo(() => tipsForDelivery(deliveryMethod), [deliveryMethod]);
-  const [tipIndex, setTipIndex] = useState(() => getTipIndex(new Date(), tipsForDelivery(storage.getProfile()?.insulinDeliveryMethod).length));
   const [showRandom, setShowRandom] = useState(false);
 
   useEffect(() => {
-    const onProfile = () => setDeliveryMethod(storage.getProfile()?.insulinDeliveryMethod);
+    const onProfile = () => setProfile(storage.getProfile());
     window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
     return () => window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
   }, []);

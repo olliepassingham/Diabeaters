@@ -30,8 +30,10 @@ import {
 } from "@/components/profile/profile-ui";
 import { fetchCommunityPostsByAuthorPage } from "@/lib/community";
 import { useCommunityStories } from "@/hooks/use-community-stories";
+import { isType2AppSession } from "@/lib/insulin-clinical-access";
 import { canEngageWithCommunityFeed, useProfile } from "@/lib/profile";
 import { sharePublicProfile } from "@/lib/share-public-profile";
+import { storage } from "@/lib/storage";
 import { useToast } from "@/hooks/use-toast";
 
 export function AccountPublicProfileTab({
@@ -182,7 +184,9 @@ export function AccountPublicProfileTab({
               followingTestId="link-my-public-profile-following"
             />
 
-            {!supporterMode ? <AccountPublicAchievementsSummary onsetDate={diabetesOnsetDate} /> : null}
+            {!supporterMode && !isType2AppSession(storage.getProfile()) ? (
+              <AccountPublicAchievementsSummary onsetDate={diabetesOnsetDate} />
+            ) : null}
 
             <ProfileBioPreview compact bio={bioPreview} livingWithLine={livingWithLine} />
           </ProfileHeroRow>

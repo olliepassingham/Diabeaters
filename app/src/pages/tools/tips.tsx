@@ -8,8 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-import { CATEGORY_LABELS, tipsForDelivery, type Tip } from "@/components/dashboard/widgets/tipOfDayData";
-import { storage, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
+import { CATEGORY_LABELS, tipsForProfile, type Tip } from "@/components/dashboard/widgets/tipOfDayData";
+import { storage, DIABEATER_PROFILE_CHANGED_EVENT, type UserProfile } from "@/lib/storage";
 
 type TipWithIndex = Tip & { idx: number };
 
@@ -21,16 +21,14 @@ function pickRandomTipIndex(length: number, exclude?: number): number {
 }
 
 export default function TipsPage() {
-  const [deliveryMethod, setDeliveryMethod] = useState(
-    () => storage.getProfile()?.insulinDeliveryMethod,
-  );
-  const tips = useMemo(() => tipsForDelivery(deliveryMethod), [deliveryMethod]);
+  const [profile, setProfile] = useState<UserProfile | null>(() => storage.getProfile());
+  const tips = useMemo(() => tipsForProfile(profile), [profile]);
   const [randomIdx, setRandomIdx] = useState(() =>
-    pickRandomTipIndex(tipsForDelivery(storage.getProfile()?.insulinDeliveryMethod).length),
+    pickRandomTipIndex(tipsForProfile(storage.getProfile()).length),
   );
 
   useEffect(() => {
-    const onProfile = () => setDeliveryMethod(storage.getProfile()?.insulinDeliveryMethod);
+    const onProfile = () => setProfile(storage.getProfile());
     window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
     return () => window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
   }, []);

@@ -18,7 +18,6 @@ import {
   ArrowLeftRight,
   History,
   Car,
-  Wine,
 } from "lucide-react";
 import { HubListPanel, HubListRow, type HubListAccent, type HubListTone } from "@/components/hub-list-panel";
 import { cn } from "@/lib/utils";
@@ -43,7 +42,7 @@ import { OfflineDeviceNotice } from "@/components/offline-device-notice";
 import { hasLiveCgmCredentials, readCgmPreferences } from "@/lib/cgm/preferences";
 import { hasInsulinClinicalTools, isType2AppSession } from "@/lib/insulin-clinical-access";
 import { ensureLocalType2Profile } from "@/lib/type2-session";
-import { canShowAlcoholScenarios, canShowDrivingReadiness } from "@/lib/user-age";
+import { canShowDrivingReadiness } from "@/lib/user-age";
 import { hapticLight } from "@/lib/haptics";
 
 type ToolDef = {
@@ -160,12 +159,14 @@ const TYPE2_HIDDEN_TOOL_IDS = new Set([
   "hypo-history",
   "routines",
   "education",
+  "achievements",
+  "activity-log",
 ]);
 
 const TYPE2_CARE_IDS = ["supply-tracker", "appointments", "help-now", "ai-coach"] as const;
-const TYPE2_HELPER_IDS = ["hypo-help", "glucose-converter", "tips", "achievements", "activity-log"] as const;
+const TYPE2_HELPER_IDS = ["hypo-help", "glucose-converter", "tips"] as const;
 
-function type2ToolsForHub(): ToolDef[] {
+export function type2ToolsForHub(): ToolDef[] {
   ensureLocalType2Profile(storage.getProfile());
   const byId = new Map(PATIENT_TOOLS.map((t) => [t.id, t] as const));
   byId.set("help-now", {
@@ -370,15 +371,7 @@ function Type2ToolsHub({
 }) {
   const dob = storage.getProfile()?.dateOfBirth;
   const situationTools: ToolDef[] = [];
-  if (canShowAlcoholScenarios(dob)) {
-    situationTools.push({
-      id: "alcohol",
-      href: "/scenarios/alcohol",
-      icon: Wine,
-      title: "Alcohol",
-      description: "Situation prep — education only",
-    });
-  }
+  // Alcohol stays Type 1–only (bolus / ratio flow). Driving is safe for Type 2.
   if (canShowDrivingReadiness(dob)) {
     situationTools.push({
       id: "driving",
@@ -395,7 +388,7 @@ function Type2ToolsHub({
         <div className="rounded-2xl border border-border/50 bg-muted/15 px-4 py-3">
           <p className="text-sm font-semibold text-foreground">Type 2 tools</p>
           <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
-            Supplies, appointments, emergency details, and situation guides — no insulin dosing.
+            Supplies, appointments, emergency details, and a driving check — no insulin dosing.
           </p>
         </div>
         {about}
@@ -437,7 +430,7 @@ function ToolsAboutDialog({ hubVariant }: { hubVariant: "patient" | "type2" | "c
       {hubVariant === "type2" ? (
         <InfoSection title="Type 2 tools">
           <p>
-            Supplies, appointments, emergency details, and a few situation guides — without insulin dosing or ratios.
+            Supplies, appointments, emergency details, and a driving readiness check — without insulin dosing or ratios.
             Educational only.
           </p>
         </InfoSection>

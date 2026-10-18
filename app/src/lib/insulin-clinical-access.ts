@@ -41,6 +41,19 @@ export function isInsulinClinicalPath(pathOnly: string, profile?: InsulinAccessP
   if (p === "/scenarios/bedtime" || p === "/bedtime") return true;
   if (p === "/scenarios/sick-day" || p === "/sick-day") return true;
   if (p === "/scenarios/pump-failure") return true;
+  // Alcohol situation tool still runs meal/bolus math — Type 1 clinical only until a Type 2 education flow exists.
+  if (p === "/scenarios/alcohol") return true;
   if (p.startsWith("/settings/ratios")) return true;
+  return false;
+}
+
+/**
+ * Type 1–oriented helper pages kept off the Type 2 tools hub (and deep links).
+ * Hypo help stays reachable but renders education-only for Type 2.
+ */
+export function isType2HiddenToolsPath(pathOnly: string): boolean {
+  const p = (pathOnly || "/").split("?")[0] ?? "/";
+  if (p === "/tools/achievements") return true;
+  if (p === "/tools/activity" || p.startsWith("/tools/activity/")) return true;
   return false;
 }

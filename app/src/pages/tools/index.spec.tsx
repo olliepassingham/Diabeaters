@@ -8,10 +8,14 @@ vi.mock("@/hooks/use-community-push-prompt-after-onboarding", () => ({
   }),
 }));
 
-import { CARER_TOOLS, ToolsHubPage } from "./index";
+import { setOnboardingAccountPath, clearOnboardingAccountPath } from "@/lib/carer-session";
+import { storage } from "@/lib/storage";
+import { CARER_TOOLS, ToolsHubPage, type2ToolsForHub } from "./index";
 
 describe("ToolsHubPage", () => {
   beforeEach(() => {
+    localStorage.clear();
+    clearOnboardingAccountPath();
     Object.defineProperty(window, "matchMedia", {
       writable: true,
       configurable: true,
@@ -60,5 +64,27 @@ describe("ToolsHubPage", () => {
     expect(screen.queryByTestId("tools-section-learn")).toBeNull();
     expect(screen.getByRole("heading", { name: /hypo help/i })).not.toBeNull();
     expect(screen.getByRole("heading", { name: /^education$/i })).not.toBeNull();
+  });
+
+  it("Type 2 hub omits achievements and activity log", () => {
+    setOnboardingAccountPath("type2");
+    storage.saveProfile({
+      name: "Chris",
+      email: "",
+      dateOfBirth: "",
+      bgUnits: "mmol/L",
+      carbUnits: "grams",
+      diabetesType: "type2",
+      insulinDeliveryMethod: "pen",
+      usingInsulin: false,
+      hasAcceptedDisclaimer: true,
+      accountType: "patient",
+    });
+    render(<ToolsHubPage tools={type2ToolsForHub()} hubVariant="type2" />);
+
+    expect(screen.queryByTestId("tools-type2")).not.toBeNull();
+    expect(screen.getByRole("heading", { name: /what is a hypo/i })).not.toBeNull();
+    expect(screen.queryByRole("heading", { name: /^achievements$/i })).toBeNull();
+    expect(screen.queryByRole("heading", { name: /activity log/i })).toBeNull();
   });
 });

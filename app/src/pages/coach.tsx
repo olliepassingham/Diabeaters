@@ -35,7 +35,7 @@ import {
   coachPageTitle,
   coachSupporterTopicScopeHint,
 } from "@/lib/ai-coach/persona";
-import { isType2Patient } from "@/lib/insulin-clinical-access";
+import { isType2AppSession, isType2Patient } from "@/lib/insulin-clinical-access";
 import { recordLastInteraction } from "@/lib/last-interaction";
 import { cn } from "@/lib/utils";
 
@@ -490,11 +490,13 @@ export default function CoachPage() {
     }
   }, []);
 
-  const intro = useMemo(
-    () =>
-      `${AI_ASSISTANT_NAME} is an educational guide for people with type 1 diabetes in the UK, including teenagers when they use the app with their team and family. This is not medical advice and it cannot suggest insulin doses, ratios, or targets. Messages are sent to our servers and, when the guide is enabled for your environment, to OpenAI to generate a reply. Do not type anything you would not want a third party to see.`,
-    [],
-  );
+  const intro = useMemo(() => {
+    const type2 = isType2AppSession(storage.getProfile()) || isType2Patient(storage.getProfile());
+    if (type2) {
+      return `${AI_ASSISTANT_NAME} is an educational guide about diabetes in the UK. This is not medical advice — Type 2 management plans, medicine changes, and dosing are out of scope. Messages are sent to our servers and, when the guide is enabled for your environment, to OpenAI to generate a reply. Do not type anything you would not want a third party to see.`;
+    }
+    return `${AI_ASSISTANT_NAME} is an educational guide for people with type 1 diabetes in the UK, including teenagers when they use the app with their team and family. This is not medical advice and it cannot suggest insulin doses, ratios, or targets. Messages are sent to our servers and, when the guide is enabled for your environment, to OpenAI to generate a reply. Do not type anything you would not want a third party to see.`;
+  }, []);
 
   const profileVisibility = useMemo(() => {
     if (isSupporter) return null;

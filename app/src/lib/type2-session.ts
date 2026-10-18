@@ -14,7 +14,8 @@ export function ensureLocalType2Profile(profile: UserProfile | null): UserProfil
       bgUnits: "mmol/L",
       carbUnits: "grams",
       diabetesType: "type2",
-      insulinDeliveryMethod: "pen",
+      // Do not default to "pen" — that pulls Type 1 tips / coach MDI context.
+      insulinDeliveryMethod: "",
       usingInsulin: false,
       hasAcceptedDisclaimer: true,
       accountType: "patient",
@@ -22,7 +23,14 @@ export function ensureLocalType2Profile(profile: UserProfile | null): UserProfil
     storage.saveProfile(next);
     return next;
   }
-  if (profile.diabetesType === "type2" && profile.usingInsulin === false && profile.accountType !== "community") {
+  const alreadyType2 =
+    profile.diabetesType === "type2" &&
+    profile.usingInsulin === false &&
+    profile.accountType !== "community";
+  const needsClearPenDefault =
+    alreadyType2 &&
+    (profile.insulinDeliveryMethod === "pen" || profile.insulinDeliveryMethod === "pump");
+  if (alreadyType2 && !needsClearPenDefault) {
     return profile;
   }
   const next: UserProfile = {
@@ -30,6 +38,8 @@ export function ensureLocalType2Profile(profile: UserProfile | null): UserProfil
     diabetesType: "type2",
     usingInsulin: false,
     accountType: "patient",
+    // Clear leftover Type 1 delivery so tips/coach stay Type 2–safe.
+    insulinDeliveryMethod: needsClearPenDefault || !alreadyType2 ? "" : profile.insulinDeliveryMethod,
   };
   storage.saveProfile(next);
   return next;

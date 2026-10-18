@@ -35,7 +35,19 @@ describe("Type2Home", () => {
     const next = ensureLocalType2Profile(storage.getProfile());
     expect(next?.diabetesType).toBe("type2");
     expect(next?.usingInsulin).toBe(false);
+    expect(next?.insulinDeliveryMethod).toBe("");
     expect(storage.getProfile()?.diabetesType).toBe("type2");
+  });
+
+  it("clears leftover pen/pump delivery on an existing Type 2 profile", () => {
+    storage.saveProfile({
+      ...baseProfile(),
+      diabetesType: "type2",
+      usingInsulin: false,
+      insulinDeliveryMethod: "pen",
+    });
+    const next = ensureLocalType2Profile(storage.getProfile());
+    expect(next?.insulinDeliveryMethod).toBe("");
   });
 
   it("renders supply runway and care essentials without the hero box or tile grid", () => {

@@ -4,6 +4,7 @@ import {
   hasInsulinClinicalTools,
   isInsulinClinicalPath,
   isType2AppSession,
+  isType2HiddenToolsPath,
   isType2Patient,
 } from "@/lib/insulin-clinical-access";
 
@@ -47,6 +48,7 @@ describe("insulin-clinical-access", () => {
   it("recognises insulin clinical paths", () => {
     expect(isInsulinClinicalPath("/adviser?tab=meal")).toBe(true);
     expect(isInsulinClinicalPath("/scenarios/exercise")).toBe(true);
+    expect(isInsulinClinicalPath("/scenarios/alcohol")).toBe(true);
     expect(isInsulinClinicalPath("/tools")).toBe(false);
     expect(isInsulinClinicalPath("/community")).toBe(false);
   });
@@ -66,5 +68,12 @@ describe("insulin-clinical-access", () => {
         accountType: "patient",
       }),
     ).toBe(true);
+  });
+
+  it("hides Type 1 achievement and activity paths from Type 2", () => {
+    expect(isType2HiddenToolsPath("/tools/achievements")).toBe(true);
+    expect(isType2HiddenToolsPath("/tools/activity")).toBe(true);
+    expect(isType2HiddenToolsPath("/tools/hypo-help")).toBe(false);
+    expect(isType2HiddenToolsPath("/tools")).toBe(false);
   });
 });

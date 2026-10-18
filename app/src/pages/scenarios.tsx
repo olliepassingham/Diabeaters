@@ -98,8 +98,7 @@ export default function Scenarios() {
   const [location, setLocation] = useLocation();
   const search = useSearch();
   const isType2 = isType2AppSession(storage.getProfile());
-  const onType2SituationDeepLink =
-    location.startsWith("/scenarios/alcohol") || location.startsWith("/scenarios/driving");
+  const onType2SituationDeepLink = location.startsWith("/scenarios/driving");
 
   const [visibleScenarioCards, setVisibleScenarioCards] = useState<ScenarioCardDef[]>(() => {
     const profile = storage.getProfile();
@@ -111,7 +110,7 @@ export default function Scenarios() {
   );
 
   useEffect(() => {
-    // Type 2 uses the combined Tools hub (guides live there). Keep alcohol/driving deep links.
+    // Type 2 uses the combined Tools hub (guides live there). Keep driving deep links only.
     if (isType2 && !onType2SituationDeepLink) {
       setLocation("/tools");
     }

@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { storage, type UserProfile, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
+import { isType2AppSession } from "@/lib/insulin-clinical-access";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import {
   formatWeightInputFromKg,
@@ -84,6 +85,88 @@ function formatRecheckCountdown(remainingSec: number): string {
   const m = Math.floor(remainingSec / 60);
   const s = remainingSec % 60;
   return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function Type2HypoEducationPage({ bgUnits }: { bgUnits: string }) {
+  const isMgdl = bgUnits === "mg/dL";
+  const unit = isMgdl ? "mg/dL" : "mmol/L";
+  const alertExample = isMgdl ? "70 mg/dL" : "3.9 mmol/L";
+
+  return (
+    <PageShell variant="standard" className="bg-background text-foreground" data-testid="type2-hypo-education">
+      <PageHeader
+        leading={<PageBackButton />}
+        title="What is a hypo?"
+        description="Low blood glucose basics — education only. Follow your care team’s plan."
+        actions={
+          <PageInfoDialog
+            title="About this guide"
+            description="General education for people living with Type 2 diabetes. Not personal medical advice."
+          >
+            <InfoSection title="Why this is education-only">
+              <p>
+                Type 2 management varies widely. Some people use insulin or other medicines that can lower glucose; many
+                do not. This page explains common ideas — your clinic’s written plan always comes first.
+              </p>
+            </InfoSection>
+            <InfoSection title="Safety">
+              <p>
+                If you cannot swallow, feel confused, or someone cannot keep you safe, get emergency help. Use any
+                rescue medicine your team has prescribed for you.
+              </p>
+              <MedicalSourcesLink anchor="hypoglycaemia" className="mt-2 inline-block" />
+            </InfoSection>
+          </PageInfoDialog>
+        }
+      />
+
+      <div className="mt-4 space-y-4">
+        <Card className="rounded-2xl border-border/60 shadow-sm">
+          <CardContent className="space-y-3 p-4 sm:p-5">
+            <h2 className="text-base font-semibold text-foreground">In plain terms</h2>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              A hypo (hypoglycaemia) means blood glucose is lower than your personal safe range. Many teams treat
+              readings around {alertExample} or below as a signal to act — your own targets may differ.
+            </p>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              Symptoms can include shaking, sweating, hunger, irritability, or confusion. Some people feel little
+              warning. If you are unsure, check with a meter or sensor when you can.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border-border/60 shadow-sm">
+          <CardContent className="space-y-3 p-4 sm:p-5">
+            <h2 className="text-base font-semibold text-foreground">Typical first steps</h2>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              If your team has taught you a hypo plan, follow that. A common pattern is:
+            </p>
+            <StepLadder steps={HYPO_RECHECK_FLOW_STEPS} ariaLabel="Hypo education steps" />
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              Fast carbs often mean glucose tablets, juice, or another option your team listed — not diet drinks. Amounts
+              and follow-up snacks depend on your medicines and plan ({unit} readings).
+            </p>
+          </CardContent>
+        </Card>
+
+        <Alert className="border-amber-500/35 bg-amber-500/5 dark:bg-amber-950/20">
+          <AlertDescription className="text-sm leading-relaxed">
+            This is not a dose calculator. Ask your clinic what to do if you use insulin, sulfonylureas, or other
+            medicines that can lower glucose.
+          </AlertDescription>
+        </Alert>
+
+        <div className="flex flex-wrap gap-3 text-sm">
+          <Link href="/education/hypoglycaemia" className="font-medium text-primary underline-offset-4 hover:underline">
+            Read the glossary entry
+          </Link>
+          <Link href="/help-now" className="font-medium text-primary underline-offset-4 hover:underline">
+            Emergency details
+          </Link>
+        </div>
+      </div>
+    </PageShell>
+  );
 }
 
 function HypoHelpInfoDialog({ bgUnits }: { bgUnits: string }) {
@@ -179,6 +262,7 @@ function HypoContextChips({ chips }: { chips: ContextChip[] }) {
 export default function HypoHelpPage() {
   const { toast } = useToast();
   const [profile, setProfile] = useState<Partial<UserProfile>>(() => storage.getProfile() ?? {});
+  const type2EducationOnly = isType2AppSession(profile);
   const [lastHypoDetail, setLastHypoDetail] = useState<{ at: string; label: string } | null>(null);
   const [targetPrefilledFromRange, setTargetPrefilledFromRange] = useState(false);
   const [currentBg, setCurrentBg] = useState("");
@@ -367,6 +451,10 @@ export default function HypoHelpPage() {
   };
 
   const startRecheckTimer = () => setRecheckEndsAt(Date.now() + RECHECK_MS);
+
+  if (type2EducationOnly) {
+    return <Type2HypoEducationPage bgUnits={bgUnits} />;
+  }
 
   return (
     <PageShell variant="narrow" density="compact" className="space-y-4 pb-6">

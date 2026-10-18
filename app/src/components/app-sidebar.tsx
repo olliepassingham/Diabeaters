@@ -106,13 +106,21 @@ export function AppSidebar() {
     }
     if (!isCarer) {
       const base = isType2Patient
-        ? patientItems.filter((item) => item.url !== "/family-carers")
+        ? patientItems.filter(
+            (item) =>
+              item.url !== "/family-carers" &&
+              item.url !== "/adviser" &&
+              item.url !== "/scenarios",
+          )
         : patientItems;
       if (!showCommunity) return base;
+      // Type 2: Home, Supply, Appointments, Settings → insert Feed after Supply.
+      // Type 1: keep Feed after Guides (4th item).
+      const feedAt = isType2Patient ? 2 : 4;
       return [
-        ...base.slice(0, 4),
+        ...base.slice(0, feedAt),
         { title: "Feed", url: "/community", icon: Users },
-        ...base.slice(4),
+        ...base.slice(feedAt),
       ] as const;
     }
     if (!isCarerMode || !showCommunity) return carerItems;

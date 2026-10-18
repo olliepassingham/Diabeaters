@@ -18,6 +18,7 @@ import { AI_ASSISTANT_NAME, openAssistantCtaLabel } from "@/lib/ai-coach/persona
 import { isAiCoachEnabled } from "@/lib/flags";
 import { hapticLight } from "@/lib/haptics";
 import { ensureLocalType2Profile } from "@/lib/type2-session";
+import { seedPatientFirstRunDefaultsIfNeeded } from "@/lib/starter-patient-defaults";
 import {
   DIABEATER_ACTIVE_USER_CHANGED_EVENT,
   DIABEATER_SUPPLIES_CHANGED_EVENT,
@@ -120,6 +121,7 @@ export function Type2Home({
   }, [profileProp]);
 
   useEffect(() => {
+    seedPatientFirstRunDefaultsIfNeeded();
     const refresh = () => setSupplies(storage.getSupplies());
     refresh();
     const onVis = () => {

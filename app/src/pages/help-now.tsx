@@ -14,6 +14,7 @@ import {
 import { Link } from "wouter";
 import { storage, UserProfile, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
+import { isType2AppSession } from "@/lib/insulin-clinical-access";
 import { useProfile } from "@/lib/profile";
 import { useSupporterSession } from "@/hooks/use-supporter-session";
 import { emergencyDetailsEditHref } from "@/lib/emergency-details-edit-href";
@@ -31,8 +32,15 @@ const AWAKE_STEPS = [
   "Still unwell? Call emergency services using the button below.",
 ] as const;
 
-const UNCONSCIOUS_STEPS = [
+const UNCONSCIOUS_STEPS_TYPE1 = [
   "Tell paramedics this person has Type 1 Diabetes and uses insulin.",
+  "Do not give food, drink, or put anything in their mouth.",
+  "Turn them on their side and stay with them until help arrives.",
+  "Call emergency services now using the button below.",
+] as const;
+
+const UNCONSCIOUS_STEPS_TYPE2 = [
+  "Tell paramedics this person has Type 2 Diabetes.",
   "Do not give food, drink, or put anything in their mouth.",
   "Turn them on their side and stay with them until help arrives.",
   "Call emergency services now using the button below.",
@@ -96,7 +104,10 @@ export default function HelpNow() {
   const emergencyNumber = getEffectiveEmergencyNumber(profile);
   const emergencyLabel = `Call ${emergencyNumber}`;
 
-  const isPumpUser = isPumpDeliveryMethod(profile?.insulinDeliveryMethod);
+  const isType2 = profile?.diabetesType === "type2" || isType2AppSession(profile);
+  const isPumpUser =
+    !isType2 && isPumpDeliveryMethod(profile?.insulinDeliveryMethod);
+  const unconsciousSteps = isType2 ? UNCONSCIOUS_STEPS_TYPE2 : UNCONSCIOUS_STEPS_TYPE1;
 
   const quickSymptoms = useMemo(
     () => ["Shaking", "Sweating", "Confused", "Slurred speech", "Drowsy", "Pale"],
@@ -255,7 +266,7 @@ export default function HelpNow() {
             </p>
             <div className="mt-3">
               <StepList
-                steps={mode === "awake" ? AWAKE_STEPS : UNCONSCIOUS_STEPS}
+                steps={mode === "awake" ? AWAKE_STEPS : unconsciousSteps}
                 urgent={mode === "unconscious"}
               />
             </div>

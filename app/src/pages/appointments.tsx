@@ -44,6 +44,7 @@ import {
   ClipboardList,
 } from "lucide-react";
 import { storage, Appointment, AppointmentType } from "@/lib/storage";
+import { isType2AppSession } from "@/lib/insulin-clinical-access";
 import { format, isAfter, isBefore, addDays, differenceInCalendarDays } from "date-fns";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
@@ -333,15 +334,25 @@ function UpcomingAppointmentCard({
   );
 }
 
-const CHECKUP_TIPS = [
+const CHECKUP_TIPS_TYPE1 = [
   { icon: Eye, label: "Eye screening", cadence: "Every 1–2 years" },
   { icon: Footprints, label: "Foot check", cadence: "Annually" },
   { icon: TestTube, label: "HbA1c blood test", cadence: "Every 3–6 months" },
   { icon: Heart, label: "BP & cholesterol", cadence: "Annually" },
 ] as const;
 
+/** UK Type 2 screening-style reminders (educational — follow your clinic’s invite). */
+const CHECKUP_TIPS_TYPE2 = [
+  { icon: Eye, label: "Eye screening", cadence: "Usually annually (NHS DES invite)" },
+  { icon: Footprints, label: "Foot check", cadence: "At least annually" },
+  { icon: TestTube, label: "HbA1c blood test", cadence: "Every 3–6 months" },
+  { icon: Heart, label: "BP, kidneys & cholesterol", cadence: "Usually annually" },
+] as const;
+
 export default function Appointments() {
   const { user } = useAuth();
+  const isType2User = isType2AppSession(storage.getProfile());
+  const checkupTips = isType2User ? CHECKUP_TIPS_TYPE2 : CHECKUP_TIPS_TYPE1;
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
@@ -362,6 +373,19 @@ export default function Appointments() {
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [hba1cUnit, setHba1cUnit] = useHba1cUnit();
   const previousHba1cUnit = useRef(hba1cUnit);
+
+  const appointmentTypeOptions = useMemo(() => {
+    if (!isType2User) return APPOINTMENT_TYPES;
+    const base = APPOINTMENT_TYPES.filter((t) => t.value !== "pump_review").map((t) =>
+      t.value === "clinic" ? { ...t, label: "Diabetes / GP review", shortLabel: "Review" } : t,
+    );
+    // Keep pump review selectable only when editing a legacy Type 1-style row.
+    if (editingAppointment?.type === "pump_review") {
+      const pump = APPOINTMENT_TYPES.find((t) => t.value === "pump_review");
+      if (pump) return [...base, pump];
+    }
+    return base;
+  }, [isType2User, editingAppointment?.type]);
 
   useEffect(() => {
     if (previousHba1cUnit.current === hba1cUnit) return;
@@ -628,8 +652,9 @@ export default function Appointments() {
             <PageInfoDialog title="About Appointments" description="Keep track of your diabetes healthcare visits">
               <InfoSection title="Adding appointments">
                 <p>
-                  Tap Add to schedule clinic visits, eye checks, foot checks, blood tests, pump reviews, or other
-                  appointments.
+                  {isType2User
+                    ? "Tap Add to schedule diabetes reviews, eye checks, foot checks, blood tests, or other appointments."
+                    : "Tap Add to schedule clinic visits, eye checks, foot checks, blood tests, pump reviews, or other appointments."}
                 </p>
               </InfoSection>
               <InfoSection title="Reminders">
@@ -723,7 +748,7 @@ export default function Appointments() {
               <div className="space-y-2">
                 <Label className="text-xs font-medium text-muted-foreground">Type</Label>
                 <div className="grid grid-cols-3 gap-1.5">
-                  {APPOINTMENT_TYPES.map((t) => {
+                  {appointmentTypeOptions.map((t) => {
                     const TypeIcon = t.icon;
                     const selected = type === t.value;
                     return (
@@ -894,7 +919,9 @@ export default function Appointments() {
             <div className="min-w-0 flex-1 space-y-1">
               <p className="font-display text-lg font-semibold">No upcoming visits</p>
               <p className="text-sm text-muted-foreground">
-                Add your clinic, eye, and foot appointments so reminders and supporters stay in sync.
+                {isType2User
+                  ? "Add diabetes reviews, eye, foot, and blood-test appointments so reminders stay in sync."
+                  : "Add your clinic, eye, and foot appointments so reminders and supporters stay in sync."}
               </p>
             </div>
             <Button
@@ -1164,10 +1191,14 @@ export default function Appointments() {
         <CardContent className="space-y-4 p-5">
           <div>
             <h3 className="font-display text-base font-semibold text-foreground">Recommended check-ups</h3>
-            <p className="mt-0.5 text-sm text-muted-foreground">Typical Type 1 diabetes screening intervals in the UK</p>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {isType2User
+                ? "Typical Type 2 diabetes screening intervals in the UK — follow your clinic’s invites"
+                : "Typical Type 1 diabetes screening intervals in the UK"}
+            </p>
           </div>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {CHECKUP_TIPS.map((tip) => {
+            {checkupTips.map((tip) => {
               const TipIcon = tip.icon;
               return (
                 <div

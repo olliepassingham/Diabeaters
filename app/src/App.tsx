@@ -106,7 +106,12 @@ import {
   onboardingAccountPathFromUserMetadata,
   setActiveAppMode,
 } from "@/lib/carer-session";
-import { hasInsulinClinicalTools, isInsulinClinicalPath, isType2AppSession } from "@/lib/insulin-clinical-access";
+import {
+  hasInsulinClinicalTools,
+  isInsulinClinicalPath,
+  isType2AppSession,
+  isType2HiddenToolsPath,
+} from "@/lib/insulin-clinical-access";
 import { AnimatedRouteOutlet } from "@/components/animated-route-outlet";
 import { CommunityFeatureGate } from "@/components/community-feature-gate";
 import { PatientOnboardingGate } from "@/components/patient-onboarding-gate";
@@ -644,6 +649,16 @@ function PatientRouteGuard({ children }: { children: React.ReactNode }) {
       !hasInsulinClinicalTools(storage.getProfile())
     ) {
       setLocation("/tools");
+      return;
+    }
+    // Type 2: achievements / activity log stay Type 1–oriented for now.
+    if (
+      !isCarerMode &&
+      !isCommunityMode &&
+      isType2AppSession(storage.getProfile()) &&
+      isType2HiddenToolsPath(pathOnly)
+    ) {
+      setLocation("/tools");
     }
   }, [
     loading,
@@ -677,6 +692,14 @@ function PatientRouteGuard({ children }: { children: React.ReactNode }) {
     !isCommunityMode &&
     isInsulinClinicalPath(pathOnly, storage.getProfile()) &&
     !hasInsulinClinicalTools(storage.getProfile())
+  ) {
+    return null;
+  }
+  if (
+    !isCarerMode &&
+    !isCommunityMode &&
+    isType2AppSession(storage.getProfile()) &&
+    isType2HiddenToolsPath(pathOnly)
   ) {
     return null;
   }

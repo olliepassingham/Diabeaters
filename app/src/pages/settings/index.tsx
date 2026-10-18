@@ -2281,7 +2281,7 @@ export default function Settings() {
               <SettingsHubNavLink
                 href="/onboarding?upgrade=1"
                 label="I use insulin / need Type 1 tools"
-                description="Unlock meal planner, ratios, supplies, and insulin situation guides"
+                description="Add meal planner, ratios, and insulin situation guides (supplies already available)"
                 icon={Sparkles}
               />
             ) : (

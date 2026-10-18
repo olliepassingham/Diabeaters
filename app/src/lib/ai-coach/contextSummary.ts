@@ -11,6 +11,7 @@
 
 import { normalizeDateOfBirthInput } from "@/lib/user-age";
 import { listMealRoutinesForCarbEstimator } from "@/lib/carb-estimator-routines";
+import { isType2AppSession } from "@/lib/insulin-clinical-access";
 import { isCommunityAccountProfile, storage } from "@/lib/storage";
 import { isPenDeliveryMethod, isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import type { TravelTripStyle } from "@/lib/travel-active-guidance";
@@ -131,11 +132,14 @@ export interface AiCoachClientPayload {
 export function buildCoachDeviceSetupWire(): AiCoachDeviceSetupWire {
   const profile = storage.getProfile();
   const settings = storage.getSettings() ?? {};
-  const insulinDeliveryMethod = isPumpDeliveryMethod(profile?.insulinDeliveryMethod)
-    ? "pump"
-    : isPenDeliveryMethod(profile?.insulinDeliveryMethod)
-      ? "pen"
-      : null;
+  const type2 = isType2AppSession(profile) || profile?.usingInsulin === false;
+  const insulinDeliveryMethod = type2
+    ? null
+    : isPumpDeliveryMethod(profile?.insulinDeliveryMethod)
+      ? "pump"
+      : isPenDeliveryMethod(profile?.insulinDeliveryMethod)
+        ? "pen"
+        : null;
   const carbUnitsRaw = trimIfString(profile?.carbUnits).toLowerCase();
   const carbUnits: AiCoachDeviceSetupWire["carbUnits"] =
     carbUnitsRaw === "portions" || carbUnitsRaw === "portion"
@@ -147,7 +151,9 @@ export function buildCoachDeviceSetupWire(): AiCoachDeviceSetupWire {
     (typeof settings.cgmDays === "number" && settings.cgmDays > 0) ||
     listSupplies().some((s) => s.type === "cgm");
   const usesClosedLoop =
-    isPumpDeliveryMethod(profile?.insulinDeliveryMethod) && settings.usesClosedLoop === true;
+    !type2 &&
+    isPumpDeliveryMethod(profile?.insulinDeliveryMethod) &&
+    settings.usesClosedLoop === true;
   return { insulinDeliveryMethod, carbUnits, usesCgm, usesClosedLoop };
 }
 
@@ -156,22 +162,28 @@ export function describeCoachProfileVisibility(): string | null {
   try {
     const setup = buildCoachDeviceSetupWire();
     const profile = storage.getProfile();
+    const type2 = isType2AppSession(profile) || profile?.usingInsulin === false;
     const bits: string[] = [];
-    if (setup.insulinDeliveryMethod === "pump") bits.push("pump");
+    if (type2) bits.push("Type 2");
+    else if (setup.insulinDeliveryMethod === "pump") bits.push("pump");
     else if (setup.insulinDeliveryMethod === "pen") bits.push("MDI");
     const bg = trimIfString(profile?.bgUnits);
     if (bg) bits.push(bg);
-    if (setup.carbUnits) bits.push(setup.carbUnits === "portions" ? "carb portions" : "carb grams");
+    if (setup.carbUnits && !type2) {
+      bits.push(setup.carbUnits === "portions" ? "carb portions" : "carb grams");
+    }
     if (setup.usesCgm) bits.push("CGM");
     if (setup.usesClosedLoop) bits.push("closed loop");
-    const settings = storage.getSettings() ?? {};
-    const ratiosAreSet = Boolean(
-      trimIfString(settings.breakfastRatio) ||
-        trimIfString(settings.lunchRatio) ||
-        trimIfString(settings.dinnerRatio) ||
-        trimIfString(settings.snackRatio),
-    );
-    if (ratiosAreSet) bits.push("ratios saved");
+    if (!type2) {
+      const settings = storage.getSettings() ?? {};
+      const ratiosAreSet = Boolean(
+        trimIfString(settings.breakfastRatio) ||
+          trimIfString(settings.lunchRatio) ||
+          trimIfString(settings.dinnerRatio) ||
+          trimIfString(settings.snackRatio),
+      );
+      if (ratiosAreSet) bits.push("ratios saved");
+    }
     if (bits.length === 0) return null;
     return `Beatie can see: ${bits.join(" · ")}`;
   } catch {
@@ -226,14 +238,17 @@ export function buildAiCoachClientPayload(): AiCoachClientPayload {
   const bgReadings = hypos.length + exerciseWithBg;
 
   const settings = storage.getSettings() ?? {};
-  const ratiosAreSet = Boolean(
-    trimIfString(settings.breakfastRatio) ||
-      trimIfString(settings.lunchRatio) ||
-      trimIfString(settings.dinnerRatio) ||
-      trimIfString(settings.snackRatio),
-  );
-
   const profile = storage.getProfile();
+  const type2 = isType2AppSession(profile) || profile?.usingInsulin === false;
+  const ratiosAreSet =
+    !type2 &&
+    Boolean(
+      trimIfString(settings.breakfastRatio) ||
+        trimIfString(settings.lunchRatio) ||
+        trimIfString(settings.dinnerRatio) ||
+        trimIfString(settings.snackRatio),
+    );
+
   const bgUnitsRaw = trimIfString(profile?.bgUnits);
   const bgUnits =
     bgUnitsRaw === "mmol/L" || bgUnitsRaw?.toLowerCase() === "mmol/l"
@@ -323,7 +338,7 @@ export function buildAiCoachClientPayload(): AiCoachClientPayload {
     deviceSetup: buildCoachDeviceSetupWire(),
     pharmacyStatus,
     ...(dateOfBirth ? { dateOfBirth } : {}),
-    savedMeals: buildSavedMeals(),
+    savedMeals: type2 ? [] : buildSavedMeals(),
     toolsUsed: buildToolsUsed(),
   };
 }
