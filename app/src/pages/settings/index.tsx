@@ -2310,7 +2310,7 @@ export default function Settings() {
           </SettingsHubGroup>
         ) : null}
 
-        {!inSupporterSession && !isCommunityAccount && (
+        {!inSupporterSession && !isCommunityAccount && !isType2Settings ? (
           <SettingsHubGroup title="Family & sharing">
             <SettingsHubNavLink
               href="/family-carers"
@@ -2325,7 +2325,19 @@ export default function Settings() {
               icon={HeartHandshake}
             />
           </SettingsHubGroup>
-        )}
+        ) : null}
+
+        {/* Type 2: can support a Type 1 person, but inviting supporters for themselves stays off for now. */}
+        {!inSupporterSession && !isCommunityAccount && isType2Settings ? (
+          <SettingsHubGroup title="Support someone">
+            <SettingsHubNavLink
+              href="/carer-setup"
+              label="Become a supporter"
+              description="Enter an invite code to support someone with Type 1 from this account"
+              icon={HeartHandshake}
+            />
+          </SettingsHubGroup>
+        ) : null}
 
         <SettingsHubGroup title="Appearance">
           <SettingsHubNavLink

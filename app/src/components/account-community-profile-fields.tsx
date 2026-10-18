@@ -19,7 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
-  formatLivingWithDiabetesLine,
+  formatPublicDiabetesMetaLine,
   isPublicHandleAvailable,
   isPublicCommunityProfileComplete,
   normalizePublicHandleInput,
@@ -32,6 +32,8 @@ import { getPrimaryAppRole } from "@/lib/carer-session";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { useAuth } from "@/lib/auth-context";
 import { applyDisplayNameToLocalProfile } from "@/lib/user-display-name";
+import { syncDiabetesTypeToCloud } from "@/lib/clinical-prefs-cloud-sync";
+import { storage } from "@/lib/storage";
 
 type AccountCommunityProfileFieldsProps = {
   /** Prefix for form control ids (avoid duplicates if multiple instances ever mount). */
@@ -377,6 +379,9 @@ export function AccountCommunityProfileFields({
     }
 
     const onsetVal = showOnsetDate ? onsetDateInput.trim() || null : null;
+    const localType = storage.getProfile()?.diabetesType;
+    const diabetesTypeCloud =
+      showOnsetDate && (localType === "type1" || localType === "type2") ? localType : null;
     const { error } = await updateProfile({
       id: profile.id,
       full_name: nameVal,
@@ -384,6 +389,7 @@ export function AccountCommunityProfileFields({
       public_handle: normalizedHandle,
       is_public: isPublic,
       diabetes_onset_date: onsetVal,
+      diabetes_type: diabetesTypeCloud,
     });
     setSaving(false);
     if (error) {
@@ -394,6 +400,7 @@ export function AccountCommunityProfileFields({
     void refresh();
     if (profile.id) {
       void mergeCloudAchievements(profile.id, { showToasts: true });
+      void syncDiabetesTypeToCloud(profile.id, diabetesTypeCloud);
     }
     const completeAfterSave = isPublicCommunityProfileComplete({
       full_name: nameVal,
@@ -406,7 +413,15 @@ export function AccountCommunityProfileFields({
 
   const handleSlug = handleInput.replace(/^@/, "").trim().toLowerCase();
   const readOnlyHandleSlug = savedHandleSlug;
-  const livingLine = onsetDateInput.trim() ? formatLivingWithDiabetesLine(onsetDateInput) : null;
+  const localDiabetesType = storage.getProfile()?.diabetesType;
+  const livingLine = showOnsetDate
+    ? formatPublicDiabetesMetaLine({
+        diabetesType:
+          profile?.diabetes_type ??
+          (localDiabetesType === "type1" || localDiabetesType === "type2" ? localDiabetesType : null),
+        diabetesOnsetDate: onsetDateInput.trim() || null,
+      })
+    : null;
   const handleSaveBlocked =
     isPublic &&
     editing &&

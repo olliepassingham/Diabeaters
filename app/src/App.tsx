@@ -743,6 +743,8 @@ function FamilyCarersGate() {
   const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
   const isCarerMode = isCarerSessionMode(hasCarerLink, activeMode);
   const isCommunityMode = resolveCommunityMode(hasCarerLink, activeMode);
+  // Type 2 does not invite/manage supporters for themselves yet.
+  const isType2Patient = isType2AppSession(storage.getProfile());
 
   useEffect(() => {
     const onMode = (ev: Event) => {
@@ -763,17 +765,21 @@ function FamilyCarersGate() {
       setLocation("/carer-view");
       return;
     }
+    if (isType2Patient) {
+      setLocation("/account");
+      return;
+    }
     if (hasCarerIntent() || hasPendingCarer()) {
       setLocation("/carer-setup");
     }
-  }, [loading, isCarerMode, isCommunityMode, setLocation]);
+  }, [loading, isCarerMode, isCommunityMode, isType2Patient, setLocation]);
 
   if (loading) {
     return (
       <div className="flex justify-center py-16 text-muted-foreground text-sm">Loading…</div>
     );
   }
-  if (isCommunityMode || isCarerMode || hasCarerIntent() || hasPendingCarer()) return null;
+  if (isCommunityMode || isCarerMode || isType2Patient || hasCarerIntent() || hasPendingCarer()) return null;
   return (
     <Suspense fallback={<RouteFallback />}>
       <FamilyCarers />

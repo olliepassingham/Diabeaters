@@ -33,6 +33,7 @@ import { cn } from "@/lib/utils";
 import { useEmergencyProfile } from "@/hooks/use-emergency-profile";
 import { EmergencyProfileFields } from "@/components/emergency-profile-fields";
 import { InlineInfoHint } from "@/components/ui/field-label-with-info";
+import { isType2AppSession } from "@/lib/insulin-clinical-access";
 import {
   SettingsBackLink,
   SettingsGroup,
@@ -78,6 +79,7 @@ export function SettingsEmergencySection({
   const { toast } = useToast();
   const { syncGeneration, saveNow, isLoading } = useEmergencyProfile();
   const [saving, setSaving] = useState(false);
+  const isType2 = isType2AppSession(storage.getProfile());
 
   const handleSyncNow = async () => {
     setSaving(true);
@@ -98,11 +100,17 @@ export function SettingsEmergencySection({
     variant === "embedded" ? (
       <p className="text-sm text-muted-foreground leading-relaxed">
         Used for <Link href="/help-now" className="text-primary underline-offset-2 hover:underline">Help now</Link>
-        . Linked supporters only see this if you allow it under{" "}
-        <Link href="/family-carers" className="text-primary underline-offset-2 hover:underline">
-          Family &amp; supporters
-        </Link>
-        .
+        {isType2 ? (
+          "."
+        ) : (
+          <>
+            . Linked supporters only see this if you allow it under{" "}
+            <Link href="/family-carers" className="text-primary underline-offset-2 hover:underline">
+              Family &amp; supporters
+            </Link>
+            .
+          </>
+        )}
       </p>
     ) : (
       <p className="text-body text-muted-foreground">
@@ -112,7 +120,7 @@ export function SettingsEmergencySection({
         <Link href="/account#account-emergency" className="text-primary underline-offset-2 hover:underline">
           Account
         </Link>
-        . Supporters see it only if you enable it under Family &amp; supporters.
+        {isType2 ? "." : ". Supporters see it only if you enable it under Family &amp; supporters."}
       </p>
     );
 

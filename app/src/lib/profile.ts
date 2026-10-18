@@ -25,6 +25,8 @@ export type ProfileRow = {
   emergency_notes?: string | null;
   /** ISO date YYYY-MM-DD; optional community-only. */
   diabetes_onset_date?: string | null;
+  /** Public-safe type label: type1 | type2. Null for explorers / supporters without diabetes. */
+  diabetes_type?: "type1" | "type2" | null;
   /** pen | pump; owner sync from app (not exposed in batch community profile selects). */
   insulin_delivery_method?: string | null;
   /** Total daily insulin (units); optional owner sync from app settings. */
@@ -76,7 +78,14 @@ export type PublicProfileSupportedPerson = {
 /** Safe fields for community public profile pages (never include emergency_*). */
 export type PublicCommunityProfile = Pick<
   ProfileRow,
-  "id" | "full_name" | "avatar_url" | "bio" | "public_handle" | "is_public" | "diabetes_onset_date"
+  | "id"
+  | "full_name"
+  | "avatar_url"
+  | "bio"
+  | "public_handle"
+  | "is_public"
+  | "diabetes_onset_date"
+  | "diabetes_type"
 > & {
   streaks?: PublicProfileStreak[];
   /** @deprecated Use streaks */
@@ -88,7 +97,26 @@ export const profileQueryKey = (userId: string | undefined) => ["profile", userI
 
 /** Batch / community fetches: exclude owner-only clinical columns from the select list. */
 const PROFILE_LIST_SELECT =
+  "id, full_name, avatar_url, bio, public_handle, is_public, onboarding_complete, emergency_contact_name, emergency_contact_phone, emergency_notes, diabetes_onset_date, diabetes_type";
+
+const PROFILE_LIST_SELECT_WITHOUT_DIABETES_TYPE =
   "id, full_name, avatar_url, bio, public_handle, is_public, onboarding_complete, emergency_contact_name, emergency_contact_phone, emergency_notes, diabetes_onset_date";
+
+function isMissingProfilesColumnError(message: string, column: string): boolean {
+  const m = message.toLowerCase();
+  const c = column.toLowerCase();
+  return (
+    m.includes(c) &&
+    (m.includes("schema cache") || m.includes("could not find") || m.includes("column"))
+  );
+}
+
+function normalizeDiabetesTypeFromCloud(raw: unknown): "type1" | "type2" | null | undefined {
+  if (raw === null) return null;
+  if (raw === undefined) return undefined;
+  if (raw === "type1" || raw === "type2") return raw;
+  return null;
+}
 
 function rowFromData(data: Record<string, unknown>): ProfileRow {
   const rawTdd = data.tdd;
@@ -191,6 +219,7 @@ function rowFromData(data: Record<string, unknown>): ProfileRow {
     emergency_contact_phone: (data.emergency_contact_phone as string | null) ?? null,
     emergency_notes: (data.emergency_notes as string | null) ?? null,
     diabetes_onset_date: (data.diabetes_onset_date as string | null) ?? null,
+    diabetes_type: normalizeDiabetesTypeFromCloud(data.diabetes_type) ?? null,
     insulin_delivery_method,
     tdd,
     date_of_birth,
@@ -293,8 +322,18 @@ export async function getProfilesByIds(userIds: string[]): Promise<Map<string, P
   if (unique.length === 0) return map;
 
   try {
-    const { data, error } = await supabase.from("profiles").select(PROFILE_LIST_SELECT).in("id", unique);
-    if (error || !data) return map;
+    let data: unknown[] | null = null;
+    const first = await supabase.from("profiles").select(PROFILE_LIST_SELECT).in("id", unique);
+    if (first.error && isMissingProfilesColumnError(first.error.message, "diabetes_type")) {
+      const fallbackSelect = PROFILE_LIST_SELECT.replace(", diabetes_type", "");
+      const fallback = await supabase.from("profiles").select(fallbackSelect).in("id", unique);
+      if (fallback.error || !fallback.data) return map;
+      data = fallback.data;
+    } else if (first.error || !first.data) {
+      return map;
+    } else {
+      data = first.data;
+    }
     for (const row of data) {
       map.set(String((row as Record<string, unknown>).id), rowFromData(row as Record<string, unknown>));
     }
@@ -333,6 +372,29 @@ export function formatLivingWithDiabetesLine(isoDate: string | null | undefined)
   }
 
   return "Living with diabetes";
+}
+
+/** Subtle public label: "Type 1" / "Type 2". */
+export function formatPublicDiabetesTypeLabel(
+  diabetesType: string | null | undefined,
+): string | null {
+  if (diabetesType === "type1") return "Type 1";
+  if (diabetesType === "type2") return "Type 2";
+  return null;
+}
+
+/**
+ * One muted meta line for public profiles.
+ * e.g. "Type 2" · "Living with diabetes for ~5 years" · "Type 1 · Living with diabetes for ~5 years"
+ */
+export function formatPublicDiabetesMetaLine(opts: {
+  diabetesType?: string | null;
+  diabetesOnsetDate?: string | null;
+}): string | null {
+  const typeLabel = formatPublicDiabetesTypeLabel(opts.diabetesType);
+  const living = formatLivingWithDiabetesLine(opts.diabetesOnsetDate);
+  if (typeLabel && living) return `${typeLabel} · ${living}`;
+  return typeLabel ?? living;
 }
 
 /** Normalize and validate public handle: 3–30 chars, [a-z0-9_]. Returns null if empty clear, throws if invalid. */
@@ -419,16 +481,26 @@ export async function getPublicCommunityProfile(userId: string): Promise<{
   const supabase = getSupabase();
   if (!supabase) return { profile: null, error: new Error("Supabase not configured") };
 
-  try {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("id, full_name, avatar_url, bio, public_handle, is_public, diabetes_onset_date, pinned_achievement_ids, public_streak_counts")
-      .eq("id", userId)
-      .maybeSingle();
+  const selectWithType =
+    "id, full_name, avatar_url, bio, public_handle, is_public, diabetes_onset_date, diabetes_type, pinned_achievement_ids, public_streak_counts";
+  const selectWithoutType =
+    "id, full_name, avatar_url, bio, public_handle, is_public, diabetes_onset_date, pinned_achievement_ids, public_streak_counts";
 
-    if (error) return { profile: null, error: new Error(error.message) };
+  try {
+    let data: Record<string, unknown> | null = null;
+    const first = await supabase.from("profiles").select(selectWithType).eq("id", userId).maybeSingle();
+    if (first.error && isMissingProfilesColumnError(first.error.message, "diabetes_type")) {
+      const fallback = await supabase.from("profiles").select(selectWithoutType).eq("id", userId).maybeSingle();
+      if (fallback.error) return { profile: null, error: new Error(fallback.error.message) };
+      data = (fallback.data as Record<string, unknown> | null) ?? null;
+    } else if (first.error) {
+      return { profile: null, error: new Error(first.error.message) };
+    } else {
+      data = (first.data as Record<string, unknown> | null) ?? null;
+    }
+
     if (!data) return { profile: null, error: null };
-    const r = data as Record<string, unknown>;
+    const r = data;
     const pinnedRaw = r.pinned_achievement_ids;
     const pinnedIds = Array.isArray(pinnedRaw)
       ? pinnedRaw.filter((id): id is string => typeof id === "string")
@@ -452,6 +524,7 @@ export async function getPublicCommunityProfile(userId: string): Promise<{
       public_handle: (r.public_handle as string | null) ?? null,
       is_public: typeof r.is_public === "boolean" ? r.is_public : true,
       diabetes_onset_date: (r.diabetes_onset_date as string | null) ?? null,
+      diabetes_type: normalizeDiabetesTypeFromCloud(r.diabetes_type) ?? null,
       streaks,
       achievements: streaks,
       supported_person: supportedRes.data,
@@ -627,6 +700,7 @@ export type ProfileUpdatePayload = {
     | "is_public"
     | "public_handle"
     | "diabetes_onset_date"
+    | "diabetes_type"
     | "insulin_delivery_method"
     | "tdd"
     | "units_per_insulin_pen"
@@ -663,6 +737,7 @@ export async function updateProfile(
     is_public,
     public_handle,
     diabetes_onset_date,
+    diabetes_type,
     insulin_delivery_method,
     tdd,
     units_per_insulin_pen,
@@ -709,6 +784,11 @@ export async function updateProfile(
   }
   if (diabetes_onset_date !== undefined) {
     update.diabetes_onset_date = diabetes_onset_date?.trim() ? diabetes_onset_date.trim() : null;
+  }
+  if (diabetes_type !== undefined) {
+    if (diabetes_type === null) update.diabetes_type = null;
+    else if (diabetes_type === "type1" || diabetes_type === "type2") update.diabetes_type = diabetes_type;
+    else update.diabetes_type = null;
   }
   if (insulin_delivery_method !== undefined) {
     if (insulin_delivery_method === null) {

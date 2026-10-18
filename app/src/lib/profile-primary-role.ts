@@ -53,10 +53,26 @@ export async function syncPrimaryAppRoleToCloud(
   userId: string,
   role: PrimaryAppRole,
 ): Promise<{ error: Error | null; skipped?: boolean }> {
-  const { error } = await updateProfile({ id: userId, primary_app_role: role });
+  const payload: Parameters<typeof updateProfile>[0] = { id: userId, primary_app_role: role };
+  // Supporters / community explorers should not show a diabetes type on public profiles.
+  if (role === "carer" || role === "community") {
+    payload.diabetes_type = null;
+  }
+  const { error } = await updateProfile(payload);
   if (!error) return { error: null };
   if (isMissingProfileColumnSchemaError(error.message, "primary_app_role")) {
     return { error: null, skipped: true };
+  }
+  if (
+    (role === "carer" || role === "community") &&
+    isMissingProfileColumnSchemaError(error.message, "diabetes_type")
+  ) {
+    const retry = await updateProfile({ id: userId, primary_app_role: role });
+    if (!retry.error) return { error: null };
+    if (isMissingProfileColumnSchemaError(retry.error.message, "primary_app_role")) {
+      return { error: null, skipped: true };
+    }
+    return { error: retry.error };
   }
   return { error };
 }

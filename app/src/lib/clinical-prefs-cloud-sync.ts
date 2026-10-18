@@ -179,6 +179,18 @@ export function applyClinicalPrefsFromCloudRow(row: ProfileRow | null): void {
     }
   }
 
+  // Cloud public type wins when set (multi-device); never invent type1 from a null column.
+  if (row.diabetes_type === "type1" || row.diabetes_type === "type2") {
+    const lp = storage.getProfile();
+    if (lp && lp.accountType !== "community" && lp.diabetesType !== row.diabetes_type) {
+      storage.saveProfile({
+        ...lp,
+        diabetesType: row.diabetes_type,
+        usingInsulin: row.diabetes_type === "type2" ? false : lp.usingInsulin,
+      });
+    }
+  }
+
   const cloudDelivery = normalizeDeliveryFromCloud(row.insulin_delivery_method);
   const cloudTdd = normalizeTddFromCloud(row.tdd);
   const cloudDob = normalizeDateOfBirthInput(row.date_of_birth ?? null);
@@ -426,6 +438,8 @@ export async function syncClinicalPrefsToCloud(userId: string): Promise<Clinical
 
     const { error } = await updateProfile(payload);
     if (!error) {
+      // Best-effort: keep public Type 1 / Type 2 label in sync with local profile.
+      await syncDiabetesTypeToCloud(userId);
       await queryClient.invalidateQueries({ queryKey: profileQueryKey(userId) });
       return {
         error: null,
@@ -498,12 +512,45 @@ export async function syncRegionToCloud(userId: string): Promise<{ error: Error 
  * If the column is missing on the linked Supabase project (migration not applied),
  * we treat this as a no-op so the local save still succeeds without raising an error.
  */
+/** Map local profile → public-safe cloud `diabetes_type` (type1 / type2 / null). */
+export function diabetesTypeForCloudPublic(
+  p: UserProfile | null | undefined,
+): "type1" | "type2" | null {
+  if (!p || isCommunityAccountProfile(p)) return null;
+  if (p.diabetesType === "type2") return "type2";
+  if (p.diabetesType === "type1") return "type1";
+  return null;
+}
+
+/** Push `profiles.diabetes_type` for public profiles. Tolerates missing column. */
+export async function syncDiabetesTypeToCloud(
+  userId: string,
+  override?: "type1" | "type2" | null,
+): Promise<{ error: Error | null; skipped?: boolean }> {
+  const diabetes_type =
+    override !== undefined ? override : diabetesTypeForCloudPublic(storage.getProfile());
+  const { error } = await updateProfile({ id: userId, diabetes_type });
+  if (!error) {
+    await queryClient.invalidateQueries({ queryKey: profileQueryKey(userId) });
+    return { error: null };
+  }
+  if (isMissingProfileColumnSchemaError(error.message, "diabetes_type")) {
+    return { error: null, skipped: true };
+  }
+  return { error };
+}
+
 /** Push `profiles.account_type` from local profile (patient vs community). Tolerates missing column. */
 export async function syncAccountTypeToCloud(userId: string): Promise<{ error: Error | null; skipped?: boolean }> {
   const p = storage.getProfile();
   const account_type: "patient" | "community" = isCommunityAccountProfile(p) ? "community" : "patient";
   const { error } = await updateProfile({ id: userId, account_type });
   if (!error) {
+    // Keep public type in sync with persona (clears for community explorers).
+    await syncDiabetesTypeToCloud(
+      userId,
+      account_type === "community" ? null : diabetesTypeForCloudPublic(storage.getProfile()),
+    );
     await queryClient.invalidateQueries({ queryKey: profileQueryKey(userId) });
     return { error: null };
   }

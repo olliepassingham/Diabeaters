@@ -5,7 +5,13 @@ import { AccountPublicProfileTab } from "@/pages/account/account-public-tab";
 import { ChevronDown } from "lucide-react";
 import { isUserVerified, logout } from "@/lib/auth";
 import { useAuth } from "@/lib/auth-context";
-import { upsertProfile, updateProfile, useProfile } from "@/lib/profile";
+import {
+  formatPublicDiabetesMetaLine,
+  getProfilesByIds,
+  upsertProfile,
+  updateProfile,
+  useProfile,
+} from "@/lib/profile";
 import { getSupabase } from "@/lib/supabase";
 import { uploadProfileAvatar } from "@/lib/storage-profile";
 import {
@@ -30,6 +36,7 @@ import { cn } from "@/lib/utils";
 import { FollowListDialog, type FollowListPerson } from "@/components/community/follow-list-dialog";
 import { SettingsEmergencySection } from "@/pages/settings/shared";
 import { isCommunityAccountProfile, storage } from "@/lib/storage";
+import { isType2AppSession } from "@/lib/insulin-clinical-access";
 import { clearCarerClientSessionKeys, getActiveAppMode, getPrimaryAppRole, type ActiveAppMode, canSwitchAppMode } from "@/lib/carer-session";
 import { useSupporterSession } from "@/hooks/use-supporter-session";
 import { isCommunityEnabled } from "@/lib/flags";
@@ -55,7 +62,6 @@ import {
   getSupportEmail,
   isAccountDeletionTableUnavailableMessage,
 } from "@/lib/support";
-import { formatLivingWithDiabetesLine, getProfilesByIds } from "@/lib/profile";
 import { resolveUserDisplayName } from "@/lib/user-display-name";
 import { isOnline } from "@/lib/offline";
 
@@ -367,11 +373,18 @@ export default function Account() {
   const bioPreview = profile?.bio?.trim() || "";
   const primaryRole = getPrimaryAppRole();
   const isCommunityAccount = isCommunityAccountProfile(storage.getProfile());
+  const isType2Account = isType2AppSession(storage.getProfile());
+  const localDiabetesType = storage.getProfile()?.diabetesType;
   const livingWithLine =
     !isCommunityAccount &&
     primaryRole !== "carer" &&
     (activeMode == null || activeMode === "patient")
-      ? formatLivingWithDiabetesLine(profile?.diabetes_onset_date ?? null)
+      ? formatPublicDiabetesMetaLine({
+          diabetesType:
+            profile?.diabetes_type ??
+            (localDiabetesType === "type1" || localDiabetesType === "type2" ? localDiabetesType : null),
+          diabetesOnsetDate: profile?.diabetes_onset_date ?? null,
+        })
       : null;
   const canOpenModeChooser = hasCarerLink && canSwitchAppMode();
   const modeSwitchLabel = "Switch mode";
@@ -522,7 +535,7 @@ export default function Account() {
             </Button>
           ) : null}
 
-          {!inSupporterSession && !isCommunityAccount && (
+          {!inSupporterSession && !isCommunityAccount && !isType2Account && (
             <Button variant="outline" size="sm" className="col-span-2 h-11" asChild>
               <Link href="/family-carers" data-testid="link-manage-carers">
                 Manage supporters

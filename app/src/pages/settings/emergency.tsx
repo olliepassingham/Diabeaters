@@ -6,10 +6,13 @@ import { PageHeader, PageShell } from "@/components/layout";
 import { scrollAppMainToTop } from "@/lib/settings-nav";
 import { SettingsBackLink, SettingsEmergencySection } from "./shared";
 import { useLinkedPatient } from "@/hooks/use-linked-patient";
+import { isType2AppSession } from "@/lib/insulin-clinical-access";
+import { storage } from "@/lib/storage";
 
 export default function SettingsEmergencyPage() {
   const [pathname, setLocation] = useLocation();
   const { data: supporterSession, loading } = useLinkedPatient();
+  const isType2 = isType2AppSession(storage.getProfile());
 
   useLayoutEffect(() => {
     scrollAppMainToTop("auto");
@@ -36,7 +39,11 @@ export default function SettingsEmergencyPage() {
       <SettingsBackLink />
       <PageHeader
         title="Your emergency details"
-        description="Used for Help now. Linked supporters only see this if the account holder allows it under Family & supporters."
+        description={
+          isType2
+            ? "Used for Help now."
+            : "Used for Help now. Linked supporters only see this if the account holder allows it under Family & supporters."
+        }
       />
       <Card className="rounded-2xl border-border/60 shadow-sm">
         <CardContent className="p-6">

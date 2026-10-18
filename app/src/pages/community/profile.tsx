@@ -50,6 +50,7 @@ import { useCommunityStories } from "@/hooks/use-community-stories";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { getPrimaryAppRole } from "@/lib/carer-session";
+import { storage } from "@/lib/storage";
 import {
   blockUser,
   fetchCommunityPostsByAuthorPage,
@@ -66,7 +67,7 @@ import {
 } from "@/lib/community";
 import {
   canEngageWithCommunityFeed,
-  formatLivingWithDiabetesLine,
+  formatPublicDiabetesMetaLine,
   getProfile,
   getPublicCommunityProfile,
   getPublicProfileSupportedPerson,
@@ -143,11 +144,14 @@ export default function CommunityProfilePage() {
 
   const isSelf = Boolean(user?.id && userId && user.id === userId);
   const canViewStory = Boolean(isSelf || followingThem);
-  /** Diabetes journey line: show to others when present; on your own profile only if you use the app as a patient. */
-  const onset = profile?.diabetes_onset_date?.trim() ?? "";
-  const showDiabetesJourneyLine = Boolean(
-    onset && formatLivingWithDiabetesLine(onset) && (!isSelf || getPrimaryAppRole() === "patient"),
-  );
+  /** Type + journey meta: show to others when present; on your own profile only if you use the app as a patient. */
+  const diabetesMetaLine =
+    profile && (!isSelf || getPrimaryAppRole() === "patient")
+      ? formatPublicDiabetesMetaLine({
+          diabetesType: profile.diabetes_type,
+          diabetesOnsetDate: profile.diabetes_onset_date,
+        })
+      : null;
 
   const loginNextHref = useMemo(() => {
     if (!userId) return "/community";
@@ -174,6 +178,10 @@ export default function CommunityProfilePage() {
             full.pinned_achievement_ids,
             full.public_streak_counts,
           );
+          const localType = storage.getProfile()?.diabetesType;
+          const selfType =
+            full.diabetes_type ??
+            (localType === "type1" || localType === "type2" ? localType : null);
           setProfile({
             id: full.id,
             full_name: full.full_name,
@@ -182,6 +190,7 @@ export default function CommunityProfilePage() {
             public_handle: full.public_handle,
             is_public: full.is_public,
             diabetes_onset_date: full.diabetes_onset_date ?? null,
+            diabetes_type: selfType,
             streaks,
             achievements: streaks,
             supported_person: supportedRes.data,
@@ -380,11 +389,6 @@ export default function CommunityProfilePage() {
   const profileBio =
     profile?.bio?.trim() ||
     (isBeatieProfile ? BEATIE_FEED_BOT_DEFAULT_BIO : "");
-  const livingWithLine =
-    showDiabetesJourneyLine && profile
-      ? formatLivingWithDiabetesLine(profile.diabetes_onset_date)
-      : null;
-
   return (
     <PageShell variant="standard" className="max-w-lg mx-auto space-y-3 pb-4">
       <div className="flex items-center justify-between gap-2">
@@ -495,11 +499,11 @@ export default function CommunityProfilePage() {
               </div>
             </div>
 
-            {profileBio || livingWithLine ? (
+            {profileBio || diabetesMetaLine ? (
               <ProfileBioPreview
                 relaxed
                 bio={profileBio}
-                livingWithLine={livingWithLine}
+                livingWithLine={diabetesMetaLine}
                 emptyLabel={isBeatieProfile ? BEATIE_FEED_BOT_DEFAULT_BIO : "No bio yet."}
               />
             ) : null}

@@ -126,6 +126,10 @@ describe("profile-primary-role", () => {
     const { finalizeSupporterLinkCloudSync } = await import("@/lib/profile-primary-role");
     await finalizeSupporterLinkCloudSync("u1");
 
-    expect(updateProfile).toHaveBeenCalledWith({ id: "u1", primary_app_role: "carer" });
+    expect(updateProfile).toHaveBeenCalledWith({
+      id: "u1",
+      primary_app_role: "carer",
+      diabetes_type: null,
+    });
   });
 });

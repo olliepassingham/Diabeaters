@@ -23,6 +23,7 @@ import { isAiCoachEnabled, isCommunityEnabled } from "@/lib/flags";
 import { AI_ASSISTANT_NAME } from "@/lib/ai-coach/persona";
 import { getCommunityMemberLandingPath } from "@/lib/community-landing";
 import { isCommunityAccountProfile, storage } from "@/lib/storage";
+import { isType2AppSession } from "@/lib/insulin-clinical-access";
 import { useProfile } from "@/lib/profile";
 import {
   Sidebar,
@@ -86,6 +87,8 @@ export function AppSidebar() {
     return () => window.removeEventListener("diabeater:app-mode", onMode);
   }, []);
 
+  const isType2Patient = isType2AppSession(storage.getProfile());
+
   const navItems = useMemo(() => {
     if (!isCarer && isCommunityMode) {
       const items: Array<{ title: string; url: string; icon: typeof Wrench }> = [...communityItemsBase];
@@ -102,11 +105,14 @@ export function AppSidebar() {
       return items;
     }
     if (!isCarer) {
-      if (!showCommunity) return patientItems;
+      const base = isType2Patient
+        ? patientItems.filter((item) => item.url !== "/family-carers")
+        : patientItems;
+      if (!showCommunity) return base;
       return [
-        ...patientItems.slice(0, 4),
+        ...base.slice(0, 4),
         { title: "Feed", url: "/community", icon: Users },
-        ...patientItems.slice(4),
+        ...base.slice(4),
       ] as const;
     }
     if (!isCarerMode || !showCommunity) return carerItems;
@@ -116,7 +122,7 @@ export function AppSidebar() {
       { title: "Account", url: "/account", icon: User },
       { title: "Settings", url: "/settings", icon: Settings },
     ] as const;
-  }, [isCarer, isCarerMode, isCommunityMode, showCommunity]);
+  }, [isCarer, isCarerMode, isCommunityMode, isType2Patient, showCommunity]);
 
   const homeHref = isCarer ? "/carer-view" : isCommunityMode ? getCommunityMemberLandingPath() : "/";
 
