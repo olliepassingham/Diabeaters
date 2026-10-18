@@ -28,17 +28,21 @@ describe("Welcome path picker", () => {
     setLocation.mockReset();
   });
 
-  it("renders four clear choices plus Not sure helper", () => {
+  it("renders Type 1, Type 2, supporter, then exploring", () => {
     render(<Welcome />);
     expect(screen.getByRole("heading", { name: /who is this for/i })).not.toBeNull();
-    expect(screen.getByTestId("welcome-patient")).not.toBeNull();
-    expect(screen.getByTestId("welcome-supporter")).not.toBeNull();
-    expect(screen.getByTestId("welcome-community")).not.toBeNull();
-    expect(screen.getByTestId("welcome-both")).not.toBeNull();
-    expect(screen.getByTestId("welcome-not-sure").textContent).toMatch(/not sure/i);
-    expect(screen.getByTestId("welcome-patient").textContent).toMatch(/dashboard, meals, travel, hypos/i);
-    expect(screen.getByTestId("welcome-supporter").textContent).toMatch(/see what they choose to share/i);
-    expect(screen.getByTestId("welcome-community").textContent).toMatch(/not full clinical tools/i);
+    const order = [
+      screen.getByTestId("welcome-patient"),
+      screen.getByTestId("welcome-type2"),
+      screen.getByTestId("welcome-supporter"),
+      screen.getByTestId("welcome-community"),
+    ];
+    for (let i = 1; i < order.length; i++) {
+      expect(order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+    expect(screen.queryByTestId("welcome-both")).toBeNull();
+    expect(screen.getByTestId("welcome-supporter").textContent).toMatch(/with type 1/i);
+    expect(screen.getByTestId("welcome-community").className).toMatch(/emerald/);
   });
 
   it("sets patient onboarding path and routes to signup", () => {
@@ -49,10 +53,10 @@ describe("Welcome path picker", () => {
     expect(setLocation).toHaveBeenCalledWith("/signup");
   });
 
-  it("sets both path then patient essentials signup", () => {
+  it("sets type2 path then patient signup", () => {
     render(<Welcome />);
-    fireEvent.click(screen.getByTestId("welcome-both"));
-    expect(getOnboardingAccountPath()).toBe("both");
+    fireEvent.click(screen.getByTestId("welcome-type2"));
+    expect(getOnboardingAccountPath()).toBe("type2");
     expect(getPrimaryAppRole()).toBe("patient");
     expect(setLocation).toHaveBeenCalledWith("/signup");
   });

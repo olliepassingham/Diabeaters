@@ -16,7 +16,12 @@ import { resolveCommunityMemberLandingPath } from "@/lib/community-landing";
 import { useAuth } from "@/lib/auth-context";
 import { isUserVerified } from "@/lib/auth";
 import { reconcileWrongWelcomePathForSignedInUser } from "@/lib/welcome-path-reconcile";
-import { ArrowRight, Eye, HeartHandshake, Sparkles, Users } from "lucide-react";
+import { ArrowRight, Eye, HeartHandshake, Users } from "lucide-react";
+
+const primaryChoiceClass = cn(
+  "pressable group flex w-full items-center gap-3.5 rounded-[1.35rem] border border-border/80 bg-card px-4 py-4 text-left shadow-sm",
+  "active:scale-[0.99] hover:border-primary/35 hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+);
 
 export default function Welcome() {
   const [, setLocation] = useLocation();
@@ -63,14 +68,6 @@ export default function Welcome() {
     goPatientOnboarding();
   };
 
-  const onBoth = () => {
-    clearOnboardingAccountPath();
-    setOnboardingAccountPath("both");
-    setPrimaryAppRole("patient");
-    setPendingPatient();
-    goPatientOnboarding();
-  };
-
   const onSupporter = () => {
     clearOnboardingAccountPath();
     setOnboardingAccountPath("supporter");
@@ -107,129 +104,91 @@ export default function Welcome() {
               Who is this for?
             </h1>
             <p className="text-pretty text-base leading-relaxed text-muted-foreground">
-              Pick the option that matches you — Type 1 and Type 2 are different homes.
+              One choice to get started.
             </p>
           </div>
         </div>
 
-        <div className="mt-6 flex flex-col gap-2.5 sm:mt-10">
+        <div className="mt-8 flex flex-col gap-3 sm:mt-10">
           <button
             type="button"
             onClick={onPatient}
-            className={cn(
-              "pressable group flex w-full items-start gap-3.5 rounded-[1.35rem] border border-primary/25 bg-gradient-to-b from-primary/[0.10] via-card to-card px-4 py-3.5 text-left shadow-sm sm:items-center sm:py-4",
-              "active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-            )}
+            className={primaryChoiceClass}
             data-testid="welcome-patient"
           >
-            <span className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-primary sm:mt-0 sm:h-12 sm:w-12">
-              <Users className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden />
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-primary">
+              <Users className="h-5 w-5" aria-hidden />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-base font-semibold leading-snug text-foreground">For me — Type 1</span>
+              <span className="block text-base font-semibold leading-snug text-foreground">Type 1</span>
               <span className="mt-0.5 block text-sm leading-snug text-muted-foreground">
-                Insulin tools, meals, hypos, travel
+                My day-to-day tools
               </span>
             </span>
-            <ArrowRight className="mt-1 h-5 w-5 shrink-0 text-primary/70 transition-transform group-hover:translate-x-0.5 sm:mt-0" aria-hidden />
+            <ArrowRight className="h-5 w-5 shrink-0 text-muted-foreground/70 transition-transform group-hover:translate-x-0.5" aria-hidden />
           </button>
 
           <button
             type="button"
             onClick={onType2}
-            className={cn(
-              "pressable group flex w-full items-start gap-3.5 rounded-[1.35rem] border border-teal-500/25 bg-gradient-to-b from-teal-500/[0.08] via-card to-card px-4 py-3.5 text-left shadow-sm sm:items-center sm:py-4",
-              "active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-            )}
+            className={primaryChoiceClass}
             data-testid="welcome-type2"
           >
-            <span className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-teal-500/15 text-teal-700 dark:text-teal-300 sm:mt-0 sm:h-12 sm:w-12">
-              <Users className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden />
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-primary">
+              <Users className="h-5 w-5" aria-hidden />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-base font-semibold leading-snug text-foreground">For me — Type 2</span>
+              <span className="block text-base font-semibold leading-snug text-foreground">Type 2</span>
               <span className="mt-0.5 block text-sm leading-snug text-muted-foreground">
-                Glucose, learning, community — not insulin dosing
+                Learning and community
               </span>
             </span>
-            <ArrowRight className="mt-1 h-5 w-5 shrink-0 text-teal-700/70 transition-transform group-hover:translate-x-0.5 dark:text-teal-300/70 sm:mt-0" aria-hidden />
+            <ArrowRight className="h-5 w-5 shrink-0 text-muted-foreground/70 transition-transform group-hover:translate-x-0.5" aria-hidden />
           </button>
 
           <button
             type="button"
             onClick={onSupporter}
-            className={cn(
-              "pressable group flex w-full items-start gap-3 rounded-[1.35rem] border border-border/70 bg-card/60 px-4 py-3.5 text-left sm:items-center",
-              "active:scale-[0.99] hover:border-primary/30 hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-            )}
+            className={primaryChoiceClass}
             data-testid="welcome-supporter"
           >
-            <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400 sm:mt-0 sm:h-11 sm:w-11">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-primary">
               <HeartHandshake className="h-5 w-5" aria-hidden />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold leading-snug text-foreground">
-                I support someone with Type 1
+              <span className="block text-base font-semibold leading-snug text-foreground">
+                I support someone
               </span>
               <span className="mt-0.5 block text-sm leading-snug text-muted-foreground">
-                See what they share — Type 1 only, not Type 2
+                With Type 1
               </span>
             </span>
-            <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform group-hover:translate-x-0.5 sm:mt-0" aria-hidden />
+            <ArrowRight className="h-5 w-5 shrink-0 text-muted-foreground/70 transition-transform group-hover:translate-x-0.5" aria-hidden />
           </button>
 
           <button
             type="button"
             onClick={onCommunityMember}
             className={cn(
-              "pressable group flex w-full items-start gap-3 rounded-[1.35rem] border border-border/70 bg-card/60 px-4 py-3.5 text-left sm:items-center",
-              "active:scale-[0.99] hover:border-primary/30 hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              primaryChoiceClass,
+              "border-emerald-500/30 hover:border-emerald-500/45",
             )}
             data-testid="welcome-community"
           >
-            <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400 sm:mt-0 sm:h-11 sm:w-11">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">
               <Eye className="h-5 w-5" aria-hidden />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold leading-snug text-foreground">Just exploring / community</span>
-              <span className="mt-0.5 block text-xs leading-snug text-muted-foreground sm:text-sm">
-                Feed and learning without a clinical home
+              <span className="block text-base font-semibold leading-snug text-foreground">Just exploring</span>
+              <span className="mt-0.5 block text-sm leading-snug text-muted-foreground">
+                Feed and learning only
               </span>
             </span>
-            <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform group-hover:translate-x-0.5 sm:mt-0" aria-hidden />
-          </button>
-
-          <button
-            type="button"
-            onClick={onBoth}
-            className={cn(
-              "pressable group flex w-full items-start gap-3 rounded-[1.25rem] border border-dashed border-border/80 bg-transparent px-4 py-3 text-left sm:items-center",
-              "active:scale-[0.99] hover:bg-muted/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-            )}
-            data-testid="welcome-both"
-          >
-            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted/50 text-muted-foreground sm:mt-0">
-              <Sparkles className="h-4 w-4" aria-hidden />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold leading-snug text-foreground">
-                Type 1 and I support someone
-              </span>
-              <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
-                Your Type 1 tools + link a supporter later
-              </span>
-            </span>
-            <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground/60 sm:mt-0" aria-hidden />
+            <ArrowRight className="h-5 w-5 shrink-0 text-emerald-700/70 transition-transform group-hover:translate-x-0.5 dark:text-emerald-400/70" aria-hidden />
           </button>
         </div>
 
-        <p className="mt-5 px-1 text-center text-xs leading-relaxed text-muted-foreground" data-testid="welcome-not-sure">
-          Not sure? Type 1 day to day → <span className="font-medium text-foreground">For me — Type 1</span>.
-          Type 2 → <span className="font-medium text-foreground">For me — Type 2</span>.
-          Only helping someone with Type 1 → supporter.
-        </p>
-
-        <div className="mt-auto space-y-3 pt-8">
+        <div className="mt-auto space-y-3 pt-10">
           <Button
             type="button"
             variant="outline"

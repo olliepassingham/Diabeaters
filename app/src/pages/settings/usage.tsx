@@ -6,17 +6,24 @@ type SettingsUsageRouteProps = {
   usageToolsInner: ReactNode;
 };
 
-export function SettingsUsageRoute({ usageToolsInner }: SettingsUsageRouteProps) {
+export function SettingsUsageRoute({
+  usageToolsInner,
+  type2 = false,
+}: SettingsUsageRouteProps & { type2?: boolean }) {
   return (
     <SettingsSubPageShell
-      title="Personal & usage"
+      title={type2 ? "Personal info" : "Personal & usage"}
       description={
-        <>
-          <span className="sm:hidden">Units, habits, supply packs, backup.</span>
-          <span className="hidden sm:inline">Units, typical insulin use, supply pack sizes, and backup.</span>
-        </>
+        type2 ? (
+          <>Name, region, units, and backup for your Type 2 home.</>
+        ) : (
+          <>
+            <span className="sm:hidden">Units, habits, supply packs, backup.</span>
+            <span className="hidden sm:inline">Units, typical insulin use, supply pack sizes, and backup.</span>
+          </>
+        )
       }
-      actions={<SettingsUsageInfoDialog />}
+      actions={type2 ? undefined : <SettingsUsageInfoDialog />}
     >
       <SettingsPanel id="settings-usage-tools" className="scroll-mt-20">
         {usageToolsInner}

@@ -20,6 +20,7 @@ import {
   UserProfile,
 } from "@/lib/storage";
 import { getActiveAppMode } from "@/lib/carer-session";
+import { isType2AppSession } from "@/lib/insulin-clinical-access";
 import { seedPatientFirstRunDefaultsIfNeeded } from "@/lib/starter-patient-defaults";
 import { seedDefaultTargetBgRangeIfNeeded } from "@/lib/starter-target-range";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -42,6 +43,7 @@ import { HomePumpCare } from "@/components/home/HomePumpCare";
 import { HomeMealMoment } from "@/components/home/HomeMealMoment";
 import { HomeSupplyGraph } from "@/components/home/HomeSupplyGraph";
 import { HomeNextUp } from "@/components/home/HomeNextUp";
+import { Type2Home } from "@/components/home/Type2Home";
 import { getHealthStatus } from "@/lib/dashboard-health-status";
 import { useHomeNextBestAction } from "@/hooks/use-home-next-best-action";
 import { useAskAnything } from "@/components/ai-coach/ask-anything-context";
@@ -294,11 +296,17 @@ export default function Dashboard() {
   const mode = getActiveAppMode();
   const isCommunityDash =
     isCommunityAccountProfile(profile) && mode !== "patient" && mode !== "carer";
+  const isType2Dash = !isCommunityDash && isType2AppSession(profile);
 
   const cloudDisplayName = typeof cloudProfile?.full_name === "string" ? cloudProfile.full_name.trim() : "";
   const localDisplayName = typeof profile?.name === "string" ? profile.name.trim() : "";
   const dashboardDisplayName = cloudDisplayName || localDisplayName;
   const dashboardFirstName = dashboardDisplayName.split(" ")[0] || "";
+
+  if (isType2Dash) {
+    return <Type2Home profile={profile} displayName={dashboardDisplayName} />;
+  }
+
   const showWelcomeWidget =
     !isCommunityDash && shouldOfferWelcomeWidget() && !dashboardFirstName;
 

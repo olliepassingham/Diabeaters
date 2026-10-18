@@ -25,6 +25,8 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 import { useProfile } from "@/lib/profile";
+import { isType2AppSession } from "@/lib/insulin-clinical-access";
+import { storage } from "@/lib/storage";
 
 type AppTopBarProps = {
   isCarer: boolean;
@@ -143,7 +145,14 @@ export function AppTopBar({ isCarer, isCommunityMode = false, pathOnly, onBrandC
       ? pathOnly === "/community"
       : pathOnly === "/";
 
-  const modeLabel = isCarer ? "Supporter" : isCommunityMode ? "Community" : "User";
+  const isType2 = !isCarer && !isCommunityMode && isType2AppSession(storage.getProfile());
+  const modeLabel = isCarer
+    ? "Supporter"
+    : isCommunityMode
+      ? "Community"
+      : isType2
+        ? "Type 2"
+        : "Type 1";
 
   return (
     <header

@@ -78,7 +78,8 @@ import { getSupabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSupporterSession } from "@/hooks/use-supporter-session";
 import { getOnboardingAccountPath } from "@/lib/carer-session";
-import { hasInsulinClinicalTools } from "@/lib/insulin-clinical-access";
+import { hasInsulinClinicalTools, isType2AppSession } from "@/lib/insulin-clinical-access";
+import { ensureLocalType2Profile } from "@/lib/type2-session";
 import { SettingsAppearanceRoute } from "./appearance";
 import { SettingsUsageRoute } from "./usage";
 import { SettingsNotificationsRoute } from "./notifications";
@@ -112,6 +113,9 @@ function ProfileTab({
   weightRequiredForHypo,
   onSave,
   showDesktopSave = true,
+  showInsulinDelivery = true,
+  showCarbUnits = true,
+  diabetesTypeLabel,
 }: {
   userDisplayName: string;
   setUserDisplayName: (v: string) => void;
@@ -134,6 +138,9 @@ function ProfileTab({
   weightRequiredForHypo: boolean;
   onSave: () => void;
   showDesktopSave?: boolean;
+  showInsulinDelivery?: boolean;
+  showCarbUnits?: boolean;
+  diabetesTypeLabel?: string | null;
 }) {
   const handleRegionChange = (next: AppRegion) => {
     if (next === appRegion) return;
@@ -205,6 +212,12 @@ function ProfileTab({
           />
         </div>
       ) : null}
+      {diabetesTypeLabel ? (
+        <div className="rounded-xl border border-border/50 bg-background/60 px-3 py-2.5" data-testid="settings-diabetes-type">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Diabetes type</p>
+          <p className="mt-0.5 text-sm font-semibold text-foreground">{diabetesTypeLabel}</p>
+        </div>
+      ) : null}
       <div className="grid grid-cols-1 gap-3">
         <div className="space-y-1.5">
           <Label htmlFor="bg-units">Blood Glucose Units</Label>
@@ -218,43 +231,47 @@ function ProfileTab({
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="carb-units">Carbohydrate Units</Label>
-          <Select value={carbUnits} onValueChange={setCarbUnits}>
-            <SelectTrigger id="carb-units" data-testid="select-carb-units">
+        {showCarbUnits ? (
+          <div className="space-y-1.5">
+            <Label htmlFor="carb-units">Carbohydrate Units</Label>
+            <Select value={carbUnits} onValueChange={setCarbUnits}>
+              <SelectTrigger id="carb-units" data-testid="select-carb-units">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="grams">Grams</SelectItem>
+                <SelectItem value="portions-10g">Carb Portion (10g)</SelectItem>
+                <SelectItem value="portions-15g">Carb Portion (15g)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
+      </div>
+      {showInsulinDelivery ? (
+        <div id="settings-delivery" className="scroll-mt-28 space-y-1.5">
+          <FieldLabelWithInfo
+            htmlFor="delivery-method"
+            info={
+              <p>
+                {isPumpDeliveryMethod(deliveryMethod)
+                  ? "Using an insulin pump for continuous delivery."
+                  : "Using pens or syringes for injections (MDI)."}
+              </p>
+            }
+          >
+            Insulin Delivery Method
+          </FieldLabelWithInfo>
+          <Select value={deliveryMethod} onValueChange={(v) => setDeliveryMethod(v as "pen" | "pump")}>
+            <SelectTrigger id="delivery-method" data-testid="select-delivery-method">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="grams">Grams</SelectItem>
-              <SelectItem value="portions-10g">Carb Portion (10g)</SelectItem>
-              <SelectItem value="portions-15g">Carb Portion (15g)</SelectItem>
+              <SelectItem value="pen">MDI (Multiple Daily Injections)</SelectItem>
+              <SelectItem value="pump">Insulin Pump</SelectItem>
             </SelectContent>
           </Select>
         </div>
-      </div>
-      <div id="settings-delivery" className="scroll-mt-28 space-y-1.5">
-        <FieldLabelWithInfo
-          htmlFor="delivery-method"
-          info={
-            <p>
-              {isPumpDeliveryMethod(deliveryMethod)
-                ? "Using an insulin pump for continuous delivery."
-                : "Using pens or syringes for injections (MDI)."}
-            </p>
-          }
-        >
-          Insulin Delivery Method
-        </FieldLabelWithInfo>
-        <Select value={deliveryMethod} onValueChange={(v) => setDeliveryMethod(v as "pen" | "pump")}>
-          <SelectTrigger id="delivery-method" data-testid="select-delivery-method">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="pen">MDI (Multiple Daily Injections)</SelectItem>
-            <SelectItem value="pump">Insulin Pump</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      ) : null}
       <div id="settings-dob-section" className="scroll-mt-24 space-y-1.5">
         <FieldLabelWithInfo
           htmlFor="settings-dob"
@@ -1073,8 +1090,9 @@ export default function Settings() {
   
   const isCommunityAccount = profile?.accountType === "community";
   const insulinClinical = hasInsulinClinicalTools(profile);
+  const isType2Settings = isType2AppSession(profile);
   const hidePatientClinicalHub = inSupporterSession || isCommunityAccount;
-  const showAccountTypeGroup = isCommunityAccount || showSupporterPatientUpgrade;
+  const showAccountTypeGroup = isCommunityAccount || showSupporterPatientUpgrade || isType2Settings;
 
   const [notifSettings, setNotifSettings] = useState<NotificationSettings>({
     enabled: true,
@@ -1091,6 +1109,11 @@ export default function Settings() {
     communityFeedAlerts: true,
     communityDmAlerts: true,
   });
+
+  useEffect(() => {
+    if (!isType2Settings) return;
+    ensureLocalType2Profile(storage.getProfile());
+  }, [isType2Settings]);
   
   useEffect(() => {
     const nd = normalizeDateOfBirthInput(cloudProfile?.date_of_birth ?? null);
@@ -1229,8 +1252,15 @@ export default function Settings() {
     }
     if (!insulinClinical && pathOnly === "/settings/ratios") {
       setLocation("/settings");
+      return;
     }
-  }, [hidePatientClinicalHub, insulinClinical, pathOnly, setLocation]);
+    if (
+      isType2Settings &&
+      (pathOnly === "/settings/cgm" || pathOnly === "/settings/carb-sources")
+    ) {
+      setLocation("/settings");
+    }
+  }, [hidePatientClinicalHub, insulinClinical, isType2Settings, pathOnly, setLocation]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1968,7 +1998,11 @@ export default function Settings() {
       <section id="settings-personal" className="scroll-mt-24 space-y-2.5">
         <SettingsSectionHeader
           title="Personal & units"
-          description="Your name (for Help now), region, units, delivery method, body weight, and optional date of birth."
+          description={
+            isType2Settings
+              ? "Your name (for Help now), region, glucose units, and optional date of birth."
+              : "Your name (for Help now), region, units, delivery method, body weight, and optional date of birth."
+          }
         />
         <ProfileTab
           userDisplayName={userDisplayName}
@@ -1994,10 +2028,11 @@ export default function Settings() {
                 dateOfBirth: v,
                 bgUnits,
                 carbUnits,
-                diabetesType: "type1",
+                diabetesType: isType2Settings ? "type2" : "type1",
                 insulinDeliveryMethod: deliveryMethod,
-                usingInsulin: true,
+                usingInsulin: !isType2Settings,
                 hasAcceptedDisclaimer: true,
+                accountType: "patient",
               };
             })
           }
@@ -2005,16 +2040,24 @@ export default function Settings() {
           setBodyWeightInput={setBodyWeightInput}
           weightDisplayUnit={weightDisplayUnit}
           setWeightDisplayUnit={setWeightDisplayUnit}
-          weightRequiredForHypo={profileWeightRequiredForHypo(
-            normalizeDateOfBirthInput(
-              typeof profile?.dateOfBirth === "string" ? profile.dateOfBirth.trim() : null,
-            ),
-          )}
+          weightRequiredForHypo={
+            isType2Settings
+              ? false
+              : profileWeightRequiredForHypo(
+                  normalizeDateOfBirthInput(
+                    typeof profile?.dateOfBirth === "string" ? profile.dateOfBirth.trim() : null,
+                  ),
+                )
+          }
           onSave={() => void handleSaveProfile()}
           showDesktopSave={usagePageDirty}
+          showInsulinDelivery={insulinClinical}
+          showCarbUnits={insulinClinical}
+          diabetesTypeLabel={isType2Settings ? "Type 2" : insulinClinical ? "Type 1" : null}
         />
       </section>
 
+      {insulinClinical ? (
       <section id="settings-usage" className="scroll-mt-24 space-y-2.5 border-t border-border/40 pt-5">
         <SettingsSectionHeader
           title="Usage & supplies"
@@ -2063,6 +2106,7 @@ export default function Settings() {
           showDesktopSave={usagePageDirty}
         />
       </section>
+      ) : null}
 
       <div id="settings-backup" className="scroll-mt-24 border-t border-border/40 pt-5" data-testid="card-account-backup">
         <SettingsDataBackupSection embedded />
@@ -2071,7 +2115,7 @@ export default function Settings() {
       <SettingsStickySaveBar
         visible={usagePageDirty}
         onSave={() => void handleSaveUsagePage()}
-        label="Save personal & usage"
+        label={isType2Settings ? "Save personal info" : "Save personal & usage"}
         testId="button-save-usage-page-sticky"
       />
     </div>
@@ -2174,14 +2218,16 @@ export default function Settings() {
         ) : null}
 
         {!hidePatientClinicalHub && (
-        <SettingsHubGroup title={insulinClinical ? "Personal & clinical" : "Personal"}>
+        <SettingsHubGroup title={isType2Settings ? "Personal" : insulinClinical ? "Personal & clinical" : "Personal"}>
             <SettingsHubNavLink
               href="/settings/usage"
-              label={insulinClinical ? "Personal info & usage" : "Personal info"}
+              label={isType2Settings ? "Personal info" : insulinClinical ? "Personal info & usage" : "Personal info"}
               description={
-                insulinClinical
-                  ? "Units, habits, and supply forecasts"
-                  : "Name, units, and region — insulin supply tools are off for Type 2"
+                isType2Settings
+                  ? "Name, region, and units for your Type 2 home"
+                  : insulinClinical
+                    ? "Units, habits, and supply forecasts"
+                    : "Name, units, and region"
               }
               icon={Activity}
             />
@@ -2193,16 +2239,14 @@ export default function Settings() {
                 icon={Syringe}
               />
             ) : null}
-            <SettingsHubNavLink
-              href="/settings/carb-sources"
-              label="Carb sources"
-              description={
-                insulinClinical
-                  ? "Name your gels, drinks, and tablets — used in hypo and exercise advice"
-                  : "Name your gels, drinks, and tablets"
-              }
-              icon={Cookie}
-            />
+            {insulinClinical ? (
+              <SettingsHubNavLink
+                href="/settings/carb-sources"
+                label="Carb sources"
+                description="Name your gels, drinks, and tablets — used in hypo and exercise advice"
+                icon={Cookie}
+              />
+            ) : null}
             <SettingsHubNavLink
               href="/settings/pharmacy"
               label="Your pharmacy"
@@ -2233,20 +2277,29 @@ export default function Settings() {
                 icon={HeartHandshake}
               />
             ) : null}
-            <SettingsHubNavLink
-              href="/onboarding?upgrade=1"
-              label="I have Type 1 diabetes / use insulin"
-              description={
-                showSupporterPatientUpgrade
-                  ? "Add User Mode — keep supporting them too"
-                  : "Unlock supplies, meal planner, ratios, and situation guides"
-              }
-              icon={Sparkles}
-            />
+            {isType2Settings ? (
+              <SettingsHubNavLink
+                href="/onboarding?upgrade=1"
+                label="I use insulin / need Type 1 tools"
+                description="Unlock meal planner, ratios, supplies, and insulin situation guides"
+                icon={Sparkles}
+              />
+            ) : (
+              <SettingsHubNavLink
+                href="/onboarding?upgrade=1"
+                label="I have Type 1 diabetes / use insulin"
+                description={
+                  showSupporterPatientUpgrade
+                    ? "Add User Mode — keep supporting them too"
+                    : "Unlock supplies, meal planner, ratios, and situation guides"
+                }
+                icon={Sparkles}
+              />
+            )}
           </SettingsHubGroup>
         ) : null}
 
-        {!inSupporterSession && (
+        {!inSupporterSession && !isType2Settings ? (
           <SettingsHubGroup title="Health data">
             <SettingsHubNavLink
               href="/settings/cgm"
@@ -2255,7 +2308,7 @@ export default function Settings() {
               icon={Activity}
             />
           </SettingsHubGroup>
-        )}
+        ) : null}
 
         {!inSupporterSession && !isCommunityAccount && (
           <SettingsHubGroup title="Family & sharing">
@@ -2318,7 +2371,7 @@ export default function Settings() {
   }
 
   if (pathOnly === "/settings/usage") {
-    return <SettingsUsageRoute usageToolsInner={usageToolsInner} />;
+    return <SettingsUsageRoute usageToolsInner={usageToolsInner} type2={isType2Settings} />;
   }
 
   if (pathOnly === "/settings/ratios") {

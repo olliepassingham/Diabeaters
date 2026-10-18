@@ -17,6 +17,8 @@ import {
   LineChart,
   ArrowLeftRight,
   History,
+  Car,
+  Wine,
 } from "lucide-react";
 import { HubListPanel, HubListRow, type HubListAccent, type HubListTone } from "@/components/hub-list-panel";
 import { cn } from "@/lib/utils";
@@ -39,7 +41,9 @@ import { useOffline } from "@/hooks/use-offline";
 import { filterOfflineCloudTools } from "@/lib/offline-app-gate";
 import { OfflineDeviceNotice } from "@/components/offline-device-notice";
 import { hasLiveCgmCredentials, readCgmPreferences } from "@/lib/cgm/preferences";
-import { hasInsulinClinicalTools } from "@/lib/insulin-clinical-access";
+import { hasInsulinClinicalTools, isType2AppSession } from "@/lib/insulin-clinical-access";
+import { ensureLocalType2Profile } from "@/lib/type2-session";
+import { canShowAlcoholScenarios, canShowDrivingReadiness } from "@/lib/user-age";
 import { hapticLight } from "@/lib/haptics";
 
 type ToolDef = {
@@ -147,14 +151,62 @@ const PATIENT_TOOLS: ToolDef[] = [
   },
 ];
 
+/** Insulin / Type 1 clinical tiles never shown on the Type 2 tools hub. */
 const TYPE2_HIDDEN_TOOL_IDS = new Set([
   "insulin-calculator",
   "correction-helper",
-  "supply-tracker",
+  "cgm-live",
+  "patterns",
+  "hypo-history",
+  "routines",
+  "education",
 ]);
+
+const TYPE2_CARE_IDS = ["supply-tracker", "appointments", "help-now", "ai-coach"] as const;
+const TYPE2_HELPER_IDS = ["hypo-help", "glucose-converter", "tips", "achievements", "activity-log"] as const;
+
+function type2ToolsForHub(): ToolDef[] {
+  ensureLocalType2Profile(storage.getProfile());
+  const byId = new Map(PATIENT_TOOLS.map((t) => [t.id, t] as const));
+  byId.set("help-now", {
+    id: "help-now",
+    href: "/help-now",
+    icon: Droplet,
+    title: "Emergency details",
+    description: "Help Now card for bystanders",
+  });
+  const coach: ToolDef | undefined = isAiCoachEnabled
+    ? {
+        id: "ai-coach",
+        href: buildCoachHref({ topic: "community" }),
+        icon: MessageCircle,
+        title: AI_ASSISTANT_NAME,
+        description: "Educational chat — not personal dosing advice",
+      }
+    : undefined;
+  if (coach) byId.set("ai-coach", coach);
+  const supply = byId.get("supply-tracker");
+  if (supply) {
+    byId.set("supply-tracker", {
+      ...supply,
+      description: "Stock levels and days left",
+    });
+  }
+  const hypo = byId.get("hypo-help");
+  if (hypo) {
+    byId.set("hypo-help", {
+      ...hypo,
+      title: "What is a hypo?",
+      description: "Low blood glucose basics — education only",
+    });
+  }
+  const ordered = [...TYPE2_CARE_IDS, ...TYPE2_HELPER_IDS];
+  return ordered.map((id) => byId.get(id)).filter(Boolean) as ToolDef[];
+}
 
 function patientToolsForHub(): ToolDef[] {
   const profile = storage.getProfile();
+  if (isType2AppSession(profile)) return type2ToolsForHub();
   const insulinTools = hasInsulinClinicalTools(profile);
   const coach: ToolDef | undefined = isAiCoachEnabled
     ? {
@@ -307,13 +359,89 @@ function SectionHeader({ title }: { title: string }) {
   );
 }
 
-function ToolsAboutDialog({ hubVariant }: { hubVariant: "patient" | "carer" | "community" }) {
+function Type2ToolsHub({
+  careTools,
+  helperTools,
+  about,
+}: {
+  careTools: ToolDef[];
+  helperTools: ToolDef[];
+  about: React.ReactNode;
+}) {
+  const dob = storage.getProfile()?.dateOfBirth;
+  const situationTools: ToolDef[] = [];
+  if (canShowAlcoholScenarios(dob)) {
+    situationTools.push({
+      id: "alcohol",
+      href: "/scenarios/alcohol",
+      icon: Wine,
+      title: "Alcohol",
+      description: "Situation prep — education only",
+    });
+  }
+  if (canShowDrivingReadiness(dob)) {
+    situationTools.push({
+      id: "driving",
+      href: "/scenarios/driving",
+      icon: Car,
+      title: "Driving",
+      description: "A short readiness check before you go",
+    });
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="rounded-2xl border border-border/50 bg-muted/15 px-4 py-3">
+          <p className="text-sm font-semibold text-foreground">Type 2 tools</p>
+          <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
+            Supplies, appointments, emergency details, and situation guides — no insulin dosing.
+          </p>
+        </div>
+        {about}
+      </div>
+      {careTools.length > 0 ? (
+        <section className="space-y-3" data-testid="tools-section-type2-care">
+          <SectionHeader title="Care kit" />
+          <HubListPanel label="Care kit">
+            <ToolRows tools={careTools} tone="accent" accent="teal" />
+          </HubListPanel>
+        </section>
+      ) : null}
+      {situationTools.length > 0 ? (
+        <section className="space-y-3" data-testid="tools-section-type2-situations">
+          <SectionHeader title="Situation guides" />
+          <HubListPanel label="Situation guides">
+            <ToolRows tools={situationTools} tone="guide" accent="teal" />
+          </HubListPanel>
+        </section>
+      ) : null}
+      {helperTools.length > 0 ? (
+        <section className="space-y-3" data-testid="tools-section-type2-helpers">
+          <SectionHeader title="Helpers" />
+          <HubListPanel label="Helpers">
+            <ToolRows tools={helperTools} tone="quiet" accent="gold" />
+          </HubListPanel>
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
+function ToolsAboutDialog({ hubVariant }: { hubVariant: "patient" | "type2" | "carer" | "community" }) {
   return (
     <PageInfoDialog
       title="About Tools"
       description="Calculators, tracking, and learning resources. Educational only — always follow your care team’s advice."
     >
-      {hubVariant === "carer" || hubVariant === "community" ? (
+      {hubVariant === "type2" ? (
+        <InfoSection title="Type 2 tools">
+          <p>
+            Supplies, appointments, emergency details, and a few situation guides — without insulin dosing or ratios.
+            Educational only.
+          </p>
+        </InfoSection>
+      ) : hubVariant === "carer" || hubVariant === "community" ? (
         <>
           <InfoSection title={hubVariant === "community" ? "Learn & connect" : "Supporter tools"}>
             <p>
@@ -345,7 +473,7 @@ export function ToolsHubPage({
   hubVariant = "patient",
 }: {
   tools?: ToolDef[];
-  hubVariant?: "patient" | "carer" | "community";
+  hubVariant?: "patient" | "type2" | "carer" | "community";
 }) {
   const byId = new Map(tools.map((t) => [t.id, t] as const));
   const { communityPushPromptOpen, setCommunityPushPromptOpen } = useCommunityPushPromptAfterOnboarding();
@@ -383,6 +511,9 @@ export function ToolsHubPage({
     .map((id) => byId.get(id))
     .filter(Boolean) as ToolDef[];
 
+  const type2Care = TYPE2_CARE_IDS.map((id) => byId.get(id)).filter(Boolean) as ToolDef[];
+  const type2Helpers = TYPE2_HELPER_IDS.map((id) => byId.get(id)).filter(Boolean) as ToolDef[];
+
   const supporterTools =
     hubVariant === "carer" || hubVariant === "community" ? ([...actNow, ...learn] as ToolDef[]) : [];
 
@@ -404,13 +535,24 @@ export function ToolsHubPage({
     TOOLS_HUB_SECTIONS.find((section) => section.id === activePatientSection)?.label ?? "Act now";
 
   return (
-    <PageShell variant="standard" density="compact" className="max-w-5xl pt-0 space-y-6">
-      <h1 className="sr-only">Tools</h1>
+    <PageShell
+      variant="standard"
+      density="compact"
+      className="max-w-5xl pt-0 space-y-6"
+      data-testid={hubVariant === "type2" ? "tools-type2" : undefined}
+    >
+      <h1 className="sr-only">{hubVariant === "type2" ? "Type 2 tools" : "Tools"}</h1>
 
       <RatiosSetupNotice hidden={hubVariant !== "patient"} testId="tools-ratios-setup-notice" />
       <OfflineDeviceNotice />
 
-      {(hubVariant === "carer" || hubVariant === "community") && supporterTools.length > 0 ? (
+      {hubVariant === "type2" ? (
+        <Type2ToolsHub
+          careTools={type2Care}
+          helperTools={type2Helpers}
+          about={<ToolsAboutDialog hubVariant="type2" />}
+        />
+      ) : (hubVariant === "carer" || hubVariant === "community") && supporterTools.length > 0 ? (
         <section
           className="space-y-3 sm:space-y-4"
           aria-label={hubVariant === "community" ? "Community tools" : "Supporter tools"}
@@ -564,6 +706,12 @@ export default function ToolsPage() {
     );
   }
   if (!isCarerMode && !isCommunityMode && (hasCarerIntent() || hasPendingCarer())) return null;
-  const hubVariant = isCarerMode ? "carer" : isCommunityMode ? "community" : "patient";
+  const hubVariant = isCarerMode
+    ? "carer"
+    : isCommunityMode
+      ? "community"
+      : isType2AppSession(storage.getProfile())
+        ? "type2"
+        : "patient";
   return <ToolsHubPage tools={hubTools} hubVariant={hubVariant} />;
 }

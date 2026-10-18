@@ -181,8 +181,18 @@ export default function HelpNow() {
               </div>
             )}
             <p className="text-sm leading-relaxed text-red-100/90">
-              For anyone helping — this is a <strong className="font-semibold text-white">Type 1</strong> low blood
-              sugar emergency. Follow the steps below.
+              {profile?.diabetesType === "type2" ? (
+                <>
+                  For anyone helping — this person has{" "}
+                  <strong className="font-semibold text-white">Type 2 diabetes</strong>. Follow the steps below and
+                  call emergency services if they are not recovering.
+                </>
+              ) : (
+                <>
+                  For anyone helping — this is a <strong className="font-semibold text-white">Type 1</strong> low blood
+                  sugar emergency. Follow the steps below.
+                </>
+              )}
             </p>
           </div>
         </div>

@@ -17,6 +17,7 @@ import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { useAuth } from "@/lib/auth-context";
 import { prefetchLinkedPatientsQuery } from "@/lib/carer-link-query";
 import { getActiveAppMode, isCarerSessionMode, isCommunitySessionMode } from "@/lib/carer-session";
+import { isType2AppSession } from "@/lib/insulin-clinical-access";
 import { useProfile } from "@/lib/profile";
 import { isCommunityAccountProfile, storage } from "@/lib/storage";
 
@@ -157,6 +158,56 @@ function patientTabs(showFeedTab: boolean): TabDef[] {
   return tabs;
 }
 
+/** Type 2: Home → Feed → combined Tools (guides + helpers) → Account. */
+function type2Tabs(showFeedTab: boolean): TabDef[] {
+  const tabs: TabDef[] = [
+    {
+      title: "Home",
+      href: "/",
+      icon: Home,
+      testId: "bottomnav-home",
+      isActive: (pathname) => pathname === "/",
+    },
+  ];
+  if (showFeedTab) {
+    tabs.push({
+      title: "Feed",
+      href: "/community",
+      icon: Users,
+      testId: "bottomnav-community",
+      isActive: (pathname) => isCommunityFeedPath(pathname) || pathname === "/community/setup",
+    });
+  }
+  tabs.push(
+    {
+      title: "Tools",
+      href: "/tools",
+      icon: Wrench,
+      testId: "bottomnav-tools",
+      isActive: (pathname) =>
+        pathname === "/tools" ||
+        pathname.startsWith("/tools/") ||
+        pathname === "/scenarios" ||
+        pathname.startsWith("/scenarios/") ||
+        pathname === "/supplies" ||
+        pathname.startsWith("/supplies/") ||
+        pathname === "/appointments" ||
+        pathname.startsWith("/appointments/") ||
+        pathname === "/help-now" ||
+        pathname === "/education" ||
+        pathname.startsWith("/education/"),
+    },
+    {
+      title: "Account",
+      href: "/account",
+      icon: User,
+      testId: "bottomnav-account",
+      isActive: (pathname) => pathname === "/account",
+    },
+  );
+  return tabs;
+}
+
 function communityMemberTabs(showFeedTab: boolean, showMessagesTab: boolean): TabDef[] {
   const tabs: TabDef[] = [];
   if (showFeedTab) {
@@ -263,8 +314,13 @@ export function BottomNav() {
     cloudCommunityProfile: profile?.account_type === "community",
   });
   const isOffline = useOffline();
+  const isType2Mode =
+    !isCarerMode && !isCommunityMode && isType2AppSession(storage.getProfile());
   const showCommunityNav = !isOffline && isCommunityEnabled;
-  const showPatientFeedTab = showCommunityNav && !profileLoading && profile?.is_public === true;
+  // Type 2 always gets Feed (handle is required on first entry). Type 1 still needs a public profile.
+  const showPatientFeedTab =
+    showCommunityNav &&
+    (isType2Mode || (!profileLoading && profile?.is_public === true));
   const showFeedTab = isCarerMode || isCommunityMode ? showCommunityNav : showPatientFeedTab;
   const showMessagesTab = showCommunityNav && (isCarerMode || isCommunityMode);
 
@@ -354,7 +410,9 @@ export function BottomNav() {
       ? carerTabs(showFeedTab, showMessagesTab)
       : isCommunityMode
         ? communityMemberTabs(showFeedTab, showMessagesTab)
-        : patientTabs(showPatientFeedTab),
+        : isType2Mode
+          ? type2Tabs(showPatientFeedTab)
+          : patientTabs(showPatientFeedTab),
     isOffline,
   );
 

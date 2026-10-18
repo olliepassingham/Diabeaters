@@ -7,7 +7,7 @@ import { Moon, Thermometer, Plane, Dumbbell, Syringe, Wine, Car } from "lucide-r
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { storage, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
-import { hasInsulinClinicalTools } from "@/lib/insulin-clinical-access";
+import { hasInsulinClinicalTools, isType2AppSession } from "@/lib/insulin-clinical-access";
 import { pumpSetupCompletion } from "@/lib/pump-supplies";
 import { canShowAlcoholScenarios, canShowDrivingReadiness } from "@/lib/user-age";
 import { PageShell } from "@/components/layout";
@@ -97,19 +97,31 @@ function ScenarioCard({ href, icon, title, description }: ScenarioCardDef) {
 export default function Scenarios() {
   const [location, setLocation] = useLocation();
   const search = useSearch();
+  const isType2 = isType2AppSession(storage.getProfile());
+  const onType2SituationDeepLink =
+    location.startsWith("/scenarios/alcohol") || location.startsWith("/scenarios/driving");
+
   const [visibleScenarioCards, setVisibleScenarioCards] = useState<ScenarioCardDef[]>(() => {
     const profile = storage.getProfile();
     return scenarioCardsForProfile(profile?.dateOfBirth, hasInsulinClinicalTools(profile));
   });
-
-  useEffect(() => {
-    trackFeatureEngagement("scenarios");
-  }, []);
-
   const [showPumpFailureCard, setShowPumpFailureCard] = useState(false);
   const [pumpFailureCardDescription, setPumpFailureCardDescription] = useState(
     "Triage steps if delivery stops",
   );
+
+  useEffect(() => {
+    // Type 2 uses the combined Tools hub (guides live there). Keep alcohol/driving deep links.
+    if (isType2 && !onType2SituationDeepLink) {
+      setLocation("/tools");
+    }
+  }, [isType2, onType2SituationDeepLink, setLocation]);
+
+  useEffect(() => {
+    if (isType2) return;
+    trackFeatureEngagement("scenarios");
+  }, [isType2]);
+
   useEffect(() => {
     const profile = storage.getProfile();
     const insulinClinical = hasInsulinClinicalTools(profile);
@@ -143,6 +155,10 @@ export default function Scenarios() {
     else if (tab === "sick-day" || tab === "sickday") setLocation("/scenarios/sick-day");
     else if (tab === "travel") setLocation("/scenarios/travel");
   }, [location, search, setLocation]);
+
+  if (isType2 && !onType2SituationDeepLink) {
+    return null;
+  }
 
   const guidesAboutDialog = (
     <PageInfoDialog

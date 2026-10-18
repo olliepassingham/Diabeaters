@@ -1,3 +1,4 @@
+import { getOnboardingAccountPath } from "@/lib/carer-session";
 import type { UserProfile } from "@/lib/storage";
 
 /** Local profile fields used to decide insulin / Type 1 clinical surfaces. */
@@ -5,6 +6,12 @@ export type InsulinAccessProfile = Pick<UserProfile, "diabetesType" | "usingInsu
 
 export function isType2Patient(profile: InsulinAccessProfile): boolean {
   return profile?.diabetesType === "type2";
+}
+
+/** True when this device session is the Type 2 patient home (profile or signup path). */
+export function isType2AppSession(profile?: InsulinAccessProfile): boolean {
+  if (isType2Patient(profile)) return true;
+  return getOnboardingAccountPath() === "type2";
 }
 
 /**
@@ -19,12 +26,17 @@ export function hasInsulinClinicalTools(profile: InsulinAccessProfile): boolean 
   return true;
 }
 
-/** Paths that require insulin clinical tools — block for Type 2. */
-export function isInsulinClinicalPath(pathOnly: string): boolean {
+/**
+ * Paths that require insulin clinical tools — block for Type 2 / community.
+ * Supply tracker is allowed for Type 2 (meds / kit without insulin dosing).
+ */
+export function isInsulinClinicalPath(pathOnly: string, profile?: InsulinAccessProfile): boolean {
   const p = (pathOnly || "/").split("?")[0] ?? "/";
   if (p === "/adviser" || p.startsWith("/adviser/")) return true;
   if (p === "/tools/correction") return true;
-  if (p === "/supplies" || p.startsWith("/supplies/")) return true;
+  if (p === "/supplies" || p.startsWith("/supplies/")) {
+    return !isType2AppSession(profile);
+  }
   if (p === "/scenarios/exercise") return true;
   if (p === "/scenarios/bedtime" || p === "/bedtime") return true;
   if (p === "/scenarios/sick-day" || p === "/sick-day") return true;

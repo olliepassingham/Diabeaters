@@ -40,7 +40,8 @@ export default function CommunitySetupPage() {
     cloudCommunityProfile: profile?.account_type === "community",
   });
   const supporterFirstRun = !hasCarerLink && (hasPendingCarer() || getOnboardingAccountPath() === "supporter");
-  const afterProfilePath = supporterFirstRun ? "/carer-setup" : "/community";
+  const type2Setup = getOnboardingAccountPath() === "type2";
+  const afterProfilePath = supporterFirstRun ? "/carer-setup" : type2Setup ? "/" : "/community";
 
   const [fullName, setFullName] = useState("");
   const [handleInput, setHandleInput] = useState("");
