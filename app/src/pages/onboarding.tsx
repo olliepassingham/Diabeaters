@@ -40,6 +40,7 @@ import {
   describePartialClinicalPrefsCloudSync,
   syncAccountTypeToCloud,
   syncClinicalPrefsToCloud,
+  syncDiabetesTypeToCloud,
 } from "@/lib/clinical-prefs-cloud-sync";
 import { normalizeDateOfBirthInput } from "@/lib/user-age";
 import { withReconciledTdd } from "@/lib/tdd";
@@ -318,8 +319,48 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   }, [user]);
   const showBothPath = accountPath === "both";
   const showCommunityPath = accountPath === "community";
-  const showType2Path = accountPath === "type2";
+  // Upgrade from Type 2 must leave the type2 shell — otherwise we force type2 copy/save again.
+  const showType2Path = accountPath === "type2" && !upgradeFlow;
   const [minimalSetup, setMinimalSetup] = useState(false);
+  const [currentStep, setCurrentStep] = useState<Step>(() => {
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("upgrade") === "1") {
+      return "details";
+    }
+    // Name first for community, patient, and dual-role. Upgrade skips welcome.
+    return "welcome";
+  });
+  const [type2HandleAvailability, setType2HandleAvailability] = useState<
+    "idle" | "checking" | "available" | "taken" | "invalid"
+  >("idle");
+
+  const [data, setData] = useState<OnboardingData>({
+    name: "",
+    publicHandle: "",
+    diabetesType: showType2Path ? "type2" : "type1",
+    careContext: null,
+    struggle: getInitialOnboardingStruggle(),
+    insulinDeliveryMethod: "pen",
+    dateOfBirth: "",
+    bgUnits: "mmol/L",
+    carbUnits: "grams",
+    region: "",
+    weightDisplayUnit: "kg",
+    emergencyNumber: "",
+    hasAcceptedDisclaimer: false,
+    tdd: "",
+    breakfastRatio: "",
+    lunchRatio: "",
+    dinnerRatio: "",
+    mealRatiosUnknown: false,
+    correctionFactor: "",
+    shortActingUnitsPerDay: "",
+    longActingUnitsPerDay: "",
+    injectionsPerDay: "",
+    cgmDays: "",
+    siteChangeDays: "3",
+    reservoirChangeDays: "3",
+    reservoirCapacity: "300",
+  });
 
   useEffect(() => {
     if (!showType2Path) return;
@@ -373,50 +414,12 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       }),
     [upgradeFlow, showCommunityPath, showBothPath, minimalSetup],
   );
-  const [currentStep, setCurrentStep] = useState<Step>(() => {
-    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("upgrade") === "1") {
-      return "details";
-    }
-    // Name first for community, patient, and dual-role. Upgrade skips welcome.
-    return "welcome";
-  });
-  const [type2HandleAvailability, setType2HandleAvailability] = useState<
-    "idle" | "checking" | "available" | "taken" | "invalid"
-  >("idle");
-
-  const [data, setData] = useState<OnboardingData>({
-    name: "",
-    publicHandle: "",
-    diabetesType: accountPath === "type2" ? "type2" : "type1",
-    careContext: null,
-    struggle: getInitialOnboardingStruggle(),
-    insulinDeliveryMethod: "pen",
-    dateOfBirth: "",
-    bgUnits: "mmol/L",
-    carbUnits: "grams",
-    region: "",
-    weightDisplayUnit: "kg",
-    emergencyNumber: "",
-    hasAcceptedDisclaimer: false,
-    tdd: "",
-    breakfastRatio: "",
-    lunchRatio: "",
-    dinnerRatio: "",
-    mealRatiosUnknown: false,
-    correctionFactor: "",
-    shortActingUnitsPerDay: "",
-    longActingUnitsPerDay: "",
-    injectionsPerDay: "",
-    cgmDays: "",
-    siteChangeDays: "3",
-    reservoirChangeDays: "3",
-    reservoirCapacity: "300",
-  });
 
   useEffect(() => {
     if (!upgradeFlow) return;
     const p = storage.getProfile();
     if (!p) return;
+    const upgradingFromType2 = p.diabetesType === "type2" || accountPath === "type2";
     setData((prev) => ({
       ...prev,
       name: p.name?.trim() ? p.name : prev.name,
@@ -425,12 +428,22 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       region: p.region || prev.region,
       weightDisplayUnit: p.weightDisplayUnit || prev.weightDisplayUnit,
       emergencyNumber: p.emergencyNumber || prev.emergencyNumber,
-      diabetesType: p.diabetesType && p.diabetesType !== "none" ? p.diabetesType : prev.diabetesType,
-      insulinDeliveryMethod: p.insulinDeliveryMethod || prev.insulinDeliveryMethod,
+      // Clinical upgrade always lands on Type 1 insulin tools.
+      diabetesType: upgradingFromType2
+        ? "type1"
+        : p.diabetesType && p.diabetesType !== "none"
+          ? p.diabetesType
+          : prev.diabetesType,
+      insulinDeliveryMethod:
+        upgradingFromType2
+          ? p.insulinDeliveryMethod === "pump"
+            ? "pump"
+            : "pen"
+          : p.insulinDeliveryMethod || prev.insulinDeliveryMethod,
       dateOfBirth: p.dateOfBirth || prev.dateOfBirth,
       hasAcceptedDisclaimer: p.hasAcceptedDisclaimer,
     }));
-  }, [upgradeFlow]);
+  }, [upgradeFlow, accountPath]);
 
   const updateData = (field: keyof OnboardingData, value: string | boolean | Struggle | CareContext | AppRegion) => {
     setData((prev) => {
@@ -462,13 +475,14 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
 
   const handleSaveProfile = () => {
     const prev = storage.getProfile();
-    const type2 = showType2Path || data.diabetesType === "type2";
+    // Upgrade flow always unlocks insulin clinical tools (never stay Type 2).
+    const type2 = !upgradeFlow && (showType2Path || data.diabetesType === "type2");
     storage.saveProfile({
       name: data.name,
       email: "",
       bgUnits: data.bgUnits,
       carbUnits: data.carbUnits,
-      diabetesType: type2 ? "type2" : data.diabetesType || "type1",
+      diabetesType: type2 ? "type2" : upgradeFlow ? "type1" : data.diabetesType || "type1",
       insulinDeliveryMethod:
         data.insulinDeliveryMethod === "injections"
           ? "pen"
@@ -671,11 +685,6 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       previousAccountPath === "both" ||
       isPersistedSupporterAccount();
     setPrimaryAppRole("patient");
-    if (previousAccountPath === "type2") {
-      setOnboardingAccountPath("type2");
-    } else if (previousAccountPath !== "both") {
-      setOnboardingAccountPath(previousAccountPath === "supporter" ? "both" : previousAccountPath ?? "patient");
-    }
     if (upgradeFlow) {
       setActiveAppMode("patient");
       clearPersistedCommunityAccount();
@@ -687,6 +696,10 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           hadSupporterMarkers,
         }),
       );
+    } else if (previousAccountPath === "type2") {
+      setOnboardingAccountPath("type2");
+    } else if (previousAccountPath !== "both") {
+      setOnboardingAccountPath(previousAccountPath === "supporter" ? "both" : previousAccountPath ?? "patient");
     }
     if (user?.id) {
       const fullName = isValidDisplayName(data.name) ? data.name.trim() : null;
@@ -699,7 +712,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
         return;
       }
       let type2Handle: string | null = null;
-      if (showType2Path || data.diabetesType === "type2") {
+      if (!upgradeFlow && (showType2Path || data.diabetesType === "type2")) {
         try {
           type2Handle = normalizePublicHandleInput(
             data.publicHandle.replace(/^@/, "").trim().toLowerCase(),
@@ -734,6 +747,10 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
         });
       } else {
         const syncRes = await syncClinicalPrefsToCloud(user.id);
+        if (upgradeFlow) {
+          // Ensure cloud Type 2 label flips even if clinical prefs had nothing else to push.
+          await syncDiabetesTypeToCloud(user.id, "type1");
+        }
         if (syncRes.error) {
           toast({
             title: "Profile synced; clinical prefs pending",

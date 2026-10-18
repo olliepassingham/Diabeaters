@@ -20,6 +20,15 @@ describe("patient upgrade onboarding", () => {
     ).toBe("patient");
   });
 
+  it("moves Type 2 upgrades onto the Type 1 patient path", () => {
+    expect(
+      resolveAccountPathAfterPatientUpgrade({
+        previousPath: "type2",
+        hadSupporterMarkers: false,
+      }),
+    ).toBe("patient");
+  });
+
   it("promotes supporter upgrades to dual-role", () => {
     expect(
       resolveAccountPathAfterPatientUpgrade({

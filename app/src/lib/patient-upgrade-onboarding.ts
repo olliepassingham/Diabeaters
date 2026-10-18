@@ -5,7 +5,7 @@ export function isPatientUpgradeOnboarding(search: string): boolean {
 }
 
 /**
- * After clinical upgrade onboarding, community members become patients;
+ * After clinical upgrade onboarding, community / Type 2 members become patients;
  * supporters (who keep their carer link) become dual-role.
  */
 export function resolveAccountPathAfterPatientUpgrade(input: {
@@ -19,5 +19,6 @@ export function resolveAccountPathAfterPatientUpgrade(input: {
   ) {
     return "both";
   }
+  // type2 / community / patient / null → Type 1 patient shell with clinical tools.
   return "patient";
 }
