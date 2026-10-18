@@ -119,11 +119,8 @@ export default function Welcome() {
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-primary">
               <Users className="h-5 w-5" aria-hidden />
             </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-base font-semibold leading-snug text-foreground">Type 1</span>
-              <span className="mt-0.5 block text-sm leading-snug text-muted-foreground">
-                My day-to-day tools
-              </span>
+            <span className="min-w-0 flex-1 text-base font-semibold leading-snug text-foreground">
+              Type 1
             </span>
             <ArrowRight className="h-5 w-5 shrink-0 text-muted-foreground/70 transition-transform group-hover:translate-x-0.5" aria-hidden />
           </button>
@@ -137,11 +134,8 @@ export default function Welcome() {
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-primary">
               <Users className="h-5 w-5" aria-hidden />
             </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-base font-semibold leading-snug text-foreground">Type 2</span>
-              <span className="mt-0.5 block text-sm leading-snug text-muted-foreground">
-                Learning and community
-              </span>
+            <span className="min-w-0 flex-1 text-base font-semibold leading-snug text-foreground">
+              Type 2
             </span>
             <ArrowRight className="h-5 w-5 shrink-0 text-muted-foreground/70 transition-transform group-hover:translate-x-0.5" aria-hidden />
           </button>
