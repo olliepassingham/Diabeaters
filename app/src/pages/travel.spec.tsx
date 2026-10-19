@@ -101,6 +101,75 @@ describe("Travel page", () => {
     expect(screen.queryByText("Supplies look covered for this trip")).toBeNull();
   });
 
+  it("fully clears a trip so Plan a trip starts fresh", () => {
+    storage.saveHolidayPrep({
+      id: "prep-clear",
+      destination: "Spain",
+      departureDate: "2030-06-01",
+      returnDate: "2030-06-08",
+      checklist: [],
+      createdAt: new Date().toISOString(),
+    });
+    storage.saveTravelPlan({
+      duration: 7,
+      destination: "Spain",
+      travelType: "international",
+      timezoneChange: "none",
+      timezoneHours: 0,
+      timezoneDirection: "east",
+      startDate: "2030-06-01",
+      endDate: "2030-06-08",
+      accessRisk: "easy",
+      weatherChange: "same",
+      weatherSeverity: "mild",
+      tripStyle: "relaxed",
+    });
+    storage.saveTravelWizardDraft({
+      step: "results",
+      plan: {
+        duration: 7,
+        destination: "Spain",
+        travelType: "international",
+        timezoneChange: "none",
+        timezoneHours: 0,
+        timezoneDirection: "east",
+        startDate: "2030-06-01",
+        endDate: "2030-06-08",
+        accessRisk: "easy",
+        weatherChange: "same",
+        weatherSeverity: "mild",
+        tripStyle: "relaxed",
+      },
+      packingList: [
+        {
+          name: "Fast-acting insulin",
+          category: "insulin",
+          estimatedAmount: 2,
+          unit: "pens",
+          checked: false,
+          reasoning: "test",
+        },
+      ],
+      resultsTab: "packing",
+      savedAt: new Date().toISOString(),
+    });
+
+    render(<Travel />);
+    expect(screen.queryByText("Spain")).not.toBeNull();
+    fireEvent.click(screen.getByTestId("button-delete-holiday-prep"));
+
+    expect(storage.getHolidayPrep()).toBeNull();
+    expect(storage.getTravelPlan()).toBeNull();
+    expect(storage.getTravelWizardDraft()).toBeNull();
+    expect(storage.getTravelPackingList()).toEqual([]);
+    expect(screen.queryByTestId("travel-empty-hero")).not.toBeNull();
+    expect(screen.queryByText("Spain")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("button-start-travel-plan"));
+    expect(screen.queryByTestId("travel-wizard-trip-summary")).toBeNull();
+    expect(screen.getByPlaceholderText(/City, country/i)).not.toBeNull();
+  });
+
   it("lets you edit upcoming trip destination and dates", () => {
     storage.saveHolidayPrep({
       id: "prep-edit",

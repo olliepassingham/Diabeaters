@@ -3304,6 +3304,18 @@ export const storage = {
     this.saveScenarioState(state);
   },
 
+  /**
+   * Clears planned-trip local data (holiday card, packing plan, wizard draft).
+   * Does not end an active travel-mode session by itself — call after
+   * deactivateTravelMode, or from "delete trip" when mode is already off.
+   */
+  clearPlannedTravelTrip(): void {
+    localStorage.removeItem(STORAGE_KEYS.HOLIDAY_PREP);
+    localStorage.removeItem(STORAGE_KEYS.TRAVEL_PLAN);
+    localStorage.removeItem(STORAGE_KEYS.TRAVEL_PACKING_LIST);
+    localStorage.removeItem(STORAGE_KEYS.TRAVEL_WIZARD_DRAFT);
+  },
+
   deactivateTravelMode(): void {
     const state = this.getScenarioState();
     if (state.travelModeActive && state.travelStartDate) {
@@ -3325,9 +3337,7 @@ export const storage = {
     state.travelTripStyle = undefined;
     state.travelActivityNote = undefined;
     this.saveScenarioState(state);
-    localStorage.removeItem(STORAGE_KEYS.TRAVEL_PLAN);
-    localStorage.removeItem(STORAGE_KEYS.TRAVEL_PACKING_LIST);
-    localStorage.removeItem(STORAGE_KEYS.TRAVEL_WIZARD_DRAFT);
+    this.clearPlannedTravelTrip();
   },
 
   saveTravelPlan(plan: any): void {
@@ -5549,7 +5559,9 @@ export const storage = {
   },
 
   deleteHolidayPrep(): void {
-    localStorage.removeItem(STORAGE_KEYS.HOLIDAY_PREP);
+    // Deleting the trip card must drop plan/draft too — otherwise entry restore
+    // rebuilds holiday prep from leftover travel plan / wizard draft.
+    this.clearPlannedTravelTrip();
   },
 
   /**

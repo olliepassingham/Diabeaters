@@ -1296,7 +1296,35 @@ export default function Travel() {
     };
   };
 
+  const resetPlanToDefaults = (): TravelPlan => {
+    const dates = getDefaultDates();
+    return {
+      duration: 7,
+      destination: "",
+      travelType: "domestic",
+      timezoneChange: "none",
+      timezoneHours: 0,
+      timezoneDirection: "none",
+      startDate: dates.start,
+      endDate: dates.end,
+      accessRisk: "easy",
+      weatherChange: "unknown",
+      weatherSeverity: "moderate",
+    };
+  };
+
   const handleStartPlan = () => {
+    // Empty landing → always start a new trip (don't resurrect a stale draft).
+    if (!holidayPrep && !storage.getHolidayPrep()) {
+      storage.clearPlannedTravelTrip();
+      setPackingList([]);
+      setRiskWarnings([]);
+      setPlan(resetPlanToDefaults());
+      setTravelWizardStep(0);
+      setStep("inputs");
+      return;
+    }
+
     const draft = storage.getTravelWizardDraft();
 
     // Resume an existing packing / results plan instead of restarting the wizard.
@@ -1376,8 +1404,20 @@ export default function Travel() {
   ];
 
   const handleDeleteHolidayPrep = () => {
-    storage.deleteHolidayPrep();
+    // If travel mode was on, end it (also clears planned trip storage).
+    if (storage.getScenarioState().travelModeActive) {
+      storage.deactivateTravelMode();
+      setIsTravelModeActive(false);
+      localStorage.removeItem("diabeater_travel_session");
+    } else {
+      storage.deleteHolidayPrep();
+    }
     setHolidayPrep(null);
+    setPackingList([]);
+    setRiskWarnings([]);
+    setPlan(resetPlanToDefaults());
+    setTravelWizardStep(0);
+    setStep("entry");
     setEditTripOpen(false);
     toast({ title: "Trip cleared", description: "Removed from your travel guide" });
   };
@@ -1541,9 +1581,15 @@ export default function Travel() {
   };
   
   const handleDeactivateTravelMode = () => {
+    const endedPlan = plan;
     storage.deactivateTravelMode();
     localStorage.removeItem("diabeater_travel_session");
     setIsTravelModeActive(false);
+    setHolidayPrep(null);
+    setPackingList([]);
+    setRiskWarnings([]);
+    setPlan(resetPlanToDefaults());
+    setTravelWizardStep(0);
     setStep("entry");
     const endedAt = new Date().toISOString();
     void upsertScenario({
@@ -1552,9 +1598,9 @@ export default function Travel() {
       label: "Travel mode (off)",
       state: {
         travel_active: false,
-        travel_start: plan.startDate || null,
-        travel_end: plan.endDate || null,
-        destination: plan.destination || null,
+        travel_start: endedPlan.startDate || null,
+        travel_end: endedPlan.endDate || null,
+        destination: endedPlan.destination || null,
         travel_trip_style: null,
         ended_at: endedAt,
       },
