@@ -74,6 +74,25 @@ describe("FeedWatchLearnPlayer", () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
+  it("closes when swiping right from a later clip", () => {
+    const onOpenChange = vi.fn();
+    render(
+      <FeedWatchLearnPlayer
+        open
+        onOpenChange={onOpenChange}
+        posts={[videoPost("p1", "After pizza"), videoPost("p2", "Pump bag")]}
+        initialIndex={1}
+      />,
+    );
+
+    const scroller = screen.getByTestId("watch-learn-scroller");
+    fireEvent.touchStart(scroller, { touches: [{ clientX: 40, clientY: 240 }] });
+    fireEvent.touchMove(scroller, { touches: [{ clientX: 60, clientY: 242 }] });
+    fireEvent.touchMove(scroller, { touches: [{ clientX: 160, clientY: 244 }] });
+    fireEvent.touchEnd(scroller, { changedTouches: [{ clientX: 160, clientY: 244 }] });
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
   it("shows an empty state when there are no clips", () => {
     const onOpenChange = vi.fn();
     render(<FeedWatchLearnPlayer open onOpenChange={onOpenChange} posts={[]} />);

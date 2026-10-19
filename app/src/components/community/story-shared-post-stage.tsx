@@ -100,8 +100,8 @@ export function StorySharedPostStage({ postId, className, onOpenPost, onOpenAuth
   }
 
   return (
-    <div className={cn("h-full w-full overflow-y-auto bg-background", className)}>
-      <div className="mx-auto flex min-h-full w-full max-w-lg flex-col px-3 py-[max(5.25rem,calc(env(safe-area-inset-top)+4.5rem))] pb-[max(7.5rem,calc(env(safe-area-inset-bottom)+5.5rem))]">
+    <div className={cn("flex h-full w-full items-center justify-center overflow-hidden bg-background", className)}>
+      <div className="mx-auto flex h-full max-h-full w-full max-w-lg flex-col justify-center px-3 py-[max(5.25rem,calc(env(safe-area-inset-top)+4.5rem))] pb-[max(7.5rem,calc(env(safe-area-inset-bottom)+5.5rem))]">
         <SharedFeedCard
           post={post}
           author={author}
@@ -148,10 +148,10 @@ function SharedFeedCard({
 
   return (
     <article
-      className="my-auto w-full overflow-hidden rounded-3xl border border-border/40 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)] dark:bg-card/80 dark:shadow-none"
+      className="flex max-h-full min-h-0 w-full flex-col overflow-hidden rounded-3xl border border-border/40 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)] dark:bg-card/80 dark:shadow-none"
       data-testid="story-shared-post-card"
     >
-      <div className="flex items-center gap-3 px-3.5 pb-2.5 pt-3 sm:px-4">
+      <div className="flex shrink-0 items-center gap-3 px-3.5 pb-2.5 pt-3 sm:px-4">
         <button
           type="button"
           className="shrink-0 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -216,23 +216,39 @@ function SharedFeedCard({
       </div>
 
       {hasFeedVideo && post.video_url ? (
-        <FeedPostVideo path={post.video_url} posterPath={post.video_poster_url} priority />
+        <div className="min-h-0 shrink overflow-hidden [&_video]:max-h-[38dvh] [&_img]:max-h-[38dvh]">
+          <FeedPostVideo path={post.video_url} posterPath={post.video_poster_url} priority />
+        </div>
       ) : null}
       {hasFeedImages ? (
-        <CommunityPostImageGrid
-          paths={post.image_urls}
-          altTexts={post.image_alt_texts}
-          variant="feed"
-          priority
-        />
+        <div className="min-h-0 shrink overflow-hidden [&_img]:max-h-[38dvh] [&_img]:object-contain">
+          <CommunityPostImageGrid
+            paths={post.image_urls}
+            altTexts={post.image_alt_texts}
+            variant="feed"
+            priority
+          />
+        </div>
       ) : null}
 
       {!isMediaFirst ? (
-        <div className="space-y-2 px-3.5 pb-1 sm:px-4">
+        <div className="min-h-0 shrink space-y-2 overflow-hidden px-3.5 pb-1 sm:px-4">
           {bodyText ? (
-            <p className="whitespace-pre-wrap text-[15px] leading-[1.45] text-foreground">
-              {renderBodyWithMentions(bodyText, post.mention_map)}
-            </p>
+            <button
+              type="button"
+              className="block w-full text-left"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenPost();
+              }}
+            >
+              <p className="line-clamp-8 whitespace-pre-wrap text-[15px] leading-[1.45] text-foreground">
+                {renderBodyWithMentions(bodyText, post.mention_map)}
+              </p>
+              {bodyText.length > 220 ? (
+                <span className="mt-1 inline-block text-[13px] font-semibold text-primary">View full post</span>
+              ) : null}
+            </button>
           ) : null}
           {eventExtra ? (
             <FeedEventCard
@@ -255,7 +271,7 @@ function SharedFeedCard({
         </div>
       ) : null}
 
-      <div className="flex items-center justify-between gap-1 px-2 pb-2 pt-1 sm:px-3.5">
+      <div className="flex shrink-0 items-center justify-between gap-1 px-2 pb-2 pt-1 sm:px-3.5">
         <div className="flex min-w-0 items-center">
           <Button
             type="button"
@@ -324,7 +340,7 @@ function SharedFeedCard({
       {post.like_count > 0 ? (
         <button
           type="button"
-          className="flex w-full items-center px-3.5 pb-0.5 text-left sm:px-4"
+          className="flex w-full shrink-0 items-center px-3.5 pb-0.5 text-left sm:px-4"
           onClick={(e) => {
             e.stopPropagation();
             onOpenPost();
@@ -337,7 +353,7 @@ function SharedFeedCard({
       ) : null}
 
       {isMediaFirst && bodyText ? (
-        <p className="px-3.5 pb-3 pt-1.5 text-sm leading-snug text-foreground sm:px-4">
+        <p className="min-h-0 shrink overflow-hidden px-3.5 pb-3 pt-1.5 text-sm leading-snug text-foreground sm:px-4">
           <button
             type="button"
             className="mr-1.5 font-semibold hover:underline underline-offset-2"
@@ -348,14 +364,25 @@ function SharedFeedCard({
           >
             {author.name}
           </button>
-          <span className="whitespace-pre-wrap">{renderBodyWithMentions(bodyText, post.mention_map)}</span>
+          <button
+            type="button"
+            className="mt-0.5 block w-full text-left"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenPost();
+            }}
+          >
+            <span className="line-clamp-3 block whitespace-pre-wrap">
+              {renderBodyWithMentions(bodyText, post.mention_map)}
+            </span>
+          </button>
         </p>
       ) : (
-        <div className="h-2" />
+        <div className="h-2 shrink-0" />
       )}
 
       {isMediaFirst && (eventExtra || pollExtra || previewLink) ? (
-        <div className="space-y-2 px-3.5 pb-3 sm:px-4">
+        <div className="min-h-0 shrink space-y-2 overflow-hidden px-3.5 pb-3 sm:px-4">
           {eventExtra ? (
             <FeedEventCard
               event={eventExtra}

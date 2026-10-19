@@ -32,6 +32,10 @@ const PLAY_THRESHOLD = 0.65;
 const TAP_MOVE_PX = 12;
 /** Pull past the first clip this far (px) to dismiss Watch. */
 const DISMISS_PULL_PX = 72;
+/** Swipe right (anywhere in the reel) this far to go back to the feed. */
+const DISMISS_SWIPE_PX = 88;
+/** Lock vertical vs horizontal once the finger moves past this. */
+const GESTURE_LOCK_PX = 12;
 
 function WatchLearnSlide({
   post,
@@ -139,12 +143,19 @@ export function FeedWatchLearnPlayer({
   loading = false,
 }: Props) {
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const touchStartRef = useRef<{ x: number; y: number; scrollTop: number } | null>(null);
+  const touchStartRef = useRef<{
+    x: number;
+    y: number;
+    scrollTop: number;
+    axis: "undecided" | "vertical" | "horizontal";
+  } | null>(null);
   const dismissPullRef = useRef(0);
+  const dismissSwipeRef = useRef(0);
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const [muted, setMuted] = useState(() => readFeedVideoMuted());
   const [paused, setPaused] = useState(false);
   const [dismissPull, setDismissPull] = useState(0);
+  const [dismissSwipe, setDismissSwipe] = useState(0);
   const [likeState, setLikeState] = useState<Record<string, { liked: boolean; count: number }>>({});
 
   const clips = posts.filter((post) => Boolean(post.video_url));
@@ -275,16 +286,40 @@ export function FeedWatchLearnPlayer({
       x: touch.clientX,
       y: touch.clientY,
       scrollTop: scrollerRef.current?.scrollTop ?? 0,
+      axis: "undecided",
     };
     dismissPullRef.current = 0;
+    dismissSwipeRef.current = 0;
     setDismissPull(0);
+    setDismissSwipe(0);
   };
 
   const onScrollerTouchMove = (event: TouchEvent<HTMLDivElement>) => {
     const start = touchStartRef.current;
     const touch = event.touches[0];
     if (!start || !touch) return;
+    const dx = touch.clientX - start.x;
     const dy = touch.clientY - start.y;
+
+    if (start.axis === "undecided") {
+      const absX = Math.abs(dx);
+      const absY = Math.abs(dy);
+      if (absX < GESTURE_LOCK_PX && absY < GESTURE_LOCK_PX) return;
+      start.axis = absX > absY + 4 ? "horizontal" : "vertical";
+    }
+
+    if (start.axis === "horizontal") {
+      // Swipe left→right (finger moves right) closes Watch from any clip.
+      const swipe = Math.max(0, Math.min(220, dx));
+      dismissSwipeRef.current = swipe;
+      setDismissSwipe(swipe);
+      if (dismissPullRef.current > 0) {
+        dismissPullRef.current = 0;
+        setDismissPull(0);
+      }
+      return;
+    }
+
     // On the first clip, pulling down (finger moves down → content wants to go up) dismisses.
     const atTop = activeIndex <= 0 && start.scrollTop <= 2;
     if (atTop && dy > 0) {
@@ -301,10 +336,13 @@ export function FeedWatchLearnPlayer({
     const start = touchStartRef.current;
     touchStartRef.current = null;
     const pull = dismissPullRef.current;
+    const swipe = dismissSwipeRef.current;
     dismissPullRef.current = 0;
+    dismissSwipeRef.current = 0;
     setDismissPull(0);
+    setDismissSwipe(0);
 
-    if (pull >= DISMISS_PULL_PX) {
+    if (swipe >= DISMISS_SWIPE_PX || pull >= DISMISS_PULL_PX) {
       onOpenChange(false);
       return;
     }
@@ -381,6 +419,13 @@ export function FeedWatchLearnPlayer({
     );
   }
 
+  const dismissTransform =
+    dismissSwipe > 0
+      ? { transform: `translateX(${dismissSwipe}px)`, transition: "none", opacity: Math.max(0.35, 1 - dismissSwipe / 280) }
+      : dismissPull > 0
+        ? { transform: `translateY(${dismissPull * 0.35}px)`, transition: "none" }
+        : undefined;
+
   return createPortal(
     <div
       className="fixed inset-0 z-[130] bg-black"
@@ -392,11 +437,7 @@ export function FeedWatchLearnPlayer({
       <div
         ref={scrollerRef}
         className="h-[100dvh] snap-y snap-mandatory overflow-y-auto overscroll-y-contain touch-pan-y [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        style={
-          dismissPull > 0
-            ? { transform: `translateY(${dismissPull * 0.35}px)`, transition: "none" }
-            : undefined
-        }
+        style={dismissTransform}
         onTouchStart={onScrollerTouchStart}
         onTouchMove={onScrollerTouchMove}
         onTouchEnd={finishTouchGesture}
@@ -472,12 +513,18 @@ export function FeedWatchLearnPlayer({
         })}
       </div>
 
-      {dismissPull > 24 ? (
+      {dismissSwipe > 28 || dismissPull > 24 ? (
         <p
           className="pointer-events-none absolute left-1/2 top-[max(4.5rem,calc(env(safe-area-inset-top)+3.25rem))] z-30 -translate-x-1/2 rounded-full bg-black/55 px-3 py-1.5 text-xs font-semibold text-white/90 backdrop-blur-sm"
           data-testid="watch-learn-dismiss-hint"
         >
-          {dismissPull >= DISMISS_PULL_PX ? "Release to close" : "Pull to close"}
+          {dismissSwipe > 28
+            ? dismissSwipe >= DISMISS_SWIPE_PX
+              ? "Release to go back"
+              : "Swipe to go back"
+            : dismissPull >= DISMISS_PULL_PX
+              ? "Release to close"
+              : "Pull to close"}
         </p>
       ) : null}
 
