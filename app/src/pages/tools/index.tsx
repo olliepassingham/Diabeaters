@@ -164,7 +164,7 @@ const TYPE2_HIDDEN_TOOL_IDS = new Set([
 ]);
 
 const TYPE2_CARE_IDS = ["supply-tracker", "appointments", "help-now", "ai-coach"] as const;
-const TYPE2_HELPER_IDS = ["hypo-help", "glucose-converter", "tips"] as const;
+const TYPE2_HELPER_IDS = ["glucose-converter", "tips"] as const;
 
 export function type2ToolsForHub(): ToolDef[] {
   ensureLocalType2Profile(storage.getProfile());
@@ -191,14 +191,6 @@ export function type2ToolsForHub(): ToolDef[] {
     byId.set("supply-tracker", {
       ...supply,
       description: "Stock levels and days left",
-    });
-  }
-  const hypo = byId.get("hypo-help");
-  if (hypo) {
-    byId.set("hypo-help", {
-      ...hypo,
-      title: "What is a hypo?",
-      description: "Low blood glucose basics — education only",
     });
   }
   const ordered = [...TYPE2_CARE_IDS, ...TYPE2_HELPER_IDS];

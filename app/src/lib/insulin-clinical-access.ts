@@ -49,7 +49,7 @@ export function isInsulinClinicalPath(pathOnly: string, profile?: InsulinAccessP
 
 /**
  * Type 1–oriented helper pages kept off the Type 2 tools hub (and deep links).
- * Hypo help stays reachable but renders education-only for Type 2.
+ * Hypo help is not listed for Type 2; deep links still render education-only.
  */
 export function isType2HiddenToolsPath(pathOnly: string): boolean {
   const p = (pathOnly || "/").split("?")[0] ?? "/";

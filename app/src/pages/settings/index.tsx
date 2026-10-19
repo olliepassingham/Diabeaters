@@ -2206,7 +2206,7 @@ export default function Settings() {
           </Card>
         </Link>
 
-        {!inSupporterSession && !isCommunityAccount && showSoftSetupCard ? (
+        {!inSupporterSession && !isCommunityAccount && !isType2Settings && showSoftSetupCard ? (
           <div className="space-y-2">
             <SettingsSetupBanner
               percentage={completion.percentage}

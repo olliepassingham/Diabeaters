@@ -83,7 +83,8 @@ describe("ToolsHubPage", () => {
     render(<ToolsHubPage tools={type2ToolsForHub()} hubVariant="type2" />);
 
     expect(screen.queryByTestId("tools-type2")).not.toBeNull();
-    expect(screen.getByRole("heading", { name: /what is a hypo/i })).not.toBeNull();
+    expect(screen.queryByRole("heading", { name: /what is a hypo/i })).toBeNull();
+    expect(screen.getByRole("heading", { name: /glucose units/i })).not.toBeNull();
     expect(screen.queryByRole("heading", { name: /^achievements$/i })).toBeNull();
     expect(screen.queryByRole("heading", { name: /activity log/i })).toBeNull();
   });
