@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -6,7 +6,6 @@ import {
   ChevronRight,
   HeartPulse,
   Phone,
-  ShieldAlert,
   Syringe,
   User,
   UserRound,
@@ -26,24 +25,24 @@ import { resolveUserDisplayName } from "@/lib/user-display-name";
 import { cn } from "@/lib/utils";
 
 const AWAKE_STEPS = [
-  "Give fast sugar — juice, regular cola, glucose tablets, or sweets.",
-  "Stay with them for 10–15 minutes.",
-  "Repeat fast sugar if they are not improving.",
-  "Still unwell? Call emergency services using the button below.",
+  "Give fast sugar (juice, cola, glucose tabs, or sweets).",
+  "Wait 10–15 minutes with them.",
+  "Repeat if no better.",
+  "Still unwell? Call emergency services.",
 ] as const;
 
 const UNCONSCIOUS_STEPS_TYPE1 = [
-  "Tell paramedics this person has Type 1 Diabetes and uses insulin.",
-  "Do not give food, drink, or put anything in their mouth.",
-  "Turn them on their side and stay with them until help arrives.",
-  "Call emergency services now using the button below.",
+  "Tell paramedics: Type 1 diabetes — uses insulin.",
+  "Nothing in their mouth.",
+  "Turn them on their side.",
+  "Call emergency services now.",
 ] as const;
 
 const UNCONSCIOUS_STEPS_TYPE2 = [
-  "Tell paramedics this person has Type 2 Diabetes.",
-  "Do not give food, drink, or put anything in their mouth.",
-  "Turn them on their side and stay with them until help arrives.",
-  "Call emergency services now using the button below.",
+  "Tell paramedics: Type 2 diabetes — medicines may cause lows.",
+  "Nothing in their mouth.",
+  "Turn them on their side.",
+  "Call emergency services now.",
 ] as const;
 
 function StepList({ steps, urgent }: { steps: readonly string[]; urgent?: boolean }) {
@@ -109,11 +108,6 @@ export default function HelpNow() {
     !isType2 && isPumpDeliveryMethod(profile?.insulinDeliveryMethod);
   const unconsciousSteps = isType2 ? UNCONSCIOUS_STEPS_TYPE2 : UNCONSCIOUS_STEPS_TYPE1;
 
-  const quickSymptoms = useMemo(
-    () => ["Shaking", "Sweating", "Confused", "Slurred speech", "Drowsy", "Pale"],
-    [],
-  );
-
   const emergencyDockClearance =
     "calc(var(--bottom-nav-height, 7.5rem) + var(--keyboard-inset-bottom, 0px) + 7rem)";
 
@@ -159,53 +153,25 @@ export default function HelpNow() {
           ) : null}
         </div>
 
-        <div className="relative flex items-start gap-4">
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20">
-            <ShieldAlert className="h-6 w-6" aria-hidden />
-          </span>
-          <div className="min-w-0 flex-1 space-y-2">
-            <p className="text-sm font-bold uppercase tracking-wide text-red-50">
-              Low blood sugar emergency
+        <div className="relative space-y-1 text-center sm:text-left">
+          {displayName ? (
+            <p
+              className="font-display text-3xl font-bold leading-none tracking-tight"
+              data-testid="help-now-display-name"
+            >
+              {displayName}
             </p>
-            {displayName ? (
-              <div className="space-y-0.5">
-                <p
-                  className="font-display text-3xl font-bold leading-none tracking-tight"
-                  data-testid="help-now-display-name"
-                >
-                  {displayName}
-                </p>
-                <p className="text-base font-medium text-red-50">may be having a severe hypo</p>
-              </div>
-            ) : (
-              <div className="space-y-1">
-                <p className="text-xl font-bold leading-tight">Someone needs help</p>
-                <p className="text-sm text-red-50">
-                  <Link
-                    href="/settings/usage#settings-personal"
-                    className="font-medium underline underline-offset-2 hover:text-white"
-                  >
-                    Add your name in Settings
-                  </Link>{" "}
-                  so helpers know who this is for.
-                </p>
-              </div>
-            )}
-            <p className="text-sm leading-relaxed text-red-100/90">
-              {profile?.diabetesType === "type2" ? (
-                <>
-                  For anyone helping — this person has{" "}
-                  <strong className="font-semibold text-white">Type 2 diabetes</strong>. Follow the steps below and
-                  call emergency services if they are not recovering.
-                </>
-              ) : (
-                <>
-                  For anyone helping — this is a <strong className="font-semibold text-white">Type 1</strong> low blood
-                  sugar emergency. Follow the steps below.
-                </>
-              )}
+          ) : (
+            <p className="text-xl font-bold leading-tight">
+              <Link
+                href="/settings/usage#settings-personal"
+                className="underline underline-offset-2 hover:text-white"
+              >
+                Add name
+              </Link>
             </p>
-          </div>
+          )}
+          <p className="text-lg font-semibold text-red-50">Low blood sugar — follow steps below</p>
         </div>
       </div>
 
@@ -262,7 +228,7 @@ export default function HelpNow() {
             )}
           >
             <p className="text-base font-semibold text-foreground">
-              {mode === "awake" ? "Give fast sugar, then wait" : `Call ${emergencyNumber} now`}
+              {mode === "awake" ? "Do this" : `Call ${emergencyNumber} now`}
             </p>
             <div className="mt-3">
               <StepList
@@ -272,33 +238,13 @@ export default function HelpNow() {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Common signs
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {quickSymptoms.map((symptom) => (
-                <span
-                  key={symptom}
-                  className="rounded-full border border-border/70 bg-muted/30 px-2.5 py-1 text-xs font-medium text-muted-foreground"
-                >
-                  {symptom}
-                </span>
-              ))}
-            </div>
-          </div>
-
           {isPumpUser ? (
-            <div
-              className="flex gap-3 rounded-2xl border border-amber-500/25 bg-amber-500/[0.08] px-3.5 py-3 dark:bg-amber-950/25"
+            <p
+              className="text-sm font-medium text-amber-800 dark:text-amber-300"
               data-testid="card-pump-emergency"
             >
-              <Syringe className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-400" aria-hidden />
-              <p className="text-sm leading-relaxed text-foreground">
-                <strong>Pump user:</strong> treat the hypo first — do not disconnect the pump. If unconscious,
-                tell paramedics they use an insulin pump.
-              </p>
-            </div>
+              Pump: treat first — do not disconnect. Tell paramedics if unconscious.
+            </p>
           ) : null}
         </CardContent>
       </Card>

@@ -10,6 +10,25 @@ vi.mock("@/lib/flags", () => ({
   isCommunityEnabled: true,
 }));
 
+vi.mock("@/lib/auth-context", () => ({
+  useAuth: () => ({ user: { id: "user-type2-demo" }, loading: false }),
+}));
+
+vi.mock("@/lib/profile", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/profile")>();
+  return {
+    ...actual,
+    useProfile: () => ({
+      profile: {
+        full_name: "Alex Demo",
+        public_handle: "alex_demo",
+        is_public: true,
+      },
+      loading: false,
+    }),
+  };
+});
+
 const baseProfile = (): UserProfile => ({
   name: "Alex Demo",
   email: "alex@example.com",
@@ -50,19 +69,26 @@ describe("Type2Home", () => {
     expect(next?.insulinDeliveryMethod).toBe("");
   });
 
-  it("renders supply runway and care essentials without the hero box or tile grid", () => {
+  it("orders supplies, appointments, Feed, Beatie, then Help Now", () => {
     storage.saveProfile({ ...baseProfile(), diabetesType: "type2", usingInsulin: false });
     render(<Type2Home profile={storage.getProfile()} displayName="Alex Demo" />);
     expect(screen.getByTestId("type2-home")).not.toBeNull();
     expect(screen.getByTestId("type2-home-greeting")).not.toBeNull();
     expect(screen.queryByTestId("type2-home-hero")).toBeNull();
-    expect(screen.getByTestId("home-supply-graph")).not.toBeNull();
-    expect(screen.queryByTestId("type2-home-supplies")).toBeNull();
-    expect(screen.getByTestId("type2-home-appointments")).not.toBeNull();
-    expect(screen.getByTestId("type2-home-emergency")).not.toBeNull();
-    expect(screen.getByTestId("type2-home-ask-beatie")).not.toBeNull();
+
+    const order = [
+      screen.getByTestId("home-supply-graph"),
+      screen.getByTestId("type2-home-appointments"),
+      screen.getByTestId("type2-home-feed"),
+      screen.getByTestId("type2-home-ask-beatie"),
+      screen.getByTestId("type2-home-emergency"),
+    ];
+    for (let i = 1; i < order.length; i++) {
+      expect(order[i - 1]!.compareDocumentPosition(order[i]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+    expect(screen.getByText(/No visits yet/i)).not.toBeNull();
+    expect(screen.getByText(/Emergency card for bystanders/i)).not.toBeNull();
     expect(screen.queryByTestId("type2-home-tiles")).toBeNull();
     expect(screen.queryByText(/connect your cgm/i)).toBeNull();
   });
 });
-
