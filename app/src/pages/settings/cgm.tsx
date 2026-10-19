@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 import { Activity, CheckCircle2, CircleOff, Droplet, HeartPulse, Radio as RadioIcon, Smartphone, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -176,28 +175,28 @@ function getCgmStatus({
   if (!prefs.prefillEnabled) {
     return {
       label: "Off",
-      detail: "Turn on below to offer recent BG in tools.",
+      detail: "Choose your CGM below to connect.",
       tone: "muted",
     };
   }
   if (hasDexcomShareCredentials(prefs)) {
     return {
       label: "Connected",
-      detail: "Dexcom Share can prefill near-live readings in Driving and exercise.",
+      detail: "Dexcom Share — near-live glucose in the app.",
       tone: "green",
     };
   }
   if (hasLibreLinkUpCredentials(prefs)) {
     return {
       label: "Connected",
-      detail: "LibreLink Up can prefill near-live readings in Driving and exercise.",
+      detail: "LibreLink Up — near-live glucose in the app.",
       tone: "green",
     };
   }
   if (accessGranted === true) {
     return {
       label: "Connected",
-      detail: `${healthLabel} can suggest a recent reading (may be delayed vs your CGM app).`,
+      detail: `${healthLabel} — readings may be delayed.`,
       tone: "green",
     };
   }
@@ -210,28 +209,28 @@ function getCgmStatus({
   }
   if (!prefs.healthPlatformEnabled && !prefs.dexcomShareEnabled && !prefs.libreLinkUpEnabled) {
     return {
-      label: "Almost ready",
-      detail: `Enable Dexcom Share, LibreLink Up, or ${healthLabel} below, then connect.`,
+      label: "Not connected",
+      detail: "Pick Dexcom, Libre, or Health below.",
       tone: "amber",
     };
   }
   if (prefs.libreLinkUpEnabled && !hasLibreLinkUpCredentials(prefs)) {
     return {
       label: "Needs setup",
-      detail: "Enter your LibreLink Up login and tap Connect LibreLink Up.",
+      detail: "Enter LibreLink Up login, then Connect.",
       tone: "amber",
     };
   }
   if (prefs.dexcomShareEnabled) {
     return {
       label: "Needs setup",
-      detail: "Paste your Dexcom account ID (or try email), then tap Connect Dexcom Share.",
+      detail: "Add account ID + password, then Connect.",
       tone: "amber",
     };
   }
   return {
     label: "Needs permission",
-    detail: "Tap Connect and allow blood glucose read access.",
+    detail: `Tap Connect and allow Blood Glucose in ${healthLabel}.`,
     tone: "amber",
   };
 }
@@ -258,8 +257,6 @@ export function SettingsCgmRoute() {
   const [dexcomServer, setDexcomServer] = useState<DexcomShareServer>(
     () => readCgmPreferences().dexcomShareServer ?? "eu",
   );
-  const [nativeBuildLabel, setNativeBuildLabel] = useState<string | null>(null);
-  const healthAuthAvailable = isIosDevice() && Capacitor.isPluginAvailable("HealthAuthorization");
   const devicePlatform = getDevicePlatform();
 
   const isNative = isCapacitorNativeShell();
@@ -275,17 +272,6 @@ export function SettingsCgmRoute() {
     () => readCgmPreferences().libreLinkUpRegion ?? "eu",
   );
   const [dexcomAssistEmphasize, setDexcomAssistEmphasize] = useState(false);
-
-  useEffect(() => {
-    if (!isCapacitorNativeShell()) return;
-    void CapacitorApp.getInfo()
-      .then((info) => {
-        const version = info.version?.trim() || "?";
-        const build = info.build?.trim();
-        setNativeBuildLabel(build ? `${version} (${build})` : version);
-      })
-      .catch(() => undefined);
-  }, []);
 
   const runDiagnostics = useCallback(async () => {
     if (!isCapacitorNativeShell()) {
@@ -510,61 +496,73 @@ export function SettingsCgmRoute() {
   const StatusIcon =
     status.tone === "green" ? CheckCircle2 : status.tone === "amber" ? Sparkles : isNative ? Activity : Smartphone;
 
+  const selectSource = (value: CgmSourceChoice) => {
+    if (value === "dexcom") {
+      updatePrefs({
+        ...prefs,
+        prefillEnabled: true,
+        dexcomShareEnabled: true,
+        libreLinkUpEnabled: false,
+        healthPlatformEnabled: false,
+      });
+    } else if (value === "libre") {
+      updatePrefs({
+        ...prefs,
+        prefillEnabled: true,
+        libreLinkUpEnabled: true,
+        dexcomShareEnabled: false,
+        healthPlatformEnabled: false,
+      });
+    } else {
+      updatePrefs({
+        ...prefs,
+        prefillEnabled: true,
+        healthPlatformEnabled: true,
+        dexcomShareEnabled: false,
+        libreLinkUpEnabled: false,
+      });
+    }
+  };
+
+  const anyLiveConnected = dexcomConnected || libreConnected || accessGranted === true;
+
   return (
     <SettingsSubPageShell
-      title="CGM prefill"
-      description="Near-live Dexcom Share or LibreLink Up, or delayed Apple Health / Health Connect."
+      title="Connect CGM"
+      description="Better charts, home glucose, and tool suggestions."
       actions={<SettingsCgmInfoDialog />}
     >
       <SettingsPanel className="bg-gradient-to-b from-muted/30 to-muted/5 dark:from-muted/15 dark:to-muted/5">
-        <SettingsPanelBody className="flex items-start gap-3.5">
+        <SettingsPanelBody className="flex items-center gap-3.5">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/12 text-primary shadow-inner dark:bg-primary/20">
-            <Activity className="h-5 w-5" strokeWidth={1.75} aria-hidden />
+            <StatusIcon
+              className={cn(
+                "h-5 w-5",
+                status.tone === "green" && "text-green-600 dark:text-green-400",
+                status.tone === "amber" && "text-amber-600 dark:text-amber-400",
+                status.tone === "muted" && "text-primary",
+              )}
+              aria-hidden
+            />
           </span>
-          <div className="min-w-0 flex-1 space-y-1.5">
+          <div className="min-w-0 flex-1 space-y-1">
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm font-semibold text-foreground">Status</p>
               <Badge variant="outline" className={cn("rounded-full px-2 py-0 text-[11px] font-medium", STATUS_BADGE_CLASS[status.tone])}>
                 {status.label}
               </Badge>
             </div>
-            <p className="text-xs leading-relaxed text-muted-foreground">{status.detail}</p>
-            {isNative ? (
-              <p className="pt-1 text-[11px] leading-relaxed text-muted-foreground" data-testid="text-cgm-build-diag">
-                Build {nativeBuildLabel ?? "…"} on{" "}
-                {devicePlatform === "android" ? "Android" : devicePlatform === "ios" ? "iPhone" : "web"}.
-                {isIosDevice() ? (
-                  <>
-                    {" "}
-                    Health bridge: {healthAuthAvailable ? "ready" : "missing — install newest TestFlight build"}.
-                  </>
-                ) : isAndroidDevice() ? (
-                  <> Health Connect via Capacitor plugin.</>
-                ) : null}
-              </p>
-            ) : null}
+            <p className="text-sm text-muted-foreground">{status.detail}</p>
           </div>
-          <StatusIcon
-            className={cn(
-              "mt-0.5 h-5 w-5 shrink-0",
-              status.tone === "green" && "text-green-600 dark:text-green-400",
-              status.tone === "amber" && "text-amber-600 dark:text-amber-400",
-              status.tone === "muted" && "text-muted-foreground/70",
-            )}
-            aria-hidden
-          />
         </SettingsPanelBody>
       </SettingsPanel>
 
       {needsAppUpdate && !dexcomConnected && !libreConnected ? (
         <SettingsPanel>
-          <SettingsPanelBody className="space-y-2">
-            <p className="text-sm font-medium text-amber-900 dark:text-amber-100">Update the Diabeaters app</p>
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              {nativeProbe?.status === "plugin_missing"
-                ? nativeProbe.message
-                : "Apple Health support is not in this app build."}{" "}
-              You can still use Dexcom Share or LibreLink Up below for near-live readings.
+          <SettingsPanelBody className="space-y-1">
+            <p className="text-sm font-medium text-amber-900 dark:text-amber-100">Update Diabeaters</p>
+            <p className="text-sm text-muted-foreground">
+              Health needs a newer app build. You can still connect Dexcom or Libre below.
             </p>
           </SettingsPanelBody>
         </SettingsPanel>
@@ -576,33 +574,19 @@ export function SettingsCgmRoute() {
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted/50 text-muted-foreground">
               <Smartphone className="h-4 w-4" aria-hidden />
             </span>
-            <p className="text-sm text-muted-foreground">
-              Use the Diabeaters mobile app to connect Dexcom Share, LibreLink Up, or{" "}
-              {isAndroidDevice() ? "Health Connect" : isIosDevice() ? "Apple Health" : "Apple Health / Health Connect"}.
-            </p>
+            <p className="text-sm text-muted-foreground">Open Diabeaters on iPhone or Android to connect.</p>
           </SettingsPanelBody>
         </SettingsPanel>
       ) : null}
 
-      {isNative && prefs.prefillEnabled ? (
+      {isNative ? (
         <SettingsPanel>
           <SettingsPanelBody className="space-y-3" data-testid="panel-cgm-source-guide">
-            <div className="space-y-0.5">
-              <p className="text-sm font-medium text-foreground">Which CGM do you use?</p>
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                Pick one to open the right setup below. You can change this later.
-              </p>
-            </div>
+            <p className="text-sm font-semibold text-foreground">1. Choose your CGM</p>
             <RadioGroup
               value={selectedCgmSourceChoice(prefs) ?? ""}
               onValueChange={(value) => {
-                if (value === "dexcom") {
-                  updatePrefs({ ...prefs, dexcomShareEnabled: true, libreLinkUpEnabled: false, healthPlatformEnabled: false });
-                } else if (value === "libre") {
-                  updatePrefs({ ...prefs, libreLinkUpEnabled: true, dexcomShareEnabled: false, healthPlatformEnabled: false });
-                } else if (value === "health") {
-                  updatePrefs({ ...prefs, healthPlatformEnabled: true, dexcomShareEnabled: false, libreLinkUpEnabled: false });
-                }
+                if (value === "dexcom" || value === "libre" || value === "health") selectSource(value);
               }}
               className="grid gap-2"
             >
@@ -611,7 +595,7 @@ export function SettingsCgmRoute() {
                 selected={selectedCgmSourceChoice(prefs) === "dexcom"}
                 icon={RadioIcon}
                 title="Dexcom"
-                description="Near-live Share — best for charts, overnight review, and supporter live BG. Account ID usually works better than email."
+                description="Near-live · best for charts"
                 testId="button-cgm-choose-dexcom"
               />
               <CgmSourceChoiceCard
@@ -619,98 +603,27 @@ export function SettingsCgmRoute() {
                 selected={selectedCgmSourceChoice(prefs) === "libre"}
                 icon={Droplet}
                 title="Libre"
-                description="Near-live via LibreLink Up (follower / care-partner login — not the patient LibreLink app alone)."
+                description="Near-live · LibreLink Up login"
                 testId="button-cgm-choose-libre"
               />
               <CgmSourceChoiceCard
                 value="health"
                 selected={selectedCgmSourceChoice(prefs) === "health"}
                 icon={HeartPulse}
-                title={`Just ${healthLabel} for now`}
-                description="Easiest — one OS permission, no Share login. Readings are often delayed; not ideal for live charts."
+                title={healthLabel}
+                description="Quick · may be delayed"
                 testId="button-cgm-choose-health"
               />
             </RadioGroup>
-            {(dexcomConnected || libreConnected || accessGranted) ? (
-              <p className="text-[11px] leading-relaxed text-muted-foreground">
-                Already connected. If both Share/Libre and {healthLabel} are on, Diabeaters uses the freshest reading.
-              </p>
-            ) : null}
           </SettingsPanelBody>
         </SettingsPanel>
       ) : null}
 
-      <div>
-        <SettingsGroupLabel>Options</SettingsGroupLabel>
-        <SettingsGroup>
-          <CgmToggleRow
-            id="cgm-prefill-enabled"
-            label="Suggest in tools"
-            info={<p>Driving, exercise, and other BG fields can offer a recent reading you can tap to apply.</p>}
-            checked={prefs.prefillEnabled}
-            onCheckedChange={(checked) => updatePrefs({ ...prefs, prefillEnabled: checked })}
-            testId="switch-cgm-prefill"
-          />
-          <CgmToggleRow
-            id="cgm-dexcom-enabled"
-            label="Dexcom Share"
-            info={
-              <p>
-                Near-live readings via Dexcom&apos;s Share service. Use your Dexcom app login (not a Follower account).
-                Share must be on in the Dexcom app. Credentials stay on this device except during an active exercise
-                session with low-glucose alerts enabled — then they are sent encrypted to our server for background
-                polling and deleted when the session ends.
-              </p>
-            }
-            checked={Boolean(prefs.dexcomShareEnabled)}
-            disabled={!prefs.prefillEnabled}
-            onCheckedChange={(checked) => updatePrefs({ ...prefs, dexcomShareEnabled: checked })}
-            testId="switch-cgm-dexcom"
-          />
-          <CgmToggleRow
-            id="cgm-libre-enabled"
-            label="LibreLink Up"
-            info={
-              <p>
-                Near-live readings via LibreLink Up (care-partner / follower app). Use the login for the account that
-                follows their sensor — not the LibreLink patient app unless linked. Credentials stay on this device only.
-              </p>
-            }
-            checked={Boolean(prefs.libreLinkUpEnabled)}
-            disabled={!prefs.prefillEnabled}
-            onCheckedChange={(checked) => updatePrefs({ ...prefs, libreLinkUpEnabled: checked })}
-            testId="switch-cgm-libre"
-          />
-          {isNative ? (
-            <CgmToggleRow
-              id="cgm-health-enabled"
-              label={healthLabel}
-              info={
-                <p>
-                  Optional fallback: read blood glucose your CGM app shares with {healthLabel}. Often delayed vs your CGM
-                  app — no trend arrows, charts, or supporter live BG. Use Dexcom Share or LibreLink Up above for those.
-                  Does not require storing extra credentials in Diabeaters.
-                </p>
-              }
-              checked={prefs.healthPlatformEnabled}
-              disabled={!prefs.prefillEnabled}
-              onCheckedChange={(checked) => updatePrefs({ ...prefs, healthPlatformEnabled: checked })}
-              testId="switch-cgm-health"
-            />
-          ) : null}
-        </SettingsGroup>
-      </div>
-
-      {isNative && prefs.prefillEnabled && prefs.dexcomShareEnabled ? (
+      {isNative && prefs.dexcomShareEnabled ? (
         <div>
-          <SettingsGroupLabel>Dexcom Share</SettingsGroupLabel>
+          <SettingsGroupLabel>2. Connect Dexcom</SettingsGroupLabel>
           <SettingsPanel>
             <SettingsPanelBody className="space-y-3">
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                Use your <span className="font-medium text-foreground">Dexcom G7/G6 or Clarity</span> account — not
-                Dexcom Follow. Share must be on in the Dexcom app. UK/EU: region Europe.
-              </p>
-
               {!dexcomConnected ? (
                 <DexcomLoginAssist
                   server={dexcomServer}
@@ -725,12 +638,12 @@ export function SettingsCgmRoute() {
               ) : null}
 
               <div className="space-y-1.5">
-                <Label htmlFor="dexcom-username" className="text-xs text-muted-foreground">
+                <Label htmlFor="dexcom-username" className="text-sm">
                   {dexcomConnected
                     ? "Linked account"
                     : isDexcomAccountId(dexcomUsername)
                       ? "Account ID"
-                      : "Account ID, portal link, or email"}
+                      : "Account ID or email"}
                 </Label>
                 <Input
                   id="dexcom-username"
@@ -745,24 +658,15 @@ export function SettingsCgmRoute() {
                     setDexcomAssistEmphasize(false);
                   }}
                   autoComplete="username"
-                  className="h-10"
+                  className="h-11"
                   disabled={dexcomConnected}
                   placeholder="Paste portal link or account ID"
                   data-testid="input-dexcom-username"
                 />
-                {dexcomConnected && isDexcomAccountId(dexcomUsername) ? (
-                  <p className="text-[11px] text-muted-foreground">
-                    Your Dexcom account ID is saved — you won&apos;t need to look it up again.
-                  </p>
-                ) : !dexcomConnected ? (
-                  <p className="text-[11px] text-muted-foreground">
-                    Email or phone sometimes works — if Connect fails, use the account ID steps above.
-                  </p>
-                ) : null}
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="dexcom-password" className="text-xs text-muted-foreground">
-                  Dexcom app / Clarity password
+                <Label htmlFor="dexcom-password" className="text-sm">
+                  Password
                 </Label>
                 <Input
                   id="dexcom-password"
@@ -770,36 +674,36 @@ export function SettingsCgmRoute() {
                   value={dexcomPassword}
                   onChange={(e) => setDexcomPassword(e.target.value)}
                   autoComplete="current-password"
-                  className="h-10"
+                  className="h-11"
                   data-testid="input-dexcom-password"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="dexcom-server" className="text-xs text-muted-foreground">
-                  Dexcom region
+                <Label htmlFor="dexcom-server" className="text-sm">
+                  Region
                 </Label>
                 <Select
                   value={dexcomServer}
                   onValueChange={(value) => setDexcomServer(value === "us" ? "us" : value === "jp" ? "jp" : "eu")}
                 >
-                  <SelectTrigger id="dexcom-server" className="h-10 rounded-xl" data-testid="select-dexcom-server">
+                  <SelectTrigger id="dexcom-server" className="h-11 rounded-xl" data-testid="select-dexcom-server">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="eu">Europe / UK (shareous1)</SelectItem>
-                    <SelectItem value="us">United States (share2)</SelectItem>
+                    <SelectItem value="eu">Europe / UK</SelectItem>
+                    <SelectItem value="us">United States</SelectItem>
                     <SelectItem value="jp">Japan / Asia-Pacific</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               {dexcomError ? (
-                <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs leading-relaxed text-destructive">
+                <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                   {dexcomError}
                 </p>
               ) : null}
               <Button
                 type="button"
-                className="h-10 w-full gap-2 rounded-xl"
+                className="h-11 w-full gap-2 rounded-xl"
                 disabled={dexcomConnecting || dexcomConnected}
                 onClick={() => void handleConnectDexcom()}
                 data-testid="button-cgm-connect-dexcom"
@@ -812,11 +716,11 @@ export function SettingsCgmRoute() {
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-8 w-full text-xs text-muted-foreground"
+                  className="h-9 w-full text-sm text-muted-foreground"
                   onClick={() => void handleDisconnectDexcom()}
                   data-testid="button-cgm-disconnect-dexcom"
                 >
-                  Disconnect Dexcom Share
+                  Disconnect
                 </Button>
               ) : null}
             </SettingsPanelBody>
@@ -824,19 +728,18 @@ export function SettingsCgmRoute() {
         </div>
       ) : null}
 
-      {isNative && prefs.prefillEnabled && prefs.libreLinkUpEnabled ? (
+      {isNative && prefs.libreLinkUpEnabled ? (
         <div>
-          <SettingsGroupLabel>LibreLink Up</SettingsGroupLabel>
+          <SettingsGroupLabel>2. Connect Libre</SettingsGroupLabel>
           <SettingsPanel>
             <SettingsPanelBody className="space-y-3">
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                Use your <span className="font-medium text-foreground">LibreLink Up</span> email and password — the
-                care-partner / follower app that follows their sensor, not the LibreLink patient app login on its own.
-                Ask them to invite you (or follow them) in LibreLink Up first. UK/EU: region Europe.
-              </p>
+              <ol className="list-decimal space-y-1 pl-4 text-sm text-muted-foreground">
+                <li>Open LibreLink Up (follower app)</li>
+                <li>Enter that email and password here</li>
+              </ol>
               <div className="space-y-1.5">
-                <Label htmlFor="libre-email" className="text-xs text-muted-foreground">
-                  LibreLink Up email
+                <Label htmlFor="libre-email" className="text-sm">
+                  Email
                 </Label>
                 <Input
                   id="libre-email"
@@ -847,15 +750,15 @@ export function SettingsCgmRoute() {
                     setLibreError(null);
                   }}
                   autoComplete="username"
-                  className="h-10"
+                  className="h-11"
                   disabled={libreConnected}
                   placeholder="you@email.com"
                   data-testid="input-libre-email"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="libre-password" className="text-xs text-muted-foreground">
-                  LibreLink Up password
+                <Label htmlFor="libre-password" className="text-sm">
+                  Password
                 </Label>
                 <Input
                   id="libre-password"
@@ -863,13 +766,13 @@ export function SettingsCgmRoute() {
                   value={librePassword}
                   onChange={(e) => setLibrePassword(e.target.value)}
                   autoComplete="current-password"
-                  className="h-10"
+                  className="h-11"
                   data-testid="input-libre-password"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="libre-region" className="text-xs text-muted-foreground">
-                  Libre region
+                <Label htmlFor="libre-region" className="text-sm">
+                  Region
                 </Label>
                 <Select
                   value={libreRegion}
@@ -881,7 +784,7 @@ export function SettingsCgmRoute() {
                     )
                   }
                 >
-                  <SelectTrigger id="libre-region" className="h-10 rounded-xl" data-testid="select-libre-region">
+                  <SelectTrigger id="libre-region" className="h-11 rounded-xl" data-testid="select-libre-region">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -895,13 +798,13 @@ export function SettingsCgmRoute() {
                 </Select>
               </div>
               {libreError ? (
-                <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs leading-relaxed text-destructive">
+                <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                   {libreError}
                 </p>
               ) : null}
               <Button
                 type="button"
-                className="h-10 w-full gap-2 rounded-xl"
+                className="h-11 w-full gap-2 rounded-xl"
                 disabled={libreConnecting || libreConnected}
                 onClick={() => void handleConnectLibre()}
                 data-testid="button-cgm-connect-libre"
@@ -914,11 +817,11 @@ export function SettingsCgmRoute() {
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-8 w-full text-xs text-muted-foreground"
+                  className="h-9 w-full text-sm text-muted-foreground"
                   onClick={() => void handleDisconnectLibre()}
                   data-testid="button-cgm-disconnect-libre"
                 >
-                  Disconnect LibreLink Up
+                  Disconnect
                 </Button>
               ) : null}
             </SettingsPanelBody>
@@ -926,41 +829,28 @@ export function SettingsCgmRoute() {
         </div>
       ) : null}
 
-      {isNative && prefs.prefillEnabled && prefs.healthPlatformEnabled ? (
+      {isNative && prefs.healthPlatformEnabled ? (
         <div>
-          <SettingsGroupLabel>{healthLabel}</SettingsGroupLabel>
+          <SettingsGroupLabel>2. Connect {healthLabel}</SettingsGroupLabel>
           <SettingsPanel>
             <SettingsPanelBody className="space-y-3">
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                Fallback only — readings are often delayed and won&apos;t power trend charts or supporter live BG. Enable
-                sharing in your CGM app first, then connect here for OS read permission (no Share/Libre login stored).
-              </p>
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-medium text-foreground">{healthLabel}</p>
-                <InlineInfoHint
-                  ariaLabel={`How to connect ${healthLabel}`}
-                  content={
-                    <p>
-                      {isAndroidDevice()
-                        ? "In your Libre or Dexcom app, enable Health Connect sharing if available. Install Health Connect from the Play Store if prompted."
-                        : "In your Dexcom or Libre app, enable sharing blood glucose to Apple Health. Often delayed — use Dexcom Share or LibreLink Up for near-live features."}
-                    </p>
-                  }
-                />
-              </div>
+              <ol className="list-decimal space-y-1 pl-4 text-sm text-muted-foreground">
+                <li>In your CGM app, share glucose to {healthLabel}</li>
+                <li>Tap Connect and allow Blood Glucose</li>
+              </ol>
               {healthAvailable === false && healthReason ? (
-                <p className="rounded-lg border border-amber-300/50 bg-amber-50/80 px-3 py-2 text-xs text-amber-900 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-100">
+                <p className="rounded-lg border border-amber-300/50 bg-amber-50/80 px-3 py-2 text-sm text-amber-900 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-100">
                   {healthReason}
                 </p>
               ) : null}
               {connectError ? (
-                <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs leading-relaxed text-destructive">
+                <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                   {connectError}
                 </p>
               ) : null}
               <Button
                 type="button"
-                className="h-10 w-full gap-2 rounded-xl"
+                className="h-11 w-full gap-2 rounded-xl"
                 disabled={connecting || accessGranted === true || (needsAppUpdate && !dexcomConnected && !libreConnected)}
                 onClick={() => void handleConnectHealth()}
                 data-testid="button-cgm-connect-health"
@@ -969,8 +859,8 @@ export function SettingsCgmRoute() {
                 {connectButtonLabel}
               </Button>
               {connecting ? (
-                <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
-                  Approve <span className="font-medium text-foreground">Blood Glucose</span> in the {healthLabel} sheet.
+                <p className="text-center text-sm text-muted-foreground">
+                  Approve Blood Glucose in the {healthLabel} sheet.
                 </p>
               ) : null}
             </SettingsPanelBody>
@@ -978,17 +868,28 @@ export function SettingsCgmRoute() {
         </div>
       ) : null}
 
-      <p className="px-0.5 text-center text-[11px] leading-relaxed text-muted-foreground">
-        Not a medical device — confirm on your CGM or meter before treating. Dexcom Share and LibreLink Up use unofficial
-        APIs and may stop working if those services change.
-      </p>
+      {anyLiveConnected ? (
+        <div>
+          <SettingsGroupLabel>Options</SettingsGroupLabel>
+          <SettingsGroup>
+            <CgmToggleRow
+              id="cgm-prefill-enabled"
+              label="Suggest in tools"
+              info={<p>Offer recent CGM readings in Driving, exercise, and other BG fields.</p>}
+              checked={prefs.prefillEnabled}
+              onCheckedChange={(checked) => updatePrefs({ ...prefs, prefillEnabled: checked })}
+              testId="switch-cgm-prefill"
+            />
+          </SettingsGroup>
+        </div>
+      ) : null}
 
       <div className="flex justify-center pt-1">
         <Button
           type="button"
           variant="ghost"
           size="sm"
-          className="h-8 gap-1.5 text-xs text-muted-foreground"
+          className="h-9 gap-1.5 text-sm text-muted-foreground"
           onClick={() => {
             void disconnectDexcomShareCgm();
             void disconnectLibreLinkUpCgm();
@@ -1000,7 +901,7 @@ export function SettingsCgmRoute() {
           }}
         >
           <CircleOff className="h-3.5 w-3.5" aria-hidden />
-          Reset settings
+          Reset
         </Button>
       </div>
     </SettingsSubPageShell>

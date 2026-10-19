@@ -36,9 +36,8 @@ export function shouldEmphasizeDexcomAccountIdAssist(error: string | null | unde
 }
 
 /**
- * Primary Dexcom Share setup guide. Account ID from the Dexcom portal is the
- * reliable path for many G7/Clarity accounts — email/phone often fails against
- * the unofficial Share API even when the password is correct.
+ * Short Dexcom Share setup guide. Account ID from the portal is the reliable path
+ * for many G7/Clarity accounts.
  */
 export function DexcomLoginAssist({
   server,
@@ -62,7 +61,7 @@ export function DexcomLoginAssist({
       const extracted = extractDexcomAccountIdFromInput(text);
       if (!extracted) {
         onAssistError?.(
-          "No Dexcom account ID found. After signing in at the portal, copy the full web address from the address bar, then paste here.",
+          "No account ID found. Copy the full portal web address, then paste here.",
         );
         return;
       }
@@ -70,14 +69,14 @@ export function DexcomLoginAssist({
       onAssistError?.(null);
       setPasteFlash(true);
     } catch {
-      onAssistError?.("Could not read the clipboard. Paste the portal link or account ID into the field below.");
+      onAssistError?.("Could not read clipboard. Paste the portal link into the field below.");
     }
   };
 
   return (
     <div
       className={cn(
-        "space-y-3 rounded-xl border px-3 py-3",
+        "space-y-2.5 rounded-xl border px-3 py-3",
         emphasize
           ? "border-amber-400/60 bg-amber-50/80 dark:border-amber-700/50 dark:bg-amber-950/30"
           : "border-border/60 bg-muted/20",
@@ -86,27 +85,15 @@ export function DexcomLoginAssist({
       data-testid="dexcom-login-assist"
       data-emphasized={emphasize ? "true" : "false"}
     >
-      <div className="space-y-1">
-        <p className="text-xs font-semibold text-foreground">
-          {emphasize ? "Email login often fails — use your account ID" : "Recommended: connect with your account ID"}
-        </p>
-        <p className="text-[11px] leading-relaxed text-muted-foreground">
-          Dexcom Share frequently rejects email or phone for G7/Clarity accounts. Your account ID from the Dexcom portal
-          is the reliable way in.
-        </p>
-      </div>
-
-      <ol className="list-decimal space-y-1.5 pl-4 text-[11px] leading-relaxed text-muted-foreground">
+      <p className="text-sm font-semibold text-foreground">
+        {emphasize ? "Try your account ID instead" : "Quick setup"}
+      </p>
+      <ol className="list-decimal space-y-1 pl-4 text-sm leading-snug text-muted-foreground">
         <li>
-          In the <span className="font-medium text-foreground">Dexcom G7</span> app, turn on{" "}
-          <span className="font-medium text-foreground">Share</span> and add at least one follower if asked.
+          In Dexcom, turn on <span className="font-medium text-foreground">Share</span>
         </li>
-        <li>Open the Dexcom account portal and sign in with the same password you use in the Dexcom app.</li>
-        <li>
-          Copy the web address — it contains a long code like{" "}
-          <span className="font-mono text-[10px] text-foreground/80">a1b2c3d4-…</span>
-        </li>
-        <li>Paste below. We extract the ID automatically.</li>
+        <li>Open the account portal and sign in</li>
+        <li>Copy the web address, then paste below</li>
       </ol>
 
       <div className="flex flex-wrap gap-2">
@@ -119,7 +106,7 @@ export function DexcomLoginAssist({
           data-testid="button-dexcom-open-portal"
         >
           <ExternalLink className="h-3.5 w-3.5" aria-hidden />
-          Open account portal
+          Open portal
         </Button>
         <Button
           type="button"
@@ -130,7 +117,7 @@ export function DexcomLoginAssist({
           data-testid="button-dexcom-paste-account-id"
         >
           <ClipboardPaste className="h-3.5 w-3.5" aria-hidden />
-          {pasteFlash ? "Account ID pasted" : "Paste from clipboard"}
+          {pasteFlash ? "Pasted" : "Paste ID"}
         </Button>
       </div>
     </div>

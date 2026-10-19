@@ -2303,8 +2303,8 @@ export default function Settings() {
           <SettingsHubGroup title="Health data">
             <SettingsHubNavLink
               href="/settings/cgm"
-              label="CGM prefill"
-              description="Near-live Dexcom/Libre, or delayed Apple Health / Health Connect"
+              label="Connect CGM"
+              description="Dexcom, Libre, or Health — unlocks better charts and tools"
               icon={Activity}
             />
           </SettingsHubGroup>

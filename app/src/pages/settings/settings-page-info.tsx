@@ -135,8 +135,8 @@ export function SettingsAboutInfoDialog() {
 export function SettingsCgmInfoDialog() {
   return (
     <PageInfoDialog
-      title="About CGM prefill"
-      description="Optional blood glucose suggestions from near-live bridges or your phone health app"
+      title="About Connect CGM"
+      description="Link Dexcom, Libre, or your phone health app so Diabeaters can use recent glucose"
     >
       <InfoSection title="Near-live (recommended)">
         <p>
