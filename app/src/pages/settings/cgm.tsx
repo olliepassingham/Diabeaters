@@ -643,7 +643,7 @@ export function SettingsCgmRoute() {
                     ? "Linked account"
                     : isDexcomAccountId(dexcomUsername)
                       ? "Account ID"
-                      : "Account ID or email"}
+                      : "Email or phone"}
                 </Label>
                 <Input
                   id="dexcom-username"
@@ -660,7 +660,7 @@ export function SettingsCgmRoute() {
                   autoComplete="username"
                   className="h-11"
                   disabled={dexcomConnected}
-                  placeholder="Paste portal link or account ID"
+                  placeholder="Email or phone from the Dexcom app"
                   data-testid="input-dexcom-username"
                 />
               </div>

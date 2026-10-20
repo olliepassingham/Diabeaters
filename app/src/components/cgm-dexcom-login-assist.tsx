@@ -36,8 +36,8 @@ export function shouldEmphasizeDexcomAccountIdAssist(error: string | null | unde
 }
 
 /**
- * Short Dexcom Share setup guide. Account ID from the portal is the reliable path
- * for many G7/Clarity accounts.
+ * Short Dexcom Share setup guide. Email or phone is the first path.
+ * The portal account ID is the backup after a failed login.
  */
 export function DexcomLoginAssist({
   server,
@@ -92,34 +92,42 @@ export function DexcomLoginAssist({
         <li>
           In Dexcom, turn on <span className="font-medium text-foreground">Share</span>
         </li>
-        <li>Open the account portal and sign in</li>
-        <li>Copy the web address, then paste below</li>
+        {emphasize ? (
+          <>
+            <li>Open the account portal and sign in</li>
+            <li>Copy the web address, then paste below</li>
+          </>
+        ) : (
+          <li>Enter the email or phone you use there, plus your password</li>
+        )}
       </ol>
 
-      <div className="flex flex-wrap gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-9 gap-1.5 text-xs"
-          onClick={() => openExternalUrl(portalUrl)}
-          data-testid="button-dexcom-open-portal"
-        >
-          <ExternalLink className="h-3.5 w-3.5" aria-hidden />
-          Open portal
-        </Button>
-        <Button
-          type="button"
-          variant={pasteFlash ? "default" : "outline"}
-          size="sm"
-          className="h-9 gap-1.5 text-xs"
-          onClick={() => void pasteAccountId()}
-          data-testid="button-dexcom-paste-account-id"
-        >
-          <ClipboardPaste className="h-3.5 w-3.5" aria-hidden />
-          {pasteFlash ? "Pasted" : "Paste ID"}
-        </Button>
-      </div>
+      {emphasize ? (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-9 gap-1.5 text-xs"
+            onClick={() => openExternalUrl(portalUrl)}
+            data-testid="button-dexcom-open-portal"
+          >
+            <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+            Open portal
+          </Button>
+          <Button
+            type="button"
+            variant={pasteFlash ? "default" : "outline"}
+            size="sm"
+            className="h-9 gap-1.5 text-xs"
+            onClick={() => void pasteAccountId()}
+            data-testid="button-dexcom-paste-account-id"
+          >
+            <ClipboardPaste className="h-3.5 w-3.5" aria-hidden />
+            {pasteFlash ? "Pasted" : "Paste ID"}
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }
