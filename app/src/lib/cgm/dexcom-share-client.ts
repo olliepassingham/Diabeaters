@@ -363,21 +363,21 @@ export async function testDexcomShareConnection(
       return {
         ok: false,
         error:
-          "Dexcom rejected that login for Share. Turn on Share in the Dexcom G7 app (add a follower if asked), then connect with your account ID from the portal — email/phone often fails even when the password is right.",
+          "Share did not accept that phone or email. Paste the account portal address and use the same Clarity password. Turn on Share in the Dexcom app.",
       };
     }
     if (/login failed|authenticate|AccountNotFound|InvalidArgument/i.test(message)) {
       return {
         ok: false,
         error:
-          "Could not sign in with that email or phone. Use “Open account portal”, copy the web address after signing in, and paste your account ID below.",
+          "No account ID in that address. Open the account portal, sign in, and paste the address from there.",
       };
     }
     if (/500/.test(message)) {
       return {
         ok: false,
         error:
-          `${message} Check Share is on in the Dexcom app and region is correct (UK/EU → Europe). If email still fails, paste your account ID from the Dexcom portal.`,
+          `${message} Check Share is on in the Dexcom app and the region is Europe / UK. Paste the account portal address, not a Clarity website address.`,
       };
     }
     return { ok: false, error: message };

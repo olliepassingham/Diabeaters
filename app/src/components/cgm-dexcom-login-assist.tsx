@@ -14,7 +14,7 @@ type DexcomLoginAssistProps = {
   server: DexcomShareServer;
   onAccountIdPasted: (accountId: string) => void;
   onAssistError?: (message: string | null) => void;
-  /** Highlight the guide after a failed email/password attempt. */
+  /** Highlight the guide when the portal address is still missing. */
   emphasize?: boolean;
   className?: string;
 };
@@ -29,6 +29,19 @@ export function normalizeDexcomUsernameInput(raw: string): string {
   return extractDexcomAccountIdFromInput(raw) ?? raw;
 }
 
+/** Explain a pasted address that is not the Dexcom account portal. */
+export function dexcomUsernameInputNotice(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed || extractDexcomAccountIdFromInput(trimmed)) return null;
+  if (/clarity\.dexcom/i.test(trimmed)) {
+    return "That is a Clarity website address. Open the account portal, sign in, and paste the address from there.";
+  }
+  if (/^https?:\/\//i.test(trimmed)) {
+    return "No account ID in that address. Open the account portal, sign in, and paste the address from there.";
+  }
+  return null;
+}
+
 /** True when a Connect failure should push the user toward the account-ID path. */
 export function shouldEmphasizeDexcomAccountIdAssist(error: string | null | undefined): boolean {
   if (!error) return false;
@@ -36,8 +49,8 @@ export function shouldEmphasizeDexcomAccountIdAssist(error: string | null | unde
 }
 
 /**
- * Short Dexcom Share setup guide. Email or phone is the first path.
- * The portal account ID is the backup after a failed login.
+ * Dexcom Share setup. The account portal address is the login.
+ * The password is the same one used for Clarity.
  */
 export function DexcomLoginAssist({
   server,
@@ -61,7 +74,8 @@ export function DexcomLoginAssist({
       const extracted = extractDexcomAccountIdFromInput(text);
       if (!extracted) {
         onAssistError?.(
-          "No account ID found. Copy the full portal web address, then paste here.",
+          dexcomUsernameInputNotice(text) ??
+            "No account ID in that address. Open the account portal, sign in, and paste the address from there.",
         );
         return;
       }
@@ -86,48 +100,43 @@ export function DexcomLoginAssist({
       data-emphasized={emphasize ? "true" : "false"}
     >
       <p className="text-sm font-semibold text-foreground">
-        {emphasize ? "Try your account ID instead" : "Quick setup"}
+        {emphasize ? "Paste the portal address" : "How to connect"}
+      </p>
+      <p className="text-sm leading-snug text-muted-foreground">
+        Use the same password as Clarity. Paste the account portal address from after you sign in. A Clarity website
+        address will not connect.
       </p>
       <ol className="list-decimal space-y-1 pl-4 text-sm leading-snug text-muted-foreground">
         <li>
-          In Dexcom, turn on <span className="font-medium text-foreground">Share</span>
+          In the Dexcom app, turn on <span className="font-medium text-foreground">Share</span>
         </li>
-        {emphasize ? (
-          <>
-            <li>Open the account portal and sign in</li>
-            <li>Copy the web address, then paste below</li>
-          </>
-        ) : (
-          <li>Enter the email or phone you use there, plus your password</li>
-        )}
+        <li>Open the account portal and sign in with your Clarity phone or email</li>
+        <li>Copy the web address and paste it below</li>
       </ol>
-
-      {emphasize ? (
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-9 gap-1.5 text-xs"
-            onClick={() => openExternalUrl(portalUrl)}
-            data-testid="button-dexcom-open-portal"
-          >
-            <ExternalLink className="h-3.5 w-3.5" aria-hidden />
-            Open portal
-          </Button>
-          <Button
-            type="button"
-            variant={pasteFlash ? "default" : "outline"}
-            size="sm"
-            className="h-9 gap-1.5 text-xs"
-            onClick={() => void pasteAccountId()}
-            data-testid="button-dexcom-paste-account-id"
-          >
-            <ClipboardPaste className="h-3.5 w-3.5" aria-hidden />
-            {pasteFlash ? "Pasted" : "Paste ID"}
-          </Button>
-        </div>
-      ) : null}
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-9 gap-1.5 text-xs"
+          onClick={() => openExternalUrl(portalUrl)}
+          data-testid="button-dexcom-open-portal"
+        >
+          <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+          Open portal
+        </Button>
+        <Button
+          type="button"
+          variant={pasteFlash ? "default" : "outline"}
+          size="sm"
+          className="h-9 gap-1.5 text-xs"
+          onClick={() => void pasteAccountId()}
+          data-testid="button-dexcom-paste-account-id"
+        >
+          <ClipboardPaste className="h-3.5 w-3.5" aria-hidden />
+          {pasteFlash ? "Pasted" : "Paste address"}
+        </Button>
+      </div>
     </div>
   );
 }

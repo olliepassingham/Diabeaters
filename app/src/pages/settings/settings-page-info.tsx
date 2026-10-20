@@ -141,8 +141,9 @@ export function SettingsCgmInfoDialog() {
       <InfoSection title="Near-live (recommended)">
         <p>
           <strong>Dexcom Share</strong> or <strong>LibreLink Up</strong> give the freshest readings, trend arrows,
-          glucose trend charts, bedtime overnight review, and live BG for linked supporters. Logins stay on this device
-          only — they are never uploaded to Diabeaters.
+          glucose trend charts, bedtime overnight review, and live BG for linked supporters. Dexcom uses your Clarity
+          password and the account portal address: open the portal, sign in, and paste the web address. A Clarity
+          website link will not connect. Logins stay on this device only — they are never uploaded to Diabeaters.
         </p>
       </InfoSection>
       <InfoSection title="Apple Health / Health Connect (fallback)">

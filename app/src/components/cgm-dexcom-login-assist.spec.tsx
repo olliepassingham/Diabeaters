@@ -1,9 +1,23 @@
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { DexcomLoginAssist } from "@/components/cgm-dexcom-login-assist";
 import {
+  dexcomUsernameInputNotice,
   formatDexcomStoredLoginLabel,
   normalizeDexcomUsernameInput,
   shouldEmphasizeDexcomAccountIdAssist,
 } from "@/components/cgm-dexcom-login-assist";
+
+describe("DexcomLoginAssist", () => {
+  it("leads with the account portal and the Clarity password", () => {
+    render(<DexcomLoginAssist server="eu" onAccountIdPasted={() => undefined} />);
+    expect(screen.getByText("How to connect")).toBeTruthy();
+    expect(screen.getByText(/same password as Clarity/i)).toBeTruthy();
+    expect(screen.getByText(/Clarity website address will not connect/i)).toBeTruthy();
+    expect(screen.getByTestId("button-dexcom-open-portal")).toBeTruthy();
+    expect(screen.getByTestId("button-dexcom-paste-account-id")).toBeTruthy();
+  });
+});
 
 describe("normalizeDexcomUsernameInput", () => {
   it("extracts a UUID from a portal URL", () => {
@@ -39,5 +53,23 @@ describe("shouldEmphasizeDexcomAccountIdAssist", () => {
     ).toBe(true);
     expect(shouldEmphasizeDexcomAccountIdAssist("Could not sign in with that email or phone.")).toBe(true);
     expect(shouldEmphasizeDexcomAccountIdAssist("Dexcom Share error: 500")).toBe(true);
+  });
+});
+
+describe("dexcomUsernameInputNotice", () => {
+  it("accepts a portal address", () => {
+    expect(
+      dexcomUsernameInputNotice(
+        "https://uam2.dexcom.com/identity/accounts/a1b2c3d4-e5f6-7890-abcd-ef1234567890/edit",
+      ),
+    ).toBeNull();
+  });
+
+  it("rejects a Clarity website address", () => {
+    expect(dexcomUsernameInputNotice("https://clarity.dexcom.eu/")).toMatch(/Clarity website/);
+  });
+
+  it("rejects a web address with no account id", () => {
+    expect(dexcomUsernameInputNotice("https://example.com/home")).toMatch(/No account ID/);
   });
 });

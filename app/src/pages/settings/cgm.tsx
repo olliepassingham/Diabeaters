@@ -43,6 +43,7 @@ import {
 import { SettingsCgmInfoDialog } from "./settings-page-info";
 import {
   DexcomLoginAssist,
+  dexcomUsernameInputNotice,
   formatDexcomStoredLoginLabel,
   normalizeDexcomUsernameInput,
   shouldEmphasizeDexcomAccountIdAssist,
@@ -224,7 +225,7 @@ function getCgmStatus({
   if (prefs.dexcomShareEnabled) {
     return {
       label: "Needs setup",
-      detail: "Add account ID + password, then Connect.",
+      detail: "Paste the portal address and your Clarity password, then Connect.",
       tone: "amber",
     };
   }
@@ -631,7 +632,6 @@ export function SettingsCgmRoute() {
                   onAccountIdPasted={(id) => {
                     setDexcomUsername(id);
                     setDexcomError(null);
-                    setDexcomAssistEmphasize(false);
                   }}
                   onAssistError={(message) => setDexcomError(message)}
                 />
@@ -643,7 +643,7 @@ export function SettingsCgmRoute() {
                     ? "Linked account"
                     : isDexcomAccountId(dexcomUsername)
                       ? "Account ID"
-                      : "Email or phone"}
+                      : "Portal address"}
                 </Label>
                 <Input
                   id="dexcom-username"
@@ -653,14 +653,14 @@ export function SettingsCgmRoute() {
                       : dexcomUsername
                   }
                   onChange={(e) => {
-                    setDexcomUsername(normalizeDexcomUsernameInput(e.target.value));
-                    setDexcomError(null);
-                    setDexcomAssistEmphasize(false);
+                    const raw = e.target.value;
+                    setDexcomUsername(normalizeDexcomUsernameInput(raw));
+                    setDexcomError(dexcomUsernameInputNotice(raw));
                   }}
                   autoComplete="username"
                   className="h-11"
                   disabled={dexcomConnected}
-                  placeholder="Email or phone from the Dexcom app"
+                  placeholder="Paste the portal web address"
                   data-testid="input-dexcom-username"
                 />
               </div>
@@ -677,6 +677,7 @@ export function SettingsCgmRoute() {
                   className="h-11"
                   data-testid="input-dexcom-password"
                 />
+                <p className="text-xs text-muted-foreground">Same password as Clarity.</p>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="dexcom-server" className="text-sm">
