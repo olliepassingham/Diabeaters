@@ -263,7 +263,7 @@ function getPathDataCareContext(data: OnboardingData): CareContext {
 
 interface OnboardingData {
   name: string;
-  /** Community @handle — required for Type 2 (with name) on first entry. */
+  /** Public @handle, required with the display name on first entry. */
   publicHandle: string;
   diabetesType: string;
   careContext: CareContext;
@@ -329,7 +329,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     // Name first for community, patient, and dual-role. Upgrade skips welcome.
     return "welcome";
   });
-  const [type2HandleAvailability, setType2HandleAvailability] = useState<
+  const [handleAvailability, setHandleAvailability] = useState<
     "idle" | "checking" | "available" | "taken" | "invalid"
   >("idle");
 
@@ -367,42 +367,38 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     setData((prev) => (prev.diabetesType === "type2" ? prev : { ...prev, diabetesType: "type2" }));
   }, [showType2Path]);
 
-  const type2HandleSlug = data.publicHandle.replace(/^@/, "").trim().toLowerCase();
+  const welcomeHandleSlug = data.publicHandle.replace(/^@/, "").trim().toLowerCase();
   useEffect(() => {
-    if (!showType2Path) {
-      setType2HandleAvailability("idle");
-      return;
-    }
-    if (!type2HandleSlug) {
-      setType2HandleAvailability("idle");
+    if (!welcomeHandleSlug) {
+      setHandleAvailability("idle");
       return;
     }
     let cancelled = false;
-    setType2HandleAvailability("checking");
+    setHandleAvailability("checking");
     const timer = window.setTimeout(() => {
       void (async () => {
         try {
-          normalizePublicHandleInput(type2HandleSlug);
+          normalizePublicHandleInput(welcomeHandleSlug);
         } catch {
-          if (!cancelled) setType2HandleAvailability("invalid");
+          if (!cancelled) setHandleAvailability("invalid");
           return;
         }
-        const res = await isPublicHandleAvailable(type2HandleSlug, {
+        const res = await isPublicHandleAvailable(welcomeHandleSlug, {
           excludeUserId: user?.id ?? undefined,
         });
         if (cancelled) return;
         if (res.error) {
-          setType2HandleAvailability("invalid");
+          setHandleAvailability("invalid");
           return;
         }
-        setType2HandleAvailability(res.available ? "available" : "taken");
+        setHandleAvailability(res.available ? "available" : "taken");
       })();
     }, 350);
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [showType2Path, type2HandleSlug, user?.id]);
+  }, [welcomeHandleSlug, user?.id]);
 
   const steps: Step[] = useMemo(
     () =>
@@ -577,7 +573,41 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     }
   };
 
+  const resolveWelcomePublicHandle = (): string | null => {
+    try {
+      return normalizePublicHandleInput(data.publicHandle.replace(/^@/, "").trim().toLowerCase());
+    } catch {
+      return null;
+    }
+  };
+
+  /** Name and @handle are collected together on the first screen. Upgrade skips that screen. */
+  const requireWelcomeIdentity = (): { fullName: string; publicHandle: string } | null => {
+    const fullName = isValidDisplayName(data.name) ? data.name.trim() : null;
+    if (!fullName) {
+      toast({
+        title: "Add your name",
+        description: "A display name is required to finish setup.",
+        variant: "destructive",
+      });
+      return null;
+    }
+    const publicHandle = resolveWelcomePublicHandle();
+    if (!publicHandle) {
+      toast({
+        title: "Choose a handle",
+        description: "A public @handle is required with your name.",
+        variant: "destructive",
+      });
+      return null;
+    }
+    return { fullName, publicHandle };
+  };
+
   const handleFinishCommunity = async (pathOverride?: string) => {
+    const identity = requireWelcomeIdentity();
+    if (!identity) return;
+
     const region = data.region || "UK";
     const units = applyRegionUnitDefaults(region, {
       bgUnits: data.bgUnits,
@@ -615,19 +645,11 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     setPrimaryAppRole("community");
     if (getOnboardingAccountPath() == null) setOnboardingAccountPath("community");
     if (user?.id) {
-      const fullName = isValidDisplayName(data.name) ? data.name.trim() : null;
-      if (!fullName) {
-        toast({
-          title: "Add your name",
-          description: "A display name is required to finish setup.",
-          variant: "destructive",
-        });
-        return;
-      }
       const { error } = await upsertProfile({
         id: user.id,
         onboarding_complete: true,
-        full_name: fullName,
+        full_name: identity.fullName,
+        public_handle: identity.publicHandle,
         account_type: "community",
         primary_app_role: "community",
       });
@@ -663,6 +685,9 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       await handleFinishCommunity(pathOverride);
       return;
     }
+
+    const identity = upgradeFlow ? null : requireWelcomeIdentity();
+    if (!upgradeFlow && !identity) return;
 
     handleSaveProfile();
     if (!showType2Path && data.diabetesType !== "type2") {
@@ -702,40 +727,12 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       setOnboardingAccountPath(previousAccountPath === "supporter" ? "both" : previousAccountPath ?? "patient");
     }
     if (user?.id) {
-      const fullName = isValidDisplayName(data.name) ? data.name.trim() : null;
-      if (!upgradeFlow && !fullName) {
-        toast({
-          title: "Add your name",
-          description: "A display name is required to finish setup.",
-          variant: "destructive",
-        });
-        return;
-      }
-      let type2Handle: string | null = null;
-      if (!upgradeFlow && (showType2Path || data.diabetesType === "type2")) {
-        try {
-          type2Handle = normalizePublicHandleInput(
-            data.publicHandle.replace(/^@/, "").trim().toLowerCase(),
-          );
-        } catch {
-          type2Handle = null;
-        }
-        if (!type2Handle) {
-          toast({
-            title: "Choose a handle",
-            description: "Type 2 accounts need a public @handle with your name.",
-            variant: "destructive",
-          });
-          return;
-        }
-      }
+      const makeProfilePublic = showType2Path || data.diabetesType === "type2";
       const { error } = await upsertProfile({
         id: user.id,
         onboarding_complete: true,
-        ...(fullName ? { full_name: fullName } : {}),
-        ...(type2Handle
-          ? { public_handle: type2Handle, is_public: true }
-          : {}),
+        ...(identity ? { full_name: identity.fullName, public_handle: identity.publicHandle } : {}),
+        ...(identity && makeProfilePublic ? { is_public: true } : {}),
         account_type: "patient",
         primary_app_role: "patient",
       });
@@ -798,11 +795,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   const canProceed = (): boolean => {
     switch (currentStep) {
       case "welcome":
-        if (!isValidDisplayName(data.name)) return false;
-        if (showType2Path || data.diabetesType === "type2") {
-          return type2HandleAvailability === "available";
-        }
-        return true;
+        return isValidDisplayName(data.name) && handleAvailability === "available";
       case "care_context":
         return data.careContext !== null;
       case "struggle":
@@ -830,7 +823,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
             showBothPath={showBothPath}
             communityFlow={showCommunityPath}
             type2Flow={showType2Path}
-            handleAvailability={type2HandleAvailability}
+            handleAvailability={handleAvailability}
           />
         );
       case "care_context":
@@ -954,9 +947,9 @@ function CommunityMemberFirstWinStep({ onFinish }: { onFinish: (path?: string) =
       <OnboardingCard accent="primary" contentClassName="pt-5 pb-5">
         <ul className="space-y-3 text-sm text-muted-foreground" data-testid="onboarding-community-feed-requirements">
           {[
-            ["Display name", "how others see you on posts and messages"],
-            ["Public @handle", "your unique community username"],
-            ["Profile public", "turns on Feed access when the rest is complete"],
+            ["Display name", "saved on the first screen"],
+            ["Public @handle", "chosen with your name"],
+            ["Profile public", "turns on Feed access"],
           ].map(([label, detail]) => (
             <li key={label} className="flex items-start gap-2.5">
               <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
@@ -1013,18 +1006,17 @@ function WelcomeStep({
   handleAvailability?: "idle" | "checking" | "available" | "taken" | "invalid";
 }) {
   const handleSlug = data.publicHandle.replace(/^@/, "").trim().toLowerCase();
-  const handleHint =
-    !type2Flow || !handleSlug
-      ? "3–30 characters · letters, numbers, underscore"
-      : handleAvailability === "checking"
-        ? "Checking availability…"
-        : handleAvailability === "available"
-          ? "Looks good"
-          : handleAvailability === "taken"
-            ? PUBLIC_HANDLE_TAKEN_MESSAGE
-            : handleAvailability === "invalid"
-              ? "Use 3–30 characters: letters, numbers, underscore"
-              : "3–30 characters · letters, numbers, underscore";
+  const handleHint = !handleSlug
+    ? "3–30 characters · letters, numbers, underscore"
+    : handleAvailability === "checking"
+      ? "Checking availability…"
+      : handleAvailability === "available"
+        ? "Looks good"
+        : handleAvailability === "taken"
+          ? PUBLIC_HANDLE_TAKEN_MESSAGE
+          : handleAvailability === "invalid"
+            ? "Use 3–30 characters: letters, numbers, underscore"
+            : "3–30 characters · letters, numbers, underscore";
 
   return (
     <div className="space-y-8 text-center">
@@ -1078,41 +1070,41 @@ function WelcomeStep({
             </p>
           </div>
 
-          {type2Flow || data.diabetesType === "type2" ? (
-            <div className="space-y-2 text-left" data-testid="onboarding-type2-handle">
-              <Label htmlFor="welcome-handle" className="text-base">
-                Choose a public @handle <span className="text-destructive">*</span>
-              </Label>
-              <div className="relative">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                  @
-                </span>
-                <Input
-                  id="welcome-handle"
-                  value={data.publicHandle.replace(/^@/, "")}
-                  onChange={(e) => updateData("publicHandle", e.target.value.replace(/^@/, ""))}
-                  placeholder="your_handle"
-                  className="pl-7 text-base"
-                  autoComplete="username"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  required
-                  aria-required
-                  data-testid="input-onboarding-handle"
-                />
-              </div>
-              <p
-                className={cn(
-                  "text-xs",
-                  handleAvailability === "taken" || handleAvailability === "invalid"
-                    ? "text-destructive"
-                    : handleAvailability === "available"
-                      ? "text-emerald-700 dark:text-emerald-400"
-                      : "text-muted-foreground",
-                )}
-              >
-                {handleHint}
-              </p>
+          <div className="space-y-2 text-left" data-testid="onboarding-welcome-handle">
+            <Label htmlFor="welcome-handle" className="text-base">
+              Choose a public @handle <span className="text-destructive">*</span>
+            </Label>
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                @
+              </span>
+              <Input
+                id="welcome-handle"
+                value={data.publicHandle.replace(/^@/, "")}
+                onChange={(e) => updateData("publicHandle", e.target.value.replace(/^@/, ""))}
+                placeholder="your_handle"
+                className="pl-7 text-base"
+                autoComplete="username"
+                autoCapitalize="none"
+                spellCheck={false}
+                required
+                aria-required
+                data-testid="input-onboarding-handle"
+              />
+            </div>
+            <p
+              className={cn(
+                "text-xs",
+                handleAvailability === "taken" || handleAvailability === "invalid"
+                  ? "text-destructive"
+                  : handleAvailability === "available"
+                    ? "text-emerald-700 dark:text-emerald-400"
+                    : "text-muted-foreground",
+              )}
+            >
+              {handleHint}
+            </p>
+            {type2Flow || data.diabetesType === "type2" ? (
               <div
                 className="rounded-xl border border-teal-500/25 bg-teal-500/[0.06] px-3 py-2.5 text-sm text-muted-foreground"
                 data-testid="onboarding-diabetes-type2-note"
@@ -1121,8 +1113,8 @@ function WelcomeStep({
                 {" — "}
                 name and handle are required so Feed and emergency details work from day one.
               </div>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
           {!communityFlow && data.diabetesType !== "type2" ? (
           <div className="space-y-2">
             <div className="flex items-center gap-1">
