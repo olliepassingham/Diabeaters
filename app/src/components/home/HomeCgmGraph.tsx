@@ -47,7 +47,7 @@ export function HomeCgmGraph() {
   );
   const [insulinTick, setInsulinTick] = useState(0);
   const [penUser, setPenUser] = useState(() => isPenDeliveryMethod(storage.getProfile()?.insulinDeliveryMethod));
-  const { units, connected, sourceLabel, loading, refresh } = history;
+  const { units, connected, loading, refresh } = history;
   const savedPoints = useMemo(() => localPoints(units), [units]);
   const points = history.points.length ? history.points : savedPoints;
   const target = useMemo(() => resolveUserTargetBgRange(storage.getSettings(), units), [units]);
@@ -62,7 +62,6 @@ export function HomeCgmGraph() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [insulinTick]);
 
-  const latest = points[points.length - 1];
   const timelineEvents = useMemo(
     () =>
       mealEvents.map((event) => ({
@@ -101,84 +100,60 @@ export function HomeCgmGraph() {
 
   return (
     <section
-      className="relative overflow-hidden pb-2 pt-3"
+      className="relative pb-1 pt-2"
       data-testid="home-cgm-graph"
       aria-labelledby={showChart ? "home-cgm-title" : undefined}
       aria-label={showChart ? undefined : "Glucose"}
     >
-      <div className="mt-2 overflow-hidden rounded-2xl bg-muted/40 ring-1 ring-border/40">
       {showChart ? (
-      <div className="mb-1 flex items-start justify-between gap-3 px-3 pt-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <Activity className="h-4 w-4 text-primary" aria-hidden />
-            <h2
-              id="home-cgm-title"
-              className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
+        <div className="mb-1 flex items-center justify-between gap-2 px-1">
+          <h2 id="home-cgm-title" className="font-sans text-[15px] font-semibold text-foreground">
+            Glucose · 12 hours
+          </h2>
+          <div className="flex items-center">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 rounded-full"
+              onClick={refresh}
+              disabled={loading}
+              aria-label="Refresh glucose graph"
             >
-              Glucose · 12 hours
-            </h2>
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+              ) : (
+                <RefreshCw className="h-4 w-4" aria-hidden />
+              )}
+            </Button>
+            <Button asChild variant="ghost" size="icon" className="h-9 w-9 rounded-full">
+              <Link href={connected ? "/tools/cgm-live" : "/settings/cgm"} aria-label="Open glucose trends">
+                <ChevronRight className="h-4 w-4" aria-hidden />
+              </Link>
+            </Button>
           </div>
-          {latest ? (
-            <p className="mt-1 text-[11px] text-muted-foreground">{sourceLabel ?? "On this device"}</p>
-          ) : null}
         </div>
-        <div className="flex items-center gap-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-10 w-10 rounded-full"
-            onClick={refresh}
-            disabled={loading}
-            aria-label="Refresh glucose graph"
-          >
-            {loading ? (
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-            ) : (
-              <RefreshCw className="h-4 w-4" aria-hidden />
-            )}
-          </Button>
-          <Button asChild variant="ghost" size="icon" className="h-10 w-10 rounded-full">
-            <Link href={connected ? "/tools/cgm-live" : "/settings/cgm"} aria-label="Open glucose trends">
-              <ChevronRight className="h-4 w-4" aria-hidden />
-            </Link>
-          </Button>
-        </div>
-      </div>
       ) : null}
 
       {showChart ? (
-        <CgmGlucoseChart
-          points={points}
-          units={units}
-          targetLow={target.low}
-          targetHigh={target.high}
-          timelineEvents={timelineEvents}
-          insulinSeries={penUser && insulin.visible ? insulin.series : undefined}
-          insulinMarks={penUser && insulin.visible ? insulin.marks : undefined}
-          xDomain={penUser && insulin.visible ? insulin.xDomain ?? undefined : undefined}
-          className="w-full px-1 [&_svg]:min-h-[200px] [&>p]:hidden"
-        />
-      ) : null}
-      {showChart && points.length <= 1 ? (
-        <p className="text-center text-xs text-muted-foreground">
-          {connected ? (
-            "Glucose readings will appear on this graph once they arrive."
-          ) : (
-            <>
-              <Link href="/settings/cgm" className="font-medium text-primary">
-                Connect your CGM
-              </Link>{" "}
-              to see glucose on this graph too.
-            </>
-          )}
-        </p>
-      ) : null}
-      {showChart ? null : (
+        <div className="-mx-6 w-[calc(100%+3rem)] md:-mx-8 md:w-[calc(100%+4rem)]">
+          <CgmGlucoseChart
+            points={points}
+            units={units}
+            targetLow={target.low}
+            targetHigh={target.high}
+            timelineEvents={timelineEvents}
+            insulinSeries={penUser && insulin.visible ? insulin.series : undefined}
+            insulinMarks={penUser && insulin.visible ? insulin.marks : undefined}
+            xDomain={penUser && insulin.visible ? insulin.xDomain ?? undefined : undefined}
+            plotHeight={240}
+            className="w-full [&>p]:hidden"
+          />
+        </div>
+      ) : (
         <Link
           href={connected ? "/tools/cgm-live" : "/settings/cgm"}
-          className="flex items-center gap-3 px-3 py-3"
+          className="flex items-center gap-3 py-2"
           data-testid="home-cgm-empty-graph"
         >
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -199,23 +174,33 @@ export function HomeCgmGraph() {
           <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
         </Link>
       )}
+      {showChart && points.length <= 1 ? (
+        <p className="px-1 text-center text-xs text-muted-foreground">
+          {connected ? (
+            "Glucose readings will appear on this graph once they arrive."
+          ) : (
+            <>
+              <Link href="/settings/cgm" className="font-medium text-primary">
+                Connect your CGM
+              </Link>{" "}
+              to see glucose on this graph too.
+            </>
+          )}
+        </p>
+      ) : null}
 
       {penUser ? (
-        <>
-          <div className="mx-3 border-t border-border/60" />
-          <InsulinChartControls
-            visible={insulin.visible}
-            hasDoses={insulin.hasDoses}
-            remaining={insulin.remaining}
-            runsOutLabel={insulin.runsOutLabel}
-            longActingUnits={usualLongActingUnits(
-              storage.getSettings().longActingUnitsPerDay,
-              storage.getSettings().longActingInjectionsPerDay,
-            )}
-          />
-        </>
+        <InsulinChartControls
+          visible={insulin.visible}
+          hasDoses={insulin.hasDoses}
+          remaining={insulin.remaining}
+          runsOutLabel={insulin.runsOutLabel}
+          longActingUnits={usualLongActingUnits(
+            storage.getSettings().longActingUnitsPerDay,
+            storage.getSettings().longActingInjectionsPerDay,
+          )}
+        />
       ) : null}
-      </div>
 
       {history.error && savedPoints.length > 1 ? (
         <p className="mt-1 text-center text-xs text-muted-foreground">

@@ -40,6 +40,8 @@ type CgmGlucoseChartProps = {
   insulinMarks?: InsulinChartMark[];
   /** Used when the insulin line needs to extend past the last glucose reading. */
   xDomain?: { startMs: number; endMs: number };
+  /** Plot frame height in viewBox units. Wider home charts use a taller frame. */
+  plotHeight?: number;
   className?: string;
 };
 
@@ -188,13 +190,15 @@ export function CgmGlucoseChart({
   insulinSeries = [],
   insulinMarks = [],
   xDomain,
+  plotHeight = HEIGHT,
   className,
 }: CgmGlucoseChartProps) {
   const [selectedTimelineEventId, setSelectedTimelineEventId] = useState<string | null>(null);
   const gradientId = useId().replace(/:/g, "");
   const futureGradientId = useId().replace(/:/g, "");
+  const frameHeight = Math.max(plotHeight, PAD.top + PAD.bottom + 80);
   const innerWidth = WIDTH - PAD.left - PAD.right;
-  const innerHeight = HEIGHT - PAD.top - PAD.bottom;
+  const innerHeight = frameHeight - PAD.top - PAD.bottom;
 
   const hasProjection = Boolean(projection) && points.length > 0;
   const futureWidth = hasProjection ? innerWidth * FUTURE_ZONE_RATIO : 0;
@@ -211,7 +215,7 @@ export function CgmGlucoseChart({
   const chartEndMs = xDomain?.endMs ?? points[points.length - 1]?.timeMs ?? chartStartMs;
   const insulinPeak = insulinSeries.reduce((max, sample) => Math.max(max, sample.units), 0);
   const showInsulin = insulinPeak > 0.05 || insulinMarks.length > 0;
-  const svgHeight = showInsulin ? HEIGHT + INSULIN_LANE_EXTRA : HEIGHT;
+  const svgHeight = showInsulin ? frameHeight + INSULIN_LANE_EXTRA : frameHeight;
   const insulinLaneTop = PAD.top + innerHeight + 18;
   const insulinFadeId = `${gradientId}-insulin`;
   const nowMs = Date.now();
