@@ -1,5 +1,4 @@
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   Bookmark,
@@ -14,7 +13,6 @@ import {
   Sparkles,
   Trash2,
 } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { CommunityPostImageGrid } from "@/components/community/community-post-image-grid";
 import { FeedPostVideo } from "@/components/community/feed-post-video";
@@ -49,6 +47,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { CommunityPeopleSheet } from "@/components/community/community-people-sheet";
 import { MentionTextarea } from "@/components/community/mention-textarea";
 import { prepareFileInputForPicker } from "@/lib/click-hidden-file-input";
@@ -81,82 +80,29 @@ import {
   sendFeedPostToDmThread,
   type CommunityPostCommentRow,
   type CommunityPostRow,
-  type PostLikerDisplay,
 } from "@/lib/community";
-import { useProfile } from "@/lib/profile";
 
 const RECENT_DM_PEERS_LIMIT = 20;
-const LIKE_PREVIEW_LIMIT = 4;
 
 function shortPeerId(id: string) {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
 }
 
-function firstName(name: string): string {
-  return name.trim().split(/\s+/)[0] || name;
-}
-
-function likesSummaryLine({
-  count,
-  likedByMe,
-  preview,
-  viewerId,
-}: {
-  count: number;
-  likedByMe: boolean;
-  preview: PostLikerDisplay[];
-  viewerId?: string;
-}): string {
-  const others = preview.filter((p) => p.user_id !== viewerId);
-  const n0 = others[0] ? firstName(others[0].name) : null;
-  const n1 = others[1] ? firstName(others[1].name) : null;
-  const rest = likedByMe ? count - 1 : count;
-
-  if (likedByMe) {
-    if (count <= 1) return "Liked by you";
-    if (n0 && rest === 1) return `Liked by you and ${n0}`;
-    if (n0 && rest === 2 && n1) return `Liked by you, ${n0} and ${n1}`;
-    if (n0) return `Liked by you, ${n0} and ${rest - 1} ${rest - 1 === 1 ? "other" : "others"}`;
-    return `Liked by you and ${rest} ${rest === 1 ? "other" : "others"}`;
-  }
-  if (count === 1 && n0) return `Liked by ${n0}`;
-  if (count === 2 && n0 && n1) return `Liked by ${n0} and ${n1}`;
-  if (n0 && count > 1) return `Liked by ${n0} and ${count - 1} ${count - 1 === 1 ? "other" : "others"}`;
-  return `${count} ${count === 1 ? "like" : "likes"}`;
-}
-
-function LikeFacepile({ people }: { people: PostLikerDisplay[] }) {
-  const shown = people.slice(0, 3);
-  if (shown.length === 0) return null;
-  return (
-    <div className="flex shrink-0 items-center" aria-hidden>
-      {shown.map((p, i) => (
-        <div
-          key={p.user_id}
-          className="relative rounded-full ring-2 ring-card"
-          style={{ marginLeft: i === 0 ? 0 : -7, zIndex: shown.length - i }}
-        >
-          <CommunityAuthorAvatar
-            size="sm"
-            displayName={p.name}
-            avatarPath={p.avatar_url}
-            className="!h-[1.375rem] !w-[1.375rem]"
-          />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/** date-fns throws RangeError on invalid dates; DB/RPC should always send ISO strings but guard anyway. */
+/** Compact stamp for the post header: now, 5m, 3h, 2d, 4w, or a short date. */
 function formatRelativeTime(iso: string): string {
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "recently";
-  try {
-    return formatDistanceToNow(d, { addSuffix: true });
-  } catch {
-    return "recently";
-  }
+  if (Number.isNaN(d.getTime())) return "now";
+  const sec = Math.max(0, (Date.now() - d.getTime()) / 1000);
+  if (sec < 45) return "now";
+  const min = Math.round(sec / 60);
+  if (min < 60) return `${Math.max(1, min)}m`;
+  const hr = Math.round(min / 60);
+  if (hr < 24) return `${hr}h`;
+  const day = Math.round(hr / 24);
+  if (day < 7) return `${day}d`;
+  const week = Math.round(day / 7);
+  if (week < 5) return `${week}w`;
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 export type CommentAuthorMeta = FeedAuthorMeta;
@@ -229,7 +175,6 @@ export function FeedPostCard({
   onCommentImageChange,
   commentInputRef,
   onToggleComments,
-  onReplyFocus,
   onLike,
   onEventInterest,
   onSavePost,
@@ -253,20 +198,14 @@ export function FeedPostCard({
 }: FeedPostCardProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { profile: viewerProfile } = useProfile();
   const uploadPending = post.id.startsWith("pending:");
   const mayEngage = Boolean(viewerId && canEngageWithFeed && !uploadPending);
   const canReportPost = viewerId && viewerId !== post.author_id;
   const onLikersLoadedRef = useRef(onLikersLoaded);
   onLikersLoadedRef.current = onLikersLoaded;
 
-  const [commentFocused, setCommentFocused] = useState(false);
-  const [commentBarHeight, setCommentBarHeight] = useState(0);
-  const commentComposerRef = useRef<HTMLDivElement>(null);
-  const commentSlotRef = useRef<HTMLDivElement>(null);
-  const [commentHost] = useState<HTMLDivElement | null>(() =>
-    typeof document === "undefined" ? null : document.createElement("div"),
-  );
+  const [heartPop, setHeartPop] = useState(false);
+  const likedRef = useRef(post.liked_by_me);
   const [shareOpen, setShareOpen] = useState(false);
   const [shareHandle, setShareHandle] = useState("");
   const [shareNote, setShareNote] = useState("");
@@ -319,47 +258,14 @@ export function FeedPostCard({
   }, [commentImage]);
 
   useEffect(() => {
-    if (!commentFocused) return;
-    document.documentElement.setAttribute("data-comment-keyboard", "");
-    return () => document.documentElement.removeAttribute("data-comment-keyboard");
-  }, [commentFocused]);
-
-  useLayoutEffect(() => {
-    const el = commentComposerRef.current;
-    if (!el) return;
-    const measure = () => setCommentBarHeight(el.offsetHeight);
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [commentFocused, commentImagePreviewUrl, commentDraft, expanded]);
-
-  useLayoutEffect(() => {
-    const host = commentHost;
-    if (!host) return;
-    if (!expanded) {
-      host.remove();
-      return;
+    if (post.liked_by_me && !likedRef.current) {
+      setHeartPop(true);
+      const timer = window.setTimeout(() => setHeartPop(false), 420);
+      likedRef.current = true;
+      return () => window.clearTimeout(timer);
     }
-    if (commentFocused) {
-      const moved = host.parentElement !== document.body;
-      if (moved) document.body.appendChild(host);
-      if (moved) {
-        const field = host.querySelector("textarea");
-        if (field instanceof HTMLTextAreaElement && document.activeElement !== field) {
-          field.focus({ preventScroll: true });
-        }
-      }
-      return;
-    }
-    const slot = commentSlotRef.current;
-    if (slot && host.parentElement !== slot) slot.appendChild(host);
-  }, [commentFocused, commentHost, expanded]);
-
-  useEffect(() => {
-    const host = commentHost;
-    return () => host?.remove();
-  }, [commentHost]);
+    likedRef.current = post.liked_by_me;
+  }, [post.liked_by_me]);
 
   const [likersOpen, setLikersOpen] = useState(false);
   const [likersLoading, setLikersLoading] = useState(false);
@@ -368,7 +274,6 @@ export function FeedPostCard({
   >([]);
   const [likersError, setLikersError] = useState<string | null>(null);
   const [likersTruncated, setLikersTruncated] = useState(false);
-  const [previewLikers, setPreviewLikers] = useState<PostLikerDisplay[]>([]);
 
   const [interestedOpen, setInterestedOpen] = useState(false);
   const [interestedLoading, setInterestedLoading] = useState(false);
@@ -410,29 +315,12 @@ export function FeedPostCard({
       }
       setLikersRows(res.data);
       setLikersTruncated(res.truncated);
-      setPreviewLikers(res.data.slice(0, LIKE_PREVIEW_LIMIT));
       onLikersLoadedRef.current?.({ visibleCount: res.data.length });
     })();
     return () => {
       cancelled = true;
     };
   }, [likersOpen, post.id]);
-
-  useEffect(() => {
-    if (post.like_count <= 0) {
-      setPreviewLikers([]);
-      return;
-    }
-    if (likersOpen) return;
-    let cancelled = false;
-    void fetchPostLikersWithProfiles(post.id, { limit: LIKE_PREVIEW_LIMIT }).then((res) => {
-      if (cancelled || res.error) return;
-      setPreviewLikers(res.data);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [likersOpen, post.id, post.like_count]);
 
   useEffect(() => {
     if (!interestedOpen) return;
@@ -634,39 +522,16 @@ export function FeedPostCard({
   const contentNoteHint = visibleContentNote ? communityContentNoteHint(visibleContentNote) : null;
   const canAddToStory = Boolean(onAddToStory && viewerId);
 
-  const facepilePeople = useMemo(() => {
-    const list: PostLikerDisplay[] = [];
-    if (post.liked_by_me && viewerId) {
-      list.push({
-        user_id: viewerId,
-        name: viewerProfile?.full_name?.trim() || "You",
-        avatar_url: viewerProfile?.avatar_url ?? null,
-      });
-    }
-    for (const p of previewLikers) {
-      if (p.user_id === viewerId) continue;
-      list.push(p);
-      if (list.length >= 3) break;
-    }
-    return list;
-  }, [post.liked_by_me, previewLikers, viewerId, viewerProfile?.avatar_url, viewerProfile?.full_name]);
-
-  const likesLine =
-    post.like_count > 0
-      ? likesSummaryLine({
-          count: post.like_count,
-          likedByMe: post.liked_by_me,
-          preview: previewLikers,
-          viewerId,
-        })
-      : null;
+  function onMediaDoubleTap() {
+    if (!mayEngage) return;
+    setHeartPop(true);
+    window.setTimeout(() => setHeartPop(false), 420);
+    if (!post.liked_by_me) onLike();
+  }
 
   const engagementRow = (
     <div
-      className={cn(
-        "flex items-center justify-between gap-1 px-2 pt-1 sm:px-3.5",
-        likesLine ? "pb-0.5" : "pb-3.5",
-      )}
+      className="flex items-center justify-between gap-1 px-1.5 pb-1 pt-0.5 sm:px-2.5"
       data-testid="post-engagement-row"
     >
       <div className="flex min-w-0 items-center">
@@ -682,11 +547,24 @@ export function FeedPostCard({
         >
           <Heart
             className={cn(
-              "h-[22px] w-[22px] shrink-0 transition-all duration-200 ease-out",
-              post.liked_by_me ? "fill-primary text-primary scale-105" : "scale-100",
+              "h-[22px] w-[22px] shrink-0",
+              post.liked_by_me && "fill-primary text-primary",
+              heartPop && "animate-feed-heart-pop",
             )}
           />
         </Button>
+        {post.like_count > 0 ? (
+          <button
+            type="button"
+            className="-ml-1.5 h-11 min-w-6 px-1 text-left text-sm font-semibold tabular-nums text-foreground"
+            disabled={!viewerId}
+            aria-label={`${post.like_count} ${post.like_count === 1 ? "like" : "likes"} — see who liked`}
+            onClick={() => setLikersOpen(true)}
+            data-testid="button-post-likers"
+          >
+            {post.like_count}
+          </button>
+        ) : null}
         <Button
           type="button"
           variant="ghost"
@@ -694,9 +572,9 @@ export function FeedPostCard({
           className="h-11 w-11 p-0 text-foreground hover:text-foreground"
           aria-expanded={expanded}
           aria-label={
-            expanded
-              ? "Hide comments"
-              : `${post.comment_count} comment${post.comment_count === 1 ? "" : "s"}`
+            post.comment_count > 0
+              ? `${post.comment_count} comment${post.comment_count === 1 ? "" : "s"}`
+              : "Comments"
           }
           onClick={onToggleComments}
         >
@@ -785,63 +663,53 @@ export function FeedPostCard({
               <Skeleton className="h-3 w-36" />
             </div>
           ) : (
-            <div className="space-y-0.5">
-              <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
+            <div className="min-w-0">
+              <div className="flex min-w-0 items-baseline gap-x-1.5">
                 <Link
                   href={`/community/profile/${post.author_id}`}
-                  className="truncate text-[15px] font-semibold leading-tight text-foreground hover:underline underline-offset-2"
+                  className="min-w-0 shrink truncate text-[15px] font-semibold leading-tight text-foreground hover:underline underline-offset-2"
                 >
                   {authorDisplayName}
                 </Link>
-                {authorPublicHandle ? (
-                  <span className="truncate text-[13px] text-muted-foreground">@{authorPublicHandle}</span>
-                ) : null}
                 {isBeatiePost ? (
                   <Badge
                     variant="outline"
-                    className="border-primary/35 bg-transparent px-1.5 py-0 text-[9px] font-medium leading-none text-primary"
+                    className="shrink-0 border-primary/35 bg-transparent px-1.5 py-0 text-[9px] font-medium leading-none text-primary"
                   >
                     AI guide
                   </Badge>
                 ) : null}
-              </div>
-              <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12px] text-muted-foreground">
-                <span
-                  data-testid="feed-post-topic"
-                  title={topicLabel}
-                  className="inline-flex max-w-[10rem] truncate rounded-full bg-muted/60 px-1.5 py-0.5 text-[11px] font-medium text-foreground/80"
-                >
-                  {topicLabel}
-                </span>
-                {post.audience === "followers" ? (
-                  <span className="inline-flex rounded-full bg-muted/60 px-1.5 py-0.5 text-[11px] font-medium text-foreground/80">
-                    Followers
-                  </span>
-                ) : null}
-                {contentNoteLabel ? (
-                  <>
-                    <span aria-hidden>·</span>
-                    <span
-                      data-testid="feed-post-content-note"
-                      title={contentNoteHint ?? contentNoteLabel}
-                      className="inline-flex max-w-[9rem] truncate rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-medium text-amber-900 dark:text-amber-100"
-                    >
-                      {contentNoteLabel}
-                    </span>
-                  </>
-                ) : null}
-                <span aria-hidden>·</span>
                 {uploadPending ? (
-                  <span className="inline-flex items-center gap-1 font-medium text-foreground/80">
+                  <span className="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-muted-foreground">
                     <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
                     Uploading
                   </span>
                 ) : (
-                  <time title={post.created_at}>
-                    {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                  <time
+                    title={post.created_at}
+                    className="shrink-0 text-[12px] text-muted-foreground"
+                  >
+                    {formatRelativeTime(post.created_at)}
                   </time>
                 )}
+                <span
+                  data-testid="feed-post-topic"
+                  title={topicLabel}
+                  className="min-w-0 truncate text-[12px] text-muted-foreground"
+                >
+                  · {topicLabel}
+                  {post.audience === "followers" ? " · Followers" : ""}
+                </span>
               </div>
+              {contentNoteLabel ? (
+                <p
+                  data-testid="feed-post-content-note"
+                  title={contentNoteHint ?? contentNoteLabel}
+                  className="truncate text-[12px] font-medium text-amber-900 dark:text-amber-100"
+                >
+                  {contentNoteLabel}
+                </p>
+              ) : null}
             </div>
           )}
         </div>
@@ -888,7 +756,12 @@ export function FeedPostCard({
       </div>
 
       {hasFeedVideo && post.video_url ? (
-        <FeedPostVideo path={post.video_url} posterPath={post.video_poster_url} priority={mediaPriority} />
+        <FeedPostVideo
+          path={post.video_url}
+          posterPath={post.video_poster_url}
+          priority={mediaPriority}
+          onDoubleTapLike={mayEngage ? onMediaDoubleTap : undefined}
+        />
       ) : null}
 
       {hasFeedImages ? (
@@ -897,6 +770,7 @@ export function FeedPostCard({
           altTexts={post.image_alt_texts}
           variant="feed"
           priority={mediaPriority}
+          onDoubleTapLike={mayEngage ? onMediaDoubleTap : undefined}
         />
       ) : null}
 
@@ -937,33 +811,8 @@ export function FeedPostCard({
 
       {engagementRow}
 
-      {post.like_count > 0 ? (
-        <button
-          type="button"
-          className={cn(
-            "flex min-h-10 w-full items-center gap-2.5 px-4 pt-1.5 text-left transition-opacity hover:opacity-80 active:opacity-70",
-            post.comment_count > 0 ? "pb-0.5" : "pb-3.5",
-          )}
-          disabled={!viewerId}
-          aria-label={`${post.like_count} ${post.like_count === 1 ? "like" : "likes"} — see who liked`}
-          onClick={() => setLikersOpen(true)}
-          data-testid="button-post-likers"
-        >
-          <LikeFacepile people={facepilePeople} />
-          <span className="min-w-0 truncate text-sm font-semibold text-foreground">
-            {likesLine}
-          </span>
-        </button>
-      ) : null}
-
       {isMediaFirst && bodyText ? (
-        <p className="px-3.5 pt-1.5 text-sm leading-snug text-foreground sm:px-4">
-          <Link
-            href={`/community/profile/${post.author_id}`}
-            className="mr-1.5 font-semibold hover:underline underline-offset-2"
-          >
-            {authorDisplayName}
-          </Link>
+        <p className="px-3.5 pt-0.5 text-[15px] leading-snug text-foreground sm:px-4">
           <span className="whitespace-pre-wrap">{renderBodyWithMentions(bodyText, post.mention_map)}</span>
         </p>
       ) : null}
@@ -995,18 +844,34 @@ export function FeedPostCard({
         </div>
       ) : null}
 
-      {!expanded && post.comment_count > 0 ? (
+      {post.comment_count > 0 ? (
         <button
           type="button"
           className="block px-4 pb-3.5 pt-1 text-left text-[13px] font-medium text-muted-foreground hover:text-foreground"
           onClick={onToggleComments}
         >
-          View all {post.comment_count} comment{post.comment_count === 1 ? "" : "s"}
+          {`View all ${post.comment_count} ${post.comment_count === 1 ? "comment" : "comments"}`}
         </button>
-      ) : null}
+      ) : (
+        <div className="h-2" aria-hidden />
+      )}
+    </article>
 
-      {expanded ? (
-        <div className="mt-2.5 space-y-3 border-t border-border/30 px-3.5 pb-3.5 pt-3 sm:px-4">
+      <BottomSheet
+        open={expanded}
+        onOpenChange={(next) => {
+          if (!next && expanded) onToggleComments();
+        }}
+        title={
+          post.comment_count > 0
+            ? `${post.comment_count} comment${post.comment_count === 1 ? "" : "s"}`
+            : "Comments"
+        }
+        className="max-h-[min(78dvh,680px)]"
+        bodyClassName="flex min-h-0 flex-col"
+        onOpenAutoFocus={(event) => event.preventDefault()}
+      >
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-3">
           {loadingComments ? (
             <div className="space-y-1.5" aria-busy="true">
               <Skeleton className="h-11 w-full rounded-lg" />
@@ -1061,114 +926,83 @@ export function FeedPostCard({
                   ))}
                 </ul>
               ) : (
-                <p className="py-1 text-sm text-muted-foreground">No comments yet — say hello.</p>
+                <p className="py-6 text-center text-sm text-muted-foreground">No comments yet — say hello.</p>
               )}
             </div>
           )}
-          <div
-            ref={commentSlotRef}
-            aria-hidden={commentFocused || undefined}
-            className={commentFocused ? "pointer-events-none" : "min-w-0"}
-            style={commentFocused ? { height: commentBarHeight || 56 } : undefined}
-          />
-          {commentHost
-            ? createPortal(
-            <div
-              ref={commentComposerRef}
-              data-comment-composer=""
-              onFocus={(event) => {
-                event.currentTarget.classList.add("comment-composer-pinned");
-                document.documentElement.setAttribute("data-comment-keyboard", "");
-                setCommentFocused(true);
-              }}
-              onBlur={(event) => {
-                const next = event.relatedTarget;
-                if (next instanceof Node && event.currentTarget.contains(next)) return;
-                window.setTimeout(() => {
-                  const root = commentComposerRef.current;
-                  if (root?.contains(document.activeElement)) return;
-                  root?.classList.remove("comment-composer-pinned");
-                  setCommentFocused(false);
-                }, 160);
-              }}
-              className={cn("min-w-0 space-y-2", commentFocused && "comment-composer-pinned")}
-            >
-            {commentImagePreviewUrl ? (
-              <div className="flex items-start gap-2 rounded-2xl border border-border/50 bg-muted/30 p-2">
-                <img src={commentImagePreviewUrl} alt="" className="max-h-28 rounded-xl object-cover" />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="shrink-0 rounded-xl"
-                  onClick={() => onCommentImageChange(null)}
-                >
-                  Remove
-                </Button>
-              </div>
-            ) : null}
-            <div className="flex items-end gap-1">
-              <label
-                className={cn(
-                  "relative mb-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground",
-                  !mayEngage && "pointer-events-none opacity-50",
-                )}
-              >
-                <ImagePlus className="pointer-events-none h-5 w-5" strokeWidth={1.75} aria-hidden />
-                <input
-                  type="file"
-                  accept="image/*,image/heic,image/heif,.heic,.heif"
-                  disabled={!mayEngage}
-                  aria-label="Attach photo"
-                  data-testid="input-comment-photo"
-                  className="file-input-overlay"
-                  onClick={(e) => {
-                    prepareFileInputForPicker(e.currentTarget);
-                  }}
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) applyCommentImage(f);
-                    e.target.value = "";
-                  }}
-                />
-              </label>
-              <div className="text-composer-shell min-w-0 flex-1 rounded-[1.35rem] pl-1.5 pr-2 py-1">
-                <div className="min-w-0 flex-1">
-                  <MentionTextarea
-                    textareaRef={commentInputRef}
-                    value={commentDraft}
-                    onChange={onCommentDraftChange}
-                    currentUserId={viewerId}
-                    rows={1}
-                    maxLength={4000}
-                    hideHint
-                    autoGrow
-                    maxGrowPx={148}
-                    bare
-                    suggestionsAbove={commentFocused}
-                    placeholder={mayEngage ? "Add a comment…" : "Set up your @handle to comment"}
-                    disabled={!mayEngage}
-                    className="min-h-10 resize-none px-0 py-2 text-[15px] leading-snug"
-                  />
-                </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  className="mb-0.5 h-10 shrink-0 rounded-full px-4 text-sm font-semibold shadow-none"
-                  disabled={!mayEngage || (!commentDraft.trim() && !commentImage)}
-                  onClick={onSubmitComment}
-                >
-                  Post
-                </Button>
-              </div>
-            </div>
-            </div>,
-            commentHost,
-          )
-            : null}
         </div>
-      ) : null}
-    </article>
+        <div data-comment-composer="" className="shrink-0 space-y-2 border-t border-border/50 bg-background px-3 pb-2 pt-2">
+          {commentImagePreviewUrl ? (
+            <div className="flex items-start gap-2 rounded-2xl border border-border/50 bg-muted/30 p-2">
+              <img src={commentImagePreviewUrl} alt="" className="max-h-28 rounded-xl object-cover" />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="shrink-0 rounded-xl"
+                onClick={() => onCommentImageChange(null)}
+              >
+                Remove
+              </Button>
+            </div>
+          ) : null}
+          <div className="flex items-end gap-1">
+            <label
+              className={cn(
+                "relative mb-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground",
+                !mayEngage && "pointer-events-none opacity-50",
+              )}
+            >
+              <ImagePlus className="pointer-events-none h-5 w-5" strokeWidth={1.75} aria-hidden />
+              <input
+                type="file"
+                accept="image/*,image/heic,image/heif,.heic,.heif"
+                disabled={!mayEngage}
+                aria-label="Attach photo"
+                data-testid="input-comment-photo"
+                className="file-input-overlay"
+                onClick={(e) => {
+                  prepareFileInputForPicker(e.currentTarget);
+                }}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) applyCommentImage(f);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+            <div className="text-composer-shell min-w-0 flex-1 rounded-[1.35rem] py-1 pl-1.5 pr-2">
+              <div className="min-w-0 flex-1">
+                <MentionTextarea
+                  textareaRef={commentInputRef}
+                  value={commentDraft}
+                  onChange={onCommentDraftChange}
+                  currentUserId={viewerId}
+                  rows={1}
+                  maxLength={4000}
+                  hideHint
+                  autoGrow
+                  maxGrowPx={120}
+                  bare
+                  suggestionsAbove
+                  placeholder={mayEngage ? "Add a comment…" : "Set up your @handle to comment"}
+                  disabled={!mayEngage}
+                  className="min-h-10 resize-none px-0 py-2 text-[15px] leading-snug"
+                />
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                className="mb-0.5 h-10 shrink-0 rounded-full px-4 text-sm font-semibold shadow-none"
+                disabled={!mayEngage || (!commentDraft.trim() && !commentImage)}
+                onClick={onSubmitComment}
+              >
+                Post
+              </Button>
+            </div>
+          </div>
+        </div>
+      </BottomSheet>
 
       <Dialog open={likersOpen} onOpenChange={setLikersOpen}>
         <CommunityPeopleSheet

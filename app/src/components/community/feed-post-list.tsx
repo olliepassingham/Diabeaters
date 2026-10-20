@@ -507,7 +507,7 @@ export function FeedPostList(props: {
 
   async function onToggleComments(postId: string) {
     const nextOpen = !expanded[postId];
-    setExpanded((m) => ({ ...m, [postId]: nextOpen }));
+    setExpanded(nextOpen ? { [postId]: true } : {});
     if (nextOpen) await ensureCommentsLoaded(postId);
   }
 

@@ -81,7 +81,7 @@ export default function CommunityPostPage() {
   const [notFound, setNotFound] = useState(false);
 
   const [authorMeta, setAuthorMeta] = useState<Record<string, FeedAuthorMeta>>({});
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const [comments, setComments] = useState<CommunityPostCommentRow[]>([]);
   const [commentDraft, setCommentDraft] = useState("");
   const [commentImage, setCommentImage] = useState<File | null>(null);

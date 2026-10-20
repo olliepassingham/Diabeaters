@@ -5,6 +5,7 @@ import { claimActiveFeedVideo, releaseActiveFeedVideo } from "@/lib/feed-video-p
 import { getCachedPostMediaSignedUrl, getPostVideoSignedUrl } from "@/lib/community";
 import { getPostImageSignedUrls } from "@/lib/community/posts-supabase";
 import { readFeedVideoMuted, writeFeedVideoMuted } from "@/lib/community/feed-video-mute";
+import { FeedLikeBurst, useTapSplitter } from "@/components/community/feed-like-burst";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -14,6 +15,8 @@ type Props = {
   className?: string;
   /** Start buffering immediately (first visible feed posts). */
   priority?: boolean;
+  /** Second tap likes. A single tap still plays or pauses. */
+  onDoubleTapLike?: () => void;
 };
 
 const PLAY_THRESHOLD = 0.55;
@@ -28,7 +31,16 @@ function playFeedVideo(video: HTMLVideoElement, preferMuted: boolean): void {
   });
 }
 
-export function FeedPostVideo({ path, posterPath = null, className, priority = false }: Props) {
+export function FeedPostVideo({ path, posterPath = null, className, priority = false, onDoubleTapLike }: Props) {
+  const [likeBurst, setLikeBurst] = useState(false);
+  const splitTap = useTapSplitter(
+    onDoubleTapLike
+      ? () => {
+          setLikeBurst(true);
+          onDoubleTapLike();
+        }
+      : undefined,
+  );
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const userPausedRef = useRef(false);
@@ -219,9 +231,11 @@ export function FeedPostVideo({ path, posterPath = null, className, priority = f
           type="button"
           className="absolute inset-0 z-10"
           aria-label={playing ? "Pause video" : "Play video"}
-          onClick={togglePlay}
+          onClick={() => splitTap(togglePlay)}
         />
       ) : null}
+
+      <FeedLikeBurst show={likeBurst} onDone={() => setLikeBurst(false)} />
 
       {flash || (held && !playing) ? (
         <span className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">

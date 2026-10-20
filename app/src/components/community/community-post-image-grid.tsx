@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { getCachedPostMediaSignedUrl, getPostImageSignedUrls } from "@/lib/community";
+import { FeedLikeBurst, useTapSplitter } from "@/components/community/feed-like-burst";
 import { FeedMediaLightbox } from "@/components/community/feed-media-lightbox";
 import { Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -16,6 +17,8 @@ type Props = {
   eventTitle?: string;
   /** Load immediately (first visible feed posts). */
   priority?: boolean;
+  /** Feed photos: second tap likes instead of opening the photo. */
+  onDoubleTapLike?: () => void;
 };
 
 function indexWithUrl(urls: (string | null)[], start: number, dir: -1 | 1): number | null {
@@ -30,13 +33,30 @@ function indexWithUrl(urls: (string | null)[], start: number, dir: -1 | 1): numb
 /**
  * Resolves private storage paths to signed URLs and renders a small grid.
  */
-export function CommunityPostImageGrid({ paths, altTexts, className, variant = "default", eventTitle, priority = false }: Props) {
+export function CommunityPostImageGrid({
+  paths,
+  altTexts,
+  className,
+  variant = "default",
+  eventTitle,
+  priority = false,
+  onDoubleTapLike,
+}: Props) {
   const [urls, setUrls] = useState<(string | null)[]>(() =>
     paths.map((path) => getCachedPostMediaSignedUrl(path)),
   );
   const [signing, setSigning] = useState(() => paths.some((path) => !getCachedPostMediaSignedUrl(path)));
   const [failedIndices, setFailedIndices] = useState<Set<number>>(() => new Set());
   const [openIdx, setOpenIdx] = useState<number | null>(null);
+  const [likeBurst, setLikeBurst] = useState(false);
+  const splitTap = useTapSplitter(
+    onDoubleTapLike
+      ? () => {
+          setLikeBurst(true);
+          onDoubleTapLike();
+        }
+      : undefined,
+  );
 
   useEffect(() => {
     if (paths.length === 0) {
@@ -180,10 +200,15 @@ export function CommunityPostImageGrid({ paths, altTexts, className, variant = "
 
     return (
       <>
-        <div className={cn("overflow-hidden bg-muted/20", className)}>
+        <div className={cn("relative overflow-hidden bg-muted/20", className)}>
           {paths.length === 1 ? (
             loadedIndices[0] != null ? (
-              <button type="button" onClick={() => setOpenIdx(loadedIndices[0]!)} className={tileButtonClass} aria-label="Open photo">
+              <button
+                type="button"
+                onClick={() => splitTap(() => setOpenIdx(loadedIndices[0]!))}
+                className={tileButtonClass}
+                aria-label="Open photo"
+              >
                 <img
                   src={urls[loadedIndices[0]!]!}
                   alt={altTexts?.[loadedIndices[0]!]?.trim() || "Photo attached to post"}
@@ -211,7 +236,7 @@ export function CommunityPostImageGrid({ paths, altTexts, className, variant = "
                   <button
                     key={`${path}-${i}`}
                     type="button"
-                    onClick={() => setOpenIdx(i)}
+                    onClick={() => splitTap(() => setOpenIdx(i))}
                     className={cn(tileButtonClass, paths.length === 3 && i === 0 && "col-span-2 aspect-[2/1]")}
                     aria-label={`Open photo ${i + 1}`}
                   >
@@ -231,6 +256,7 @@ export function CommunityPostImageGrid({ paths, altTexts, className, variant = "
               })}
             </div>
           )}
+          <FeedLikeBurst show={likeBurst} onDone={() => setLikeBurst(false)} />
         </div>
         {loadFailed ? (
           <p className="px-3 pt-1 text-xs text-muted-foreground">Photos could not be loaded. Try refreshing the feed.</p>
