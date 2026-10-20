@@ -61,6 +61,7 @@ const CATEGORIES: CarbFoodCategory[] = [
   "breakfast",
   "bread",
   "staples",
+  "ingredients",
   "veg",
   "protein",
   "fruit",

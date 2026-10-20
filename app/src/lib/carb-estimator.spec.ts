@@ -32,6 +32,35 @@ describe("carb estimator", () => {
     expect(searchCarbFoods("chips")[0]?.id).toBe("chips");
     expect(searchCarbFoods("ketchup")[0]?.id).toBe("ketchup");
     expect(searchCarbFoods("pasta sauce")[0]?.id).toBe("pasta-sauce");
+    expect(searchCarbFoods("flour")[0]?.id).toBe("plain-flour");
+    expect(searchCarbFoods("uncooked rice")[0]?.id).toBe("dry-rice");
+    expect(searchCarbFoods("kidney beans")[0]?.id).toBe("kidney-beans");
+    expect(searchCarbFoods("tofu")[0]?.id).toBe("tofu");
+    expect(searchCarbFoods("mozzarella")[0]?.id).toBe("mozzarella");
+    expect(searchCarbFoods("medjool")[0]?.id).toBe("dates");
+    expect(searchCarbFoods("nachos")[0]?.id).toBe("tortilla-chips");
+  });
+
+  it("browses cooking ingredients as their own category", () => {
+    const results = searchCarbFoods("", { category: "ingredients", limit: 50 });
+    expect(results.length).toBeGreaterThan(10);
+    expect(results.every((food) => food.category === "ingredients")).toBe(true);
+    expect(results.map((food) => food.id)).toContain("plain-flour");
+  });
+
+  it("builds a meal from weighed ingredients", () => {
+    const result = estimateCarbMeal([
+      { id: "pasta", foodId: "dry-pasta", portionId: "regular", quantity: 1 },
+      { id: "tomatoes", foodId: "chopped-tomatoes", portionId: "regular", quantity: 1 },
+      { id: "beans", foodId: "kidney-beans", portionId: "regular", quantity: 1 },
+    ]);
+    expect(result.estimatedGrams).toBe(95);
+    expect(result.compositionHint).toEqual({
+      carbType: "starchy",
+      hasFat: false,
+      hasProtein: true,
+      hasFibre: true,
+    });
   });
 
   it("keeps one entry per food", () => {
