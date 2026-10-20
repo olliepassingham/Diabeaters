@@ -20,6 +20,7 @@ import {
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { sendStoryReplyToDmThread, submitContentReport } from "@/lib/community";
 import { getCachedPostMediaSignedUrl, prefetchStoryMedia } from "@/lib/community/post-media-signed-urls";
 import {
@@ -34,12 +35,13 @@ import {
   type StoryReactionKind,
   type StoryReactionSummary,
 } from "@/lib/community/stories-supabase";
-import { STORY_MEDIA_CLASS, STORY_STAGE_CLASS } from "@/lib/community/story-frame";
+import { STORY_MEDIA_CLASS } from "@/lib/community/story-frame";
 import { cn } from "@/lib/utils";
 
 const DISMISS_DRAG_PX = 72;
 const NAV_DRAG_PX = 56;
 const TAP_SLOP_PX = 12;
+const HOLD_PAUSE_MS = 220;
 const IMAGE_STORY_MS = 5000;
 
 export type StoryViewerEntry = {
@@ -118,6 +120,7 @@ export function StoryViewerDialog({
   onViewed,
 }: Props) {
   const { toast } = useToast();
+  const phone = useIsMobile();
   const [, setLocation] = useLocation();
   const queue = useMemo(() => {
     if (entriesProp && entriesProp.length > 0) return entriesProp;
@@ -179,6 +182,9 @@ export function StoryViewerDialog({
   const [progress, setProgress] = useState(0);
   const [drag, setDrag] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
+  const [holding, setHolding] = useState(false);
+  const holdingRef = useRef(false);
+  const holdTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -194,6 +200,12 @@ export function StoryViewerDialog({
       dragRef.current = { x: 0, y: 0 };
       setDrag({ x: 0, y: 0 });
       setDragging(false);
+      if (holdTimerRef.current != null) {
+        window.clearTimeout(holdTimerRef.current);
+        holdTimerRef.current = null;
+      }
+      holdingRef.current = false;
+      setHolding(false);
       progressRef.current = 0;
       setProgress(0);
       return;
@@ -295,7 +307,38 @@ export function StoryViewerDialog({
   }, [index, replyOpen, viewersOpen, deleteOpen]);
 
   const isVideoStory = resolvedStory?.media_kind === "video" && !sourcePostId;
-  const playbackPaused = replyOpen || viewersOpen || deleteOpen || dragging;
+  const playbackPaused = replyOpen || viewersOpen || deleteOpen || dragging || holding;
+
+  const clearHoldTimer = useCallback(() => {
+    if (holdTimerRef.current != null) {
+      window.clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+  }, []);
+
+  const endHold = useCallback(
+    (suppressNavigation: boolean) => {
+      clearHoldTimer();
+      if (!holdingRef.current) return;
+      holdingRef.current = false;
+      setHolding(false);
+      if (suppressNavigation) suppressClick.current = true;
+    },
+    [clearHoldTimer],
+  );
+
+  const beginHold = useCallback(
+    (target: EventTarget | null) => {
+      if (replyOpen || viewersOpen || deleteOpen) return;
+      if (target instanceof Element && target.closest("[data-story-chrome], input, textarea, a")) return;
+      clearHoldTimer();
+      holdTimerRef.current = window.setTimeout(() => {
+        holdingRef.current = true;
+        setHolding(true);
+      }, HOLD_PAUSE_MS);
+    },
+    [replyOpen, viewersOpen, deleteOpen, clearHoldTimer],
+  );
 
   useEffect(() => {
     progressRef.current = 0;
@@ -332,6 +375,22 @@ export function StoryViewerDialog({
   }, [isVideoStory, playbackPaused, mediaUrl]);
 
   useEffect(() => {
+    if (!open || !isVideoStory || playbackPaused || !mediaUrl) return;
+    let frame = 0;
+    const tick = () => {
+      const video = videoRef.current;
+      if (video && Number.isFinite(video.duration) && video.duration > 0) {
+        const next = Math.min(1, video.currentTime / video.duration);
+        progressRef.current = next;
+        setProgress(next);
+      }
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [open, isVideoStory, playbackPaused, mediaUrl]);
+
+  useEffect(() => {
     if (!open) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (replyOpen || viewersOpen || deleteOpen) return;
@@ -354,7 +413,6 @@ export function StoryViewerDialog({
     const t = e.changedTouches[0];
     if (!t) return;
     touchStart.current = { x: t.clientX, y: t.clientY };
-    setDragging(true);
   };
 
   const onTouchMove = (e: TouchEvent) => {
@@ -363,6 +421,10 @@ export function StoryViewerDialog({
     if (!t) return;
     const dx = t.clientX - touchStart.current.x;
     const dy = t.clientY - touchStart.current.y;
+    if (Math.hypot(dx, dy) > TAP_SLOP_PX) {
+      setDragging(true);
+      if (!holdingRef.current) clearHoldTimer();
+    }
     if (Math.abs(dy) > Math.abs(dx) && dy > 0) {
       dragRef.current = { x: 0, y: dy };
       setDrag({ x: 0, y: dy });
@@ -390,6 +452,7 @@ export function StoryViewerDialog({
     } else if (x >= NAV_DRAG_PX) {
       goPrev();
     }
+    endHold(true);
     resetDrag();
   };
 
@@ -482,10 +545,13 @@ export function StoryViewerDialog({
       <Dialog open={open} onOpenChange={onOpenChange} mobileSheet={false}>
         <DialogContent
           className={cn(
-            "inset-0 left-0 top-0 flex h-dvh max-h-dvh w-screen max-w-none translate-x-0 translate-y-0 animate-none flex-col gap-0 overflow-hidden rounded-none border-0 p-0 shadow-none [&>button]:hidden",
-            sourcePostId ? "bg-background text-foreground" : "bg-black",
+            "flex animate-none flex-col gap-0 overflow-hidden border-0 p-0 shadow-none [&>button]:hidden",
+            phone
+              ? "!inset-0 !left-0 !top-0 !h-dvh !max-h-dvh !w-screen !max-w-none !translate-x-0 !translate-y-0 !rounded-none"
+              : "!h-[min(92dvh,920px)] !w-auto !max-w-none aspect-[9/16] !rounded-[1.35rem]",
+            sourcePostId ? "bg-background text-foreground" : "bg-black text-white",
           )}
-          style={{ animation: "none", transform: "none" }}
+          style={{ animation: "none" }}
           aria-describedby={undefined}
         >
           <DialogTitle className="sr-only">{displayName}'s story</DialogTitle>
@@ -502,6 +568,9 @@ export function StoryViewerDialog({
             onTouchMove={onTouchMove}
             onTouchEnd={onTouchEnd}
             onTouchCancel={onTouchEnd}
+            onPointerDown={(event) => beginHold(event.target)}
+            onPointerUp={() => endHold(true)}
+            onPointerCancel={() => endHold(true)}
           >
             <div
               className={cn(
@@ -511,7 +580,7 @@ export function StoryViewerDialog({
                   : "bg-gradient-to-b from-black/45 to-transparent",
               )}
             >
-              <div className="pointer-events-auto mb-2 flex gap-1" aria-hidden>
+              <div className="pointer-events-auto mb-2 flex gap-1" data-story-chrome="" aria-hidden>
               {Array.from({ length: authorRun.count }, (_, i) => (
                 <div
                   key={i}
@@ -521,7 +590,10 @@ export function StoryViewerDialog({
                   )}
                 >
                   <div
-                    className={cn("h-full rounded-full", sourcePostId ? "bg-foreground" : "bg-white")}
+                    className={cn(
+                      "h-full origin-left rounded-full transition-none",
+                      sourcePostId ? "bg-foreground" : "bg-white",
+                    )}
                     style={{
                       width: i < authorRun.local ? "100%" : i === authorRun.local ? `${progress * 100}%` : "0%",
                     }}
@@ -529,7 +601,7 @@ export function StoryViewerDialog({
                 </div>
               ))}
               </div>
-            <div className="pointer-events-auto flex items-center justify-between gap-2 pb-2">
+            <div className="pointer-events-auto flex items-center justify-between gap-2 pb-2" data-story-chrome="">
               {current ? (
                 <Link
                   href={profileHref}
@@ -664,7 +736,7 @@ export function StoryViewerDialog({
                   This story is no longer available.
                 </p>
               ) : (
-                <div className={sourcePostId ? "relative h-full w-full" : STORY_STAGE_CLASS}>
+                <div className="relative h-full w-full">
                   {sourcePostId ? (
                     <>
                       <StorySharedPostStage
@@ -720,12 +792,12 @@ export function StoryViewerDialog({
                 </div>
               )}
 
-              {/* Edge taps: previous / next — keep narrow on shared posts so card controls stay tappable. */}
+              {/* Left third goes back. The rest goes forward. Shared posts keep a narrow edge so the card stays tappable. Hold anywhere here to pause. */}
               <button
                 type="button"
                 className={cn(
                   "absolute inset-y-0 left-0 z-10 cursor-pointer border-0 bg-transparent",
-                  sourcePostId ? "w-10" : "w-[30%]",
+                  sourcePostId ? "w-12" : "w-[28%]",
                 )}
                 aria-label="Previous story"
                 onClick={(e) => {
@@ -741,7 +813,7 @@ export function StoryViewerDialog({
                 type="button"
                 className={cn(
                   "absolute inset-y-0 right-0 z-10 cursor-pointer border-0 bg-transparent",
-                  sourcePostId ? "w-10" : "w-[18%]",
+                  sourcePostId ? "w-12" : "w-[72%]",
                 )}
                 aria-label={isLast ? "Close story" : "Next story"}
                 onClick={(e) => {
@@ -753,23 +825,10 @@ export function StoryViewerDialog({
                   advance();
                 }}
               />
-              {!sourcePostId ? (
-                <button
-                  type="button"
-                  className="absolute inset-y-0 left-[30%] right-[18%] z-[5] cursor-pointer border-0 bg-transparent"
-                  aria-label={isLast ? "Close story" : "Next story"}
-                  onClick={() => {
-                    if (suppressClick.current) {
-                      suppressClick.current = false;
-                      return;
-                    }
-                    advance();
-                  }}
-                />
-              ) : null}
             </div>
 
             <div
+              data-story-chrome=""
               className={cn(
                 "absolute inset-x-0 bottom-0 z-30 px-4 pb-[max(1.1rem,env(safe-area-inset-bottom))] pt-10",
                 sourcePostId

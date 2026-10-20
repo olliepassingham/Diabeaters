@@ -94,7 +94,7 @@ export function FeedComposerSheet({
           <form
             id={formTestId}
             onSubmit={onSubmit}
-            className="flex min-h-full min-w-0 flex-col gap-3 pb-2 text-foreground"
+            className="flex min-h-full min-w-0 flex-col gap-3 pb-2 text-foreground md:min-h-0"
             data-testid={formTestId}
           >
             <FeedComposerFormBody {...formBodyProps} autoFocusComposer={open} hideInlineSubmit />

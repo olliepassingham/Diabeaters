@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { ChevronDown, PenLine, Plus } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Plus } from "lucide-react";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { StoryAvatarRing } from "@/components/community/story-avatar-ring";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   pickStoryToOpen,
   storyRingStateForStories,
@@ -29,11 +28,7 @@ type Props = {
   profileHref?: string;
   onComposerClick: () => void;
   composerDisabled?: boolean;
-  isMobile: boolean;
-  composerExpanded?: boolean;
-  onComposerExpandedChange?: (open: boolean) => void;
-  composerForm?: ReactNode;
-  /** Trailing controls (e.g. Find people) sit on the stories row to save vertical space. */
+  /** Find people and more sit on the quiet prompt row, not on the stories. */
   endActions?: ReactNode;
   className?: string;
 };
@@ -136,10 +131,10 @@ function FeedStoriesStrip({ children }: { children: ReactNode }) {
   }, [updateFade, children]);
 
   return (
-    <div className="relative -mx-1">
+    <div className="relative -mx-4 md:-mx-6">
       <div
         ref={scrollRef}
-        className="flex gap-3.5 overflow-x-auto px-1 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex gap-3.5 overflow-x-auto px-4 py-1 [scrollbar-width:none] md:px-6 [&::-webkit-scrollbar]:hidden"
         data-testid="feed-stories-strip"
         aria-label="Stories"
       >
@@ -168,10 +163,6 @@ export function FeedStoriesComposerHeader({
   profileHref,
   onComposerClick,
   composerDisabled,
-  isMobile,
-  composerExpanded,
-  onComposerExpandedChange,
-  composerForm,
   endActions,
   className,
 }: Props) {
@@ -193,119 +184,67 @@ export function FeedStoriesComposerHeader({
 
   const selfStories = self ? storiesByAuthor.get(self.id) ?? [] : [];
   const showStoriesRow = Boolean(self) || loading || storyEntries.length > 0;
-  const hideComposerAvatar = showStoriesRow && Boolean(self);
-
-  const composerTrigger = (
-    <button
-      type="button"
-      className={cn(
-        "flex w-full min-h-11 items-center gap-2.5 text-left outline-none ring-offset-background transition-colors hover:bg-muted/25 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60",
-        hideComposerAvatar ? "px-4 py-2" : "px-3.5 py-2",
-      )}
-      onClick={isMobile ? onComposerClick : undefined}
-      disabled={composerDisabled}
-      data-testid={isMobile ? "feed-composer-mobile-pill" : "feed-composer-trigger"}
-      aria-haspopup={isMobile ? "dialog" : undefined}
-      aria-expanded={!isMobile ? composerExpanded : undefined}
-    >
-      {!hideComposerAvatar ? (
-        <CommunityAuthorAvatar
-          displayName={avatarDisplayName}
-          avatarPath={avatarPath}
-          size="sm"
-          profileHref={profileHref}
-        />
-      ) : null}
-      <span className="min-w-0 flex-1 truncate text-[15px] text-muted-foreground">{composerPreview}</span>
-      {isMobile ? <PenLine className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden /> : null}
-      {!isMobile ? (
-        <ChevronDown
-          className={cn(
-            "h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200",
-            composerExpanded && "rotate-180",
-          )}
-          aria-hidden
-        />
-      ) : null}
-    </button>
-  );
 
   return (
-    <div className={cn("space-y-2", className)} data-testid="feed-stories-composer-header">
-      {showStoriesRow || endActions ? (
-        <div className="flex items-start gap-1">
-          {showStoriesRow ? (
-            <div className="min-w-0 flex-1">
-              <FeedStoriesStrip>
-                {self ? (
-                  <SelfStoryCell
-                    self={self}
-                    selfStories={selfStories}
-                    onOpenStory={onOpenStory}
-                    onAddStory={onAddStory}
-                  />
-                ) : null}
+    <div className={cn("space-y-1", className)} data-testid="feed-stories-composer-header">
+      {showStoriesRow ? (
+        <FeedStoriesStrip>
+          {self ? (
+            <SelfStoryCell
+              self={self}
+              selfStories={selfStories}
+              onOpenStory={onOpenStory}
+              onAddStory={onAddStory}
+            />
+          ) : null}
 
-                {loading
-                  ? Array.from({ length: 3 }).map((_, i) => (
-                      <div key={i} className="h-11 w-11 shrink-0 animate-pulse rounded-full bg-muted/25" />
-                    ))
-                  : storyEntries.map(({ person, stories, story }) => (
-                      <div key={person.id} className={cn("flex shrink-0 flex-col items-center gap-0.5", ITEM_WIDTH)}>
-                        <StoryAvatarRing
-                          state={storyRingStateForStories(stories)}
-                          onClick={() => onOpenStory(person.id, story)}
-                          label={`Watch ${person.name}'s story`}
-                        >
-                          <CommunityAuthorAvatar
-                            displayName={person.name}
-                            avatarPath={person.avatar_url}
-                            size="sm"
-                            className={AVATAR_CLASS}
-                          />
-                        </StoryAvatarRing>
-                        <span className={NAME_CLASS}>{person.name.split(" ")[0]}</span>
-                      </div>
-                    ))}
-              </FeedStoriesStrip>
-            </div>
-          ) : (
-            <div className="min-w-0 flex-1" />
-          )}
-          {endActions ? <div className="shrink-0 pt-0.5">{endActions}</div> : null}
-        </div>
+          {loading
+            ? Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className={cn("flex shrink-0 flex-col items-center gap-1", ITEM_WIDTH)}>
+                  <div className="h-16 w-16 animate-pulse rounded-full bg-muted/40" />
+                  <div className="h-2 w-10 animate-pulse rounded-full bg-muted/30" />
+                </div>
+              ))
+            : storyEntries.map(({ person, stories, story }) => (
+                <div key={person.id} className={cn("flex shrink-0 flex-col items-center gap-0.5", ITEM_WIDTH)}>
+                  <StoryAvatarRing
+                    state={storyRingStateForStories(stories)}
+                    onClick={() => onOpenStory(person.id, story)}
+                    label={`Watch ${person.name}'s story`}
+                  >
+                    <CommunityAuthorAvatar
+                      displayName={person.name}
+                      avatarPath={person.avatar_url}
+                      size="sm"
+                      className={AVATAR_CLASS}
+                    />
+                  </StoryAvatarRing>
+                  <span className={NAME_CLASS}>{person.name.split(" ")[0]}</span>
+                </div>
+              ))}
+        </FeedStoriesStrip>
       ) : null}
 
-      <section
-        className={cn(
-          "overflow-hidden rounded-[1.35rem] border border-border/50 bg-card/95 shadow-sm",
-          composerDisabled && "opacity-90",
-        )}
-      >
-        {isMobile ? (
-          composerTrigger
-        ) : (
-          <Collapsible open={composerExpanded} onOpenChange={onComposerExpandedChange}>
-            <CollapsibleTrigger asChild>{composerTrigger}</CollapsibleTrigger>
-            <CollapsibleContent className="overflow-hidden">
-              <div className="border-t border-border/25 px-3.5 pb-3.5 pt-3">{composerForm}</div>
-            </CollapsibleContent>
-          </Collapsible>
-        )}
-      </section>
+      <div className={cn("flex items-center gap-1", composerDisabled && "opacity-70")}>
+        <button
+          type="button"
+          className="flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-full px-1 text-left outline-none ring-offset-background transition-colors hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed"
+          onClick={onComposerClick}
+          disabled={composerDisabled}
+          data-testid="feed-composer-mobile-pill"
+          aria-haspopup="dialog"
+        >
+          <CommunityAuthorAvatar
+            displayName={avatarDisplayName}
+            avatarPath={avatarPath}
+            size="sm"
+            profileHref={profileHref}
+            className="!h-9 !w-9"
+          />
+          <span className="min-w-0 flex-1 truncate text-[15px] text-muted-foreground">{composerPreview}</span>
+        </button>
+        {endActions ? <div className="shrink-0">{endActions}</div> : null}
+      </div>
     </div>
-  );
-}
-
-export type FeedStoriesComposerHeaderFormProps = {
-  onSubmit: (e: FormEvent) => void;
-  children: ReactNode;
-};
-
-export function FeedStoriesComposerHeaderForm({ onSubmit, children }: FeedStoriesComposerHeaderFormProps) {
-  return (
-    <form onSubmit={onSubmit} className="space-y-3 text-foreground" data-testid="feed-composer-form">
-      {children}
-    </form>
   );
 }

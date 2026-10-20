@@ -5,7 +5,7 @@ import { isFilePickerActive, subscribeFilePickerActive } from "@/lib/click-hidde
 import { cn } from "@/lib/utils";
 
 /**
- * Mobile-only bottom sheet for the feed composer. Split out so `vaul` can be lazy-loaded
+ * Bottom sheet for the feed composer (phone and desktop). Split out so `vaul` can be lazy-loaded
  * with the drawer chunk instead of the main community feed route.
  */
 export function CommunityFeedComposerDrawer({
@@ -81,6 +81,7 @@ export function CommunityFeedComposerDrawer({
           className={cn(
             "fixed inset-x-0 top-[var(--vv-offset-top,0px)] z-[110] flex h-[var(--vv-height,100dvh)] max-h-[var(--vv-height,100dvh)] flex-col overflow-clip bg-background p-0 text-foreground outline-none",
             "pt-[env(safe-area-inset-top,0px)]",
+            "md:inset-x-auto md:bottom-0 md:left-1/2 md:right-auto md:top-auto md:h-auto md:max-h-[min(88dvh,760px)] md:w-full md:max-w-xl md:-translate-x-1/2 md:rounded-t-[1.25rem] md:border md:border-border/60 md:pt-2 md:shadow-2xl",
           )}
         >
           <div className="flex shrink-0 items-center gap-1 border-b border-border/40 px-1.5 py-1.5" data-vaul-no-drag>
@@ -117,7 +118,7 @@ export function CommunityFeedComposerDrawer({
             </p>
           ) : null}
           <div
-            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4"
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 md:max-h-[min(72dvh,640px)] md:flex-none"
             data-vaul-no-drag
             data-composer-scroll
           >

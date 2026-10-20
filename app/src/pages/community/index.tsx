@@ -1,14 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { Bookmark, Search as SearchIcon, SlidersHorizontal } from "lucide-react";
+import { Bookmark, Play, Search as SearchIcon, SlidersHorizontal, X } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { FeedFollowSuggestionsStrip } from "@/components/community/feed-follow-suggestions-strip";
 import { FeedWatchLearnPlayer } from "@/components/community/feed-watch-learn-player";
-import {
-  FeedStoriesComposerHeader,
-  FeedStoriesComposerHeaderForm,
-} from "@/components/community/feed-stories-composer-header";
+import { FeedStoriesComposerHeader } from "@/components/community/feed-stories-composer-header";
 import { FeedPostList } from "@/components/community/feed-post-list";
 import { StoryCreateSheet } from "@/components/community/story-create-sheet";
 import { StoryViewerDialog, buildStoryViewerQueue, type StoryViewerEntry } from "@/components/community/story-viewer-dialog";
@@ -16,7 +13,8 @@ import { PageHeader, PageShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
-import { FeedComposerFormBody } from "@/components/community/feed-composer-form-body";
+import { Switch } from "@/components/ui/switch";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { FeedComposerSheet } from "@/components/community/feed-composer-sheet";
 import { FindPeoplePanel } from "@/components/community/find-people-panel";
 import { FeedMoreMenu } from "@/components/community/feed-more-menu";
@@ -29,7 +27,6 @@ import {
   fetchCommunityPostsPage,
   fetchFollowSuggestions,
   fetchRecentCommunityVideoPosts,
-  readFeedComposerDraft,
   followUser,
   listFolloweeIdsForCurrentUser,
   type CommunityTopicId,
@@ -40,7 +37,6 @@ import {
   fetchStoryById,
 } from "@/lib/community";
 import { pickStoryToOpen } from "@/lib/community/stories-supabase";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getProfilesByIds, searchPublicProfilesForFeedQuery, useProfile, canEngageWithCommunityFeed, needsCommunityProfileSetup } from "@/lib/profile";
@@ -91,18 +87,6 @@ function readStoredFeedTab(): FeedTab {
 
 const PAGE_SIZE = MAIN_FEED_PAGE_SIZE;
 
-/** Keep the composer collapsed by default; only expand when a draft is waiting. */
-function initialFeedComposerOpen(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    const draft = readFeedComposerDraft();
-    if (draft?.body?.trim()) return true;
-  } catch {
-    /* ignore */
-  }
-  return false;
-}
-
 export default function CommunityHomePage() {
   const { user } = useAuth();
   const { communityPushPromptOpen, setCommunityPushPromptOpen } = useCommunityPushPromptAfterOnboarding();
@@ -124,8 +108,6 @@ export default function CommunityHomePage() {
 
   const [feedListRevision, setFeedListRevision] = useState(0);
   const [pendingFeedPosts, setPendingFeedPosts] = useState<CommunityPostRow[]>([]);
-  const [composerPanelOpen, setComposerPanelOpen] = useState(initialFeedComposerOpen);
-  const isMobile = useIsMobile();
   const dropPendingFeedPost = useCallback((pendingId: string) => {
     setPendingFeedPosts((prev) => {
       for (const post of prev) {
@@ -135,7 +117,7 @@ export default function CommunityHomePage() {
     });
   }, []);
   const feedComposer = useFeedComposer({
-    closeSheetOnPost: isMobile,
+    closeSheetOnPost: true,
     onOptimisticPost: (post) => {
       setPendingFeedPosts((prev) => [post, ...prev.filter((row) => row.id !== post.id)]);
       getAppScrollMain()?.scrollTo({ top: 0, behavior: "smooth" });
@@ -162,7 +144,7 @@ export default function CommunityHomePage() {
   const [followeeIds, setFolloweeIds] = useState<Set<string>>(() => new Set());
   const [followeesLoading, setFolloweesLoading] = useState(false);
   const [savedOnly, setSavedOnly] = useState(false);
-  const [feedSearchExpanded, setFeedSearchExpanded] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [followingAuthorIds, setFollowingAuthorIds] = useState<string[] | null>(null);
   const [searchMatchedAuthorIds, setSearchMatchedAuthorIds] = useState<string[] | null>(null);
   const [scrollByTab, setScrollByTab] = useState<Record<FeedTab, number>>({ everyone: 0, following: 0 });
@@ -622,9 +604,8 @@ export default function CommunityHomePage() {
 
   useEffect(() => {
     if (!feedComposer.composerExpandSignal) return;
-    if (isMobile) feedComposer.setSheetOpen(true);
-    else setComposerPanelOpen(true);
-  }, [feedComposer.composerExpandSignal, isMobile, feedComposer.setSheetOpen]);
+    feedComposer.setSheetOpen(true);
+  }, [feedComposer.composerExpandSignal, feedComposer.setSheetOpen]);
 
   if (!isSupabaseConfigured()) {
     return (
@@ -643,6 +624,20 @@ export default function CommunityHomePage() {
   if (isCommunityMode && needsPublicSetup) {
     return null;
   }
+
+  const activeFilterLabel = [
+    savedOnly ? "Saved" : null,
+    topicFilter ? orderedTopics.find((topic) => topic.id === topicFilter)?.label ?? null : null,
+    feedSearch.trim() || null,
+  ]
+    .filter((part): part is string => Boolean(part))
+    .join(" · ");
+  const filtersActive = Boolean(activeFilterLabel);
+  const clearFeedFilters = () => {
+    setTopicFilter(null);
+    setSavedOnly(false);
+    setFeedSearch("");
+  };
 
   const feedHeaderActions = (
     <div className="flex shrink-0 items-center justify-end gap-1" data-testid="feed-toolbar-actions">
@@ -691,14 +686,6 @@ export default function CommunityHomePage() {
             feedComposer.setSheetOpen(true);
           }}
           composerDisabled={!canComposeToFeed}
-          isMobile={isMobile}
-          composerExpanded={composerPanelOpen}
-          onComposerExpandedChange={setComposerPanelOpen}
-          composerForm={
-            <FeedStoriesComposerHeaderForm onSubmit={feedComposer.handlePost}>
-              <FeedComposerFormBody {...feedComposer.formBodyProps} />
-            </FeedStoriesComposerHeaderForm>
-          }
         />
       ) : (
         <div className="flex justify-end">{feedHeaderActions}</div>
@@ -757,223 +744,164 @@ export default function CommunityHomePage() {
         extras={feedComposer.composerExtras}
       />
 
-      <div className="space-y-2.5">
-        <div className="flex items-center gap-1.5">
-        <Tabs
-          value={watchLearnOpen ? "watch" : feedTab}
-          onValueChange={(v) => {
-            if (v === "watch") {
-              setWatchLearnStartId(watchLearnPosts[0]?.id ?? null);
-              setWatchLearnOpen(true);
-              return;
-            }
-            setWatchLearnOpen(false);
-            // Sync scroll from app main container (not window — mobile shell scrolls #app-scroll-main).
-            setScrollByTab((prev) => ({ ...prev, [feedTab]: getAppScrollTop() }));
-            setFeedTab(v as FeedTab);
-          }}
-          className="min-w-0 flex-1"
-        >
-          <TabsList className="grid h-10 w-full grid-cols-3 rounded-full bg-muted/45 p-1 dark:bg-muted/30">
-            <TabsTrigger
-              value="following"
-              className="rounded-full px-2 text-[13px] font-semibold sm:text-sm data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
-            >
-              Following
-            </TabsTrigger>
-            <TabsTrigger
-              value="everyone"
-              className="rounded-full px-2 text-[13px] font-semibold sm:text-sm data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
-            >
-              Everyone
-            </TabsTrigger>
-            <TabsTrigger
-              value="watch"
-              className="rounded-full px-2 text-[13px] font-semibold sm:text-sm data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
-              aria-label="Watch and learn"
-            >
-              Watch
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-        {isMobile ? (
-          <Button
-            type="button"
-            variant={feedSearchExpanded || savedOnly || topicFilter || feedSearch.trim() ? "secondary" : "outline"}
-            size="icon"
-            className="h-10 w-10 shrink-0 rounded-full"
-            aria-expanded={feedSearchExpanded}
-            aria-label="Search posts"
-            onClick={() => setFeedSearchExpanded((open) => !open)}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <Tabs
+            value={watchLearnOpen ? "watch" : feedTab}
+            onValueChange={(v) => {
+              if (v === "watch") {
+                setWatchLearnStartId(watchLearnPosts[0]?.id ?? null);
+                setWatchLearnOpen(true);
+                return;
+              }
+              setWatchLearnOpen(false);
+              setScrollByTab((prev) => ({ ...prev, [feedTab]: getAppScrollTop() }));
+              setFeedTab(v as FeedTab);
+            }}
+            className="min-w-0 flex-1 sm:flex-none"
           >
-            <SlidersHorizontal className="h-4 w-4" aria-hidden />
-          </Button>
-        ) : null}
+            <TabsList className="grid h-10 w-full grid-cols-3 rounded-full bg-muted/50 p-1 dark:bg-muted/30 sm:h-9 sm:w-[21rem]">
+              <TabsTrigger
+                value="following"
+                className="rounded-full px-2 text-[13px] font-semibold data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+              >
+                Following
+              </TabsTrigger>
+              <TabsTrigger
+                value="everyone"
+                className="rounded-full px-2 text-[13px] font-semibold data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+              >
+                Everyone
+              </TabsTrigger>
+              <TabsTrigger
+                value="watch"
+                aria-label="Watch and learn"
+                className="gap-1 rounded-full px-2 text-[13px] font-semibold data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+              >
+                <Play className="h-3.5 w-3.5 fill-current" aria-hidden />
+                Watch
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <Popover open={filtersOpen} onOpenChange={setFiltersOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant={filtersActive ? "secondary" : "outline"}
+                size="icon"
+                className="h-10 w-10 shrink-0 rounded-full sm:h-9 sm:w-9"
+                aria-expanded={filtersOpen}
+                aria-label="Filter feed"
+              >
+                <SlidersHorizontal className="h-4 w-4" aria-hidden />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="end"
+              sideOffset={8}
+              className="w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border-border/60 p-0 shadow-lg"
+            >
+              <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
+                <p className="text-sm font-semibold tracking-tight">Filter</p>
+                {filtersActive ? (
+                  <button
+                    type="button"
+                    className="text-[13px] font-semibold text-primary"
+                    onClick={clearFeedFilters}
+                  >
+                    Clear
+                  </button>
+                ) : (
+                  <span className="text-[13px] text-muted-foreground">All posts</span>
+                )}
+              </div>
+              <div className="max-h-[min(70dvh,28rem)] space-y-4 overflow-y-auto p-4">
+                <div className="relative">
+                  <SearchIcon
+                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                    aria-hidden
+                  />
+                  <Input
+                    value={feedSearch}
+                    onChange={(e) => setFeedSearch(e.target.value)}
+                    placeholder="Search posts…"
+                    className="h-11 rounded-xl border-border/70 bg-muted/30 pl-9 pr-3"
+                    aria-label="Search posts"
+                    title="Search posts (header search finds people by @handle)"
+                  />
+                </div>
+                <label className="flex items-center gap-3 rounded-xl border border-border/60 bg-background px-3 py-2.5">
+                  <Bookmark className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                  <span className="min-w-0 flex-1 text-sm font-medium">Saved posts</span>
+                  <Switch
+                    checked={savedOnly}
+                    data-testid="button-saved-filter-desktop"
+                    aria-label={savedOnly ? "Saved posts filter on" : "Show saved posts"}
+                    onCheckedChange={(checked) => {
+                      setSavedOnly(checked);
+                      if (checked) setTopicFilter(null);
+                    }}
+                  />
+                </label>
+                <div>
+                  <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    Topics
+                  </p>
+                  <div role="group" aria-label="Feed topics" className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      aria-pressed={topicFilter === null && !savedOnly}
+                      className={cn(
+                        "rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors",
+                        topicFilter === null && !savedOnly
+                          ? "border-foreground bg-foreground text-background"
+                          : "border-border/70 bg-background text-foreground/80 hover:bg-muted/50",
+                      )}
+                      onClick={() => {
+                        setTopicFilter(null);
+                        setSavedOnly(false);
+                      }}
+                    >
+                      All topics
+                    </button>
+                    {orderedTopics.map((topic) => (
+                      <button
+                        key={topic.id}
+                        type="button"
+                        aria-pressed={topicFilter === topic.id && !savedOnly}
+                        className={cn(
+                          "rounded-full border px-3 py-1.5 text-left text-[13px] font-medium transition-colors",
+                          topicFilter === topic.id && !savedOnly
+                            ? "border-foreground bg-foreground text-background"
+                            : "border-border/70 bg-background text-foreground/80 hover:bg-muted/50",
+                        )}
+                        onClick={() => {
+                          setTopicFilter(topic.id);
+                          setSavedOnly(false);
+                        }}
+                      >
+                        {topic.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
-
-        {isMobile && !savedOnly ? (
-          <div
-            role="tablist"
-            aria-label="Feed topics"
-            className="-mx-1 flex gap-1.5 overflow-x-auto px-0.5 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-          >
+        {filtersActive ? (
+          <div className="flex h-8 w-fit max-w-full items-center rounded-full bg-muted pl-3 pr-0.5 text-xs font-medium text-foreground">
+            <button type="button" className="min-w-0 truncate" onClick={() => setFiltersOpen(true)}>
+              {activeFilterLabel}
+            </button>
             <button
               type="button"
-              role="tab"
-              aria-selected={topicFilter === null}
-              className={cn(
-                "shrink-0 rounded-full px-3 py-1.5 text-[13px] font-medium",
-                topicFilter === null
-                  ? "bg-foreground text-background"
-                  : "bg-muted/70 text-muted-foreground",
-              )}
-              onClick={() => setTopicFilter(null)}
+              className="ml-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
+              aria-label="Clear feed filters"
+              onClick={clearFeedFilters}
             >
-              All
+              <X className="h-3.5 w-3.5" aria-hidden />
             </button>
-            {orderedTopics.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                role="tab"
-                aria-selected={topicFilter === t.id}
-                className={cn(
-                  "shrink-0 rounded-full px-3 py-1.5 text-[13px] font-medium",
-                  topicFilter === t.id
-                    ? "bg-foreground text-background"
-                    : "bg-muted/70 text-muted-foreground",
-                )}
-                onClick={() => {
-                  setTopicFilter(t.id);
-                  setSavedOnly(false);
-                }}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
-        ) : null}
-
-        <div
-          role="tablist"
-          aria-label="Feed topics"
-          className="hidden flex-wrap gap-2 rounded-xl bg-muted/25 px-1 py-1.5 dark:bg-muted/15 md:flex"
-        >
-          <Button
-            type="button"
-            role="tab"
-            aria-selected={topicFilter === null && !savedOnly}
-            variant={topicFilter === null && !savedOnly ? "default" : "outline"}
-            size="sm"
-            className="shrink-0 rounded-full"
-            onClick={() => {
-              setTopicFilter(null);
-              setSavedOnly(false);
-            }}
-          >
-            All topics
-          </Button>
-          {orderedTopics.map((t) => (
-            <Button
-              key={t.id}
-              type="button"
-              role="tab"
-              aria-selected={topicFilter === t.id && !savedOnly}
-              variant={topicFilter === t.id && !savedOnly ? "default" : "outline"}
-              size="sm"
-              className="max-w-[14rem] shrink-0 whitespace-normal rounded-full text-balance text-center leading-snug"
-              onClick={() => {
-                setTopicFilter(t.id);
-                setSavedOnly(false);
-              }}
-            >
-              {t.label}
-            </Button>
-          ))}
-        </div>
-
-        {isMobile && feedSearchExpanded ? (
-          <div className="flex items-center gap-1.5">
-            <div className="relative min-w-0 flex-1">
-              <SearchIcon
-                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                aria-hidden
-              />
-              <Input
-                value={feedSearch}
-                onChange={(e) => setFeedSearch(e.target.value)}
-                placeholder="Search posts…"
-                className="h-10 rounded-2xl pl-9 pr-3"
-                aria-label="Search posts"
-                title="Search posts (header search finds people by @handle)"
-              />
-            </div>
-            <Button
-              type="button"
-              variant={savedOnly ? "secondary" : "outline"}
-              size="icon"
-              className="h-10 w-10 shrink-0 rounded-2xl"
-              aria-pressed={savedOnly}
-              aria-label={savedOnly ? "Saved posts filter on" : "Show saved posts"}
-              onClick={() => {
-                setSavedOnly((s) => {
-                  const next = !s;
-                  if (next) setTopicFilter(null);
-                  return next;
-                });
-              }}
-            >
-              <Bookmark className="h-4 w-4" aria-hidden />
-            </Button>
-          </div>
-        ) : null}
-
-        {isMobile && !feedSearchExpanded && (savedOnly || feedSearch.trim()) ? (
-          <button
-            type="button"
-            className="flex h-8 max-w-full items-center truncate rounded-full bg-muted/50 px-3 text-left text-xs font-medium text-foreground"
-            onClick={() => setFeedSearchExpanded(true)}
-          >
-            {savedOnly ? "Saved" : "Posts"}
-            {feedSearch.trim() ? ` · ${feedSearch.trim()}` : ""}
-          </button>
-        ) : null}
-
-        {!isMobile ? (
-          <div className="flex items-center gap-2">
-            <div className="relative min-w-0 flex-1">
-              <SearchIcon
-                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                aria-hidden
-              />
-              <Input
-                value={feedSearch}
-                onChange={(e) => setFeedSearch(e.target.value)}
-                placeholder="Search posts…"
-                className="h-11 pl-9 pr-3 rounded-2xl"
-                aria-label="Search posts"
-                title="Search posts (header search finds people by @handle)"
-              />
-            </div>
-            <Button
-              type="button"
-              variant={savedOnly ? "secondary" : "outline"}
-              size="sm"
-              className="h-9 shrink-0 rounded-full"
-              aria-pressed={savedOnly}
-              aria-label={savedOnly ? "Saved posts filter on" : "Show saved posts"}
-              onClick={() => {
-                setSavedOnly((s) => {
-                  const next = !s;
-                  if (next) setTopicFilter(null);
-                  return next;
-                });
-              }}
-              data-testid="button-saved-filter-desktop"
-            >
-              <Bookmark className="h-4 w-4 mr-2" aria-hidden />
-              Saved
-            </Button>
           </div>
         ) : null}
       </div>
@@ -1002,7 +930,6 @@ export default function CommunityHomePage() {
         searchQuery={feedSearch}
         pageSize={PAGE_SIZE}
         topicsForSelect={orderedTopics}
-        showRefreshButton={!isMobile}
         feedTab={feedTab}
         topicFilter={topicFilter}
         followingAuthorIds={followingAuthorIds}
@@ -1016,10 +943,7 @@ export default function CommunityHomePage() {
           setTopicFilter(null);
           setSavedOnly(false);
         }}
-        onClearSearch={() => {
-          setFeedSearch("");
-          setFeedSearchExpanded(false);
-        }}
+        onClearSearch={() => setFeedSearch("")}
         onExploreTopicInEveryone={(tid) => {
           setFeedTab("everyone");
           setTopicFilter(tid);
