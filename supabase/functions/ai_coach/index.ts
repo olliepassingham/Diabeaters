@@ -10,7 +10,8 @@
  */
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { matchAppGuide } from "../_shared/ai-coach/appGuides.ts";
-import { packContext } from "../_shared/ai-coach/contextPacker.ts";
+import { ageInWholeYearsUtc, packContext } from "../_shared/ai-coach/contextPacker.ts";
+import { matchAppNavigation } from "../_shared/ai-coach/navigation.ts";
 import {
   loadCoachScenarioFlags,
   loadCoachSuppliesSummary,
@@ -502,6 +503,44 @@ Deno.serve(async (req: Request) => {
       return jsonResponse(429, { success: false, error: "rate_limited", ...out });
     }
 
+    /**
+     * Navigation runs before the keyword interceptor so a question like
+     * "where do I find my hypo history?" reaches the hypo-history screen
+     * instead of the acute response. The matcher itself returns null for
+     * acute self-reports ("I'm having a hypo…"), so safety interception
+     * still wins whenever the user describes symptoms.
+     */
+    const clinical = await loadCoachClinicalExtras(admin, userId);
+    /**
+     * DOB is *only* read from the authenticated user's `profiles` row. When
+     * the row has no DOB on file, the age is null and the navigation
+     * matcher (like the context packer) treats adult-only routes as
+     * default-deny until a date of birth is saved.
+     */
+    const dateOfBirth =
+      typeof clinical.date_of_birth === "string" && clinical.date_of_birth.trim().length > 0
+        ? clinical.date_of_birth.trim()
+        : null;
+
+    const navReply = matchAppNavigation(message, {
+      ageYears: ageInWholeYearsUtc(dateOfBirth, new Date()),
+    });
+    if (navReply) {
+      const out: CoachResponse = { ...navReply, category: "llm", postFilter: "n/a" };
+      await insertAudit(admin, {
+        user_id: userId,
+        category: "llm",
+        deferred: false,
+        post_filter_status: "n/a",
+        latency_ms: Date.now() - t0,
+        tokens_in: null,
+        tokens_out: null,
+        model: null,
+        prompt_chars: message.length,
+      });
+      return jsonResponse(200, { success: true, ...out });
+    }
+
     const hit = intercept(message);
     if (hit) {
       const det = deterministicResponse(hit.category);
@@ -578,17 +617,6 @@ Deno.serve(async (req: Request) => {
       return jsonResponse(503, { success: false, error: "openai_not_configured" });
     }
 
-    const clinical = await loadCoachClinicalExtras(admin, userId);
-    /**
-     * DOB is *only* read from the authenticated user's `profiles` row. When the
-     * row has no DOB on file, the context packer returns the `unknown` band and
-     * the system prompt treats the user as default-deny under-18 for adult-only
-     * routes (see Phase 2).
-     */
-    const dateOfBirth =
-      typeof clinical.date_of_birth === "string" && clinical.date_of_birth.trim().length > 0
-        ? clinical.date_of_birth.trim()
-        : null;
     /**
      * Audience is derived from `carer_links`: a caller who has not been linked
      * as a carer for any patient cannot run as `supporter` even if they ask to.

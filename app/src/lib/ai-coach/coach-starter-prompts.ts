@@ -42,6 +42,7 @@ const STARTER_POOLS: Record<CoachTopicSlug, StarterEntry[]> = {
     { text: "How might supporters help during a hypo without taking over someone's plan?", boost: ["evening"] },
   ],
   general: [
+    { text: "Where do I find my hypo history?" },
     { text: "What should I bring to a routine diabetes clinic appointment?", boost: ["morning", "afternoon"] },
     { text: "How can I describe glucose patterns to my team without focusing on exact numbers?" },
     { text: "What questions are useful to ask about sick day rules before I need them?" },
