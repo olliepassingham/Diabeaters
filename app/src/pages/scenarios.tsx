@@ -220,7 +220,11 @@ export default function Scenarios() {
 
   return (
     <PageShell variant="standard" density="compact" className="space-y-3 pt-0">
-      <h1 className="sr-only">Guides</h1>
+      <div className="px-0.5 pb-1">
+        <h1 className="font-display text-[1.7rem] font-semibold leading-tight tracking-tight text-foreground">
+          Guides
+        </h1>
+      </div>
 
       <DobUnknownNotice testId="guides-dob-unknown-notice" />
       <OfflineDeviceNotice />

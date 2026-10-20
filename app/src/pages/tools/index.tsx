@@ -18,7 +18,9 @@ import {
   ArrowLeftRight,
   History,
   Car,
+  Search,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { HubListPanel, HubListRow, type HubListAccent, type HubListTone } from "@/components/hub-list-panel";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -356,10 +358,12 @@ function Type2ToolsHub({
   careTools,
   helperTools,
   about,
+  query = "",
 }: {
   careTools: ToolDef[];
   helperTools: ToolDef[];
   about: React.ReactNode;
+  query?: string;
 }) {
   const dob = storage.getProfile()?.dateOfBirth;
   const situationTools: ToolDef[] = [];
@@ -373,6 +377,9 @@ function Type2ToolsHub({
       description: "A short readiness check before you go",
     });
   }
+  const visibleSituationTools = situationTools.filter(
+    (tool) => !query || `${tool.title} ${tool.description}`.toLowerCase().includes(query),
+  );
 
   return (
     <div className="space-y-5">
@@ -393,11 +400,11 @@ function Type2ToolsHub({
           </HubListPanel>
         </section>
       ) : null}
-      {situationTools.length > 0 ? (
+      {visibleSituationTools.length > 0 ? (
         <section className="space-y-3" data-testid="tools-section-type2-situations">
           <SectionHeader title="Situation guides" />
           <HubListPanel label="Situation guides">
-            <ToolRows tools={situationTools} tone="guide" accent="teal" />
+            <ToolRows tools={visibleSituationTools} tone="guide" accent="teal" />
           </HubListPanel>
         </section>
       ) : null}
@@ -502,22 +509,23 @@ export function ToolsHubPage({
   const supporterTools =
     hubVariant === "carer" || hubVariant === "community" ? ([...actNow, ...learn] as ToolDef[]) : [];
 
-  const patientSections = TOOLS_HUB_SECTIONS.filter((section) => {
-    if (section.id === "act-now") return actNow.length > 0;
-    if (section.id === "plan") return plan.length > 0;
-    return learn.length > 0;
-  });
-  const [patientSection, setPatientSection] = useState<ToolsHubSection>("act-now");
-  const activePatientSection = patientSections.some((section) => section.id === patientSection)
-    ? patientSection
-    : patientSections[0]?.id ?? "act-now";
-  const activePatientTools =
-    activePatientSection === "plan" ? plan : activePatientSection === "learn" ? learn : actNow;
-  const activePatientTone: HubListTone = activePatientSection === "act-now" ? "accent" : "quiet";
-  const activePatientAccent: HubListAccent =
-    activePatientSection === "plan" ? "sky" : activePatientSection === "learn" ? "gold" : "teal";
-  const activePatientLabel =
-    TOOLS_HUB_SECTIONS.find((section) => section.id === activePatientSection)?.label ?? "Act now";
+  const [toolsQuery, setToolsQuery] = useState("");
+  const normalizedQuery = toolsQuery.trim().toLowerCase();
+  const matchesTool = (tool: ToolDef) =>
+    !normalizedQuery || `${tool.title} ${tool.description}`.toLowerCase().includes(normalizedQuery);
+
+  const patientSectionTools: { id: ToolsHubSection; label: string; tools: ToolDef[]; tone: HubListTone; accent: HubListAccent }[] =
+    TOOLS_HUB_SECTIONS.map((section) => ({
+      ...section,
+      tools: (section.id === "act-now" ? actNow : section.id === "plan" ? plan : learn).filter(matchesTool),
+      tone: section.id === "act-now" ? ("accent" as HubListTone) : ("quiet" as HubListTone),
+      accent: (section.id === "plan" ? "sky" : section.id === "learn" ? "gold" : "teal") as HubListAccent,
+    })).filter((section) => section.tools.length > 0);
+
+  const filteredSupporterTools = supporterTools.filter(matchesTool);
+  const filteredType2Care = type2Care.filter(matchesTool);
+  const filteredType2Helpers = type2Helpers.filter(matchesTool);
+  const noPatientMatches = hubVariant === "patient" && patientSectionTools.length === 0;
 
   return (
     <PageShell
@@ -531,13 +539,36 @@ export function ToolsHubPage({
       <RatiosSetupNotice hidden={hubVariant !== "patient"} testId="tools-ratios-setup-notice" />
       <OfflineDeviceNotice />
 
+      <div className="flex items-center gap-2">
+        <div className="relative min-w-0 flex-1">
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+            aria-hidden
+          />
+          <Input
+            value={toolsQuery}
+            onChange={(event) => setToolsQuery(event.target.value)}
+            placeholder="Search tools"
+            className="h-11 rounded-full pl-9"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            enterKeyHint="search"
+            aria-label="Search tools"
+            data-testid="input-tools-search"
+          />
+        </div>
+        {hubVariant === "patient" ? <ToolsAboutDialog hubVariant={hubVariant} /> : null}
+      </div>
+
       {hubVariant === "type2" ? (
         <Type2ToolsHub
-          careTools={type2Care}
-          helperTools={type2Helpers}
+          careTools={filteredType2Care}
+          helperTools={filteredType2Helpers}
           about={<ToolsAboutDialog hubVariant="type2" />}
+          query={normalizedQuery}
         />
-      ) : (hubVariant === "carer" || hubVariant === "community") && supporterTools.length > 0 ? (
+      ) : (hubVariant === "carer" || hubVariant === "community") && filteredSupporterTools.length > 0 ? (
         <section
           className="space-y-3 sm:space-y-4"
           aria-label={hubVariant === "community" ? "Community tools" : "Supporter tools"}
@@ -551,64 +582,36 @@ export function ToolsHubPage({
             <ToolsAboutDialog hubVariant={hubVariant} />
           </div>
           <HubListPanel label="Supporter tools">
-            <ToolRows tools={supporterTools} tone="accent" accent="teal" />
+            <ToolRows tools={filteredSupporterTools} tone="accent" accent="teal" />
           </HubListPanel>
         </section>
-      ) : (
-        <>
-          {patientSections.length > 0 ? (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <div
-                  role="tablist"
-                  aria-label="Tool groups"
-                  className="grid min-w-0 flex-1 gap-1 rounded-2xl bg-muted/60 p-1"
-                  style={{ gridTemplateColumns: `repeat(${patientSections.length}, minmax(0, 1fr))` }}
-                >
-                  {patientSections.map((section) => {
-                    const selected = section.id === activePatientSection;
-                    return (
-                      <button
-                        key={section.id}
-                        type="button"
-                        role="tab"
-                        id={`tools-tab-${section.id}`}
-                        aria-selected={selected}
-                        aria-controls={`tools-panel-${section.id}`}
-                        data-testid={`tools-tab-${section.id}`}
-                        className={cn(
-                          "h-10 rounded-xl px-2 text-sm font-semibold",
-                          selected
-                            ? "bg-background text-foreground shadow-sm"
-                            : "text-muted-foreground",
-                        )}
-                        onClick={() => {
-                          setPatientSection(section.id);
-                          void hapticLight();
-                        }}
-                      >
-                        {section.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                <ToolsAboutDialog hubVariant={hubVariant} />
-              </div>
-              <section
-                id={`tools-panel-${activePatientSection}`}
-                role="tabpanel"
-                aria-labelledby={`tools-tab-${activePatientSection}`}
-                aria-label={`${activePatientLabel} tools`}
-                data-testid={`tools-section-${activePatientSection}`}
-              >
-                <HubListPanel label={activePatientLabel}>
-                  <ToolRows tools={activePatientTools} tone={activePatientTone} accent={activePatientAccent} />
-                </HubListPanel>
-              </section>
-            </div>
+      ) : hubVariant === "patient" ? (
+        <div className="space-y-6">
+          {patientSectionTools.map((section) => (
+            <section
+              key={section.id}
+              aria-label={`${section.label} tools`}
+              data-testid={`tools-section-${section.id}`}
+              className="space-y-2.5"
+            >
+              <SectionHeader title={section.label} />
+              <HubListPanel label={section.label}>
+                <ToolRows tools={section.tools} tone={section.tone} accent={section.accent} />
+              </HubListPanel>
+            </section>
+          ))}
+          {noPatientMatches ? (
+            <p className="py-4 text-center text-sm text-muted-foreground" data-testid="tools-search-empty">
+              No tool matches “{toolsQuery.trim()}”. Try a shorter word.
+            </p>
           ) : null}
-        </>
-      )}
+        </div>
+      ) : null}
+      {(hubVariant === "carer" || hubVariant === "community") && normalizedQuery && filteredSupporterTools.length === 0 ? (
+        <p className="py-4 text-center text-sm text-muted-foreground" data-testid="tools-search-empty">
+          No tool matches “{toolsQuery.trim()}”. Try a shorter word.
+        </p>
+      ) : null}
       {hubVariant === "community" ? (
         <CommunityPushPromptDialog
           open={communityPushPromptOpen}

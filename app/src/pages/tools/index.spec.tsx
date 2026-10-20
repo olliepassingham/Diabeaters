@@ -32,27 +32,33 @@ describe("ToolsHubPage", () => {
     });
   });
 
-  it("renders patient sections without duplicate Most used; meal and ratios tool appears once", () => {
+  it("renders all patient sections stacked without duplicate Most used; meal and ratios tool appears once", () => {
     render(<ToolsHubPage hubVariant="patient" />);
 
     expect(screen.queryByTestId("tools-section-most-used")).toBeNull();
     expect(screen.queryByTestId("tools-section-act-now")).not.toBeNull();
-    expect(screen.queryByTestId("tools-section-plan")).toBeNull();
-    expect(screen.queryByTestId("tools-section-learn")).toBeNull();
+    expect(screen.queryByTestId("tools-section-plan")).not.toBeNull();
+    expect(screen.queryByTestId("tools-section-learn")).not.toBeNull();
     expect(screen.queryByTestId("tools-section-resources")).toBeNull();
+    expect(screen.queryByRole("tab", { name: "Plan" })).toBeNull();
 
     const titles = screen.getAllByRole("heading", { name: /meal.*ratios/i });
     expect(titles.length).toBe(1);
-    expect(screen.queryByRole("heading", { name: /hypo history/i })).toBeNull();
-
-    fireEvent.click(screen.getByRole("tab", { name: "Plan" }));
-    expect(screen.queryByTestId("tools-section-plan")).not.toBeNull();
     expect(screen.getByRole("heading", { name: /hypo history/i })).not.toBeNull();
-    expect(screen.queryByRole("heading", { name: /meal.*ratios/i })).toBeNull();
-
-    fireEvent.click(screen.getByRole("tab", { name: "Learn" }));
-    expect(screen.queryByTestId("tools-section-learn")).not.toBeNull();
     expect(screen.getByRole("heading", { name: /^education$/i })).not.toBeNull();
+  });
+
+  it("filters every section from the search field", () => {
+    render(<ToolsHubPage hubVariant="patient" />);
+
+    fireEvent.change(screen.getByTestId("input-tools-search"), { target: { value: "activity" } });
+
+    expect(screen.getByRole("heading", { name: /activity log/i })).not.toBeNull();
+    expect(screen.queryByRole("heading", { name: /meal.*ratios/i })).toBeNull();
+    expect(screen.queryByTestId("tools-section-act-now")).toBeNull();
+
+    fireEvent.change(screen.getByTestId("input-tools-search"), { target: { value: "zzzz" } });
+    expect(screen.getByTestId("tools-search-empty")).not.toBeNull();
   });
 
   it("supporter hub shows combined section and omits empty Plan", () => {

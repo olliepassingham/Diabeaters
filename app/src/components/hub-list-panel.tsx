@@ -60,13 +60,12 @@ export function HubListRow({
         onTouchStart={onWarm}
         onClick={onPress}
       >
-        <span className="hub-list-accent" aria-hidden />
         <span className="hub-icon-well" aria-hidden>
           <Icon className="h-5 w-5" />
         </span>
         <span className="hub-list-copy min-w-0">
-          <h3 className="truncate font-display text-h3 font-semibold text-foreground">{title}</h3>
-          <span className="mt-0.5 block text-sm leading-snug text-muted-foreground">{description}</span>
+          <h3 className="truncate text-[1.05rem] font-semibold leading-tight text-foreground">{title}</h3>
+          <span className="mt-0.5 block text-[13px] leading-snug text-muted-foreground">{description}</span>
         </span>
         <ChevronRight
           className="hub-list-chevron h-[1.125rem] w-[1.125rem] shrink-0 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5"

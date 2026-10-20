@@ -1102,21 +1102,21 @@
   }
 }
 
-/* Separate list cards. Each one carries the short guide colour line. */
+/* One grouped list surface, iOS style: hairline rows, no per-row cards. */
 .hub-list-panel {
   display: flex;
   flex-direction: column;
-  gap: 0.7rem;
-}
-
-.hub-list-panel-compact {
-  gap: 0.4rem;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid rgb(var(--color-border) / 0.5);
+  border-radius: 1.25rem;
+  background: rgb(var(--color-bg-card));
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
 }
 
 .hub-list-panel-compact .hub-list-row {
-  row-gap: 0.35rem;
-  min-height: 0;
-  padding: 0.5rem 0.85rem 0.55rem;
+  min-height: 3.75rem;
+  padding: 0.55rem 0.85rem;
 }
 
 .hub-accent-teal {
@@ -1183,49 +1183,25 @@
 }
 
 .hub-list-card {
-  overflow: hidden;
-  border-radius: 1.2rem;
+  background: transparent;
 }
 
-:root:not(.dark) .hub-list-card {
-  background: linear-gradient(180deg, var(--hub-wash) 0%, rgb(var(--color-bg-card)) 72%);
-  border: 1px solid var(--hub-edge);
-  box-shadow: 0 12px 28px -22px rgb(var(--color-primary));
-}
-
-.dark .hub-list-card {
-  background:
-    linear-gradient(180deg, var(--hub-wash) 0%, transparent 78%),
-    var(--surface-glass-bg);
-  -webkit-backdrop-filter: blur(var(--surface-glass-blur));
-  backdrop-filter: blur(var(--surface-glass-blur));
-  border: 1px solid var(--surface-glass-border);
-  box-shadow: var(--surface-glass-shadow);
+.hub-list-card + .hub-list-card {
+  border-top: 1px solid rgb(var(--color-border) / 0.45);
 }
 
 .hub-list-row {
   display: grid;
   grid-template-columns: 2.5rem minmax(0, 1fr) auto;
-  grid-template-areas:
-    "accent accent accent"
-    "icon copy chevron";
+  grid-template-areas: "icon copy chevron";
   column-gap: 0.75rem;
-  row-gap: 0.45rem;
   align-items: center;
-  min-height: 4.75rem;
-  padding: 0.7rem 0.9rem 0.8rem;
+  min-height: 4rem;
+  padding: 0.65rem 0.9rem;
 }
 
-:root:not(.dark) .hub-list-row:hover {
-  background: rgb(255 255 255 / 0.45);
-}
-
-.hub-list-accent {
-  grid-area: accent;
-  width: 4.25rem;
-  height: 0.28rem;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--hub-from), var(--hub-to));
+.hub-list-row:hover {
+  background: rgb(var(--color-primary) / 0.04);
 }
 
 .hub-icon-well {
@@ -1236,16 +1212,12 @@
   align-items: center;
   justify-content: center;
   border-radius: 0.9rem;
-  background: var(--hub-wash);
-  color: var(--hub-ink);
-  box-shadow: inset 0 0 0 1px var(--hub-edge);
+  background: rgb(var(--color-primary) / 0.09);
+  color: rgb(var(--color-primary-dark));
+  box-shadow: none;
 }
 
 .dark .hub-icon-well {
-  color: var(--hub-from);
-}
-
-.dark .hub-list-card-steady .hub-icon-well {
   color: rgb(var(--color-primary));
 }
 
