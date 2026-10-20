@@ -667,7 +667,7 @@ export function FeedPostCard({
               <div className="flex min-w-0 items-baseline gap-x-1.5">
                 <Link
                   href={`/community/profile/${post.author_id}`}
-                  className="min-w-0 shrink truncate text-[15px] font-semibold leading-tight text-foreground hover:underline underline-offset-2"
+                  className="min-w-0 shrink truncate text-[15px] font-semibold leading-tight text-foreground hover:underline underline-offset-2 sm:max-w-[14rem] sm:shrink-0"
                 >
                   {authorDisplayName}
                 </Link>
@@ -695,12 +695,19 @@ export function FeedPostCard({
                 <span
                   data-testid="feed-post-topic"
                   title={topicLabel}
-                  className="min-w-0 truncate text-[12px] text-muted-foreground"
+                  className="hidden min-w-0 flex-1 truncate text-[12px] text-muted-foreground sm:inline"
                 >
                   · {topicLabel}
                   {post.audience === "followers" ? " · Followers" : ""}
                 </span>
               </div>
+              <p
+                className="truncate text-[12px] leading-tight text-muted-foreground sm:hidden"
+                title={topicLabel}
+              >
+                {topicLabel}
+                {post.audience === "followers" ? " · Followers" : ""}
+              </p>
               {contentNoteLabel ? (
                 <p
                   data-testid="feed-post-content-note"
