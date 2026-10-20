@@ -56,24 +56,23 @@ export function HomeSupplyGraph({ supplies }: { supplies: Supply[] }) {
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
-              <Package className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+              <Package className="h-4 w-4 text-muted-foreground" aria-hidden />
               <h2
                 id="home-supply-title"
-                className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
+                className="font-sans text-[15px] font-semibold leading-tight tracking-normal text-foreground"
               >
                 Supply runway
               </h2>
             </div>
             {shortest ? (
-              <div className="mt-1 flex min-w-0 items-baseline gap-2">
-                <p className="font-display text-xl font-semibold leading-none tracking-tight tabular-nums text-foreground">
-                  {shortest.days > CHART_MAX_DAYS ? "90+" : shortest.days}
-                  <span className="ml-1 text-xs font-medium text-muted-foreground">
-                    {shortest.days === 1 ? "day shortest" : "days shortest"}
-                  </span>
-                </p>
-                <p className="min-w-0 truncate text-xs text-muted-foreground">{shortest.supply.name}</p>
-              </div>
+              <p className="mt-0.5 truncate text-[13px] leading-snug text-muted-foreground">
+                <span className="font-medium tabular-nums text-foreground">
+                  {shortest.days > CHART_MAX_DAYS ? "90+" : shortest.days}{" "}
+                  {shortest.days === 1 ? "day" : "days"}
+                </span>
+                {" · "}
+                {shortest.supply.name}
+              </p>
             ) : (
               <p className="mt-1 text-sm text-muted-foreground">
                 {supplies.length ? "Add usage details for runway estimates" : "No supplies tracked yet"}
@@ -99,12 +98,12 @@ export function HomeSupplyGraph({ supplies }: { supplies: Supply[] }) {
                     className="block rounded-lg py-0.5 transition-colors hover:bg-background/35"
                   >
                     <div className="flex items-baseline justify-between gap-3">
-                      <span className="min-w-0 truncate text-xs font-medium text-foreground/90">
+                      <span className="min-w-0 truncate text-sm font-medium text-foreground">
                         {supply.name}
                       </span>
                       <span
                         className={cn(
-                          "shrink-0 text-[11px] font-semibold tabular-nums",
+                          "shrink-0 text-[13px] font-medium tabular-nums",
                           status === "critical" && "text-red-600 dark:text-red-400",
                           status === "low" && "text-amber-700 dark:text-amber-400",
                           status === "ok" && "text-muted-foreground",

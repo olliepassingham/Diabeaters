@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation, useSearch } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, ArrowRight, X } from "lucide-react";
+import { AlertCircle, ArrowRight, LayoutGrid, X } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Link } from "wouter";
 import {
@@ -387,18 +387,15 @@ export default function Dashboard() {
             <HomeCommandHero
               profile={profile}
               scenarioState={scenarioState}
-              onEditWidgets={() => setWidgetsDialogOpen(true)}
               showCoach={showCoach}
               nextAction={homeNextAction}
               pill={homeNext.pill}
               liveGlucose={homeNext.glucose}
-            />
+            >
+              <HomeCgmGraph />
+            </HomeCommandHero>
           </div>
         ) : null}
-
-        {!isCommunityDash ? <HomeCgmGraph /> : null}
-
-        {!isCommunityDash ? <HomePumpCare /> : null}
 
         {!isCommunityDash ? <HomeNextUp suppressActionId={homeNextAction.id} /> : null}
 
@@ -444,6 +441,7 @@ export default function Dashboard() {
       />
 
       <section className="home-widget-flow" data-testid="dashboard-widgets">
+        {!isCommunityDash ? <HomePumpCare /> : null}
         {!isCommunityDash ? (
           <HomeMealMoment
             healthStatus={healthStatus}
@@ -477,6 +475,17 @@ export default function Dashboard() {
             );
           })}
         </div>
+        {!isCommunityDash ? (
+          <button
+            type="button"
+            className="mx-auto mt-2 flex h-11 items-center justify-center gap-2 px-4 text-sm font-medium text-muted-foreground"
+            onClick={() => setWidgetsDialogOpen(true)}
+            data-testid="button-customize"
+          >
+            <LayoutGrid className="h-4 w-4" aria-hidden />
+            Edit home
+          </button>
+        ) : null}
       </section>
 
       {widgetsToRender.length === 0 && isSettingsComplete && (

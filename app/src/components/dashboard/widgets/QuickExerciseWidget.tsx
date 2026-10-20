@@ -418,7 +418,7 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
                           </Badge>
                         ) : null}
                       </span>
-                      <span className="mt-0.5 block truncate text-[11px] leading-none text-muted-foreground">
+                      <span className="mt-0.5 block truncate text-[13px] leading-snug text-muted-foreground">
                         {exercise.durationMinutes} min · {exercise.intensity}
                       </span>
                     </span>

@@ -225,7 +225,7 @@ export function RatioAdviserWidget(_props: DashboardWidgetLayoutProps) {
                       <>
                         <span className="min-w-0 flex-1">
                           <span className="block text-sm font-medium leading-tight text-foreground">{r.label}</span>
-                          <span className="mt-0.5 block text-[11px] leading-tight text-muted-foreground">
+                          <span className="mt-0.5 block text-[13px] leading-snug text-muted-foreground">
                             Usual{" "}
                             <span className="tabular-nums line-through opacity-80">{base}</span>
                           </span>
@@ -236,7 +236,7 @@ export function RatioAdviserWidget(_props: DashboardWidgetLayoutProps) {
                       </>
                     ) : (
                       <>
-                        <span className="min-w-0 flex-1 truncate text-[11px] font-medium leading-none text-muted-foreground">
+                        <span className="min-w-0 flex-1 truncate text-sm font-medium leading-tight text-foreground">
                           {r.label}
                         </span>
                         <span className="shrink-0 text-sm font-bold tabular-nums leading-none tracking-tight text-foreground">
@@ -270,7 +270,7 @@ export function RatioAdviserWidget(_props: DashboardWidgetLayoutProps) {
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-sky-500/10 dark:bg-sky-500/15">
                       <RowIcon className="h-3 w-3 text-sky-600 dark:text-sky-400" aria-hidden />
                     </span>
-                    <span className="min-w-0 flex-1 truncate text-[11px] font-medium leading-none text-muted-foreground">
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium leading-tight text-foreground">
                       {label}
                     </span>
                     <span className="shrink-0 text-sm font-semibold tabular-nums leading-none text-foreground/90">

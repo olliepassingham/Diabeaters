@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useLocation } from "wouter";
-import { LayoutGrid, AlertCircle, Dumbbell, Minus, Moon, TrendingDown, TrendingUp } from "lucide-react";
+import { AlertCircle, Dumbbell, Minus, Moon, TrendingDown, TrendingUp } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,8 +35,6 @@ import { formatTargetBgInput } from "@/lib/hypo-context";
 import { normalizeBgUnits } from "@/lib/alcohol-night-tool";
 import type { HomeLiveGlucose } from "@/hooks/use-home-next-best-action";
 import type { HomeNextBestAction } from "@/lib/home-next-best-action";
-import { cn } from "@/lib/utils";
-
 function DashboardInfoDialog() {
   return (
     <PageInfoDialog title="About Your Dashboard" description="Your personal diabetes command centre">
@@ -61,19 +59,19 @@ function DashboardInfoDialog() {
 export function HomeCommandHero({
   profile,
   scenarioState,
-  onEditWidgets,
   showCoach,
   nextAction,
   pill,
   liveGlucose,
+  children,
 }: {
   profile: UserProfile | null;
   scenarioState: ScenarioState;
-  onEditWidgets: () => void;
   showCoach: boolean;
   nextAction: HomeNextBestAction;
   pill: { status: HealthStatus; label: string };
   liveGlucose: HomeLiveGlucose | null;
+  children?: ReactNode;
 }) {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
@@ -170,16 +168,16 @@ export function HomeCommandHero({
               <TodayActivityLink compact />
               <StagingChip />
             </div>
-            <div className="mt-2 flex flex-wrap items-center gap-2.5" data-testid="home-hero-status-row">
+            <div className="mt-2" data-testid="home-hero-status-row">
               <div data-testid="wrap-dashboard-status-pill">
                 <StatusPill status={pill.status} label={pill.label} />
               </div>
               {hasLiveBg && glucose ? (
                 <div
-                  className="flex items-baseline gap-1.5"
+                  className="mt-2 flex items-baseline gap-1.5"
                   data-testid="home-hero-bg"
                 >
-                  <span className="font-display text-2xl font-bold tabular-nums tracking-tight text-foreground sm:text-[1.75rem]">
+                  <span className="font-display text-5xl font-semibold tabular-nums leading-none tracking-[-0.04em] text-foreground">
                     {formatTargetBgInput(glucose.value, normalizeBgUnits(glucose.units))}
                   </span>
                   <span className="text-xs font-medium text-muted-foreground">
@@ -192,18 +190,8 @@ export function HomeCommandHero({
               ) : null}
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-1.5">
+          <div className="flex shrink-0 items-center">
             <DashboardInfoDialog />
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onEditWidgets}
-              className="h-10 w-10 rounded-full"
-              data-testid="button-customize"
-              aria-label="Customise dashboard widgets"
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </Button>
           </div>
         </div>
 
@@ -247,15 +235,18 @@ export function HomeCommandHero({
           </div>
         )}
 
-        <div className={cn("mt-3.5", !showScenarioChips && "mt-4")}>
-          <HomeActionDock
-            isUrgent={isUrgent}
-            showCoach={showCoach}
-            onTreatedHypo={handleTreatedHypoClick}
-            primary={nextAction}
-          />
-        </div>
       </header>
+
+      <div className="pb-1 pt-1">
+        <HomeActionDock
+          isUrgent={isUrgent}
+          showCoach={showCoach}
+          onTreatedHypo={handleTreatedHypoClick}
+          primary={nextAction}
+        />
+      </div>
+
+      {children}
 
       <LogHypoTreatmentSheet
         open={hypoDialogOpen}

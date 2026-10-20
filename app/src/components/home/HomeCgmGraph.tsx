@@ -7,7 +7,6 @@ import type { CgmChartPoint } from "@/lib/cgm/cgm-chart";
 import { getCgmLocalHistory } from "@/lib/cgm/cgm-history-store";
 import { convertGlucoseValue } from "@/lib/cgm/units";
 import type { BgUnits } from "@/lib/cgm/types";
-import { formatTargetBgInput } from "@/lib/hypo-context";
 import { resolveUserTargetBgRange } from "@/lib/target-bg-range";
 import { storage, DIABEATER_PROFILE_CHANGED_EVENT, DIABEATER_SETTINGS_CHANGED_EVENT } from "@/lib/storage";
 import { isPenDeliveryMethod } from "@/lib/insulin-delivery-method";
@@ -39,78 +38,6 @@ function localPoints(units: BgUnits): CgmChartPoint[] {
     valueMgDl: point.valueMgDl,
     trend: null,
   }));
-}
-
-function EmptyCgmChart({
-  units,
-  targetLow,
-  targetHigh,
-}: {
-  units: BgUnits;
-  targetLow: number;
-  targetHigh: number;
-}) {
-  const ticks = units === "mmol/L" ? [3, 6, 9, 12, 15] : [54, 108, 162, 216, 270];
-  const min = ticks[0]!;
-  const max = ticks[ticks.length - 1]!;
-  const y = (value: number) => 12 + (1 - (value - min) / (max - min)) * 154;
-
-  return (
-    <div className="relative mt-2" data-testid="home-cgm-empty-graph">
-      <svg
-        viewBox="0 0 320 200"
-        className="h-auto w-full min-h-[200px] text-muted-foreground"
-        role="img"
-        aria-label="Blank 12-hour glucose chart, connect CGM to add readings"
-      >
-        <rect
-          x="36"
-          y={y(targetHigh)}
-          width="274"
-          height={Math.max(0, y(targetLow) - y(targetHigh))}
-          rx="2"
-          fill="#10b981"
-          fillOpacity="0.08"
-        />
-        {ticks.map((tick) => (
-          <g key={tick}>
-            <line
-              x1="36"
-              y1={y(tick)}
-              x2="310"
-              y2={y(tick)}
-              stroke="currentColor"
-              strokeOpacity="0.12"
-              strokeDasharray="4 4"
-            />
-            <text x="30" y={y(tick) + 3} textAnchor="end" fontSize="9" fill="currentColor">
-              {units === "mmol/L" ? tick.toFixed(1) : tick}
-            </text>
-          </g>
-        ))}
-        {[36, 173, 310].map((x) => (
-          <line
-            key={x}
-            x1={x}
-            y1="12"
-            x2={x}
-            y2="166"
-            stroke="currentColor"
-            strokeOpacity="0.07"
-          />
-        ))}
-        <text x="36" y="190" textAnchor="start" fontSize="9" fill="currentColor" fillOpacity="0.8">
-          12h ago
-        </text>
-        <text x="173" y="190" textAnchor="middle" fontSize="9" fill="currentColor" fillOpacity="0.8">
-          6h ago
-        </text>
-        <text x="310" y="190" textAnchor="end" fontSize="9" fill="currentColor" fillOpacity="0.8">
-          Now
-        </text>
-      </svg>
-    </div>
-  );
 }
 
 export function HomeCgmGraph() {
@@ -170,13 +97,18 @@ export function HomeCgmGraph() {
     };
   }, []);
 
+  const showChart = points.length > 1 || Boolean(penUser && insulin.visible && insulin.xDomain);
+
   return (
     <section
-      className="relative overflow-hidden pb-6 pt-3"
+      className="relative overflow-hidden pb-2 pt-3"
       data-testid="home-cgm-graph"
-      aria-labelledby="home-cgm-title"
+      aria-labelledby={showChart ? "home-cgm-title" : undefined}
+      aria-label={showChart ? undefined : "Glucose"}
     >
-      <div className="mb-1 flex items-start justify-between gap-3 px-1">
+      <div className="mt-2 overflow-hidden rounded-2xl bg-muted/40 ring-1 ring-border/40">
+      {showChart ? (
+      <div className="mb-1 flex items-start justify-between gap-3 px-3 pt-3">
         <div>
           <div className="flex items-center gap-2">
             <Activity className="h-4 w-4 text-primary" aria-hidden />
@@ -188,17 +120,7 @@ export function HomeCgmGraph() {
             </h2>
           </div>
           {latest ? (
-            <div className="mt-2 flex items-end gap-2">
-              <p className="font-display text-5xl font-semibold leading-none tracking-[-0.04em] tabular-nums text-foreground">
-                {formatTargetBgInput(latest.value, units)}
-              </p>
-              <div className="pb-1">
-                <p className="text-sm font-medium text-muted-foreground">{units}</p>
-                <p className="text-[11px] text-muted-foreground">
-                  {sourceLabel ?? "On this device"}
-                </p>
-              </div>
-            </div>
+            <p className="mt-1 text-[11px] text-muted-foreground">{sourceLabel ?? "On this device"}</p>
           ) : null}
         </div>
         <div className="flex items-center gap-1">
@@ -224,8 +146,9 @@ export function HomeCgmGraph() {
           </Button>
         </div>
       </div>
+      ) : null}
 
-      {points.length > 1 || (penUser && insulin.visible && insulin.xDomain) ? (
+      {showChart ? (
         <CgmGlucoseChart
           points={points}
           units={units}
@@ -235,10 +158,10 @@ export function HomeCgmGraph() {
           insulinSeries={penUser && insulin.visible ? insulin.series : undefined}
           insulinMarks={penUser && insulin.visible ? insulin.marks : undefined}
           xDomain={penUser && insulin.visible ? insulin.xDomain ?? undefined : undefined}
-          className="-mx-1 w-[calc(100%+0.5rem)] [&_svg]:min-h-[220px] [&>p]:hidden"
+          className="w-full px-1 [&_svg]:min-h-[200px] [&>p]:hidden"
         />
       ) : null}
-      {points.length <= 1 && penUser && insulin.visible && insulin.xDomain ? (
+      {showChart && points.length <= 1 ? (
         <p className="text-center text-xs text-muted-foreground">
           {connected ? (
             "Glucose readings will appear on this graph once they arrive."
@@ -252,39 +175,47 @@ export function HomeCgmGraph() {
           )}
         </p>
       ) : null}
-      {points.length > 1 || (penUser && insulin.visible && insulin.xDomain) ? null : (
+      {showChart ? null : (
         <Link
           href={connected ? "/tools/cgm-live" : "/settings/cgm"}
-          className="group block"
+          className="flex items-center gap-3 px-3 py-3"
+          data-testid="home-cgm-empty-graph"
         >
-          <EmptyCgmChart units={units} targetLow={target.low} targetHigh={target.high} />
-          <div className="-mt-1 space-y-1.5 text-center">
-            <p className="text-sm font-semibold text-primary transition-opacity group-hover:opacity-80">
-              {connected && loading ? "Loading your glucose" : connected ? "Waiting for the first readings" : "Connect your CGM"}
-            </p>
-            <p className="mx-auto max-w-[20rem] text-xs leading-snug text-muted-foreground">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Activity className="h-4 w-4" aria-hidden />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-foreground">
+              {connected && loading ? "Loading your glucose" : connected ? "Waiting for readings" : "Connect your CGM"}
+            </span>
+            <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
               {connected && loading
                 ? "The latest readings are on the way."
                 : connected
-                  ? "Once readings arrive, this chart tells a short story of in-range, above, and below — education only."
-                  : "Link Dexcom, Libre, or phone health in Settings. One connection fills this chart with your day."}
-            </p>
-          </div>
+                  ? "They will draw this 12-hour chart."
+                  : "Dexcom, Libre, or phone health."}
+            </span>
+          </span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
         </Link>
       )}
 
       {penUser ? (
-        <InsulinChartControls
-          visible={insulin.visible}
-          hasDoses={insulin.hasDoses}
-          remaining={insulin.remaining}
-          runsOutLabel={insulin.runsOutLabel}
-          longActingUnits={usualLongActingUnits(
-            storage.getSettings().longActingUnitsPerDay,
-            storage.getSettings().longActingInjectionsPerDay,
-          )}
-        />
+        <>
+          <div className="mx-3 border-t border-border/60" />
+          <InsulinChartControls
+            visible={insulin.visible}
+            hasDoses={insulin.hasDoses}
+            remaining={insulin.remaining}
+            runsOutLabel={insulin.runsOutLabel}
+            longActingUnits={usualLongActingUnits(
+              storage.getSettings().longActingUnitsPerDay,
+              storage.getSettings().longActingInjectionsPerDay,
+            )}
+          />
+        </>
       ) : null}
+      </div>
 
       {history.error && savedPoints.length > 1 ? (
         <p className="mt-1 text-center text-xs text-muted-foreground">

@@ -103,9 +103,38 @@ export function HomeActionDock({
     </>
   );
 
+  const primaryIsHelpNow = primary.id === "help_now" || primary.kind === "help";
+
   return (
     <div className="space-y-3 px-1" data-testid="home-action-dock">
-      {primary.kind === "link" && primaryHref ? (
+      <div className="grid grid-cols-2 gap-2" data-testid="home-action-overflow">
+        <Button
+          asChild
+          variant="outline"
+          className={cn(
+            "h-12 rounded-2xl border-red-500/25 bg-red-500/[0.07] text-sm font-semibold text-red-800 shadow-none hover:bg-red-500/[0.12] dark:text-red-200",
+            isUrgent && "ring-1 ring-red-500/30",
+          )}
+        >
+          <Link href="/help-now" data-testid="button-help-now" onPointerDown={() => void hapticLight()}>
+            <Phone className="mr-2 h-4 w-4" aria-hidden />
+            Help Now
+          </Link>
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          className="h-12 rounded-2xl border-emerald-500/25 bg-emerald-500/[0.07] text-sm font-semibold text-emerald-900 shadow-none hover:bg-emerald-500/[0.12] dark:text-emerald-200"
+          onClick={onTreatedHypo}
+          data-testid="button-dashboard-treated-hypo"
+          onPointerDown={() => void hapticLight()}
+        >
+          <CheckCircle2 className="mr-2 h-4 w-4" aria-hidden />
+          Treated a hypo
+        </Button>
+      </div>
+
+      {primaryIsHelpNow ? null : primary.kind === "link" && primaryHref ? (
         <Link
           href={primaryHref}
           className={primaryClass}
@@ -135,51 +164,17 @@ export function HomeActionDock({
         </button>
       )}
 
-      <div className="grid grid-cols-2 gap-2" data-testid="home-action-overflow">
-        <Button
-          asChild
-          variant="outline"
-          className={cn(
-            "h-12 rounded-2xl border-red-500/25 bg-red-500/[0.07] text-sm font-semibold text-red-800 shadow-none hover:bg-red-500/[0.12] dark:text-red-200",
-            isUrgent && "ring-1 ring-red-500/30",
-          )}
-        >
-          <Link href="/help-now" data-testid="button-help-now" onPointerDown={() => void hapticLight()}>
-            <Phone className="mr-2 h-4 w-4" aria-hidden />
-            Help Now
-          </Link>
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          className="h-12 rounded-2xl border-emerald-500/25 bg-emerald-500/[0.07] text-sm font-semibold text-emerald-900 shadow-none hover:bg-emerald-500/[0.12] dark:text-emerald-200"
-          onClick={onTreatedHypo}
-          data-testid="button-dashboard-treated-hypo"
-          onPointerDown={() => void hapticLight()}
-        >
-          <CheckCircle2 className="mr-2 h-4 w-4" aria-hidden />
-          Treated a hypo
-        </Button>
-      </div>
-
       {showCoach && primary.id !== "coach" ? (
-        <div className="flex justify-center">
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="h-9 rounded-full px-3 text-xs font-medium text-muted-foreground hover:text-foreground"
-          >
-            <Link
-              href={coachHref}
-              data-testid="link-dashboard-coach-open"
-              onPointerDown={() => void hapticLight()}
-            >
-              <MessageCircle className="mr-1.5 h-3.5 w-3.5" aria-hidden />
-              {openAssistantCtaLabel()}
-            </Link>
-          </Button>
-        </div>
+        <Link
+          href={coachHref}
+          data-testid="link-dashboard-coach-open"
+          onPointerDown={() => void hapticLight()}
+          className="flex items-center gap-3 rounded-2xl px-1 py-1 text-sm text-muted-foreground"
+        >
+          <MessageCircle className="h-4 w-4 shrink-0" aria-hidden />
+          <span className="min-w-0 flex-1 font-medium">{openAssistantCtaLabel()}</span>
+          <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
+        </Link>
       ) : null}
     </div>
   );

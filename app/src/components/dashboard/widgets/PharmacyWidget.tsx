@@ -73,15 +73,15 @@ export function PharmacyWidget(_props: DashboardWidgetLayoutProps) {
         ) : (
           <div className="flex items-center justify-between gap-3 py-1">
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-foreground">{pharmacy.name}</p>
+              <p className="truncate text-[15px] font-medium text-foreground">{pharmacy.name}</p>
               {pharmacy.addressLine ? (
-                <p className="truncate text-xs text-muted-foreground">{pharmacy.addressLine}</p>
+                <p className="truncate text-[13px] text-muted-foreground">{pharmacy.addressLine}</p>
               ) : (
                 <p className="text-xs text-muted-foreground">Primary pharmacy</p>
               )}
             </div>
             {status ? (
-              <span className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <span className="flex shrink-0 items-center gap-1.5 text-[13px] font-medium text-muted-foreground">
                 <span className={cn("h-2 w-2 rounded-full", status.open ? "bg-emerald-500" : "bg-muted-foreground/50")} />
                 {status.line}
               </span>

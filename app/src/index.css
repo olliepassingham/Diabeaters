@@ -378,6 +378,16 @@
     isolation: isolate;
     margin-top: -0.25rem;
     padding: 0 0 2rem;
+    font-family: var(--font-sans);
+  }
+
+  /* Widget titles were Outfit at mixed sizes. On the phone home they use the same face as the rest of the screen. */
+  .home-widget-flow .font-display {
+    font-family: var(--font-sans);
+    font-size: 0.9375rem;
+    line-height: 1.25rem;
+    font-weight: 600;
+    letter-spacing: 0;
   }
 
   .home-widget-flow::before {

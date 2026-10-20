@@ -68,10 +68,10 @@ export function TipOfDayWidget(_props: DashboardWidgetLayoutProps) {
         </div>
       </CardHeader>
       <CardContent className={`${widgetContentClass} space-y-2`}>
-        <p className="max-w-3xl text-sm leading-relaxed text-foreground/90 sm:text-base" data-testid="text-tip-content">
+        <p className="max-w-3xl text-[15px] leading-relaxed text-foreground" data-testid="text-tip-content">
           {tip?.text}
         </p>
-        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-700/80 dark:text-amber-300/80" data-testid="text-tip-category">
+        <p className="text-[13px] font-medium text-muted-foreground" data-testid="text-tip-category">
           {tip ? CATEGORY_LABELS[tip.category] || tip.category : ""}
         </p>
       </CardContent>

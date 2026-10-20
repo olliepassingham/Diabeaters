@@ -161,8 +161,8 @@ export function AppointmentsWidget(props: DashboardWidgetLayoutProps) {
         {appointments.length === 0 ? (
           <div className="flex items-center justify-between gap-3 py-3">
             <div className="min-w-0">
-              <p className="text-sm font-medium text-foreground">No upcoming appointments</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">Your next clinic visit will appear here.</p>
+              <p className="text-[15px] font-medium text-foreground">No upcoming appointments</p>
+              <p className="mt-0.5 text-[13px] text-muted-foreground">Your next clinic visit will appear here.</p>
             </div>
             <Button asChild variant="ghost" size="sm" className="shrink-0 rounded-full text-blue-700 hover:bg-blue-500/10 dark:text-blue-300">
               <Link href="/appointments" data-testid="button-add-appointment-widget">
@@ -191,7 +191,7 @@ export function AppointmentsWidget(props: DashboardWidgetLayoutProps) {
                         <span className="text-2xl font-semibold tabular-nums text-foreground leading-none">
                           {format(d, "d")}
                         </span>
-                        <span className="text-tiny font-medium uppercase tracking-wide text-muted-foreground mt-1">{format(d, "MMM")}</span>
+                        <span className="mt-1 text-[13px] font-medium text-muted-foreground">{format(d, "MMM")}</span>
                       </>
                     ) : (
                       <span className="text-small font-medium text-muted-foreground text-center">—</span>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Syringe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -57,48 +57,64 @@ export function InsulinChartControls({
     setOpen(false);
   };
 
+  const onBoard = hasDoses && visible;
+  const title = onBoard
+    ? remaining > 0.05
+      ? `${remaining.toFixed(1)}u still working`
+      : "Rapid insulin has run out"
+    : hasDoses
+      ? "Insulin hidden"
+      : "Insulin";
+  const detail = onBoard
+    ? runsOutLabel ?? "Shown on this graph"
+    : hasDoses
+      ? "Hidden on this graph"
+      : "Add a dose to this graph";
+
   return (
-    <div className="mt-1 px-1" data-testid="insulin-chart-controls">
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          {hasDoses && visible ? (
-            <p className="text-sm leading-tight" data-testid="insulin-chart-caption">
-              <span className="font-semibold tabular-nums text-amber-700 dark:text-amber-400">
-                {remaining > 0.05 ? `${remaining.toFixed(1)}u still working` : "Rapid insulin has run out"}
-              </span>
-              {runsOutLabel ? <span className="mt-0.5 block text-[13px] text-muted-foreground">{runsOutLabel}</span> : null}
-            </p>
-          ) : (
-            <p className="text-sm font-medium text-foreground" data-testid="insulin-chart-caption">
-              {hasDoses ? "Insulin hidden" : "Insulin"}
-            </p>
-          )}
-        </div>
-        <div className="flex shrink-0 items-center gap-1">
-          {hasDoses ? (
-            <button
-              type="button"
-              className="h-9 rounded-full px-3 text-[13px] font-medium text-muted-foreground"
-              onClick={() => setInsulinChartVisible(!visible)}
-              data-testid="button-toggle-insulin-chart"
+    <div data-testid="insulin-chart-controls">
+      <div className="flex items-center gap-2 px-3 py-2">
+        <button
+          type="button"
+          className="flex min-w-0 flex-1 items-center gap-2 text-left"
+          onClick={() => (open ? setOpen(false) : openForm())}
+          data-testid="button-add-insulin-dose"
+          aria-expanded={open}
+        >
+          <Syringe className="h-3.5 w-3.5 shrink-0 text-amber-700 dark:text-amber-300" aria-hidden />
+          <span className="min-w-0 flex-1">
+            <span
+              className={cn(
+                "block truncate text-[13px] font-medium",
+                onBoard ? "tabular-nums text-amber-800 dark:text-amber-200" : "text-foreground",
+              )}
+              data-testid="insulin-chart-caption"
             >
-              {visible ? "Hide" : "Show"}
-            </button>
-          ) : null}
+              {onBoard || hasDoses ? title : "Add insulin"}
+            </span>
+            {onBoard || hasDoses ? (
+              <span className="block truncate text-[11px] text-muted-foreground">{detail}</span>
+            ) : null}
+          </span>
+          <Plus
+            className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-45")}
+            aria-hidden
+          />
+        </button>
+        {hasDoses ? (
           <button
             type="button"
-            className="inline-flex h-9 items-center gap-1 rounded-full bg-foreground/[0.05] px-3 text-[13px] font-medium text-foreground"
-            onClick={() => (open ? setOpen(false) : openForm())}
-            data-testid="button-add-insulin-dose"
+            className="shrink-0 text-[12px] font-medium text-muted-foreground"
+            onClick={() => setInsulinChartVisible(!visible)}
+            data-testid="button-toggle-insulin-chart"
           >
-            <Plus className="h-3.5 w-3.5" aria-hidden />
-            Add dose
+            {visible ? "Hide" : "Show"}
           </button>
-        </div>
+        ) : null}
       </div>
 
       {open ? (
-        <div className="mt-3 space-y-3">
+        <div className="mt-3 space-y-3 border-t border-border/50 pt-3">
           <div className="grid grid-cols-2 rounded-full bg-muted/70 p-1" role="group" aria-label="Insulin type">
             {(
               [
@@ -121,7 +137,7 @@ export function InsulinChartControls({
               </button>
             ))}
           </div>
-          <div className="grid grid-cols-[5.5rem_1fr] gap-2">
+          <div className="grid gap-2">
             <Input
               inputMode="decimal"
               value={units}
@@ -136,13 +152,15 @@ export function InsulinChartControls({
               value={takenAt}
               onChange={(event) => setTakenAt(event.target.value)}
               aria-label="When"
-              className="h-12 text-base"
+              className="h-12 min-w-0 text-base"
               data-testid="input-insulin-time"
             />
           </div>
-          <Button type="button" className="h-11 w-full rounded-full" onClick={save} data-testid="button-save-insulin-dose">
-            Add to graph
-          </Button>
+          <div className="flex justify-end">
+            <Button type="button" variant="ghost" className="h-9 rounded-full px-3 text-sm font-semibold" onClick={save} data-testid="button-save-insulin-dose">
+              Add to graph
+            </Button>
+          </div>
         </div>
       ) : null}
     </div>
