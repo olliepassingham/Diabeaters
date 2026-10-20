@@ -23,9 +23,6 @@ type Props = {
   onOpenStory: (authorId: string, story?: CommunityStoryRow) => void;
   onAddStory: () => void;
   composerPreview: string;
-  avatarDisplayName: string;
-  avatarPath: string | null;
-  profileHref?: string;
   onComposerClick: () => void;
   composerDisabled?: boolean;
   /** Find people and more sit on the quiet prompt row, not on the stories. */
@@ -158,9 +155,6 @@ export function FeedStoriesComposerHeader({
   onOpenStory,
   onAddStory,
   composerPreview,
-  avatarDisplayName,
-  avatarPath,
-  profileHref,
   onComposerClick,
   composerDisabled,
   endActions,
@@ -228,19 +222,12 @@ export function FeedStoriesComposerHeader({
       <div className={cn("flex items-center gap-1", composerDisabled && "opacity-70")}>
         <button
           type="button"
-          className="flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-full px-1 text-left outline-none ring-offset-background transition-colors hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed"
+          className="flex h-11 min-w-0 flex-1 items-center rounded-full px-1 text-left outline-none ring-offset-background transition-colors hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed"
           onClick={onComposerClick}
           disabled={composerDisabled}
           data-testid="feed-composer-mobile-pill"
           aria-haspopup="dialog"
         >
-          <CommunityAuthorAvatar
-            displayName={avatarDisplayName}
-            avatarPath={avatarPath}
-            size="sm"
-            profileHref={profileHref}
-            className="!h-9 !w-9"
-          />
           <span className="min-w-0 flex-1 truncate text-[15px] text-muted-foreground">{composerPreview}</span>
         </button>
         {endActions ? <div className="shrink-0">{endActions}</div> : null}

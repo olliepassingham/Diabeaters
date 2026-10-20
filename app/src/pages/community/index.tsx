@@ -670,9 +670,6 @@ export default function CommunityHomePage() {
           onOpenStory={openStory}
           onAddStory={() => setStoryCreateOpen(true)}
           composerPreview={feedComposer.pillPreview}
-          avatarDisplayName={feedComposer.avatarDisplayName}
-          avatarPath={feedComposer.avatarPath}
-          profileHref={feedComposer.profileHref}
           endActions={feedHeaderActions}
           onComposerClick={() => {
             if (!canComposeToFeed) {
