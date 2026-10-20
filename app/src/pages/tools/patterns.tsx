@@ -13,6 +13,9 @@ import { FortnightRangeCard } from "@/components/patterns/fortnight-range-card";
 import { Hba1cHistoryChart } from "@/components/patterns/hba1c-history-chart";
 import { PatternInsightCard } from "@/components/patterns/pattern-insight-card";
 import { computePatternInsights } from "@/lib/insights/pattern-insights";
+import { computeInsulinPatternInsights } from "@/lib/insights/insulin-pattern-insights";
+import { getLongActingDoseHistory, getRapidInsulinDoseHistory } from "@/lib/insulin-activity";
+import type { GlucoseDayOverlayDoseMark } from "@/components/patterns/glucose-day-overlay-chart";
 import {
   computeHourlyHypoComparison,
   computeWeekdayHypoComparison,
@@ -137,6 +140,14 @@ function PatternsInfoDialog() {
           It is a picture of readings on this phone, not a lab HbA1c.
         </p>
       </InfoSection>
+      <InfoSection title="Insulin doses">
+        <p>
+          Doses you add to the Home CGM graph are kept on this phone for 30 days. Patterns can show them under the
+          daily glucose overlay and note habits like rapid doses overlapping, lows landing while a dose is still
+          working, or long-acting doses logged at moving times. These notes describe your log — they never suggest
+          changing a dose.
+        </p>
+      </InfoSection>
       <InfoSection title="HbA1c history">
         <p>
           HbA1c you log on a visit, or add as a past result on Appointments, appears here as a simple trend. Educational
@@ -204,6 +215,27 @@ function GlucoseDayPatternCard({ historyTick }: { historyTick: number }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [cgmConnected, units, historyTick, filters],
   );
+
+  // Dose ticks under the overlay, matched to the same day range and
+  // weekday/weekend filter as the glucose days themselves.
+  const doseMarks = useMemo<GlucoseDayOverlayDoseMark[]>(() => {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const fromMs = startOfToday.getTime() - (dayRange - 1) * 24 * 60 * 60 * 1000;
+    const matchesKind = (date: Date) => {
+      const weekend = date.getDay() === 0 || date.getDay() === 6;
+      return dayKind === "all" || (dayKind === "weekends" ? weekend : !weekend);
+    };
+    const toMark = (takenAtIso: string, kind: GlucoseDayOverlayDoseMark["kind"]): GlucoseDayOverlayDoseMark | null => {
+      const date = new Date(takenAtIso);
+      if (Number.isNaN(date.getTime()) || date.getTime() < fromMs || !matchesKind(date)) return null;
+      return { minuteOfDay: date.getHours() * 60 + date.getMinutes(), kind };
+    };
+    return [
+      ...getRapidInsulinDoseHistory(dayRange).map((d) => toMark(d.takenAtIso, "rapid")),
+      ...getLongActingDoseHistory(dayRange).map((d) => toMark(d.takenAtIso, "long")),
+    ].filter((m): m is GlucoseDayOverlayDoseMark => m != null);
+  }, [dayRange, dayKind]);
 
   if (!cgmConnected) {
     return (
@@ -294,6 +326,7 @@ function GlucoseDayPatternCard({ historyTick }: { historyTick: number }) {
                 targetRange={targetRange}
                 minuteStart={timeWindow.minuteStart}
                 minuteEnd={timeWindow.minuteEnd}
+                doseMarks={doseMarks}
                 data-testid="chart-patterns-glucose-overlay"
               />
             ) : null}
@@ -313,6 +346,7 @@ function GlucoseDayPatternCard({ historyTick }: { historyTick: number }) {
             targetRange={targetRange}
             minuteStart={timeWindow.minuteStart}
             minuteEnd={timeWindow.minuteEnd}
+            doseMarks={doseMarks}
             data-testid="chart-patterns-glucose-overlay"
           />
         )}
@@ -354,10 +388,16 @@ export default function PatternsPage() {
     [exerciseOutcomes],
   );
 
-  const insights = useMemo(
-    () => computePatternInsights({ hypos, exerciseOutcomes }, 10),
-    [hypos, exerciseOutcomes],
-  );
+  const insights = useMemo(() => {
+    const hypoInsights = computePatternInsights({ hypos, exerciseOutcomes }, 10);
+    const insulinInsights = computeInsulinPatternInsights({
+      rapidDoses: getRapidInsulinDoseHistory(),
+      longActingDoses: getLongActingDoseHistory(),
+      hypos,
+    });
+    const toneRank = { attention: 0, positive: 1, neutral: 2 } as const;
+    return [...hypoInsights, ...insulinInsights].sort((a, b) => toneRank[a.tone] - toneRank[b.tone]);
+  }, [hypos, exerciseOutcomes]);
   const visibleInsights = useMemo(() => {
     const dismissed = new Set(listDismissedPatternInsightIds());
     return insights.filter((i) => !dismissed.has(i.id));
@@ -389,7 +429,8 @@ export default function PatternsPage() {
     return () => window.clearTimeout(t);
   }, []);
 
-  const hasEnoughData = hypos.length >= 3;
+  const hasHypoData = hypos.length >= 3;
+  const hasEnoughData = hasHypoData || visibleInsights.length > 0;
 
   return (
     <PageShell variant="standard" className="mx-auto max-w-lg space-y-5" data-testid="page-patterns">
@@ -416,7 +457,7 @@ export default function PatternsPage() {
         <EmptyState
           icon={Sparkles}
           title="Not enough data yet"
-          description="Log a few hypo treatments and this page will start finding patterns in when they happen."
+          description="Log a few hypo treatments, or add insulin doses on the Home graph, and this page will start finding patterns in when they happen."
         />
       ) : (
         <>
@@ -443,6 +484,8 @@ export default function PatternsPage() {
             </section>
           ) : null}
 
+          {hasHypoData ? (
+            <>
           <Card id="when-lows" data-testid="card-patterns-hourly">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between gap-2">
@@ -495,6 +538,8 @@ export default function PatternsPage() {
               <WeeklyTrendChart points={weeklyTrend} data-testid="chart-patterns-weekly-trend" />
             </CardContent>
           </Card>
+            </>
+          ) : null}
         </>
       )}
     </PageShell>

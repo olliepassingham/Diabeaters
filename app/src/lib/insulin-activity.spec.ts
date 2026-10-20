@@ -1,8 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import {
+  getLongActingDoseHistory,
+  getRapidInsulinDoseHistory,
   RAPID_ACTION_HOURS,
   rapidRunsOutAt,
+  recordLongActingDose,
+  recordRapidInsulinDose,
   remainingRapidUnits,
   type RapidInsulinDose,
 } from "@/lib/insulin-activity";
@@ -31,5 +35,40 @@ describe("remainingRapidUnits", () => {
     const doses = [dose(4, taken)];
     expect(rapidRunsOutAt(doses, at + 3_600_000)).toBe(at + RAPID_ACTION_HOURS * 3_600_000);
     expect(rapidRunsOutAt(doses, at + RAPID_ACTION_HOURS * 3_600_000)).toBeNull();
+  });
+});
+
+describe("dose history for patterns", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it("keeps recorded doses in history beyond the graph's live window", () => {
+    const tenDaysAgo = new Date(Date.now() - 10 * 24 * 3_600_000).toISOString();
+    recordRapidInsulinDose({ units: 6, takenAtIso: tenDaysAgo });
+    recordLongActingDose({ units: 12, takenAtIso: tenDaysAgo });
+
+    const rapid = getRapidInsulinDoseHistory();
+    expect(rapid).toHaveLength(1);
+    expect(rapid[0]?.units).toBe(6);
+    expect(getLongActingDoseHistory()).toHaveLength(1);
+  });
+
+  it("drops history older than the retention window and honours withinDays", () => {
+    const fortyDaysAgo = new Date(Date.now() - 40 * 24 * 3_600_000).toISOString();
+    recordRapidInsulinDose({ units: 5, takenAtIso: fortyDaysAgo });
+    recordRapidInsulinDose({ units: 7 });
+
+    expect(getRapidInsulinDoseHistory().map((d) => d.units)).toEqual([7]);
+    expect(getRapidInsulinDoseHistory(0)).toEqual([]);
+  });
+
+  it("seeds history from doses already on the graph store", () => {
+    const yesterday = new Date(Date.now() - 24 * 3_600_000).toISOString();
+    localStorage.setItem(
+      "diabeater_insulin_activity_v1",
+      JSON.stringify({ rapid: [dose(4, yesterday)], longActing: [] }),
+    );
+    expect(getRapidInsulinDoseHistory().map((d) => d.units)).toEqual([4]);
   });
 });

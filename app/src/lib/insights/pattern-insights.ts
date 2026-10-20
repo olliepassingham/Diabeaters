@@ -13,7 +13,10 @@ export interface PatternInsight {
     | "hypo_weekday_cluster"
     | "post_exercise_lows"
     | "hypo_free_stretch"
-    | "hypo_frequency_trend";
+    | "hypo_frequency_trend"
+    | "insulin_lows_after_dose"
+    | "insulin_stacking"
+    | "long_acting_pattern";
   tone: PatternInsightTone;
   title: string;
   body: string;

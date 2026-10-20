@@ -2,7 +2,19 @@
 export const RAPID_ACTION_HOURS = 4;
 
 const STORAGE_KEY = "diabeater_insulin_activity_v1";
+const HISTORY_STORAGE_KEY = "diabeater_insulin_dose_history_v1";
 const VISIBLE_KEY = "diabeater_insulin_chart_visible";
+
+/**
+ * Patterns analysis needs more than the graph's live window: dose history is
+ * kept for 30 days so the Patterns page can look at dose timing against
+ * glucose and hypo logs. The chart-facing store keeps its own short prune
+ * below; history is append-only from `record*` and seeded from the live
+ * store on first read so recent graph doses carry across.
+ */
+export const INSULIN_DOSE_HISTORY_DAYS = 30;
+const RAPID_HISTORY_CAP = 400;
+const LONG_ACTING_HISTORY_CAP = 120;
 export const INSULIN_ACTIVITY_CHANGED_EVENT = "diabeater-insulin-activity-changed";
 
 export type RapidInsulinDose = {
@@ -60,6 +72,67 @@ function isLongDose(value: unknown): value is LongActingDose {
   return typeof dose.id === "string" && typeof dose.takenAtIso === "string" && Number.isFinite(dose.units) && dose.units > 0;
 }
 
+function readDoseHistory(): InsulinActivityStore {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(HISTORY_STORAGE_KEY) ?? "{}") as Partial<InsulinActivityStore>;
+    const rapid = Array.isArray(parsed.rapid) ? parsed.rapid.filter(isRapidDose) : [];
+    const longActing = Array.isArray(parsed.longActing) ? parsed.longActing.filter(isLongDose) : [];
+    if (rapid.length > 0 || longActing.length > 0) return { rapid, longActing };
+  } catch {
+    /* fall through to seeding */
+  }
+  // First read: seed from the live chart store so doses already on the graph
+  // start the history off.
+  return readStore();
+}
+
+function appendDoseHistory(kind: "rapid" | "longActing", dose: RapidInsulinDose | LongActingDose) {
+  try {
+    const cutoff = Date.now() - INSULIN_DOSE_HISTORY_DAYS * 24 * 60 * 60 * 1000;
+    const within = (iso: string) => {
+      const time = new Date(iso).getTime();
+      return Number.isFinite(time) && time >= cutoff;
+    };
+    const history = readDoseHistory();
+    const next: InsulinActivityStore = {
+      rapid: history.rapid.filter((d) => within(d.takenAtIso)),
+      longActing: history.longActing.filter((d) => within(d.takenAtIso)),
+    };
+    if (kind === "rapid") {
+      const rapidDose = dose as RapidInsulinDose;
+      if (!next.rapid.some((d) => d.id === rapidDose.id)) next.rapid.push(rapidDose);
+      next.rapid = next.rapid.slice(-RAPID_HISTORY_CAP);
+    } else {
+      const longDose = dose as LongActingDose;
+      if (!next.longActing.some((d) => d.id === longDose.id)) next.longActing.push(longDose);
+      next.longActing = next.longActing.slice(-LONG_ACTING_HISTORY_CAP);
+    }
+    localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(next));
+  } catch {
+    /* history is best-effort — the live chart store already saved the dose */
+  }
+}
+
+function historyWithin<T extends { takenAtIso: string }>(doses: T[], withinDays: number, nowMs: number): T[] {
+  const cutoff = nowMs - withinDays * 24 * 60 * 60 * 1000;
+  return doses
+    .filter((dose) => {
+      const time = new Date(dose.takenAtIso).getTime();
+      return Number.isFinite(time) && time >= cutoff && time <= nowMs;
+    })
+    .sort((a, b) => new Date(a.takenAtIso).getTime() - new Date(b.takenAtIso).getTime());
+}
+
+/** Rapid doses from the 30-day dose history, oldest first. */
+export function getRapidInsulinDoseHistory(withinDays = INSULIN_DOSE_HISTORY_DAYS, nowMs = Date.now()): RapidInsulinDose[] {
+  return historyWithin(readDoseHistory().rapid, withinDays, nowMs);
+}
+
+/** Long-acting doses from the 30-day dose history, oldest first. */
+export function getLongActingDoseHistory(withinDays = INSULIN_DOSE_HISTORY_DAYS, nowMs = Date.now()): LongActingDose[] {
+  return historyWithin(readDoseHistory().longActing, withinDays, nowMs);
+}
+
 function writeStore(store: InsulinActivityStore) {
   const cutoff = Date.now() - 48 * 60 * 60 * 1000;
   const keep = (iso: string) => {
@@ -104,6 +177,7 @@ export function recordRapidInsulinDose(input: { units: number; takenAtIso?: stri
   };
   const store = readStore();
   writeStore({ ...store, rapid: [dose, ...store.rapid] });
+  appendDoseHistory("rapid", dose);
   return dose;
 }
 
@@ -116,6 +190,7 @@ export function recordLongActingDose(input: { units: number; takenAtIso?: string
   };
   const store = readStore();
   writeStore({ ...store, longActing: [dose, ...store.longActing] });
+  appendDoseHistory("longActing", dose);
   return dose;
 }
 

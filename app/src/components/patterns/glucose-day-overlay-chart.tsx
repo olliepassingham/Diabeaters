@@ -8,6 +8,11 @@ import {
 } from "@/lib/live-glucose-range";
 import { cn } from "@/lib/utils";
 
+export type GlucoseDayOverlayDoseMark = {
+  minuteOfDay: number;
+  kind: "rapid" | "long";
+};
+
 type GlucoseDayOverlayChartProps = {
   series: GlucoseDaySeries[];
   units: BgUnits;
@@ -16,9 +21,13 @@ type GlucoseDayOverlayChartProps = {
   minuteStart?: number;
   /** Exclusive end of the visible x-axis in minutes since midnight. */
   minuteEnd?: number;
+  /** Insulin doses (all overlaid days) drawn as density ticks under the plot. */
+  doseMarks?: GlucoseDayOverlayDoseMark[];
   className?: string;
   "data-testid"?: string;
 };
+
+const DOSE_MARK_COLORS = { rapid: "#d97706", long: "#0284c7" } as const;
 
 const WIDTH = 320;
 const HEIGHT = 200;
@@ -63,6 +72,7 @@ export function GlucoseDayOverlayChart({
   targetRange,
   minuteStart = 0,
   minuteEnd = MINUTES_PER_DAY,
+  doseMarks = [],
   className,
   "data-testid": testId,
 }: GlucoseDayOverlayChartProps) {
@@ -95,6 +105,23 @@ export function GlucoseDayOverlayChart({
 
   const hourTicks = useMemo(() => buildHourTicks(viewStart, viewEnd), [viewStart, viewEnd]);
   const mostRecentCount = Math.max(1, series.length);
+
+  // Dose ticks aggregate into 15-minute buckets across every overlaid day,
+  // so density reads as habit (more doses at that time = stronger mark).
+  const doseBuckets = useMemo(() => {
+    const buckets = new Map<string, { minuteOfDay: number; kind: "rapid" | "long"; count: number }>();
+    for (const mark of doseMarks) {
+      if (mark.minuteOfDay < viewStart || mark.minuteOfDay >= viewEnd) continue;
+      const bucketMinute = Math.floor(mark.minuteOfDay / 15) * 15 + 7.5;
+      const key = `${mark.kind}:${bucketMinute}`;
+      const existing = buckets.get(key);
+      if (existing) existing.count += 1;
+      else buckets.set(key, { minuteOfDay: bucketMinute, kind: mark.kind, count: 1 });
+    }
+    return [...buckets.values()];
+  }, [doseMarks, viewStart, viewEnd]);
+  const hasRapidMarks = doseMarks.some((m) => m.kind === "rapid");
+  const hasLongMarks = doseMarks.some((m) => m.kind === "long");
 
   return (
     <div className={cn("w-full", className)} data-testid={testId}>
@@ -191,6 +218,28 @@ export function GlucoseDayOverlayChart({
           );
         })}
 
+        {doseBuckets.map((bucket) => {
+          const cx = xFor(bucket.minuteOfDay);
+          const cy = PAD.top + innerHeight + 7;
+          const r = 2.2 + Math.min(bucket.count, 6) * 0.55;
+          return (
+            <rect
+              key={`${bucket.kind}:${bucket.minuteOfDay}`}
+              data-testid={`glucose-overlay-dose-${bucket.kind}`}
+              x={cx - r}
+              y={cy - r}
+              width={r * 2}
+              height={r * 2}
+              rx={1.2}
+              transform={`rotate(45 ${cx} ${cy})`}
+              fill={DOSE_MARK_COLORS[bucket.kind]}
+              fillOpacity={Math.min(0.35 + bucket.count * 0.15, 0.95)}
+            >
+              <title>{`${bucket.count} ${bucket.kind === "rapid" ? "rapid" : "long-acting"} dose${bucket.count === 1 ? "" : "s"} around ${hourTickLabel(Math.floor(bucket.minuteOfDay / 60))}`}</title>
+            </rect>
+          );
+        })}
+
         {hourTicks.map((hour) => (
           <text
             key={hour}
@@ -226,6 +275,26 @@ export function GlucoseDayOverlayChart({
           <span className="h-2 w-2 rounded-sm" style={{ backgroundColor: "#22c55e", opacity: 0.5 }} aria-hidden />
           Target
         </span>
+        {hasRapidMarks ? (
+          <span className="flex items-center gap-1.5">
+            <span
+              className="h-2 w-2 rotate-45 rounded-[2px]"
+              style={{ backgroundColor: DOSE_MARK_COLORS.rapid }}
+              aria-hidden
+            />
+            Rapid dose
+          </span>
+        ) : null}
+        {hasLongMarks ? (
+          <span className="flex items-center gap-1.5">
+            <span
+              className="h-2 w-2 rotate-45 rounded-[2px]"
+              style={{ backgroundColor: DOSE_MARK_COLORS.long }}
+              aria-hidden
+            />
+            Long-acting dose
+          </span>
+        ) : null}
       </div>
     </div>
   );
