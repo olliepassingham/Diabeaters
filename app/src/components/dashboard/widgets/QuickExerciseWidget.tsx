@@ -311,7 +311,7 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
       <CardHeader className={widgetHeaderClass}>
         <Link href="/scenarios/exercise">
           <div className="flex items-center gap-2 transition-opacity hover:opacity-80">
-            <WidgetHeaderIcon icon={Dumbbell} className="bg-emerald-500/10 ring-emerald-500/15 [&_svg]:text-emerald-600 dark:[&_svg]:text-emerald-400" />
+            <WidgetHeaderIcon icon={Dumbbell} />
             <CardTitle className="text-base font-semibold leading-tight text-foreground">Quick exercise</CardTitle>
           </div>
         </Link>

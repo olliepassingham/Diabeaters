@@ -41,8 +41,8 @@ import { HomeTodayPulse } from "@/components/home/HomeTodayPulse";
 import { HomeCgmGraph } from "@/components/home/HomeCgmGraph";
 import { HomePumpCare } from "@/components/home/HomePumpCare";
 import { HomeMealMoment } from "@/components/home/HomeMealMoment";
-import { HomeSupplyGraph } from "@/components/home/HomeSupplyGraph";
 import { HomeNextUp } from "@/components/home/HomeNextUp";
+import { HomeStickyGlucoseBar } from "@/components/home/HomeStickyGlucoseBar";
 import { Type2Home } from "@/components/home/Type2Home";
 import { getHealthStatus } from "@/lib/dashboard-health-status";
 import { useHomeNextBestAction } from "@/hooks/use-home-next-best-action";
@@ -378,6 +378,8 @@ export default function Dashboard() {
           </Alert>
         )}
 
+        {!isCommunityDash ? <HomeStickyGlucoseBar glucose={homeNext.glucose} /> : null}
+
         {!isCommunityDash ? (
           <PendingHypoCheckInBanner />
         ) : null}
@@ -451,10 +453,9 @@ export default function Dashboard() {
         {!isCommunityDash ? (
           <HomeTodayPulse healthStatus={healthStatus} suppressRunwayDuplicate />
         ) : null}
-        {!isCommunityDash ? <HomeSupplyGraph supplies={supplies} /> : null}
         <div
           className={cn(
-            "animate-stagger grid grid-cols-1 items-start",
+            "grid grid-cols-1 items-start",
             isCommunityDash && "md:grid-cols-2",
           )}
         >

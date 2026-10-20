@@ -11,6 +11,7 @@ import {
   PharmacyWidget,
   CommunityQuickPostWidget,
   PatternInsightsWidget,
+  SupplyRunwayWidget,
 } from "@/components/widgets";
 
 export type DashboardWidgetComponentProps = { layoutSize?: WidgetSize; widgetType?: WidgetType };
@@ -62,11 +63,19 @@ export interface DashboardWidgetDefinition {
 
 /**
  * Default order is array order (also used as initial `order` index). Persisted `order` in localStorage overrides.
- * New users: Community → Pharmacy → Quick exercise → Ratios → Appointments →
+ * New users: Supply runway → Community → Pharmacy → Quick exercise → Ratios → Appointments →
  * Tip of the day → Patterns; Routines off. Settings progress on; Welcome stays off.
  * UK-English copy throughout.
  */
 export const DASHBOARD_WIDGET_REGISTRY: DashboardWidgetDefinition[] = [
+  {
+    id: "supply-summary",
+    label: "Supply runway",
+    description: "Days left on each tracked supply, shortest first.",
+    defaultEnabled: true,
+    defaultSize: "full",
+    component: SupplyRunwayWidget,
+  },
   {
     id: "community-quick-post",
     label: "Community",

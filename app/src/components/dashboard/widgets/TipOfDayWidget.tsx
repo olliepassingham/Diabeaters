@@ -46,7 +46,7 @@ export function TipOfDayWidget(_props: DashboardWidgetLayoutProps) {
       <CardHeader className={widgetHeaderClass}>
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <WidgetHeaderIcon icon={Lightbulb} className="bg-amber-500/10 ring-amber-500/15 [&_svg]:text-amber-500 dark:[&_svg]:text-amber-400" />
+            <WidgetHeaderIcon icon={Lightbulb} />
             <Link
               href="/tools/tips"
               className="rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
@@ -67,11 +67,11 @@ export function TipOfDayWidget(_props: DashboardWidgetLayoutProps) {
           </Button>
         </div>
       </CardHeader>
-      <CardContent className={`${widgetContentClass} space-y-2`}>
+      <CardContent className={widgetContentClass}>
         <p className="max-w-3xl text-[15px] leading-relaxed text-foreground" data-testid="text-tip-content">
           {tip?.text}
         </p>
-        <p className="text-[13px] font-medium text-muted-foreground" data-testid="text-tip-category">
+        <p className="mt-1 text-[11px] font-medium text-muted-foreground" data-testid="text-tip-category">
           {tip ? CATEGORY_LABELS[tip.category] || tip.category : ""}
         </p>
       </CardContent>

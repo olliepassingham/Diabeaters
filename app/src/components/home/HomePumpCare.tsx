@@ -148,9 +148,8 @@ export function HomePumpCare() {
       <div
         className={cn(
           "relative overflow-hidden rounded-[1.35rem] px-3.5 py-3",
-          "bg-gradient-to-br from-teal-500/[0.1] via-background/90 to-sky-500/[0.06]",
-          "ring-1 ring-teal-500/15",
-          due && "from-amber-500/[0.1] via-background/90 to-teal-500/[0.06] ring-amber-500/20",
+          "bg-muted/25 ring-1 ring-border/40",
+          due && "bg-amber-500/[0.07] ring-amber-500/25",
         )}
       >
         <div className="relative space-y-2.5">

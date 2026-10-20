@@ -174,7 +174,7 @@ export function RatioAdviserWidget(_props: DashboardWidgetLayoutProps) {
       <CardHeader className={widgetHeaderClass}>
         <Link href="/settings/ratios">
           <div className="flex flex-wrap items-center gap-1.5 hover:opacity-80 transition-opacity cursor-pointer">
-            <WidgetHeaderIcon icon={Syringe} className="bg-sky-500/10 ring-sky-500/15 [&_svg]:text-sky-600 dark:[&_svg]:text-sky-400" />
+            <WidgetHeaderIcon icon={Syringe} />
             <CardTitle className="text-base font-semibold leading-tight text-foreground">Your ratios</CardTitle>
             {scenario && (
               <span

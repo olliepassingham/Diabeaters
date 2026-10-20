@@ -1,4 +1,5 @@
 export { SupplySummaryWidget } from "./supply-summary-widget";
+export { SupplyRunwayWidget } from "./supply-runway-widget";
 export { SettingsCompletionWidget } from "./settings-completion-widget";
 export { RatioAdviserWidget } from "./ratio-adviser-widget";
 export { WelcomeWidget } from "./welcome-widget";

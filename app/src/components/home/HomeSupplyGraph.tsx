@@ -13,7 +13,14 @@ function daysLabel(days: number): string {
   return `${days}d`;
 }
 
-export function HomeSupplyGraph({ supplies }: { supplies: Supply[] }) {
+export function HomeSupplyGraph({
+  supplies,
+  embedded = false,
+}: {
+  supplies: Supply[];
+  /** Inside a home widget section, which already spans the phone width. */
+  embedded?: boolean;
+}) {
   const plotted = useMemo(
     () =>
       supplies
@@ -41,14 +48,16 @@ export function HomeSupplyGraph({ supplies }: { supplies: Supply[] }) {
       className={cn(
         "animate-fade-in-up py-1",
         // Break out of main px-4 / md:px-6 so the runway spans the phone width.
-        "-mx-4 w-[calc(100%+2rem)] md:-mx-6 md:w-[calc(100%+3rem)]",
+        // Skipped when a home widget section already provides that span.
+        !embedded && "-mx-4 w-[calc(100%+2rem)] md:-mx-6 md:w-[calc(100%+3rem)]",
       )}
       data-testid="home-supply-graph"
       aria-labelledby="home-supply-title"
     >
       <div
         className={cn(
-          "border-y border-border/40 bg-muted/20 px-4 py-2.5 dark:bg-muted/10 md:px-6",
+          "border-y border-border/40 px-4 py-2.5 md:px-6",
+          embedded ? "bg-transparent" : "bg-muted/20 dark:bg-muted/10",
           tone === "critical" && "border-red-500/25 bg-red-500/[0.05] dark:bg-red-950/20",
           tone === "low" && "border-amber-500/25 bg-amber-500/[0.05] dark:bg-amber-950/15",
         )}

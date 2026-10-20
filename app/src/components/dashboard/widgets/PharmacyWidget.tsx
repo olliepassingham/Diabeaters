@@ -46,7 +46,7 @@ export function PharmacyWidget(_props: DashboardWidgetLayoutProps) {
             data-testid="link-pharmacy-widget-title"
           >
             <div className="flex min-w-0 items-center gap-2 transition-opacity hover:opacity-80">
-              <WidgetHeaderIcon icon={Building2} className="bg-cyan-500/10 ring-cyan-500/15 [&_svg]:text-cyan-600 dark:[&_svg]:text-cyan-300" />
+              <WidgetHeaderIcon icon={Building2} />
               <CardTitle className="text-base font-semibold leading-tight">Pharmacy</CardTitle>
             </div>
           </Link>

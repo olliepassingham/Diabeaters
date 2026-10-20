@@ -144,10 +144,9 @@ export function HomeMealMoment({
   return (
     <>
       <section className="animate-fade-in-up px-1 py-3" data-testid="home-meal-moment">
-        <div className="relative overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-primary/[0.13] via-background/75 to-cyan-500/[0.10] px-4 pb-3.5 pt-3 ring-1 ring-primary/10">
-          <div className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full bg-primary/10 blur-3xl" />
+        <div className="relative overflow-hidden rounded-[1.75rem] bg-muted/25 px-4 pb-3.5 pt-3 ring-1 ring-border/40">
           <div className="relative flex items-center gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
               <Utensils className="h-5 w-5" aria-hidden />
             </span>
             <div className="min-w-0 flex-1">

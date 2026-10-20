@@ -53,7 +53,7 @@ function statusPill(appointment: Appointment) {
     );
   }
   return (
-    <span className="chip border-blue-200/70 bg-blue-50/80 text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-200">
+    <span className="chip chip-muted">
       {daysUntil}d
     </span>
   );
@@ -143,13 +143,34 @@ export function AppointmentsWidget(props: DashboardWidgetLayoutProps) {
 
   const list = compact ? appointments.slice(0, 2) : appointments;
 
+  if (appointments.length === 0) {
+    return (
+      <WidgetCard accent="tracking" className="overflow-visible" data-testid="widget-appointments">
+        <div className="flex items-center gap-2 px-4 py-2.5 md:px-6">
+          <WidgetHeaderIcon icon={Calendar} />
+          <p className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
+            <span className="font-semibold text-foreground">Appointments</span>
+            {" · "}
+            No upcoming
+          </p>
+          <Button asChild variant="ghost" size="sm" className="h-9 shrink-0 rounded-full px-3 text-sm font-medium">
+            <Link href="/appointments" data-testid="button-add-appointment-widget">
+              <Plus className="mr-1 h-3.5 w-3.5" aria-hidden />
+              Add
+            </Link>
+          </Button>
+        </div>
+      </WidgetCard>
+    );
+  }
+
   return (
     <WidgetCard accent="tracking" className="overflow-visible" data-testid="widget-appointments">
       <CardHeader className={widgetHeaderClass}>
         <div>
           <Link href="/appointments">
             <div className="flex items-center gap-2 transition-opacity hover:opacity-80">
-              <WidgetHeaderIcon icon={Calendar} className="bg-blue-500/10 ring-blue-500/15 [&_svg]:text-blue-600 dark:[&_svg]:text-blue-400" />
+              <WidgetHeaderIcon icon={Calendar} />
               <CardTitle className="text-base font-semibold leading-tight text-foreground">
                 {compact ? "Appts" : "Appointments"}
               </CardTitle>
@@ -158,32 +179,18 @@ export function AppointmentsWidget(props: DashboardWidgetLayoutProps) {
         </div>
       </CardHeader>
       <CardContent className={cn(widgetContentClass, "flex flex-col gap-2")}>
-        {appointments.length === 0 ? (
-          <div className="flex items-center justify-between gap-3 py-3">
-            <div className="min-w-0">
-              <p className="text-[15px] font-medium text-foreground">No upcoming appointments</p>
-              <p className="mt-0.5 text-[13px] text-muted-foreground">Your next clinic visit will appear here.</p>
-            </div>
-            <Button asChild variant="ghost" size="sm" className="shrink-0 rounded-full text-blue-700 hover:bg-blue-500/10 dark:text-blue-300">
-              <Link href="/appointments" data-testid="button-add-appointment-widget">
-                <Plus className="mr-1 h-3.5 w-3.5" aria-hidden />
-                Add
-              </Link>
-            </Button>
-          </div>
-        ) : (
           <div>
             {list.map((appointment) => {
               const d = parseAppointmentDate(appointment.date);
               return (
                 <div
                   key={appointment.id}
-                  className="pressable flex gap-3 px-1 py-3 transition-colors hover:bg-blue-500/[0.04] dark:hover:bg-blue-950/15"
+                  className="pressable flex gap-3 px-1 py-3 transition-colors hover:bg-muted/40"
                   data-testid={`widget-appointment-${appointment.id}`}
                 >
                   <div
                     className={cn(
-                      "flex min-w-[3.25rem] flex-col items-center justify-center rounded-xl bg-blue-500/[0.08] px-2 py-2",
+                      "flex min-w-[3.25rem] flex-col items-center justify-center rounded-xl bg-muted/50 px-2 py-2",
                     )}
                   >
                     {d ? (
@@ -227,7 +234,6 @@ export function AppointmentsWidget(props: DashboardWidgetLayoutProps) {
               );
             })}
           </div>
-        )}
       </CardContent>
     </WidgetCard>
   );
