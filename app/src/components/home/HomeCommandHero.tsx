@@ -16,8 +16,8 @@ import {
 import { StagingChip } from "@/components/StagingChip";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { LogHypoTreatmentSheet } from "@/components/log-hypo-treatment-sheet";
-import { StatusPill } from "@/components/home/StatusPill";
 import { HomeActionDock } from "@/components/home/HomeActionDock";
+import { cn } from "@/lib/utils";
 import { TodayActivityLink } from "@/components/dashboard/SupplyTrackerTodaySection";
 import type { HealthStatus } from "@/lib/dashboard-health-status";
 import {
@@ -43,7 +43,7 @@ function DashboardInfoDialog() {
       </InfoSection>
       <InfoSection title="Status">
         <p>
-          With a live reading, the pill follows glucose: Low, Dropping, or High. In range, it goes back to supplies and guides — Stable, Watch, or Action needed.
+          The current glucose is the first thing on Home. Low, Dropping, High, Watch, or Action needed appears beside it. In range, the number stands on its own.
         </p>
       </InfoSection>
       <InfoSection title="Next action">
@@ -157,10 +157,22 @@ export function HomeCommandHero({
   const trendLabel = glucose?.trend ?? null;
   const TrendIcon =
     trendLabel === "rising" ? TrendingUp : trendLabel === "falling" ? TrendingDown : trendLabel === "flat" ? Minus : null;
+  const showAttention = pill.label !== "Stable";
+  const attentionWord = showAttention ? (
+    <span
+      className={cn(
+        "text-sm font-semibold",
+        pill.status === "action" ? "text-red-700 dark:text-red-300" : "text-amber-800 dark:text-amber-200",
+      )}
+      data-testid="status-indicator"
+    >
+      {pill.label}
+    </span>
+  ) : null;
 
   return (
     <>
-      <header className="pb-3 pt-1" data-testid="card-hero">
+      <header className="pb-2 pt-1" data-testid="card-hero">
         <div className="flex items-start justify-between gap-2 px-1">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
@@ -168,27 +180,24 @@ export function HomeCommandHero({
               <TodayActivityLink compact />
               <StagingChip />
             </div>
-            <div className="mt-2" data-testid="home-hero-status-row">
-              <div data-testid="wrap-dashboard-status-pill">
-                <StatusPill status={pill.status} label={pill.label} />
+            {hasLiveBg && glucose ? (
+              <div className="mt-2 flex items-baseline gap-2" data-testid="home-hero-bg">
+                <span className="font-display text-5xl font-semibold tabular-nums leading-none tracking-[-0.04em] text-foreground">
+                  {formatTargetBgInput(glucose.value, normalizeBgUnits(glucose.units))}
+                </span>
+                <span className="text-sm font-medium text-muted-foreground">
+                  {glucose.units || profile?.bgUnits || ""}
+                </span>
+                {TrendIcon ? (
+                  <TrendIcon className="h-5 w-5 self-center text-muted-foreground" aria-label={trendLabel ?? undefined} />
+                ) : null}
+                {attentionWord}
               </div>
-              {hasLiveBg && glucose ? (
-                <div
-                  className="mt-2 flex items-baseline gap-1.5"
-                  data-testid="home-hero-bg"
-                >
-                  <span className="font-display text-5xl font-semibold tabular-nums leading-none tracking-[-0.04em] text-foreground">
-                    {formatTargetBgInput(glucose.value, normalizeBgUnits(glucose.units))}
-                  </span>
-                  <span className="text-xs font-medium text-muted-foreground">
-                    {glucose.units || profile?.bgUnits || ""}
-                  </span>
-                  {TrendIcon ? (
-                    <TrendIcon className="h-4 w-4 text-muted-foreground" aria-label={trendLabel ?? undefined} />
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
+            ) : attentionWord ? (
+              <div className="mt-2" data-testid="home-hero-status-row">
+                {attentionWord}
+              </div>
+            ) : null}
           </div>
           <div className="flex shrink-0 items-center">
             <DashboardInfoDialog />
@@ -239,6 +248,7 @@ export function HomeCommandHero({
 
       <div className="pb-1 pt-1">
         <HomeActionDock
+          section="emergency"
           isUrgent={isUrgent}
           showCoach={showCoach}
           onTreatedHypo={handleTreatedHypoClick}
@@ -247,6 +257,14 @@ export function HomeCommandHero({
       </div>
 
       {children}
+
+      <HomeActionDock
+        section="next"
+        isUrgent={isUrgent}
+        showCoach={showCoach}
+        onTreatedHypo={handleTreatedHypoClick}
+        primary={nextAction}
+      />
 
       <LogHypoTreatmentSheet
         open={hypoDialogOpen}

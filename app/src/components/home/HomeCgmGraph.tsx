@@ -102,20 +102,16 @@ export function HomeCgmGraph() {
     <section
       className="relative pb-1 pt-2"
       data-testid="home-cgm-graph"
-      aria-labelledby={showChart ? "home-cgm-title" : undefined}
-      aria-label={showChart ? undefined : "Glucose"}
+      aria-label={showChart ? "Glucose, last 12 hours" : "Glucose"}
     >
       {showChart ? (
-        <div className="mb-1 flex items-center justify-between gap-2 px-1">
-          <h2 id="home-cgm-title" className="font-sans text-[15px] font-semibold text-foreground">
-            Glucose · 12 hours
-          </h2>
-          <div className="flex items-center">
+        <div className="relative -mx-6 w-[calc(100%+3rem)] md:-mx-8 md:w-[calc(100%+4rem)]">
+          <div className="absolute right-1 top-0 z-10 flex">
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              className="h-9 w-9 rounded-full"
+              className="h-8 w-8 rounded-full bg-background/70"
               onClick={refresh}
               disabled={loading}
               aria-label="Refresh glucose graph"
@@ -126,17 +122,12 @@ export function HomeCgmGraph() {
                 <RefreshCw className="h-4 w-4" aria-hidden />
               )}
             </Button>
-            <Button asChild variant="ghost" size="icon" className="h-9 w-9 rounded-full">
+            <Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/70">
               <Link href={connected ? "/tools/cgm-live" : "/settings/cgm"} aria-label="Open glucose trends">
                 <ChevronRight className="h-4 w-4" aria-hidden />
               </Link>
             </Button>
           </div>
-        </div>
-      ) : null}
-
-      {showChart ? (
-        <div className="-mx-6 w-[calc(100%+3rem)] md:-mx-8 md:w-[calc(100%+4rem)]">
           <CgmGlucoseChart
             points={points}
             units={units}

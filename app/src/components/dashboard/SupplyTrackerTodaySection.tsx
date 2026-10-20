@@ -263,7 +263,7 @@ export function TodayActivityLink({ compact = false }: { compact?: boolean }) {
       className={cn(
         "group outline-none ring-offset-background transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         compact
-          ? "flex min-w-0 items-center gap-2 rounded-xl text-muted-foreground hover:text-foreground"
+          ? "inline-flex min-w-0 items-center text-[15px] font-medium text-muted-foreground hover:text-foreground"
           : "-mx-1 mb-2 flex items-center justify-between gap-2 rounded-lg px-1 pb-2 hover:bg-muted/30 dark:hover:bg-muted/15",
       )}
       data-testid="link-today-activity-calendar"
@@ -275,34 +275,30 @@ export function TodayActivityLink({ compact = false }: { compact?: boolean }) {
       onPointerEnter={() => prefetchToolsDestinationHref("/tools/activity")}
       onFocus={() => prefetchToolsDestinationHref("/tools/activity")}
     >
-      <div className={cn("flex min-w-0 items-center", compact ? "gap-2" : "gap-2")}>
-        <div
-          className={cn(
-            "flex shrink-0 items-center justify-center bg-primary/12 text-primary transition-colors group-hover:bg-primary/20",
-            compact ? "h-8 w-8 rounded-xl" : "h-7 w-7 rounded-md",
-          )}
-        >
-          <Calendar className={compact ? "h-4 w-4" : "h-3.5 w-3.5"} aria-hidden />
-        </div>
-        <div className="min-w-0">
-          <div className="flex items-center gap-0.5">
-            <span className={cn("font-semibold tracking-tight text-foreground", compact ? "font-display text-2xl" : "text-sm")}>
-              Today
-            </span>
-            <ChevronRight
-              className={cn(
-                "shrink-0 text-primary opacity-90 transition-transform group-hover:translate-x-0.5",
-                compact ? "h-4 w-4" : "h-3.5 w-3.5",
-              )}
-              aria-hidden
-            />
+      {compact ? (
+        <span className="tabular-nums">{dateLabel}</span>
+      ) : (
+        <>
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/12 text-primary transition-colors group-hover:bg-primary/20">
+              <Calendar className="h-3.5 w-3.5" aria-hidden />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-0.5">
+                <span className="text-sm font-semibold tracking-tight text-foreground">Today</span>
+                <ChevronRight
+                  className="h-3.5 w-3.5 shrink-0 text-primary opacity-90 transition-transform group-hover:translate-x-0.5"
+                  aria-hidden
+                />
+              </div>
+              <p className="text-[11px] leading-tight text-muted-foreground">{activityLabel}</p>
+            </div>
           </div>
-          {compact ? null : <p className="text-[11px] leading-tight text-muted-foreground">{activityLabel}</p>}
-        </div>
-      </div>
-      <span className={cn("shrink-0 tabular-nums text-muted-foreground", compact ? "text-sm" : "max-w-[46%] truncate text-xs font-medium")}>
-        {compact ? `· ${dateLabel}` : dateLabel}
-      </span>
+          <span className="max-w-[46%] shrink-0 truncate text-xs font-medium tabular-nums text-muted-foreground">
+            {dateLabel}
+          </span>
+        </>
+      )}
     </Link>
   );
 }

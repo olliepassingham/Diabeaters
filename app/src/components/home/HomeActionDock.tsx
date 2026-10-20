@@ -70,11 +70,14 @@ export function HomeActionDock({
   showCoach,
   onTreatedHypo,
   primary,
+  section = "all",
 }: {
   isUrgent: boolean;
   showCoach: boolean;
   onTreatedHypo: () => void;
   primary: HomeNextBestAction;
+  /** Emergency actions sit above the graph. The next step and Ask Beatie sit below it. */
+  section?: "all" | "emergency" | "next";
 }) {
   const coachHref = buildCoachHref({ topic: pickCoachTopicSlugFromScenarioState() });
   const primaryHref = primary.id === "coach" ? coachHref : primary.href;
@@ -105,8 +108,9 @@ export function HomeActionDock({
 
   const primaryIsHelpNow = primary.id === "help_now" || primary.kind === "help";
 
-  return (
-    <div className="space-y-3 px-1" data-testid="home-action-dock">
+  const showPrimary = !primaryIsHelpNow;
+  const showCoachRow = showCoach && primary.id !== "coach";
+  const emergency = (
       <div className="grid grid-cols-2 gap-2" data-testid="home-action-overflow">
         <Button
           asChild
@@ -133,8 +137,11 @@ export function HomeActionDock({
           Treated a hypo
         </Button>
       </div>
+  );
 
-      {primaryIsHelpNow ? null : primary.kind === "link" && primaryHref ? (
+  const next = (
+    <>
+      {showPrimary && primary.kind === "link" && primaryHref ? (
         <Link
           href={primaryHref}
           className={primaryClass}
@@ -143,16 +150,8 @@ export function HomeActionDock({
         >
           {primaryInner}
         </Link>
-      ) : primary.kind === "help" || primary.id === "help_now" ? (
-        <Link
-          href="/help-now"
-          className={primaryClass}
-          data-testid="home-next-best-action"
-          onPointerDown={onPrimaryPointer}
-        >
-          {primaryInner}
-        </Link>
-      ) : (
+      ) : null}
+      {showPrimary && !(primary.kind === "link" && primaryHref) ? (
         <button
           type="button"
           className={primaryClass}
@@ -162,9 +161,9 @@ export function HomeActionDock({
         >
           {primaryInner}
         </button>
-      )}
+      ) : null}
 
-      {showCoach && primary.id !== "coach" ? (
+      {showCoachRow ? (
         <Link
           href={coachHref}
           data-testid="link-dashboard-coach-open"
@@ -176,6 +175,30 @@ export function HomeActionDock({
           <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
         </Link>
       ) : null}
+    </>
+  );
+
+  if (section === "emergency") {
+    return (
+      <div className="px-1" data-testid="home-action-dock">
+        {emergency}
+      </div>
+    );
+  }
+
+  if (section === "next") {
+    if (!showPrimary && !showCoachRow) return null;
+    return (
+      <div className="space-y-3 px-1 pt-1" data-testid="home-action-dock-next">
+        {next}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3 px-1" data-testid="home-action-dock">
+      {emergency}
+      {next}
     </div>
   );
 }
