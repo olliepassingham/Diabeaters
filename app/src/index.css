@@ -1119,6 +1119,42 @@
   padding: 0.55rem 0.85rem;
 }
 
+/* Beatie entry point: warm gold surface so it reads as its own thing next
+   to the teal hub lists. */
+.hub-list-panel-beatie {
+  border-color: rgb(217 164 65 / 0.4);
+  background: rgb(217 164 65 / 0.08);
+}
+
+.hub-list-panel-beatie .hub-icon-well {
+  background: rgb(217 164 65 / 0.22);
+  color: rgb(146 96 20);
+}
+
+.dark .hub-list-panel-beatie .hub-icon-well {
+  color: rgb(252 211 77);
+}
+
+.hub-list-panel-beatie .hub-list-row:hover {
+  background: rgb(217 164 65 / 0.1);
+}
+
+/* Full-height variant: rows share the panel height evenly so a short list
+   still fills a phone screen with generous tap targets. */
+.hub-list-panel-fill {
+  flex: 1 1 auto;
+}
+
+.hub-list-panel-fill .hub-list-card {
+  display: flex;
+  flex: 1 1 0%;
+}
+
+.hub-list-panel-fill .hub-list-row {
+  flex: 1 1 auto;
+  width: 100%;
+}
+
 .hub-accent-teal {
   --hub-from: rgb(var(--color-primary));
   --hub-to: rgb(217 164 65);
@@ -1192,12 +1228,12 @@
 
 .hub-list-row {
   display: grid;
-  grid-template-columns: 2.5rem minmax(0, 1fr) auto;
+  grid-template-columns: 2.75rem minmax(0, 1fr) auto;
   grid-template-areas: "icon copy chevron";
-  column-gap: 0.75rem;
+  column-gap: 0.8rem;
   align-items: center;
-  min-height: 4rem;
-  padding: 0.65rem 0.9rem;
+  min-height: 4.25rem;
+  padding: 0.7rem 1rem;
 }
 
 .hub-list-row:hover {
@@ -1207,11 +1243,11 @@
 .hub-icon-well {
   grid-area: icon;
   display: flex;
-  height: 2.5rem;
-  width: 2.5rem;
+  height: 2.75rem;
+  width: 2.75rem;
   align-items: center;
   justify-content: center;
-  border-radius: 0.9rem;
+  border-radius: 1rem;
   background: rgb(var(--color-primary) / 0.09);
   color: rgb(var(--color-primary-dark));
   box-shadow: none;

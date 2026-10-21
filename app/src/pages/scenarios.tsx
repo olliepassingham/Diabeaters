@@ -3,8 +3,11 @@ import { useLocation, useSearch } from "wouter";
 import type { LucideIcon } from "lucide-react";
 import { HubListPanel, HubListRow } from "@/components/hub-list-panel";
 import { trackFeatureEngagement } from "@/components/discovery-prompts";
-import { Moon, Thermometer, Plane, Dumbbell, Syringe, Wine, Car } from "lucide-react";
+import { Moon, Thermometer, Plane, Dumbbell, Syringe, Wine, Car, MessageCircle } from "lucide-react";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
+import { isAiCoachEnabled } from "@/lib/flags";
+import { buildCoachHref } from "@/lib/ai-coach/links";
+import { AI_ASSISTANT_NAME, openAssistantCtaLabel } from "@/lib/ai-coach/persona";
 import { storage, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { hasInsulinClinicalTools, isType2AppSession } from "@/lib/insulin-clinical-access";
@@ -219,31 +222,50 @@ export default function Scenarios() {
   );
 
   return (
-    <PageShell variant="standard" density="compact" className="space-y-3 pt-0">
-      <div className="px-0.5 pb-1">
-        <h1 className="font-display text-[1.7rem] font-semibold leading-tight tracking-tight text-foreground">
-          Guides
-        </h1>
-      </div>
+    <PageShell variant="standard" density="compact" className="flex min-h-full flex-col pt-0">
+      <div className="flex flex-1 flex-col gap-2.5">
+        <div className="px-0.5 pb-0.5 pt-1">
+          <h1 className="font-display text-[2.1rem] font-semibold leading-none tracking-tight text-foreground">
+            Guides
+          </h1>
+        </div>
 
-      <DobUnknownNotice testId="guides-dob-unknown-notice" />
-      <OfflineDeviceNotice />
+        <DobUnknownNotice testId="guides-dob-unknown-notice" />
+        <OfflineDeviceNotice />
 
-      <HubListPanel label="Situation guides" density="compact">
-        {visibleScenarioCards.map((c) => (
-          <ScenarioCard key={c.href} {...c} />
-        ))}
-        {showPumpFailureCard ? (
-          <ScenarioCard
-            href="/scenarios/pump-failure"
-            icon={Syringe}
-            title="Pump failure"
-            description={pumpFailureCardDescription}
-          />
+        <HubListPanel label="Situation guides" fill>
+          {visibleScenarioCards.map((c) => (
+            <ScenarioCard key={c.href} {...c} />
+          ))}
+          {showPumpFailureCard ? (
+            <ScenarioCard
+              href="/scenarios/pump-failure"
+              icon={Syringe}
+              title="Pump failure"
+              description={pumpFailureCardDescription}
+            />
+          ) : null}
+        </HubListPanel>
+
+        {isAiCoachEnabled ? (
+          <div className="mt-3">
+            <HubListPanel label={openAssistantCtaLabel()} density="compact" className="hub-list-panel-beatie">
+              <HubListRow
+                href={buildCoachHref({})}
+                icon={MessageCircle}
+                title={openAssistantCtaLabel()}
+                description={`Not sure which guide fits? Ask ${AI_ASSISTANT_NAME} where to go`}
+                tone="accent"
+                onPress={() => {
+                  void hapticLight();
+                }}
+              />
+            </HubListPanel>
+          </div>
         ) : null}
-      </HubListPanel>
 
-      <p className="pt-1 text-center">{guidesAboutDialog}</p>
+        <p className="pt-1 text-center">{guidesAboutDialog}</p>
+      </div>
     </PageShell>
   );
 }

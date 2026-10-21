@@ -18,13 +18,26 @@ export function HubListPanel({
   children,
   label,
   density = "regular",
+  fill = false,
+  className,
 }: {
   children: ReactNode;
   label: string;
   density?: "regular" | "compact";
+  /** Stretch rows evenly to fill the panel's share of a full-height screen. */
+  fill?: boolean;
+  className?: string;
 }) {
   return (
-    <ul className={cn("hub-list-panel m-0 list-none p-0", density === "compact" && "hub-list-panel-compact")} aria-label={label}>
+    <ul
+      className={cn(
+        "hub-list-panel m-0 list-none p-0",
+        density === "compact" && "hub-list-panel-compact",
+        fill && "hub-list-panel-fill",
+        className,
+      )}
+      aria-label={label}
+    >
       {children}
     </ul>
   );
