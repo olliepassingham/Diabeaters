@@ -9,7 +9,6 @@ import {
   MessageCircle,
   Phone,
   Plane,
-  Sparkles,
   Thermometer,
   User as UserIcon,
 } from "lucide-react";
@@ -38,7 +37,7 @@ import type { ReactNode } from "react";
 export const carerCardHeaderClass = "space-y-1 p-3.5 pb-1.5 sm:p-4 sm:pb-1.5";
 export const carerCardContentClass = "px-3.5 pb-3.5 pt-0 sm:px-4 sm:pb-4";
 export const carerCardTitleClass =
-  "flex items-center gap-2 text-sm font-semibold tracking-tight text-foreground sm:text-[0.95rem]";
+  "flex items-center gap-2 text-[15px] font-semibold tracking-tight text-foreground sm:text-base";
 /** Shared shell for appointments/emergency/clinical — not urgent cards (those keep accent borders). */
 export const carerCardShellClass =
   "rounded-xl border border-border/50 shadow-sm ring-1 ring-border/15 dark:border-border/40";
@@ -238,7 +237,9 @@ export function SupporterHero({
             {avatarUrl ? (
               <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
             ) : (
-              <Sparkles className="h-5 w-5 text-primary sm:h-6 sm:w-6" aria-hidden />
+              <span className="text-lg font-bold text-primary sm:text-xl" aria-hidden>
+                {displayName.trim().charAt(0).toUpperCase() || "?"}
+              </span>
             )}
           </div>
           <div className="min-w-0 flex-1">
@@ -260,7 +261,7 @@ export function SupporterHero({
                   type="button"
                   variant="outline"
                   size="icon"
-                  className="h-9 w-9 rounded-xl border-border/60 bg-background/70 shadow-none"
+                  className="h-10 w-10 rounded-xl border-border/60 bg-background/70 shadow-none"
                   aria-label="Choose which cards to show"
                   data-testid="button-supporter-customise"
                   onClick={onCustomise}
@@ -272,12 +273,11 @@ export function SupporterHero({
                 <a
                   href="#carer-emergency"
                   className={cn(
-                    "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border",
+                    "inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-full border px-3 text-xs font-semibold",
                     "hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    "sm:h-9 sm:w-auto sm:gap-1.5 sm:rounded-full sm:px-2.5 sm:text-xs sm:font-semibold",
                     calm
-                      ? "border-border/60 bg-background/70 text-muted-foreground sm:text-foreground"
-                      : "border-destructive/25 bg-destructive/[0.06] text-destructive hover:bg-destructive/10 sm:text-foreground",
+                      ? "border-border/60 bg-background/70 text-foreground"
+                      : "border-destructive/25 bg-destructive/[0.06] text-destructive hover:bg-destructive/10",
                   )}
                   aria-label="Jump to emergency details"
                   onClick={(e) => {
@@ -286,7 +286,7 @@ export function SupporterHero({
                   }}
                 >
                   <Phone className="h-4 w-4" aria-hidden />
-                  <span className="hidden sm:inline">Emergency</span>
+                  Emergency
                 </a>
               ) : null}
             </div>
@@ -427,7 +427,7 @@ export function SupporterQuickActions({
             asChild
             variant="ghost"
             size="sm"
-            className="h-8 gap-1.5 rounded-full px-3 text-xs font-medium text-muted-foreground no-underline hover:bg-muted/40 hover:text-foreground active:bg-muted/55"
+            className="h-10 gap-1.5 rounded-full px-3 text-[13px] font-medium text-muted-foreground no-underline hover:bg-muted/40 hover:text-foreground active:bg-muted/55"
             data-testid="button-switch-user-mode"
           >
             <Link href="/mode">

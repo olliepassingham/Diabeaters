@@ -1991,7 +1991,7 @@ export default function CarerViewPage() {
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="h-9 w-full text-xs text-muted-foreground hover:text-foreground"
+                        className="h-10 w-full text-[13px] text-muted-foreground hover:text-foreground"
                         onClick={() => setRecentHyposExpanded((open) => !open)}
                         data-testid="button-recent-hypos-expand"
                         aria-expanded={recentHyposExpanded}
@@ -2064,7 +2064,7 @@ export default function CarerViewPage() {
                           <li
                             key={s.id}
                             className={cn(
-                              "flex items-center gap-2.5 rounded-lg border px-2.5 py-2 text-sm",
+                              "flex items-center gap-2.5 rounded-lg border px-2.5 py-2.5 text-sm",
                               tone === "critical" && "border-destructive/35 bg-destructive/[0.04]",
                               tone === "low" && "border-amber-500/30 bg-amber-500/[0.04]",
                               tone === "ok" && "border-border/60 bg-background/40",
@@ -2073,7 +2073,7 @@ export default function CarerViewPage() {
                             <SupplyStockIndicator tone={tone} />
                             <span className="font-medium truncate min-w-0 flex-1">{s.name}</span>
                             <div className="flex items-center gap-2 shrink-0">
-                              <span className="text-muted-foreground tabular-nums text-right text-xs sm:text-sm">
+                              <span className="text-muted-foreground tabular-nums text-right text-[13px] sm:text-sm">
                                 {formatCarerSupplyQuantity(s, patientSupplyPackPrefs)}
                               </span>
                               {tone === "critical" && (

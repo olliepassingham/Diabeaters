@@ -523,6 +523,10 @@ export function ToolsHubPage({
     })).filter((section) => section.tools.length > 0);
 
   const filteredSupporterTools = supporterTools.filter(matchesTool);
+  // Beatie gets her own gold panel (same treatment as Guides) so she stands out
+  // as the way to find your way around Supporter Mode.
+  const supporterBeatieTool = filteredSupporterTools.find((tool) => tool.id === "ai-coach") ?? null;
+  const supporterRestTools = filteredSupporterTools.filter((tool) => tool.id !== "ai-coach");
   const filteredType2Care = type2Care.filter(matchesTool);
   const filteredType2Helpers = type2Helpers.filter(matchesTool);
   const noPatientMatches = hubVariant === "patient" && patientSectionTools.length === 0;
@@ -581,9 +585,26 @@ export function ToolsHubPage({
             </div>
             <ToolsAboutDialog hubVariant={hubVariant} />
           </div>
-          <HubListPanel label="Supporter tools">
-            <ToolRows tools={filteredSupporterTools} tone="accent" accent="teal" />
-          </HubListPanel>
+          {supporterBeatieTool ? (
+            <HubListPanel label={supporterBeatieTool.title} density="compact" className="hub-list-panel-beatie">
+              <HubListRow
+                href={supporterBeatieTool.href}
+                icon={supporterBeatieTool.icon}
+                title={supporterBeatieTool.title}
+                description={`Not sure where to find something? Ask ${AI_ASSISTANT_NAME} where to go`}
+                tone="accent"
+                onWarm={() => prefetchToolsDestinationHref(supporterBeatieTool.href)}
+                onPress={() => {
+                  void hapticLight();
+                }}
+              />
+            </HubListPanel>
+          ) : null}
+          {supporterRestTools.length > 0 ? (
+            <HubListPanel label="Supporter tools">
+              <ToolRows tools={supporterRestTools} tone="accent" accent="teal" />
+            </HubListPanel>
+          ) : null}
         </section>
       ) : hubVariant === "patient" ? (
         <div className="space-y-6">
