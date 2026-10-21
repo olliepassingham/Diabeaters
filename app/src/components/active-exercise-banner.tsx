@@ -45,6 +45,7 @@ import { getWorkoutElapsedMs } from "@/lib/exercise-session-timing";
 import { cn } from "@/lib/utils";
 import { CgmPrefillButton } from "@/components/cgm-prefill-button";
 import { useBgPrefill } from "@/hooks/use-bg-prefill";
+import { formatTargetBgInput } from "@/lib/hypo-context";
 import { cgmTrendForExercise } from "@/lib/cgm/apply-cgm-trend";
 import { getCgmEmptyHint } from "@/lib/cgm/cgm-empty-hint";
 import { isCgmPrefillActive } from "@/lib/cgm/preferences";
@@ -618,7 +619,9 @@ function getTypeConfig(type: ExerciseType): ExerciseTypeConfig {
 
 export function ActiveExerciseBanner() {
   const { toast } = useToast();
-  const { prefill: bgPrefill, loading: bgPrefillLoading, refresh: refreshBgPrefill } = useBgPrefill();
+  const { prefill: bgPrefill, loading: bgPrefillLoading, refresh: refreshBgPrefill } = useBgPrefill({
+    pollIntervalMs: 5 * 60_000,
+  });
   const cgmPrefillActive = isCgmPrefillActive();
   const [session, setSession] = useState<ActiveExerciseSession | null>(null);
   const [expanded, setExpanded] = useState(true);
@@ -912,6 +915,54 @@ export function ActiveExerciseBanner() {
         })
       : [];
 
+  // Quick-look current BG for the collapsed banner header: live CGM first, then the last logged check.
+  const liveReading = bgPrefill?.fromCgm ? (bgPrefill.reading ?? null) : null;
+  const headerBg = (() => {
+    if (!session || (session.phase !== "active" && session.phase !== "recovery")) return null;
+    if (liveReading) {
+      const trendIcon =
+        liveReading.trend === "rising"
+          ? TrendingUp
+          : liveReading.trend === "falling"
+            ? TrendingDown
+            : liveReading.trend === "flat"
+              ? Minus
+              : null;
+      return {
+        valueText: formatTargetBgInput(liveReading.value, liveReading.units),
+        unitsText: liveReading.units,
+        trendIcon,
+        caption: liveReading.ageMinutes >= 2 ? `${Math.round(liveReading.ageMinutes)}m` : null,
+        title: bgPrefill?.source ?? "Live CGM reading",
+      };
+    }
+    const loggedBg =
+      session.phase === "active"
+        ? activeEffectiveBg
+        : (session.recoveryBg ?? session.midBg ?? session.preBg ?? null);
+    if (loggedBg == null) return null;
+    const loggedTrend =
+      session.phase === "active"
+        ? (activeEffectiveTrend ?? null)
+        : (session.recoveryTrend ?? session.midTrend ?? session.preTrend ?? null);
+    const trendIcon =
+      loggedTrend === "rising"
+        ? TrendingUp
+        : loggedTrend === "falling"
+          ? TrendingDown
+          : loggedTrend === "flat"
+            ? Minus
+            : null;
+    return {
+      valueText: formatTargetBgInput(loggedBg, bgUnits as "mmol/L" | "mg/dL"),
+      unitsText: bgUnits,
+      trendIcon,
+      caption: "last check",
+      title: "Last logged BG",
+    };
+  })();
+  const HeaderBgTrendIcon = headerBg?.trendIcon ?? null;
+
   const typeConfig = session ? getTypeConfig(session.exerciseType) : null;
   const recoveryInsulinHeadline =
     session?.phase === "recovery" && exercisePlanResult
@@ -966,6 +1017,24 @@ export function ActiveExerciseBanner() {
                 </div>
 
                 <div className="flex shrink-0 items-center gap-2">
+                  {headerBg ? (
+                    <span
+                      className="flex items-center gap-1 rounded-full bg-background/70 px-2 py-0.5"
+                      data-testid="text-active-current-bg"
+                      title={headerBg.title}
+                    >
+                      <span className="text-sm font-semibold tabular-nums">{headerBg.valueText}</span>
+                      <span className="text-[10px] font-medium text-muted-foreground">{headerBg.unitsText}</span>
+                      {HeaderBgTrendIcon ? (
+                        <HeaderBgTrendIcon className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+                      ) : null}
+                      {headerBg.caption ? (
+                        <span className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+                          {headerBg.caption}
+                        </span>
+                      ) : null}
+                    </span>
+                  ) : null}
                   {session.phase === "active" && (
                     <span className="font-mono text-sm font-medium tabular-nums" data-testid="text-exercise-timer">
                       {formatElapsed(elapsed)}

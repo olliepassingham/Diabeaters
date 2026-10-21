@@ -47,10 +47,12 @@ export default function ScenarioExercisePage() {
           <div
             className={cn(
               "grid w-full min-w-0 gap-2 sm:flex sm:w-auto sm:justify-end sm:gap-2",
-              isAiCoachEnabled ? "grid-cols-2" : "grid-cols-1",
+              !active && isAiCoachEnabled ? "grid-cols-2" : "grid-cols-1",
             )}
           >
             <ScenarioCoachLink topic="exercise" className={cn(headerActionBtn, "gap-1.5")} />
+            {/* During a live session the workout card below owns the screen — routines can wait. */}
+            {!active ? (
             <Button variant="outline" size="sm" className={cn(headerActionBtn)} asChild>
               <Link
                 href="/routines?section=exercise"
@@ -67,6 +69,7 @@ export default function ScenarioExercisePage() {
                 <span className="hidden sm:inline">Exercise routines</span>
               </Link>
             </Button>
+            ) : null}
           </div>
         }
       />

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
+import { ChevronRight } from "lucide-react";
 import { carbsGramsToCloseBgGapMmol } from "@/lib/exercise-hypo-auto";
 import {
   exerciseCgmAlertAimOptions,
@@ -134,7 +135,8 @@ export function ExerciseAlertLevelControl({
         />
       </div>
       <p className="text-sm font-medium tabular-nums" data-testid="text-exercise-alert-carbs">
-        {formatBg(threshold, bgUnits)} → {formatBg(aim, bgUnits)} · {grams}g
+        At {formatBg(threshold, bgUnits)} {bgUnits} or below, about {grams}g fast carbs to get back to{" "}
+        {formatBg(aim, bgUnits)} {bgUnits}
       </p>
     </div>
   );
@@ -162,8 +164,9 @@ export function ExerciseAlertLevelsLink({ className }: { className?: string }) {
     >
       <Link href={EXERCISE_ALERT_LEVELS_HREF} data-testid="link-exercise-alert-levels">
         <span>Workout alerts</span>
-        <span className="tabular-nums text-muted-foreground">
-          {formatBg(threshold, bgUnits)} → {formatBg(aim, bgUnits)} · Change
+        <span className="flex items-center gap-1 tabular-nums text-muted-foreground">
+          Below {formatBg(threshold, bgUnits)} · back to {formatBg(aim, bgUnits)}
+          <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
         </span>
       </Link>
     </Button>

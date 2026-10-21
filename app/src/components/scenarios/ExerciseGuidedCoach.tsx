@@ -27,12 +27,16 @@ import {
   Pill,
   Play,
   History,
+  Minus,
+  RefreshCw,
   RotateCcw,
   Snowflake,
   Sparkles,
   Sun,
   Swords,
   Thermometer,
+  TrendingDown,
+  TrendingUp,
   Waves,
   Wind,
   X,
@@ -287,7 +291,7 @@ function ExercisePhaseStepper({
           <div key={step.id} className="flex flex-1 items-center gap-1.5">
             <div
               className={cn(
-                "flex h-7 min-w-0 flex-1 items-center justify-center gap-1 rounded-full text-[11px] font-medium transition-colors",
+                "flex h-8 min-w-0 flex-1 items-center justify-center gap-1 rounded-full text-xs font-medium transition-colors",
                 immersive
                   ? active
                     ? "bg-emerald-400/20 text-emerald-100 ring-1 ring-emerald-400/35"
@@ -1229,21 +1233,61 @@ export function ExerciseGuidedCoach() {
   const fuelPlanVariant =
     phase === "pre" ? "pre" : phase === "active" ? "active" : "recovery";
 
+  // Glanceable current level in the hero: live CGM first, then the latest logged check for this phase.
+  const heroBg = (() => {
+    if (cgmPrefill?.fromCgm && cgmPrefill.reading) {
+      return {
+        live: true as const,
+        label: "Now",
+        caption: cgmPrefill.source,
+        valueText: formatTargetBgInput(cgmPrefill.reading.value, cgmPrefill.reading.units),
+        unitsText: cgmPrefill.reading.units,
+        trend: cgmPrefill.reading.trend,
+      };
+    }
+    const logged =
+      phase === "pre"
+        ? { value: activeSession.preBg, trend: activeSession.preTrend, at: activeSession.preBgAt, label: "Starting BG" }
+        : phase === "active"
+          ? {
+              value: activeSession.midBg ?? activeSession.preBg,
+              trend: activeSession.midTrend ?? activeSession.preTrend,
+              at: activeSession.midBgAt ?? activeSession.preBgAt,
+              label: "Last check",
+            }
+          : {
+              value: activeSession.recoveryBg ?? activeSession.midBg ?? activeSession.preBg,
+              trend: activeSession.recoveryTrend ?? activeSession.midTrend ?? activeSession.preTrend,
+              at: activeSession.recoveryBgAt ?? activeSession.midBgAt ?? activeSession.preBgAt,
+              label: "Last check",
+            };
+    if (logged.value == null) return null;
+    const atDate = logged.at ? new Date(logged.at) : null;
+    const atLabel =
+      atDate && !Number.isNaN(atDate.getTime())
+        ? atDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+        : null;
+    return {
+      live: false as const,
+      label: logged.label,
+      caption: atLabel ? `Logged ${atLabel}` : "From your check-in below",
+      valueText: formatTargetBgInput(logged.value, bgUnits),
+      unitsText: bgUnits,
+      trend: logged.trend ?? null,
+    };
+  })();
+  const HeroBgTrendIcon =
+    heroBg?.trend === "rising"
+      ? TrendingUp
+      : heroBg?.trend === "falling"
+        ? TrendingDown
+        : heroBg?.trend === "flat"
+          ? Minus
+          : null;
+
   return (
     <div className="space-y-4 max-sm:space-y-3" data-testid="exercise-guided-coach">
-      <div className="relative overflow-hidden rounded-[1.75rem] border border-border/50 bg-card/95 text-foreground shadow-sm">
-        <div
-          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-muted/40 via-transparent to-muted/20"
-          aria-hidden
-        />
-        <div
-          className={cn(
-            "pointer-events-none absolute -top-28 left-1/2 h-64 w-64 -translate-x-1/2 rounded-full blur-3xl transition-colors duration-700",
-            hypoCoachSuggestion ? "bg-amber-400/15 dark:bg-amber-400/10" : "bg-emerald-400/12 dark:bg-emerald-400/10",
-          )}
-          aria-hidden
-        />
-
+      <div className="relative overflow-hidden rounded-3xl border border-border/50 bg-card text-foreground shadow-sm">
         <div className="relative z-10 space-y-5 p-4 sm:p-5">
           <div className="flex items-start gap-3">
             <div
@@ -1253,8 +1297,8 @@ export function ExerciseGuidedCoach() {
               <ExerciseTypeIcon type={activeSession.exerciseType} className="h-5 w-5" />
             </div>
             <div className="min-w-0 flex-1 space-y-0.5 pt-0.5">
-              <p className="truncate text-lg font-semibold tracking-tight text-foreground">{activeSession.exerciseName}</p>
-              <p className="text-xs text-muted-foreground" data-testid="text-coach-session-meta">
+              <p className="truncate text-xl font-semibold tracking-tight text-foreground">{activeSession.exerciseName}</p>
+              <p className="text-[13px] text-muted-foreground" data-testid="text-coach-session-meta">
                 {sessionMetaLine(activeSession)}
               </p>
             </div>
@@ -1264,7 +1308,7 @@ export function ExerciseGuidedCoach() {
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                    className="h-10 w-10 shrink-0 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
                     data-testid="button-coach-end-session"
                     aria-label="End session"
                   >
@@ -1384,6 +1428,41 @@ export function ExerciseGuidedCoach() {
           ) : null}
 
           <ExercisePhaseStepper phase={phase} />
+
+          {heroBg ? (
+            <div
+              className="flex items-center gap-3 rounded-2xl border border-border/60 bg-muted/25 px-3.5 py-2.5"
+              data-testid="coach-current-bg"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  {heroBg.label}
+                </p>
+                <p className="truncate text-[11px] text-muted-foreground">{heroBg.caption}</p>
+              </div>
+              <p className="flex shrink-0 items-baseline gap-1">
+                <span className="text-[1.7rem] font-semibold leading-none tabular-nums">{heroBg.valueText}</span>
+                <span className="text-xs font-medium text-muted-foreground">{heroBg.unitsText}</span>
+                {HeroBgTrendIcon ? (
+                  <HeroBgTrendIcon className="h-4 w-4 self-center text-muted-foreground" aria-hidden />
+                ) : null}
+              </p>
+              {heroBg.live ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0"
+                  onClick={() => void refreshCgm()}
+                  disabled={cgmLoading}
+                  aria-label="Refresh glucose"
+                  data-testid="button-coach-refresh-live-bg"
+                >
+                  <RefreshCw className={cn("h-3.5 w-3.5", cgmLoading && "animate-spin")} aria-hidden />
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="space-y-4" data-testid="coach-phase-card">
             {phase === "active" && phaseTimerLabel ? (

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dumbbell, ArrowRight, Plus, Flame, Zap, Wind, Footprints, Users, Waves, Play, CircleDot } from "lucide-react";
+import { Dumbbell, ArrowRight, Plus, Flame, Zap, Wind, Footprints, Users, Waves, Play, CircleDot, TrendingDown, TrendingUp, Minus } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { storage, ExerciseRoutine, ExerciseType, ActiveExerciseSession, DIABEATER_SCENARIO_STATE_CHANGED_EVENT } from "@/lib/storage";
 import { buildExerciseScenarioPlannerHref, buildExerciseScenarioPlannerHrefFromSession } from "@/lib/exercise-planner-href";
@@ -21,6 +21,7 @@ import {
   type ExerciseRoutineAdjustValues,
 } from "@/components/exercise-routine-adjust-sheet";
 import { useBgPrefill } from "@/hooks/use-bg-prefill";
+import { formatTargetBgInput } from "@/lib/hypo-context";
 import { EXERCISE_CGM_POLL_MS } from "@/hooks/use-exercise-cgm-bg";
 import { cgmTrendForExercise } from "@/lib/cgm/apply-cgm-trend";
 import { isStarterExerciseRoutine, seedStarterExerciseRoutineIfNeeded } from "@/lib/starter-exercise-routine";
@@ -141,6 +142,33 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
       exerciseLowThreshold: Number.isFinite(lowThreshold) ? lowThreshold : undefined,
       carbsIfLow: plan.pre.carbsIfLow,
     });
+  }, [activeSession, cgmPrefill]);
+
+  // Glanceable current level while a workout or recovery window is running: live CGM first, then the last logged check.
+  const currentBgDisplay = useMemo(() => {
+    if (!activeSession || activeSession.phase === "pre") return null;
+    const profile = storage.getProfile();
+    const units = (profile?.bgUnits === "mg/dL" ? "mg/dL" : "mmol/L") as "mmol/L" | "mg/dL";
+    if (cgmPrefill?.fromCgm && cgmPrefill.reading) {
+      return {
+        valueText: formatTargetBgInput(cgmPrefill.reading.value, cgmPrefill.reading.units),
+        unitsText: cgmPrefill.reading.units,
+        trend: cgmPrefill.reading.trend,
+        caption: cgmPrefill.source,
+      };
+    }
+    const loggedBg = resolveExerciseBgForHypo(activeSession);
+    if (loggedBg == null) return null;
+    const trend =
+      activeSession.phase === "active"
+        ? (activeSession.midTrend ?? activeSession.preTrend ?? null)
+        : (activeSession.recoveryTrend ?? activeSession.midTrend ?? activeSession.preTrend ?? null);
+    return {
+      valueText: formatTargetBgInput(loggedBg, units),
+      unitsText: units,
+      trend,
+      caption: "Last logged check",
+    };
   }, [activeSession, cgmPrefill]);
 
   const widgetReadiness = useMemo(() => {
@@ -341,6 +369,30 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
                 </p>
               </div>
             </div>
+            {currentBgDisplay ? (
+              <div
+                className="flex items-center justify-between gap-3 rounded-lg bg-background/70 px-2.5 py-2"
+                data-testid="widget-exercise-current-bg"
+              >
+                <div className="min-w-0">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                    Current BG
+                  </p>
+                  <p className="truncate text-[11px] text-muted-foreground">{currentBgDisplay.caption}</p>
+                </div>
+                <p className="flex shrink-0 items-baseline gap-1">
+                  <span className="text-xl font-semibold leading-none tabular-nums">{currentBgDisplay.valueText}</span>
+                  <span className="text-[11px] font-medium text-muted-foreground">{currentBgDisplay.unitsText}</span>
+                  {currentBgDisplay.trend === "rising" ? (
+                    <TrendingUp className="h-4 w-4 self-center text-muted-foreground" aria-label="Rising" />
+                  ) : currentBgDisplay.trend === "falling" ? (
+                    <TrendingDown className="h-4 w-4 self-center text-muted-foreground" aria-label="Falling" />
+                  ) : currentBgDisplay.trend === "flat" ? (
+                    <Minus className="h-4 w-4 self-center text-muted-foreground" aria-label="Steady" />
+                  ) : null}
+                </p>
+              </div>
+            ) : null}
             {activeSession.phase === "active" && activeSession.exerciseStartedAt ? (
               <ExerciseWorkoutProgressBar
                 phase={activeSession.phase}
