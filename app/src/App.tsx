@@ -3,6 +3,7 @@ import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from "re
 import { Switch, Route, useLocation, useSearch, Redirect } from "wouter";
 import { QueryClientProvider, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
+import { initRouteAnalytics, recordRouteView } from "@/lib/route-analytics";
 
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -811,6 +812,18 @@ function FamilyCarersGate() {
   );
 }
 
+/** Records normalised screen views for owner analytics (signed-in shell only). */
+function RouteViewTracker() {
+  const [location] = useLocation();
+  useEffect(() => {
+    initRouteAnalytics();
+  }, []);
+  useEffect(() => {
+    recordRouteView(location);
+  }, [location]);
+  return null;
+}
+
 /**
  * Authenticated shell — wouter <Switch> inside ProtectedLayout (same branch as Dashboard).
  * Single app-level <Router> is in main.tsx (wouter; not react-router BrowserRouter).
@@ -818,6 +831,8 @@ function FamilyCarersGate() {
  */
 function InnerRouter() {
   return (
+    <>
+    <RouteViewTracker />
     <Switch>
       <Route path="/mode">
         <Suspense fallback={<RouteFallback />}>
@@ -1212,6 +1227,7 @@ function InnerRouter() {
         </Suspense>
       </Route>
     </Switch>
+    </>
   );
 }
 
