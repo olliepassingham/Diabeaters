@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -106,7 +106,25 @@ export default function HelpNow() {
   const isType2 = profile?.diabetesType === "type2" || isType2AppSession(profile);
   const isPumpUser =
     !isType2 && isPumpDeliveryMethod(profile?.insulinDeliveryMethod);
-  const unconsciousSteps = isType2 ? UNCONSCIOUS_STEPS_TYPE2 : UNCONSCIOUS_STEPS_TYPE1;
+  const unconsciousSteps = useMemo(() => {
+    const steps: string[] = [...(isType2 ? UNCONSCIOUS_STEPS_TYPE2 : UNCONSCIOUS_STEPS_TYPE1)];
+    // Pump wearers: a pump/loop may keep delivering basal — surface this inside the step flow.
+    if (isPumpUser) {
+      steps.splice(
+        1,
+        0,
+        "They wear an insulin pump — do not disconnect it. If you know how and their plan says so, suspend delivery, and point out the pump and where it connects to their body to paramedics.",
+      );
+    }
+    if (!isType2) {
+      steps.splice(
+        steps.length - 1,
+        0,
+        "If they have glucagon and you've been shown how, use it as their plan describes.",
+      );
+    }
+    return steps;
+  }, [isType2, isPumpUser]);
 
   const emergencyDockClearance =
     "calc(var(--bottom-nav-height, 7.5rem) + var(--keyboard-inset-bottom, 0px) + 7rem)";

@@ -303,6 +303,21 @@ export default function CorrectionHelpPage() {
 
               {parsedBg != null && result ? (
                 <div className="space-y-3">
+                  {isPump && parsedBg - targetForCalc >= (bgUnits === "mg/dL" ? 90 : 5) ? (
+                    <Alert
+                      className="rounded-2xl border-amber-200/80 bg-amber-50/70 py-2.5 dark:border-amber-800 dark:bg-amber-950/25"
+                      data-testid="alert-correction-pump-set-check"
+                    >
+                      <AlertDescription className="text-xs leading-snug sm:text-sm">
+                        High not coming down, or ketones present? Check your infusion set/site and reservoir
+                        first — insulin through a failed set may not be arriving.{" "}
+                        <Link href="/scenarios/pump-failure" className="font-semibold text-primary underline-offset-4 hover:underline">
+                          Open Pump failure
+                        </Link>{" "}
+                        — and use a pen correction only if your written plan says so.
+                      </AlertDescription>
+                    </Alert>
+                  ) : null}
                   {result.status === "dose" ? (
                     <ScenarioResultHero
                       label={remainingAfterIob != null ? "After pump IOB" : "Standard correction"}

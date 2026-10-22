@@ -214,9 +214,18 @@ export function buildAlcoholSituationOutcome(
       kind: "estimate",
       meal,
       alcoholGuidance,
-      tips: input.isPump && (input.pumpIobUnits == null || !Number.isFinite(input.pumpIobUnits))
-        ? ["Enter insulin on board from the pump so this estimate can subtract insulin still working."]
-        : [],
+      tips: [
+        ...(input.isPump && (input.pumpIobUnits == null || !Number.isFinite(input.pumpIobUnits))
+          ? ["Enter insulin on board from the pump so this estimate can subtract insulin still working."]
+          : []),
+        ...(input.isPump
+          ? [
+              "Pump: if your team has a drinking-night plan, it may include a reduced temp basal or a sleep/exercise mode overnight — don't suspend basal unless they've told you to.",
+            ]
+          : [
+              "Pens: keep your usual long-acting dose unless your team has given you a drinking-night plan — it can't be reduced overnight, so bedtime checks and a snack per your plan matter.",
+            ]),
+      ],
       disclaimer: ESTIMATE_DISCLAIMER,
     };
   }

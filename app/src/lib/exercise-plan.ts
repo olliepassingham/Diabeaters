@@ -713,7 +713,7 @@ export function calculateExercisePlan(
   }
 
   if (context.minutesUntilStart >= 75 && intensity !== "light") {
-    preTips.push("Extra lead time: good window to set temp basal or snack plan if your team uses those strategies.");
+    preTips.push("Extra lead time: use it to line up your snack and insulin plan before you start.");
   }
 
   if (typeKey !== "exercise") {
@@ -871,6 +871,15 @@ export function calculateExercisePlan(
       ...pumpTips,
       pre: [
         `With ~${context.minutesUntilStart} min until start, you have time to start or adjust a temporary basal as discussed with your team.`,
+        ...pumpTips.pre,
+      ],
+    };
+  }
+  if (!closedLoop && context.minutesUntilStart < 60 && intensity !== "light") {
+    pumpTips = {
+      ...pumpTips,
+      pre: [
+        "Starting within the hour: a temp basal set now can still help later in the session — the 60–90 minute lead works best when you have it, so don't skip it just because you're starting soon.",
         ...pumpTips.pre,
       ],
     };

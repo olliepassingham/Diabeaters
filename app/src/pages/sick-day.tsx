@@ -412,6 +412,18 @@ function calculateSickDayRecommendations(
       break;
   }
 
+  // Pump + significant ketones: insulin through a failing set may not be arriving.
+  // Route to a set change and pen correction alongside the standard ketone guidance.
+  if (isPump && (ketoneLevel === "moderate" || ketoneLevel === "large")) {
+    ketoneGuidance +=
+      " On a pump: change the infusion set/site now and give this correction by pen using your backup plan. Keep using pen corrections until glucose and ketones are falling, then restart the pump on the new set. Recheck in 1–2 hours.";
+    ketoneGuidanceBrief += " Change set/site; correct by pen.";
+  } else if (isPump && ketoneLevel === "small" && isVeryHighBg) {
+    ketoneGuidance +=
+      " On a pump: if glucose isn't coming down after a correction, change the infusion set/site and correct by pen using your backup plan.";
+    ketoneGuidanceBrief += " If BG stays high, change set/site.";
+  }
+
   // Override with critical BG warning if applicable
   if (isCriticalBg) {
     ketoneWarning = "URGENT: Blood glucose is critically high. " + (ketoneLevel === "none" 

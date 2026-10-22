@@ -178,6 +178,7 @@ export function BedtimeResultView({
           isPumpUser={isPumpUser}
           hoursUntilSleep={hoursUntilSleep}
           variant="compact"
+          closedLoop={loopOn}
         />
       ) : null}
 
@@ -293,6 +294,7 @@ export function BedtimeResultView({
                   isPumpUser={isPumpUser}
                   hoursUntilSleep={hoursUntilSleep}
                   variant="details"
+                  closedLoop={loopOn}
                 />
               </section>
             ) : null}

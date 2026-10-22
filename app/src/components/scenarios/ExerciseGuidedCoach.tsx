@@ -1566,7 +1566,7 @@ export function ExerciseGuidedCoach() {
               <ExercisePumpTipsCard tips={phasePumpTips} data-testid={`coach-pump-tips-${phase}`} />
             ) : null}
 
-            {closedLoop && phase === "pre" && closedLoopExercisePrePrompt(true) ? (
+            {isPump && closedLoop && phase === "pre" && closedLoopExercisePrePrompt(true) ? (
               <p className="text-xs leading-relaxed text-muted-foreground" data-testid="coach-closed-loop-pre-prompt">
                 {closedLoopExercisePrePrompt(true)}
               </p>
@@ -1581,6 +1581,7 @@ export function ExerciseGuidedCoach() {
                     bgInput={bgInput}
                     onTrendChange={onTrendChange}
                     update={update}
+                    isPump={isPump}
                     {...cgmPhaseProps}
                   />
                 </TabsContent>
@@ -1636,6 +1637,7 @@ type PhaseProps = {
   cgmEmptyHint?: string;
   onCgmRefresh: () => void;
   onBgFieldChange: (v: string) => void;
+  isPump?: boolean;
 };
 
 /** How many "More context" fields the user has already filled in — shown as a quiet badge. */
@@ -1674,6 +1676,7 @@ function PreQuestions({
   cgmEmptyHint,
   onCgmRefresh,
   onBgFieldChange,
+  isPump,
 }: PhaseProps) {
   const sleepPresets = [4, 6, 8, 10] as const;
   const sleepIsPreset = session.preSleepHours != null && sleepPresets.includes(session.preSleepHours as (typeof sleepPresets)[number]);
@@ -1707,6 +1710,32 @@ function PreQuestions({
           }}
         />
       </FieldRow>
+
+      {isPump ? (
+        <FieldRow icon={Pill} label="Pump insulin on board (optional)">
+          <div className="relative w-28">
+            <Input
+              type="text"
+              inputMode="decimal"
+              placeholder="0.0"
+              value={session.preIobUnits != null ? String(session.preIobUnits) : ""}
+              onChange={(e) => {
+                const raw = e.target.value.trim();
+                const parsed = raw === "" ? undefined : Number.parseFloat(raw);
+                update({
+                  preIobUnits: parsed != null && Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined,
+                });
+              }}
+              className="h-10 rounded-xl pr-7 tabular-nums"
+              data-testid="input-coach-pump-iob"
+              aria-label="Pump insulin on board in units"
+            />
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+              u
+            </span>
+          </div>
+        </FieldRow>
+      ) : null}
 
       <DeeperContextSection title="More context" icon={Sparkles} badgeCount={countMoreContextSelections(session)}>
         <Field label="Anything else going on?">

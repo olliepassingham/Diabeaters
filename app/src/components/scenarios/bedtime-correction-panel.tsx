@@ -207,11 +207,13 @@ export function BedtimeCorrectionPanel({
   isPumpUser,
   hoursUntilSleep,
   variant = "compact",
+  closedLoop = false,
 }: {
   correction: BedtimeCorrectionData;
   isPumpUser: boolean;
   hoursUntilSleep: string;
   variant?: "compact" | "details";
+  closedLoop?: boolean;
 }) {
   const warnings = buildWarnings(correction, hoursUntilSleep);
   const topWarning = warnings[0];
@@ -221,9 +223,20 @@ export function BedtimeCorrectionPanel({
   const fullLabel = formatInsulinUnits(correction.fullDose, increment);
   const why = compactWhyLine(correction);
 
+  const loopNote = closedLoop ? (
+    <p
+      className="rounded-xl border border-border/60 bg-muted/30 px-3 py-2.5 text-sm leading-snug text-foreground/90"
+      data-testid="text-correction-closed-loop-note"
+    >
+      Closed loop: your system may already be correcting this high. Many teams advise letting the loop work and
+      rechecking rather than stacking a manual dose on top — follow your team&apos;s rule if you have one.
+    </p>
+  ) : null;
+
   if (variant === "details") {
     return (
       <div className="space-y-3" data-testid="card-correction-suggestion">
+        {loopNote}
         <WarningsList warnings={warnings} />
         <CalculationDetails correction={correction} isPumpUser={isPumpUser} />
       </div>
@@ -279,6 +292,7 @@ export function BedtimeCorrectionPanel({
           <span data-testid={topWarning.testId}>{compactWarningText(topWarning)}</span>
         </div>
       ) : null}
+      {loopNote}
     </div>
   );
 }

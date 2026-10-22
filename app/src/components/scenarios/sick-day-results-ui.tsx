@@ -643,10 +643,13 @@ export function SickDayResultsPanel({
             <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-2 border-t border-border/50 px-4 pb-4 pt-3 text-sm leading-relaxed text-foreground/85">
-            <p>Change set/site if glucose stays high after two corrections.</p>
+            <p>Change set/site if glucose stays high after a correction.</p>
             <p>Use your pump calculator and check IOB.</p>
             {(ketoneLevel === "moderate" || ketoneLevel === "large") && (
-              <p className="font-medium">Moderate/large ketones: pens may be safer — ask your team.</p>
+              <p className="font-medium">
+                Moderate/large ketones: change the set/site now and correct by pen using your backup plan, as
+                above.
+              </p>
             )}
           </CollapsibleContent>
         </Collapsible>

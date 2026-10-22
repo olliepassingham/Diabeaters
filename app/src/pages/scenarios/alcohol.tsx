@@ -596,6 +596,7 @@ function AlcoholEstimateResult({
   situationLabel,
   drinkSummary,
   foodCarbsGrams,
+  tips,
   onEdit,
   onReset,
 }: {
@@ -606,6 +607,7 @@ function AlcoholEstimateResult({
   situationLabel: string | null;
   drinkSummary: AlcoholDrinkSummary | null;
   foodCarbsGrams: number;
+  tips: string[];
   onEdit: () => void;
   onReset: () => void;
 }) {
@@ -689,6 +691,19 @@ function AlcoholEstimateResult({
           ).map((patternId) => (
             <p key={patternId} className="text-base leading-snug text-foreground">
               {DRINK_PATTERN_TITLE[patternId]}
+            </p>
+          ))}
+        </div>
+      ) : null}
+
+      {tips.length > 0 ? (
+        <div className="space-y-2" data-testid="alcohol-estimate-tips">
+          {tips.map((tip) => (
+            <p
+              key={tip}
+              className="rounded-xl border border-border/50 bg-muted/20 px-3 py-2.5 text-base leading-relaxed text-foreground/90"
+            >
+              {tip}
             </p>
           ))}
         </div>
@@ -1489,6 +1504,7 @@ export default function AlcoholScenarioPage() {
                 situationLabel={activeSituation?.title ?? null}
                 drinkSummary={drinkSummary}
                 foodCarbsGrams={foodCarbsGrams}
+                tips={outcome.tips}
                 onEdit={backToInputs}
                 onReset={resetFlow}
               />
