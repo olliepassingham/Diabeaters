@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useInfiniteQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
+import type { CommunityFeedQueryKey } from "@/lib/community-feed-cache";
 import { Loader2, RefreshCw, SearchX, Users } from "lucide-react";
 import { EmptyState, FeedLoadingSkeleton } from "@/components/empty-state";
 import { FeedPostCard } from "@/components/community/feed-post-card";
@@ -229,6 +230,22 @@ export function FeedPostList(props: {
   >({
     queryKey: feedQueryKey,
     initialPageParam: null as FeedCursor | null,
+    // While a new search term loads, keep the current posts on screen instead
+    // of flashing back to the loading skeleton on every keystroke. Only within
+    // the same lane (tab/topic/saved) — a lane switch still starts fresh.
+    placeholderData: (previousData, previousQuery) => {
+      if (!previousData || !previousQuery) return undefined;
+      const prevKey = previousQuery.queryKey as unknown as CommunityFeedQueryKey;
+      const laneOf = (key: CommunityFeedQueryKey) => String(key[3] ?? "").replace(/^search:/, "");
+      // Key slot 1 (scope) embeds the raw search text, so it changes on every
+      // keystroke — lane identity lives in the viewer/tab/topic/saved slots.
+      const sameLane =
+        prevKey[2] === feedQueryKey[2] &&
+        laneOf(prevKey) === laneOf(feedQueryKey) &&
+        prevKey[4] === feedQueryKey[4] &&
+        prevKey[7] === feedQueryKey[7];
+      return sameLane ? previousData : undefined;
+    },
     enabled: isSupabaseConfigured(),
     staleTime: COMMUNITY_FEED_STALE_MS,
     gcTime: 10 * 60_000,

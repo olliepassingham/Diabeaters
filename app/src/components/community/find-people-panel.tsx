@@ -154,6 +154,7 @@ function FindPeoplePanelBody({
   query,
   onQueryChange,
   peopleLoading,
+  peoplePending,
   peopleError,
   peopleResults,
   suggested,
@@ -170,6 +171,8 @@ function FindPeoplePanelBody({
   query: string;
   onQueryChange: (value: string) => void;
   peopleLoading: boolean;
+  /** True while results for the current query text haven't arrived yet. */
+  peoplePending: boolean;
   peopleError: string | null;
   peopleResults: FindPeoplePerson[];
   suggested: FollowSuggestion[];
@@ -211,7 +214,9 @@ function FindPeoplePanelBody({
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
           {searching
-            ? "Matching public handles as you type."
+            ? peoplePending
+              ? "Searching…"
+              : "Matching public handles as you type."
             : "Browse suggestions below, or search to find someone by @handle."}
         </p>
       </div>
@@ -222,7 +227,7 @@ function FindPeoplePanelBody({
       >
         {searching ? (
           <div className="space-y-2">
-            {peopleLoading && peopleResults.length === 0 ? (
+            {peoplePending && peopleResults.length === 0 ? (
               <ul className="space-y-2" aria-busy="true">
                 {Array.from({ length: 4 }, (_, i) => (
                   <FindPeoplePersonSkeleton key={i} />
@@ -230,13 +235,13 @@ function FindPeoplePanelBody({
               </ul>
             ) : null}
             {peopleError ? <p className="px-1 text-sm text-destructive">{peopleError}</p> : null}
-            {!peopleLoading && !peopleError && peopleResults.length === 0 ? (
+            {!peoplePending && !peopleLoading && !peopleError && peopleResults.length === 0 ? (
               <p className="px-1 py-6 text-center text-sm text-muted-foreground">
                 No one found for @{trimmed.replace(/^@/, "")}. Check the spelling or try another handle.
               </p>
             ) : null}
             {peopleResults.length > 0 ? (
-              <ul className="space-y-2" aria-busy={peopleLoading}>
+              <ul className="space-y-2" aria-busy={peoplePending}>
                 {peopleResults.map((p) => {
                   const isFollowing = Boolean(userId && followeeIds.has(p.id));
                   return (
@@ -350,7 +355,12 @@ export function FindPeoplePanel({
   const [peopleLoading, setPeopleLoading] = useState(false);
   const [peopleError, setPeopleError] = useState<string | null>(null);
   const [peopleResults, setPeopleResults] = useState<FindPeoplePerson[]>([]);
+  /** The query text the current results/error belong to — drives flicker-free states. */
+  const [peopleSettledQuery, setPeopleSettledQuery] = useState("");
   const searchRequestRef = useRef(0);
+
+  const trimmedPeopleQuery = query.trim().replace(/^@/, "");
+  const peoplePending = Boolean(trimmedPeopleQuery) && peopleSettledQuery !== trimmedPeopleQuery;
 
   const visibleAuthorIds = useMemo(() => {
     const ids = new Set<string>();
@@ -371,6 +381,7 @@ export function FindPeoplePanel({
       setPeopleLoading(false);
       setPeopleError(null);
       setPeopleResults([]);
+      setPeopleSettledQuery("");
       searchRequestRef.current += 1;
       return;
     }
@@ -386,6 +397,7 @@ export function FindPeoplePanel({
         setPeopleLoading(false);
         setPeopleError(null);
         setPeopleResults([]);
+        setPeopleSettledQuery("");
         return;
       }
       const requestId = searchRequestRef.current + 1;
@@ -395,6 +407,7 @@ export function FindPeoplePanel({
       void searchProfilesByHandlePrefix(q, 12).then((res) => {
         if (requestId !== searchRequestRef.current) return;
         setPeopleLoading(false);
+        setPeopleSettledQuery(q);
         if (res.error) {
           setPeopleError(res.error.message);
           setPeopleResults([]);
@@ -425,6 +438,7 @@ export function FindPeoplePanel({
     query,
     onQueryChange: setQuery,
     peopleLoading,
+    peoplePending,
     peopleError,
     peopleResults,
     suggested,
