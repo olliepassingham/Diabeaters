@@ -1045,7 +1045,11 @@ export default function Settings() {
   const pathOnly = (location.split("?")[0] ?? "/settings").replace(/\/$/, "") || "/settings";
   const skipSettingsHashScrollRef = useRef(false);
 
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  // Seed from storage so clinical gates (Ratios etc.) are correct on first
+  // render — a null profile here reads as "no insulin tools" and the
+  // redirect effect below would bounce /settings/ratios straight back.
+  const [profile, setProfile] = useState<UserProfile | null>(() => storage.getProfile());
+  const [profileReady, setProfileReady] = useState(false);
   const [settings, setSettings] = useState<UserSettings>({});
   const [userDisplayName, setUserDisplayName] = useState("");
 
@@ -1240,9 +1244,13 @@ export default function Settings() {
     }
     
     setNotifSettings(storage.getNotificationSettings());
+    setProfileReady(true);
   }, []);
 
   useEffect(() => {
+    // Wait for the initial profile load — before it lands, insulinClinical
+    // reads false and would bounce insulin users off Ratios on mount.
+    if (!profileReady) return;
     if (
       hidePatientClinicalHub &&
       (pathOnly === "/settings/usage" || pathOnly === "/settings/ratios" || pathOnly === "/settings/pharmacy" || pathOnly === "/settings/carb-sources")
@@ -1260,7 +1268,7 @@ export default function Settings() {
     ) {
       setLocation("/settings");
     }
-  }, [hidePatientClinicalHub, insulinClinical, isType2Settings, pathOnly, setLocation]);
+  }, [profileReady, hidePatientClinicalHub, insulinClinical, isType2Settings, pathOnly, setLocation]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
