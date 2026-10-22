@@ -28,6 +28,7 @@ import {
   ProfileSectionHeading,
   ProfileSupportedPersonBadge,
 } from "@/components/profile/profile-ui";
+import { PublicTechChips } from "@/components/profile/public-tech-chips";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -191,6 +192,10 @@ export default function CommunityProfilePage() {
             is_public: full.is_public,
             diabetes_onset_date: full.diabetes_onset_date ?? null,
             diabetes_type: selfType,
+            tech_sensor: full.tech_sensor ?? null,
+            tech_delivery: full.tech_delivery ?? null,
+            tech_closed_loop: full.tech_closed_loop === true,
+            show_tech_on_profile: full.show_tech_on_profile === true,
             streaks,
             achievements: streaks,
             supported_person: supportedRes.data,
@@ -507,6 +512,8 @@ export default function CommunityProfilePage() {
                 emptyLabel={isBeatieProfile ? BEATIE_FEED_BOT_DEFAULT_BIO : "No bio yet."}
               />
             ) : null}
+
+            <PublicTechChips profile={profile} testId="community-profile-tech-chips" />
 
             {profile.supported_person || user || !isSelf ? (
               <div className="flex flex-wrap items-center gap-1.5">

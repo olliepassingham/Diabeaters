@@ -3,6 +3,7 @@ import {
   listFolloweeIdsForCurrentUser,
 } from "@/lib/community";
 import { getProfilesByIds, type ProfileRow } from "@/lib/profile";
+import { publicTechLine } from "@/lib/profile-tech";
 import { getSupabase } from "@/lib/supabase";
 
 export type FollowSuggestionReason =
@@ -19,6 +20,8 @@ export type FollowSuggestion = {
   handle: string;
   reason: FollowSuggestionReason;
   reasonLabel: string;
+  /** One-line tech summary when the member shares their tech publicly. */
+  techLine?: string | null;
 };
 
 const REASON_LABELS: Record<FollowSuggestionReason, string> = {
@@ -52,6 +55,7 @@ function profileToSuggestion(
     handle,
     reason,
     reasonLabel: REASON_LABELS[reason],
+    techLine: publicTechLine(pr),
   };
 }
 

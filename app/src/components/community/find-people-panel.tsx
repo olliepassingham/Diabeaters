@@ -14,6 +14,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { type FollowSuggestion } from "@/lib/community";
 import { pickStoryToOpen, type CommunityStoryRow, type StoryRingState } from "@/lib/community/stories-supabase";
 import { searchProfilesByHandlePrefix } from "@/lib/profile";
+import { publicTechLine } from "@/lib/profile-tech";
 
 type FindPeoplePerson = {
   id: string;
@@ -21,6 +22,7 @@ type FindPeoplePerson = {
   avatar_url: string | null;
   handle: string;
   reasonLabel?: string;
+  techLine?: string | null;
 };
 
 function preventDialogAutoFocus(e: Event) {
@@ -96,6 +98,9 @@ function FindPeoplePersonRow({
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold leading-tight text-foreground">{person.name}</p>
             <p className="truncate text-xs text-muted-foreground">@{person.handle}</p>
+            {person.techLine ? (
+              <p className="mt-0.5 truncate text-[11px] font-medium text-primary/90">{person.techLine}</p>
+            ) : null}
             {showReason && person.reasonLabel ? (
               <p className="mt-0.5 truncate text-[11px] text-muted-foreground/90">{person.reasonLabel}</p>
             ) : null}
@@ -297,6 +302,7 @@ function FindPeoplePanelBody({
                         avatar_url: p.avatar_url,
                         handle: p.handle,
                         reasonLabel: p.reasonLabel,
+                        techLine: p.techLine,
                       }}
                       showReason
                       isSelf={Boolean(userId && p.id === userId)}
@@ -421,6 +427,7 @@ export function FindPeoplePanel({
             name: p.full_name?.trim() || p.id.slice(0, 8),
             avatar_url: p.avatar_url ?? null,
             handle: (p.public_handle ?? "").trim(),
+            techLine: publicTechLine(p),
           }))
           .filter((p) => Boolean(p.handle));
         setPeopleResults(mapped);

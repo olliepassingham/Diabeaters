@@ -129,6 +129,28 @@ describe("AccountCommunityProfileFields", () => {
     );
   });
 
+  it("shows the tech pickers in edit mode and saves the opt-in", async () => {
+    const view = renderWithRouter(<AccountCommunityProfileFields />);
+    fireEvent.click(view.getByTestId("account-community-edit"));
+    expect(view.getByTestId("account-community-tech-sensor")).toBeTruthy();
+    expect(view.getByTestId("account-community-tech-delivery")).toBeTruthy();
+
+    fireEvent.click(view.getByTestId("account-community-tech-show"));
+    fireEvent.click(view.getByTestId("account-community-save"));
+
+    await waitFor(() => {
+      expect(profileLib.updateProfile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: "u1",
+          tech_sensor: null,
+          tech_delivery: null,
+          tech_closed_loop: false,
+          show_tech_on_profile: true,
+        }),
+      );
+    });
+  });
+
   it("reverts switch and toasts error when updateProfile fails", async () => {
     vi.mocked(profileLib.updateProfile).mockReset();
     vi.mocked(profileLib.updateProfile).mockResolvedValue({

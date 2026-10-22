@@ -34,6 +34,21 @@ import { useAuth } from "@/lib/auth-context";
 import { applyDisplayNameToLocalProfile } from "@/lib/user-display-name";
 import { syncDiabetesTypeToCloud } from "@/lib/clinical-prefs-cloud-sync";
 import { storage } from "@/lib/storage";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  isPumpTechDelivery,
+  suggestPublicTech,
+  TECH_DELIVERY_OPTIONS,
+  TECH_SENSOR_OPTIONS,
+} from "@/lib/profile-tech";
+import { PublicTechChips } from "@/components/profile/public-tech-chips";
+import { readCgmPreferences } from "@/lib/cgm/preferences";
 
 type AccountCommunityProfileFieldsProps = {
   /** Prefix for form control ids (avoid duplicates if multiple instances ever mount). */
@@ -68,11 +83,17 @@ export function AccountCommunityProfileFields({
   const bioId = `${idPrefix}-bio-${reactId}`;
   const onsetId = `${idPrefix}-onset-${reactId}`;
   const fullNameId = `${idPrefix}-fullname-${reactId}`;
+  const sensorId = `${idPrefix}-tech-sensor-${reactId}`;
+  const deliveryId = `${idPrefix}-tech-delivery-${reactId}`;
 
   const [fullNameInput, setFullNameInput] = useState("");
   const [bio, setBio] = useState("");
   const [handleInput, setHandleInput] = useState("");
   const [onsetDateInput, setOnsetDateInput] = useState("");
+  const [techSensor, setTechSensor] = useState("");
+  const [techDelivery, setTechDelivery] = useState("");
+  const [techClosedLoop, setTechClosedLoop] = useState(false);
+  const [showTech, setShowTech] = useState(false);
   const [isPublic, setIsPublic] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingPublic, setSavingPublic] = useState(false);
@@ -84,6 +105,7 @@ export function AccountCommunityProfileFields({
   const profileIdRef = useRef<string | undefined>(undefined);
   const bioRef = useRef<HTMLTextAreaElement>(null);
   const clearedStaleDiabetesOnset = useRef(false);
+  const seededTechForProfileId = useRef<string | undefined>(undefined);
 
   /**
    * Hide for users who chose supporter-first onboarding only. If primary role was never set (null —
@@ -99,12 +121,37 @@ export function AccountCommunityProfileFields({
     el.style.height = `${Math.min(el.scrollHeight, maxPx)}px`;
   }, []);
 
+  const applyTechFromProfile = useCallback(
+    (p: NonNullable<typeof profile>) => {
+      const savedSensor = p.tech_sensor ?? "";
+      const savedDelivery = p.tech_delivery ?? "";
+      if (!savedSensor && !savedDelivery && seededTechForProfileId.current !== p.id) {
+        // First run with nothing saved: prefill from pen/pump + connected CGM on this device.
+        seededTechForProfileId.current = p.id;
+        const cgm = readCgmPreferences();
+        const suggestion = suggestPublicTech({
+          insulinDeliveryMethod: storage.getProfile()?.insulinDeliveryMethod,
+          cgmFamily: cgm.dexcomShareEnabled ? "dexcom" : cgm.libreLinkUpEnabled ? "libre" : null,
+        });
+        setTechSensor(suggestion.tech_sensor ?? "");
+        setTechDelivery(suggestion.tech_delivery ?? "");
+      } else {
+        setTechSensor(savedSensor);
+        setTechDelivery(savedDelivery);
+      }
+      setTechClosedLoop(p.tech_closed_loop === true);
+      setShowTech(p.show_tech_on_profile === true);
+    },
+    [],
+  );
+
   useEffect(() => {
     if (!profile) return;
     setFullNameInput(profile.full_name ?? "");
     setBio(profile.bio ?? "");
     setHandleInput(profile.public_handle ?? "");
     setOnsetDateInput(showOnsetDate ? (profile.diabetes_onset_date ?? "") : "");
+    applyTechFromProfile(profile);
     setIsPublic(profile.is_public);
 
     if (profileIdRef.current !== profile.id) {
@@ -115,7 +162,7 @@ export function AccountCommunityProfileFields({
         setEditing(!isPublicCommunityProfileComplete(profile));
       }
     }
-  }, [profile, showOnsetDate]);
+  }, [profile, showOnsetDate, applyTechFromProfile]);
 
   useEffect(() => {
     if (!profile?.is_public) return;
@@ -204,9 +251,10 @@ export function AccountCommunityProfileFields({
     setBio(profile.bio ?? "");
     setHandleInput(profile.public_handle ?? "");
     setOnsetDateInput(showOnsetDate ? (profile.diabetes_onset_date ?? "") : "");
+    applyTechFromProfile(profile);
     setIsPublic(profile.is_public);
     setEditing(!profile.is_public ? false : !isPublicCommunityProfileComplete(profile));
-  }, [profile, showOnsetDate]);
+  }, [profile, showOnsetDate, applyTechFromProfile]);
 
   async function persistPublicChange(next: boolean) {
     if (!profile?.id) return;
@@ -390,6 +438,10 @@ export function AccountCommunityProfileFields({
       is_public: isPublic,
       diabetes_onset_date: onsetVal,
       diabetes_type: diabetesTypeCloud,
+      tech_sensor: showOnsetDate ? techSensor || null : null,
+      tech_delivery: showOnsetDate ? techDelivery || null : null,
+      tech_closed_loop: showOnsetDate ? isPumpTechDelivery(techDelivery || null) && techClosedLoop : false,
+      show_tech_on_profile: showOnsetDate ? showTech : false,
     });
     setSaving(false);
     if (error) {
@@ -688,6 +740,107 @@ export function AccountCommunityProfileFields({
             </div>
           ) : null}
 
+          {showOnsetDate ? (
+            <div className="space-y-3 border-t border-border/40 pt-3">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">
+                  My diabetes tech <span className="font-normal">(optional)</span>
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor={sensorId} className="text-xs font-medium text-muted-foreground">
+                  Sensor
+                </Label>
+                <Select
+                  value={techSensor || "none"}
+                  onValueChange={(v) => setTechSensor(v === "none" ? "" : v)}
+                  disabled={loading || saving || savingPublic}
+                >
+                  <SelectTrigger
+                    id={sensorId}
+                    className="h-12 rounded-xl border-border/60 bg-background/80"
+                    data-testid="account-community-tech-sensor"
+                  >
+                    <SelectValue placeholder="Not set" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Not set</SelectItem>
+                    {TECH_SENSOR_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor={deliveryId} className="text-xs font-medium text-muted-foreground">
+                  Insulin / treatment
+                </Label>
+                <Select
+                  value={techDelivery || "none"}
+                  onValueChange={(v) => setTechDelivery(v === "none" ? "" : v)}
+                  disabled={loading || saving || savingPublic}
+                >
+                  <SelectTrigger
+                    id={deliveryId}
+                    className="h-12 rounded-xl border-border/60 bg-background/80"
+                    data-testid="account-community-tech-delivery"
+                  >
+                    <SelectValue placeholder="Not set" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Not set</SelectItem>
+                    {TECH_DELIVERY_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {isPumpTechDelivery(techDelivery || null) ? (
+                <div className="flex items-center justify-between gap-3">
+                  <Label htmlFor={`${idPrefix}-tech-loop`} className="text-sm font-medium">
+                    Closed loop
+                  </Label>
+                  <Switch
+                    id={`${idPrefix}-tech-loop`}
+                    checked={techClosedLoop}
+                    onCheckedChange={setTechClosedLoop}
+                    disabled={loading || saving || savingPublic}
+                    data-testid="account-community-tech-closed-loop"
+                  />
+                </div>
+              ) : null}
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <Label htmlFor={`${idPrefix}-tech-show`} className="text-sm font-medium">
+                    Show my tech
+                  </Label>
+                </div>
+                <Switch
+                  id={`${idPrefix}-tech-show`}
+                  checked={showTech}
+                  onCheckedChange={setShowTech}
+                  disabled={loading || saving || savingPublic}
+                  data-testid="account-community-tech-show"
+                />
+              </div>
+              {showTech ? (
+                <PublicTechChips
+                  profile={{
+                    tech_sensor: techSensor || null,
+                    tech_delivery: techDelivery || null,
+                    tech_closed_loop: isPumpTechDelivery(techDelivery || null) && techClosedLoop,
+                    show_tech_on_profile: true,
+                  }}
+                  testId="account-community-tech-preview-chips"
+                />
+              ) : null}
+            </div>
+          ) : null}
+
           <Button
             type="submit"
             className="h-12 w-full rounded-xl text-base font-semibold"
@@ -726,6 +879,7 @@ export function AccountCommunityProfileFields({
           livingWithLine={livingLine}
           showOnset={showOnsetDate}
           onAddBio={() => setEditing(true)}
+          techProfile={profile}
         />
       ) : editing ? (
         editFields

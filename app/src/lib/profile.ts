@@ -10,6 +10,7 @@ import { normalizeDateOfBirthInput } from "./user-age";
 import type { PublicProfileStreak } from "./user-achievements";
 import { carbSourcePreferencesFromCloud } from "./carb-source-preferences";
 import { parseDosingPrefs, type DosingPrefs } from "./dosing-prefs";
+import { normalizeTechDelivery, normalizeTechSensor } from "./profile-tech";
 
 export type ProfileRow = {
   id: string;
@@ -55,6 +56,14 @@ export type ProfileRow = {
   dosing_prefs?: DosingPrefs | null;
   /** Supporter opt-in: show linked patient on public community profile when allowed. */
   show_supported_person_on_profile?: boolean;
+  /** Structured sensor choice for the public profile (see `profile-tech.ts`). */
+  tech_sensor?: string | null;
+  /** Structured insulin/treatment choice for the public profile. */
+  tech_delivery?: string | null;
+  /** Closed-loop (automated insulin delivery) in use. */
+  tech_closed_loop?: boolean;
+  /** Opt-in: show tech chips on the public profile and in Find people. */
+  show_tech_on_profile?: boolean;
 };
 
 /** Loose JSON shape kept on `profiles.pharmacy`; canonical type lives in `storage.ts`. */
@@ -86,6 +95,10 @@ export type PublicCommunityProfile = Pick<
   | "is_public"
   | "diabetes_onset_date"
   | "diabetes_type"
+  | "tech_sensor"
+  | "tech_delivery"
+  | "tech_closed_loop"
+  | "show_tech_on_profile"
 > & {
   streaks?: PublicProfileStreak[];
   /** @deprecated Use streaks */
@@ -97,10 +110,24 @@ export const profileQueryKey = (userId: string | undefined) => ["profile", userI
 
 /** Batch / community fetches: exclude owner-only clinical columns from the select list. */
 const PROFILE_LIST_SELECT =
-  "id, full_name, avatar_url, bio, public_handle, is_public, onboarding_complete, emergency_contact_name, emergency_contact_phone, emergency_notes, diabetes_onset_date, diabetes_type";
+  "id, full_name, avatar_url, bio, public_handle, is_public, onboarding_complete, emergency_contact_name, emergency_contact_phone, emergency_notes, diabetes_onset_date, diabetes_type, tech_sensor, tech_delivery, tech_closed_loop, show_tech_on_profile";
 
 const PROFILE_LIST_SELECT_WITHOUT_DIABETES_TYPE =
+  "id, full_name, avatar_url, bio, public_handle, is_public, onboarding_complete, emergency_contact_name, emergency_contact_phone, emergency_notes, diabetes_onset_date, tech_sensor, tech_delivery, tech_closed_loop, show_tech_on_profile";
+
+const PROFILE_LIST_SELECT_WITHOUT_TECH =
+  "id, full_name, avatar_url, bio, public_handle, is_public, onboarding_complete, emergency_contact_name, emergency_contact_phone, emergency_notes, diabetes_onset_date, diabetes_type";
+
+const PROFILE_LIST_SELECT_WITHOUT_TYPE_OR_TECH =
   "id, full_name, avatar_url, bio, public_handle, is_public, onboarding_complete, emergency_contact_name, emergency_contact_phone, emergency_notes, diabetes_onset_date";
+
+/** Select variants, richest first, so older databases without newer columns still answer. */
+const PROFILE_LIST_SELECT_VARIANTS = [
+  PROFILE_LIST_SELECT,
+  PROFILE_LIST_SELECT_WITHOUT_DIABETES_TYPE,
+  PROFILE_LIST_SELECT_WITHOUT_TECH,
+  PROFILE_LIST_SELECT_WITHOUT_TYPE_OR_TECH,
+];
 
 function isMissingProfilesColumnError(message: string, column: string): boolean {
   const m = message.toLowerCase();
@@ -234,6 +261,10 @@ function rowFromData(data: Record<string, unknown>): ProfileRow {
     dosing_prefs,
     show_supported_person_on_profile:
       typeof data.show_supported_person_on_profile === "boolean" ? data.show_supported_person_on_profile : false,
+    tech_sensor: normalizeTechSensor(data.tech_sensor),
+    tech_delivery: normalizeTechDelivery(data.tech_delivery),
+    tech_closed_loop: data.tech_closed_loop === true,
+    show_tech_on_profile: data.show_tech_on_profile === true,
   };
 }
 
@@ -323,17 +354,23 @@ export async function getProfilesByIds(userIds: string[]): Promise<Map<string, P
 
   try {
     let data: unknown[] | null = null;
-    const first = await supabase.from("profiles").select(PROFILE_LIST_SELECT).in("id", unique);
-    if (first.error && isMissingProfilesColumnError(first.error.message, "diabetes_type")) {
-      const fallbackSelect = PROFILE_LIST_SELECT.replace(", diabetes_type", "");
-      const fallback = await supabase.from("profiles").select(fallbackSelect).in("id", unique);
-      if (fallback.error || !fallback.data) return map;
-      data = fallback.data;
-    } else if (first.error || !first.data) {
-      return map;
-    } else {
-      data = first.data;
+    for (const select of PROFILE_LIST_SELECT_VARIANTS) {
+      const res = await supabase.from("profiles").select(select).in("id", unique);
+      if (!res.error && res.data) {
+        data = res.data;
+        break;
+      }
+      // Only retry on a missing-column error; anything else is a real failure.
+      const msg = res.error?.message ?? "";
+      const missingColumn =
+        isMissingProfilesColumnError(msg, "diabetes_type") ||
+        isMissingProfilesColumnError(msg, "tech_sensor") ||
+        isMissingProfilesColumnError(msg, "tech_delivery") ||
+        isMissingProfilesColumnError(msg, "tech_closed_loop") ||
+        isMissingProfilesColumnError(msg, "show_tech_on_profile");
+      if (!missingColumn) return map;
     }
+    if (!data) return map;
     for (const row of data) {
       map.set(String((row as Record<string, unknown>).id), rowFromData(row as Record<string, unknown>));
     }
@@ -481,22 +518,33 @@ export async function getPublicCommunityProfile(userId: string): Promise<{
   const supabase = getSupabase();
   if (!supabase) return { profile: null, error: new Error("Supabase not configured") };
 
-  const selectWithType =
-    "id, full_name, avatar_url, bio, public_handle, is_public, diabetes_onset_date, diabetes_type, pinned_achievement_ids, public_streak_counts";
-  const selectWithoutType =
-    "id, full_name, avatar_url, bio, public_handle, is_public, diabetes_onset_date, pinned_achievement_ids, public_streak_counts";
+  const baseCols = "id, full_name, avatar_url, bio, public_handle, is_public, diabetes_onset_date";
+  const tailCols = "pinned_achievement_ids, public_streak_counts";
+  const selectVariants = [
+    `${baseCols}, diabetes_type, tech_sensor, tech_delivery, tech_closed_loop, show_tech_on_profile, ${tailCols}`,
+    `${baseCols}, tech_sensor, tech_delivery, tech_closed_loop, show_tech_on_profile, ${tailCols}`,
+    `${baseCols}, diabetes_type, ${tailCols}`,
+    `${baseCols}, ${tailCols}`,
+  ];
 
   try {
     let data: Record<string, unknown> | null = null;
-    const first = await supabase.from("profiles").select(selectWithType).eq("id", userId).maybeSingle();
-    if (first.error && isMissingProfilesColumnError(first.error.message, "diabetes_type")) {
-      const fallback = await supabase.from("profiles").select(selectWithoutType).eq("id", userId).maybeSingle();
-      if (fallback.error) return { profile: null, error: new Error(fallback.error.message) };
-      data = (fallback.data as Record<string, unknown> | null) ?? null;
-    } else if (first.error) {
-      return { profile: null, error: new Error(first.error.message) };
-    } else {
-      data = (first.data as Record<string, unknown> | null) ?? null;
+    for (let i = 0; i < selectVariants.length; i++) {
+      const res = await supabase.from("profiles").select(selectVariants[i]).eq("id", userId).maybeSingle();
+      if (!res.error) {
+        data = (res.data as Record<string, unknown> | null) ?? null;
+        break;
+      }
+      const msg = res.error.message ?? "";
+      const missingColumn =
+        isMissingProfilesColumnError(msg, "diabetes_type") ||
+        isMissingProfilesColumnError(msg, "tech_sensor") ||
+        isMissingProfilesColumnError(msg, "tech_delivery") ||
+        isMissingProfilesColumnError(msg, "tech_closed_loop") ||
+        isMissingProfilesColumnError(msg, "show_tech_on_profile");
+      if (!missingColumn || i === selectVariants.length - 1) {
+        return { profile: null, error: new Error(res.error.message) };
+      }
     }
 
     if (!data) return { profile: null, error: null };
@@ -525,6 +573,10 @@ export async function getPublicCommunityProfile(userId: string): Promise<{
       is_public: typeof r.is_public === "boolean" ? r.is_public : true,
       diabetes_onset_date: (r.diabetes_onset_date as string | null) ?? null,
       diabetes_type: normalizeDiabetesTypeFromCloud(r.diabetes_type) ?? null,
+      tech_sensor: normalizeTechSensor(r.tech_sensor),
+      tech_delivery: normalizeTechDelivery(r.tech_delivery),
+      tech_closed_loop: r.tech_closed_loop === true,
+      show_tech_on_profile: r.show_tech_on_profile === true,
       streaks,
       achievements: streaks,
       supported_person: supportedRes.data,
@@ -614,7 +666,18 @@ export async function getProfileIdByPublicHandle(handle: string): Promise<{
   }
 }
 
-export type ProfileHandleSuggestion = Pick<ProfileRow, "id" | "full_name" | "avatar_url" | "public_handle" | "is_public">;
+export type ProfileHandleSuggestion = Pick<
+  ProfileRow,
+  | "id"
+  | "full_name"
+  | "avatar_url"
+  | "public_handle"
+  | "is_public"
+  | "tech_sensor"
+  | "tech_delivery"
+  | "tech_closed_loop"
+  | "show_tech_on_profile"
+>;
 
 /** Autocomplete: public profiles whose handle starts with the given prefix. */
 export async function searchProfilesByHandlePrefix(
@@ -628,22 +691,35 @@ export async function searchProfilesByHandlePrefix(
   if (!prefix) return { data: [], error: null };
 
   // Keep query permissive; RLS will still apply. Also filter to explicit public profiles.
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id, full_name, avatar_url, public_handle, is_public")
-    .eq("is_public", true)
-    .ilike("public_handle", `${prefix}%`)
-    .order("public_handle", { ascending: true })
-    .limit(Math.max(1, Math.min(20, limit)));
+  const runQuery = (select: string) =>
+    supabase
+      .from("profiles")
+      .select(select)
+      .eq("is_public", true)
+      .ilike("public_handle", `${prefix}%`)
+      .order("public_handle", { ascending: true })
+      .limit(Math.max(1, Math.min(20, limit)));
 
+  let result = await runQuery(
+    "id, full_name, avatar_url, public_handle, is_public, tech_sensor, tech_delivery, tech_closed_loop, show_tech_on_profile",
+  );
+  if (result.error && isMissingProfilesColumnError(result.error.message, "tech_sensor")) {
+    result = await runQuery("id, full_name, avatar_url, public_handle, is_public");
+  }
+
+  const { data, error } = result;
   if (error) return { data: [], error: new Error(error.message) };
-  const rows = (data ?? []) as Array<Record<string, unknown>>;
+  const rows = (data ?? []) as unknown as Array<Record<string, unknown>>;
   const mapped: ProfileHandleSuggestion[] = rows.map((r) => ({
     id: String(r.id),
     full_name: (r.full_name as string | null) ?? null,
     avatar_url: (r.avatar_url as string | null) ?? null,
     public_handle: (r.public_handle as string | null) ?? null,
     is_public: typeof r.is_public === "boolean" ? r.is_public : true,
+    tech_sensor: normalizeTechSensor(r.tech_sensor),
+    tech_delivery: normalizeTechDelivery(r.tech_delivery),
+    tech_closed_loop: r.tech_closed_loop === true,
+    show_tech_on_profile: r.show_tech_on_profile === true,
   }));
   return { data: mapped.filter((p) => Boolean(p.public_handle?.trim())), error: null };
 }
@@ -716,6 +792,10 @@ export type ProfileUpdatePayload = {
     | "carb_source_prefs"
     | "dosing_prefs"
     | "show_supported_person_on_profile"
+    | "tech_sensor"
+    | "tech_delivery"
+    | "tech_closed_loop"
+    | "show_tech_on_profile"
   >
 >;
 
@@ -753,6 +833,10 @@ export async function updateProfile(
     carb_source_prefs,
     dosing_prefs,
     show_supported_person_on_profile,
+    tech_sensor,
+    tech_delivery,
+    tech_closed_loop,
+    show_tech_on_profile,
   } = payload;
   const update: Record<string, unknown> = {};
   if (full_name !== undefined) update.full_name = full_name ?? null;
@@ -872,6 +956,18 @@ export async function updateProfile(
   if (show_supported_person_on_profile !== undefined) {
     update.show_supported_person_on_profile = Boolean(show_supported_person_on_profile);
   }
+  if (tech_sensor !== undefined) {
+    update.tech_sensor = tech_sensor === null ? null : normalizeTechSensor(tech_sensor);
+  }
+  if (tech_delivery !== undefined) {
+    update.tech_delivery = tech_delivery === null ? null : normalizeTechDelivery(tech_delivery);
+  }
+  if (tech_closed_loop !== undefined) {
+    update.tech_closed_loop = Boolean(tech_closed_loop);
+  }
+  if (show_tech_on_profile !== undefined) {
+    update.show_tech_on_profile = Boolean(show_tech_on_profile);
+  }
 
   if (Object.keys(update).length === 0) {
     const existing = await getProfile(id);
@@ -879,12 +975,33 @@ export async function updateProfile(
   }
 
   try {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("profiles")
       .update(update)
       .eq("id", id)
       .select()
       .single();
+
+    // Older database without the tech columns: save everything else rather than failing the whole profile save.
+    if (
+      error &&
+      (isMissingProfilesColumnError(error.message, "tech_sensor") ||
+        isMissingProfilesColumnError(error.message, "tech_delivery") ||
+        isMissingProfilesColumnError(error.message, "tech_closed_loop") ||
+        isMissingProfilesColumnError(error.message, "show_tech_on_profile"))
+    ) {
+      delete update.tech_sensor;
+      delete update.tech_delivery;
+      delete update.tech_closed_loop;
+      delete update.show_tech_on_profile;
+      if (Object.keys(update).length === 0) {
+        const existing = await getProfile(id);
+        return { data: existing.profile, error: null };
+      }
+      const retry = await supabase.from("profiles").update(update).eq("id", id).select().single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       if (isProfileHandleUniqueViolation(error)) {

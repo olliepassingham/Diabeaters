@@ -7,6 +7,8 @@ import { HomeSectionHeading } from "@/components/home/home-ui";
 import { prepareFileInputForPicker } from "@/lib/click-hidden-file-input";
 import { cn } from "@/lib/utils";
 import type { PublicProfileSupportedPerson } from "@/lib/profile";
+import type { PublicTechProfileFields } from "@/lib/profile-tech";
+import { PublicTechChips } from "@/components/profile/public-tech-chips";
 
 export const profileHeroCardClass =
   "dashboard-card-hover animate-soft-in overflow-hidden border border-primary/15 bg-gradient-to-br from-primary/[0.06] via-transparent to-transparent shadow-md ring-1 ring-border/25 dark:border-primary/18 dark:from-primary/[0.09]";
@@ -750,12 +752,14 @@ export function ProfileCommunityPreview({
   livingWithLine,
   showOnset,
   onAddBio,
+  techProfile,
 }: {
   handleSlug: string | null;
   bio?: string | null;
   livingWithLine: string | null;
   showOnset: boolean;
   onAddBio?: () => void;
+  techProfile?: PublicTechProfileFields | null;
 }) {
   return (
     <div
@@ -813,6 +817,7 @@ export function ProfileCommunityPreview({
           </p>
         )
       ) : null}
+      <PublicTechChips profile={techProfile} className="mt-2.5" testId="account-community-tech-chips" />
     </div>
   );
 }

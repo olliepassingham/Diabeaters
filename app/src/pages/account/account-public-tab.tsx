@@ -28,6 +28,7 @@ import {
   ProfileMutedCard,
   ProfileSectionHeading,
 } from "@/components/profile/profile-ui";
+import { PublicTechChips } from "@/components/profile/public-tech-chips";
 import { fetchCommunityPostsByAuthorPage } from "@/lib/community";
 import { useCommunityStories } from "@/hooks/use-community-stories";
 import { isType2AppSession } from "@/lib/insulin-clinical-access";
@@ -189,6 +190,8 @@ export function AccountPublicProfileTab({
             ) : null}
 
             <ProfileBioPreview compact bio={bioPreview} livingWithLine={livingWithLine} />
+
+            <PublicTechChips profile={viewerProfile} testId="account-public-tech-chips" />
           </ProfileHeroRow>
 
           <ProfileActionGrid>
