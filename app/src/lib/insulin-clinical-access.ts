@@ -37,6 +37,8 @@ export function isInsulinClinicalPath(pathOnly: string, profile?: InsulinAccessP
   if (p === "/supplies" || p.startsWith("/supplies/")) {
     return !isType2AppSession(profile);
   }
+  // The exercise guide is built around insulin/glucose check-ins — Type 1 only
+  // until a Type 2 activity flow exists.
   if (p === "/scenarios/exercise") return true;
   if (p === "/scenarios/bedtime" || p === "/bedtime") return true;
   if (p === "/scenarios/sick-day" || p === "/sick-day") return true;

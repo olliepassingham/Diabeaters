@@ -19,6 +19,7 @@ import {
   History,
   Car,
   Search,
+  Pill,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { HubListPanel, HubListRow, type HubListAccent, type HubListTone } from "@/components/hub-list-panel";
@@ -165,12 +166,19 @@ const TYPE2_HIDDEN_TOOL_IDS = new Set([
   "activity-log",
 ]);
 
-const TYPE2_CARE_IDS = ["supply-tracker", "appointments", "help-now", "ai-coach"] as const;
+const TYPE2_CARE_IDS = ["medications", "supply-tracker", "appointments", "help-now", "ai-coach"] as const;
 const TYPE2_HELPER_IDS = ["glucose-converter", "tips"] as const;
 
 export function type2ToolsForHub(): ToolDef[] {
   ensureLocalType2Profile(storage.getProfile());
   const byId = new Map(PATIENT_TOOLS.map((t) => [t.id, t] as const));
+  byId.set("medications", {
+    id: "medications",
+    href: "/tools/medications",
+    icon: Pill,
+    title: "Medication",
+    description: "Your medication, dose times, and taken ticks",
+  });
   byId.set("help-now", {
     id: "help-now",
     href: "/help-now",
@@ -367,7 +375,8 @@ function Type2ToolsHub({
 }) {
   const dob = storage.getProfile()?.dateOfBirth;
   const situationTools: ToolDef[] = [];
-  // Alcohol stays Type 1–only (bolus / ratio flow). Driving is safe for Type 2.
+  // Exercise stays Type 1–only for now — the guided coach is built around
+  // insulin and glucose check-ins. Alcohol too (bolus / ratio flow). Driving is safe for Type 2.
   if (canShowDrivingReadiness(dob)) {
     situationTools.push({
       id: "driving",
@@ -387,7 +396,7 @@ function Type2ToolsHub({
         <div className="rounded-2xl border border-border/50 bg-muted/15 px-4 py-3">
           <p className="text-sm font-semibold text-foreground">Type 2 tools</p>
           <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
-            Supplies, appointments, emergency details, and a driving check — no insulin dosing.
+            Medication, supplies, appointments, and emergency details — no insulin dosing.
           </p>
         </div>
         {about}

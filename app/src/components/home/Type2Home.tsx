@@ -4,7 +4,9 @@ import { differenceInCalendarDays, format } from "date-fns";
 import {
   ArrowRight,
   Calendar,
+  Check,
   MessageCircle,
+  Pill,
   ShieldAlert,
   Users,
   X,
@@ -33,6 +35,13 @@ import {
   type UserProfile,
 } from "@/lib/storage";
 import { cn } from "@/lib/utils";
+import {
+  MEDICATIONS_CHANGED_EVENT,
+  setDoseTaken,
+  toLocalDateKey,
+  todaysDoses,
+  type ScheduledDose,
+} from "@/lib/medications";
 
 const VERIFIED_WELCOME_PENDING_KEY = "diabeater_verified_welcome_pending";
 const VERIFIED_WELCOME_DISMISSED_AT_KEY = "diabeater_verified_welcome_dismissed_at";
@@ -82,6 +91,7 @@ export function Type2Home({
   const [profile, setProfile] = useState(profileProp);
   const [supplies, setSupplies] = useState<Supply[]>(() => storage.getSupplies());
   const [nextAppointment, setNextAppointment] = useState<Appointment | null>(null);
+  const [todayDoses, setTodayDoses] = useState<ScheduledDose[]>(() => todaysDoses());
   const [showVerifiedWelcome, setShowVerifiedWelcome] = useState(false);
   const firstName = displayName.split(" ")[0] || "";
   const showCoach = isAiCoachEnabled;
@@ -106,29 +116,38 @@ export function Type2Home({
       const upcoming = storage.getUpcomingAppointmentsForUser(uid);
       setNextAppointment(Array.isArray(upcoming) && upcoming.length > 0 ? upcoming[0]! : null);
     };
+    const refreshHealth = () => {
+      setTodayDoses(todaysDoses());
+    };
     refreshSupplies();
     refreshAppointments();
+    refreshHealth();
     const onVis = () => {
       if (document.visibilityState === "visible") {
         refreshSupplies();
         refreshAppointments();
+        refreshHealth();
       }
     };
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener("focus", refreshSupplies);
     window.addEventListener("focus", refreshAppointments);
+    window.addEventListener("focus", refreshHealth);
     window.addEventListener(DIABEATER_ACTIVE_USER_CHANGED_EVENT, refreshSupplies);
     window.addEventListener(DIABEATER_ACTIVE_USER_CHANGED_EVENT, refreshAppointments);
     window.addEventListener(DIABEATER_SUPPLIES_CHANGED_EVENT, refreshSupplies);
     window.addEventListener(DIABEATER_APPOINTMENTS_CHANGED_EVENT, refreshAppointments);
+    window.addEventListener(MEDICATIONS_CHANGED_EVENT, refreshHealth);
     return () => {
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("focus", refreshSupplies);
       window.removeEventListener("focus", refreshAppointments);
+      window.removeEventListener("focus", refreshHealth);
       window.removeEventListener(DIABEATER_ACTIVE_USER_CHANGED_EVENT, refreshSupplies);
       window.removeEventListener(DIABEATER_ACTIVE_USER_CHANGED_EVENT, refreshAppointments);
       window.removeEventListener(DIABEATER_SUPPLIES_CHANGED_EVENT, refreshSupplies);
       window.removeEventListener(DIABEATER_APPOINTMENTS_CHANGED_EVENT, refreshAppointments);
+      window.removeEventListener(MEDICATIONS_CHANGED_EVENT, refreshHealth);
     };
   }, [user?.id]);
 
@@ -214,6 +233,91 @@ export function Type2Home({
         </header>
 
         <HomeSupplyGraph supplies={supplies} />
+
+        {todayDoses.length > 0 ? (
+          <div
+            className="rounded-2xl border border-border/50 bg-card/70 px-4 py-3.5"
+            data-testid="type2-home-medications"
+          >
+            <div className="flex items-center gap-3.5">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <Pill className="h-5 w-5" aria-hidden />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-semibold leading-snug text-foreground">Today&apos;s medication</span>
+                <span className="mt-0.5 block text-sm leading-snug text-muted-foreground">
+                  {todayDoses.filter((d) => d.taken).length} of {todayDoses.length} taken
+                </span>
+              </span>
+              <Link
+                href="/tools/medications"
+                className="pressable shrink-0 text-sm font-semibold text-primary"
+                data-testid="link-type2-home-medications-all"
+              >
+                View all
+              </Link>
+            </div>
+            <ul className="mt-3 space-y-2">
+              {todayDoses.map((dose) => (
+                <li key={`${dose.med.id}-${dose.time}`}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void hapticLight();
+                      setDoseTaken(dose.med.id, toLocalDateKey(new Date()), dose.time, !dose.taken);
+                    }}
+                    aria-pressed={dose.taken}
+                    className={cn(
+                      "pressable flex w-full min-h-11 items-center gap-3 rounded-xl px-2 py-1 text-left",
+                      dose.taken ? "text-muted-foreground" : "text-foreground",
+                    )}
+                    data-testid={`type2-home-dose-${dose.med.id}-${dose.time}`}
+                  >
+                    <span
+                      className={cn(
+                        "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border",
+                        dose.taken ? "border-emerald-600 bg-emerald-600 text-white" : "border-border/60 text-transparent",
+                      )}
+                      aria-hidden
+                    >
+                      <Check className="h-4 w-4" />
+                    </span>
+                    <span className="min-w-0 flex-1 text-sm font-medium leading-snug">
+                      {dose.med.name}
+                      {dose.med.dose ? <span className="text-muted-foreground"> · {dose.med.dose}</span> : null}
+                      <span className="text-muted-foreground"> · {dose.time}</span>
+                    </span>
+                    {dose.due && !dose.taken ? (
+                      <span className="shrink-0 text-xs font-semibold text-amber-600 dark:text-amber-300">Due</span>
+                    ) : null}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <Link
+            href="/tools/medications"
+            onClick={() => {
+              void hapticLight();
+            }}
+            className={cn(
+              "pressable group flex w-full items-center gap-3.5 rounded-2xl border border-border/50 bg-card/70 px-4 py-3.5 text-left",
+              "active:scale-[0.99] hover:bg-muted/30",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            )}
+            data-testid="type2-home-medications"
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              <Pill className="h-5 w-5" aria-hidden />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] font-semibold leading-snug text-foreground">Medication</span>
+              <span className="mt-0.5 block text-sm leading-snug text-muted-foreground">Add your tablets and set dose times</span>
+            </span>
+            <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground/65 transition-transform group-hover:translate-x-0.5" aria-hidden />
+          </Link>
+        )}
 
         <Link
           href="/appointments"

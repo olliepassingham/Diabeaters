@@ -180,6 +180,7 @@ const CorrectionHelpPage = lazy(() => import("@/pages/tools/correction-help"));
 const CgmLivePage = lazy(() => import("@/pages/tools/cgm-live"));
 const TipsPage = lazy(() => import("@/pages/tools/tips"));
 const GlucoseConverterPage = lazy(() => import("@/pages/tools/glucose-converter"));
+const MedicationsPage = lazy(() => import("@/pages/tools/medications"));
 const GlossaryIndex = lazy(() => import("@/pages/education/index"));
 const GlossaryDetail = lazy(() => import("@/pages/education/[slug]"));
 
@@ -1007,6 +1008,13 @@ function InnerRouter() {
         <Suspense fallback={<RouteFallback />}>
           <GlucoseConverterPage />
         </Suspense>
+      </Route>
+      <Route path="/tools/medications">
+        <PatientRouteGuard>
+          <Suspense fallback={<RouteFallback />}>
+            <MedicationsPage />
+          </Suspense>
+        </PatientRouteGuard>
       </Route>
       <Route path="/tools/hypo-history">
         <PatientRouteGuard>
