@@ -15,6 +15,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { FeedComposerSheet } from "@/components/community/feed-composer-sheet";
 import { FindPeoplePanel } from "@/components/community/find-people-panel";
 import { FeedMoreMenu } from "@/components/community/feed-more-menu";
@@ -88,6 +90,7 @@ function readStoredFeedTab(): FeedTab {
 const PAGE_SIZE = MAIN_FEED_PAGE_SIZE;
 
 export default function CommunityHomePage() {
+  const isMobile = useIsMobile();
   const { user } = useAuth();
   const { communityPushPromptOpen, setCommunityPushPromptOpen } = useCommunityPushPromptAfterOnboarding();
   const { profile, loading: profileLoading } = useProfile();
@@ -639,6 +642,95 @@ export default function CommunityHomePage() {
     setFeedSearch("");
   };
 
+  /** Shared filter controls. `closeOnSelect` (mobile sheet) dismisses once a topic is picked. */
+  const renderFeedFilterBody = (closeOnSelect: boolean) => (
+    <div className="space-y-4">
+      <div className="relative">
+        <SearchIcon
+          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+          aria-hidden
+        />
+        <Input
+          value={feedSearch}
+          onChange={(e) => setFeedSearch(e.target.value)}
+          placeholder="Search posts…"
+          className="h-11 rounded-xl border-border/70 bg-muted/30 pl-9 pr-3"
+          aria-label="Search posts"
+          title="Search posts (header search finds people by @handle)"
+        />
+      </div>
+      <label className="flex items-center gap-3 rounded-xl border border-border/60 bg-background px-3 py-2.5">
+        <Bookmark className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+        <span className="min-w-0 flex-1 text-sm font-medium">Saved posts</span>
+        <Switch
+          checked={savedOnly}
+          data-testid="button-saved-filter-desktop"
+          aria-label={savedOnly ? "Saved posts filter on" : "Show saved posts"}
+          onCheckedChange={(checked) => {
+            setSavedOnly(checked);
+            if (checked) setTopicFilter(null);
+          }}
+        />
+      </label>
+      <div>
+        <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          Topics
+        </p>
+        <div role="group" aria-label="Feed topics" className="flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            aria-pressed={topicFilter === null && !savedOnly}
+            className={cn(
+              "rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors",
+              topicFilter === null && !savedOnly
+                ? "border-foreground bg-foreground text-background"
+                : "border-border/70 bg-background text-foreground/80 hover:bg-muted/50",
+            )}
+            onClick={() => {
+              setTopicFilter(null);
+              setSavedOnly(false);
+              if (closeOnSelect) setFiltersOpen(false);
+            }}
+          >
+            All topics
+          </button>
+          {orderedTopics.map((topic) => (
+            <button
+              key={topic.id}
+              type="button"
+              aria-pressed={topicFilter === topic.id && !savedOnly}
+              className={cn(
+                "rounded-full border px-3 py-1.5 text-left text-[13px] font-medium transition-colors",
+                topicFilter === topic.id && !savedOnly
+                  ? "border-foreground bg-foreground text-background"
+                  : "border-border/70 bg-background text-foreground/80 hover:bg-muted/50",
+              )}
+              onClick={() => {
+                setTopicFilter(topic.id);
+                setSavedOnly(false);
+                if (closeOnSelect) setFiltersOpen(false);
+              }}
+            >
+              {topic.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {closeOnSelect && filtersActive ? (
+        <button
+          type="button"
+          className="w-full rounded-xl border border-border/60 py-2.5 text-sm font-semibold text-primary"
+          onClick={() => {
+            clearFeedFilters();
+            setFiltersOpen(false);
+          }}
+        >
+          Clear all filters
+        </button>
+      ) : null}
+    </div>
+  );
+
   const feedHeaderActions = (
     <div className="flex shrink-0 items-center justify-end gap-1" data-testid="feed-toolbar-actions">
       <Button
@@ -780,111 +872,69 @@ export default function CommunityHomePage() {
               </TabsTrigger>
             </TabsList>
           </Tabs>
-          <Popover open={filtersOpen} onOpenChange={setFiltersOpen}>
-            <PopoverTrigger asChild>
+          {isMobile ? (
+            <>
               <Button
                 type="button"
                 variant={filtersActive ? "secondary" : "outline"}
                 size="icon"
-                className="h-10 w-10 shrink-0 rounded-full sm:h-9 sm:w-9"
+                className="h-10 w-10 shrink-0 rounded-full"
                 aria-expanded={filtersOpen}
                 aria-label="Filter feed"
+                onClick={() => setFiltersOpen(true)}
               >
                 <SlidersHorizontal className="h-4 w-4" aria-hidden />
               </Button>
-            </PopoverTrigger>
-            <PopoverContent
-              align="end"
-              sideOffset={8}
-              className="w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border-border/60 p-0 shadow-lg"
-            >
-              <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
-                <p className="text-sm font-semibold tracking-tight">Filter</p>
-                {filtersActive ? (
-                  <button
-                    type="button"
-                    className="text-[13px] font-semibold text-primary"
-                    onClick={clearFeedFilters}
-                  >
-                    Clear
-                  </button>
-                ) : (
-                  <span className="text-[13px] text-muted-foreground">All posts</span>
-                )}
-              </div>
-              <div className="max-h-[min(70dvh,28rem)] space-y-4 overflow-y-auto p-4">
-                <div className="relative">
-                  <SearchIcon
-                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                    aria-hidden
-                  />
-                  <Input
-                    value={feedSearch}
-                    onChange={(e) => setFeedSearch(e.target.value)}
-                    placeholder="Search posts…"
-                    className="h-11 rounded-xl border-border/70 bg-muted/30 pl-9 pr-3"
-                    aria-label="Search posts"
-                    title="Search posts (header search finds people by @handle)"
-                  />
+              <BottomSheet
+                open={filtersOpen}
+                onOpenChange={setFiltersOpen}
+                title="Filter"
+                onOpenAutoFocus={(e) => e.preventDefault()}
+              >
+                <div className="h-full overflow-y-auto px-4 pb-5" data-testid="feed-filter-sheet">
+                  {renderFeedFilterBody(true)}
                 </div>
-                <label className="flex items-center gap-3 rounded-xl border border-border/60 bg-background px-3 py-2.5">
-                  <Bookmark className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                  <span className="min-w-0 flex-1 text-sm font-medium">Saved posts</span>
-                  <Switch
-                    checked={savedOnly}
-                    data-testid="button-saved-filter-desktop"
-                    aria-label={savedOnly ? "Saved posts filter on" : "Show saved posts"}
-                    onCheckedChange={(checked) => {
-                      setSavedOnly(checked);
-                      if (checked) setTopicFilter(null);
-                    }}
-                  />
-                </label>
-                <div>
-                  <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                    Topics
-                  </p>
-                  <div role="group" aria-label="Feed topics" className="flex flex-wrap gap-1.5">
+              </BottomSheet>
+            </>
+          ) : (
+            <Popover open={filtersOpen} onOpenChange={setFiltersOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant={filtersActive ? "secondary" : "outline"}
+                  size="icon"
+                  className="h-9 w-9 shrink-0 rounded-full"
+                  aria-expanded={filtersOpen}
+                  aria-label="Filter feed"
+                >
+                  <SlidersHorizontal className="h-4 w-4" aria-hidden />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="end"
+                sideOffset={8}
+                className="w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border-border/60 p-0 shadow-lg"
+              >
+                <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
+                  <p className="text-sm font-semibold tracking-tight">Filter</p>
+                  {filtersActive ? (
                     <button
                       type="button"
-                      aria-pressed={topicFilter === null && !savedOnly}
-                      className={cn(
-                        "rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors",
-                        topicFilter === null && !savedOnly
-                          ? "border-foreground bg-foreground text-background"
-                          : "border-border/70 bg-background text-foreground/80 hover:bg-muted/50",
-                      )}
-                      onClick={() => {
-                        setTopicFilter(null);
-                        setSavedOnly(false);
-                      }}
+                      className="text-[13px] font-semibold text-primary"
+                      onClick={clearFeedFilters}
                     >
-                      All topics
+                      Clear
                     </button>
-                    {orderedTopics.map((topic) => (
-                      <button
-                        key={topic.id}
-                        type="button"
-                        aria-pressed={topicFilter === topic.id && !savedOnly}
-                        className={cn(
-                          "rounded-full border px-3 py-1.5 text-left text-[13px] font-medium transition-colors",
-                          topicFilter === topic.id && !savedOnly
-                            ? "border-foreground bg-foreground text-background"
-                            : "border-border/70 bg-background text-foreground/80 hover:bg-muted/50",
-                        )}
-                        onClick={() => {
-                          setTopicFilter(topic.id);
-                          setSavedOnly(false);
-                        }}
-                      >
-                        {topic.label}
-                      </button>
-                    ))}
-                  </div>
+                  ) : (
+                    <span className="text-[13px] text-muted-foreground">All posts</span>
+                  )}
                 </div>
-              </div>
-            </PopoverContent>
-          </Popover>
+                <div className="max-h-[min(70dvh,28rem)] overflow-y-auto p-4">
+                  {renderFeedFilterBody(false)}
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
         </div>
         {filtersActive ? (
           <div className="flex h-8 w-fit max-w-full items-center rounded-full bg-muted pl-3 pr-0.5 text-xs font-medium text-foreground">
