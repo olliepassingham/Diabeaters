@@ -1,11 +1,17 @@
 import { useState } from "react";
-import { Plus, Syringe } from "lucide-react";
+import { Pencil, Plus, Syringe, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  deleteInsulinDose,
+  getLongActingDoses,
+  getRapidInsulinDoses,
   recordLongActingDose,
   recordRapidInsulinDose,
+  remainingRapidUnits,
   setInsulinChartVisible,
+  updateInsulinDose,
+  type InsulinDoseKind,
 } from "@/lib/insulin-activity";
 import { cn } from "@/lib/utils";
 
@@ -13,6 +19,36 @@ function localDateTimeValue(date = new Date()): string {
   const pad = (value: number) => String(value).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
+
+function formatDoseWhen(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const time = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  const now = new Date();
+  const sameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  if (sameDay(d, now)) return `Today ${time}`;
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (sameDay(d, yesterday)) return `Yesterday ${time}`;
+  return `${d.toLocaleDateString(undefined, { day: "numeric", month: "short" })} ${time}`;
+}
+
+function relativeAgo(iso: string, nowMs: number): string {
+  const mins = Math.max(0, Math.round((nowMs - new Date(iso).getTime()) / 60_000));
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return mins % 60 >= 5 ? `${hours}h ${mins % 60}m ago` : `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+type DoseRow = {
+  kind: InsulinDoseKind;
+  id: string;
+  units: number;
+  takenAtIso: string;
+};
 
 export function InsulinChartControls({
   visible,
@@ -31,8 +67,20 @@ export function InsulinChartControls({
   const [kind, setKind] = useState<"rapid" | "long">("rapid");
   const [units, setUnits] = useState("");
   const [takenAt, setTakenAt] = useState(localDateTimeValue);
+  const [editing, setEditing] = useState<DoseRow | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const nowMs = Date.now();
+  const rows: DoseRow[] = [
+    ...getRapidInsulinDoses().map((d) => ({ kind: "rapid" as const, id: d.id, units: d.units, takenAtIso: d.takenAtIso })),
+    ...getLongActingDoses().map((d) => ({ kind: "longActing" as const, id: d.id, units: d.units, takenAtIso: d.takenAtIso })),
+  ]
+    .sort((a, b) => new Date(b.takenAtIso).getTime() - new Date(a.takenAtIso).getTime())
+    .slice(0, 6);
 
   const openForm = () => {
+    setEditing(null);
+    setConfirmDelete(false);
     setKind("rapid");
     setTakenAt(localDateTimeValue());
     setUnits("");
@@ -57,6 +105,32 @@ export function InsulinChartControls({
     setOpen(false);
   };
 
+  const startEdit = (row: DoseRow) => {
+    setOpen(false);
+    setConfirmDelete(false);
+    setEditing(row);
+    setUnits(String(row.units));
+    setTakenAt(localDateTimeValue(new Date(row.takenAtIso)));
+  };
+
+  const saveEdit = () => {
+    if (!editing) return;
+    const amount = Number(units);
+    const when = new Date(takenAt);
+    if (!Number.isFinite(amount) || amount <= 0 || Number.isNaN(when.getTime())) return;
+    if (updateInsulinDose(editing.kind, editing.id, { units: amount, takenAtIso: when.toISOString() })) {
+      setInsulinChartVisible(true);
+    }
+    setEditing(null);
+  };
+
+  const removeEditing = () => {
+    if (!editing) return;
+    deleteInsulinDose(editing.kind, editing.id);
+    setEditing(null);
+    setConfirmDelete(false);
+  };
+
   const onBoard = hasDoses && visible;
   const title = onBoard
     ? remaining > 0.05
@@ -70,6 +144,53 @@ export function InsulinChartControls({
     : hasDoses
       ? "Hidden on this graph"
       : "Add a dose to this graph";
+
+  const kindToggle = (
+    <div className="grid grid-cols-2 rounded-full bg-muted/70 p-1" role="group" aria-label="Insulin type">
+      {(
+        [
+          ["rapid", "Rapid"],
+          ["long", "Long-acting"],
+        ] as const
+      ).map(([value, label]) => (
+        <button
+          key={value}
+          type="button"
+          className={cn(
+            "h-9 rounded-full text-sm font-medium",
+            kind === value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground",
+          )}
+          aria-pressed={kind === value}
+          onClick={() => chooseKind(value)}
+          data-testid={value === "rapid" ? "button-log-rapid-insulin" : "button-log-long-insulin"}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+
+  const doseFields = (
+    <div className="grid gap-2">
+      <Input
+        inputMode="decimal"
+        value={units}
+        onChange={(event) => setUnits(event.target.value)}
+        placeholder="Units"
+        aria-label="Units"
+        className="h-12 text-base"
+        data-testid="input-insulin-units"
+      />
+      <Input
+        type="datetime-local"
+        value={takenAt}
+        onChange={(event) => setTakenAt(event.target.value)}
+        aria-label="When"
+        className="h-12 min-w-0 text-base"
+        data-testid="input-insulin-time"
+      />
+    </div>
+  );
 
   return (
     <div data-testid="insulin-chart-controls">
@@ -115,53 +236,124 @@ export function InsulinChartControls({
 
       {open ? (
         <div className="mt-3 space-y-3 border-t border-border/50 pt-3">
-          <div className="grid grid-cols-2 rounded-full bg-muted/70 p-1" role="group" aria-label="Insulin type">
-            {(
-              [
-                ["rapid", "Rapid"],
-                ["long", "Long-acting"],
-              ] as const
-            ).map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                className={cn(
-                  "h-9 rounded-full text-sm font-medium",
-                  kind === value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground",
-                )}
-                aria-pressed={kind === value}
-                onClick={() => chooseKind(value)}
-                data-testid={value === "rapid" ? "button-log-rapid-insulin" : "button-log-long-insulin"}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <div className="grid gap-2">
-            <Input
-              inputMode="decimal"
-              value={units}
-              onChange={(event) => setUnits(event.target.value)}
-              placeholder="Units"
-              aria-label={kind === "rapid" ? "Rapid units" : "Long-acting units"}
-              className="h-12 text-base"
-              data-testid="input-insulin-units"
-            />
-            <Input
-              type="datetime-local"
-              value={takenAt}
-              onChange={(event) => setTakenAt(event.target.value)}
-              aria-label="When"
-              className="h-12 min-w-0 text-base"
-              data-testid="input-insulin-time"
-            />
-          </div>
+          {kindToggle}
+          {doseFields}
           <div className="flex justify-end">
             <Button type="button" variant="ghost" className="h-9 rounded-full px-3 text-sm font-semibold" onClick={save} data-testid="button-save-insulin-dose">
               Add to graph
             </Button>
           </div>
         </div>
+      ) : null}
+
+      {editing ? (
+        <div className="mt-3 space-y-3 border-t border-border/50 pt-3" data-testid="insulin-dose-edit-form">
+          <p className="text-[13px] font-medium text-foreground">
+            Edit {editing.kind === "rapid" ? "rapid" : "long-acting"} dose · {formatDoseWhen(editing.takenAtIso)}
+          </p>
+          {doseFields}
+          {confirmDelete ? (
+            <div className="flex items-center justify-between gap-2 rounded-xl bg-destructive/[0.06] px-3 py-2">
+              <p className="text-[13px] font-medium text-foreground">Delete this dose?</p>
+              <div className="flex shrink-0 gap-1.5">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-9 rounded-full px-3 text-sm font-semibold"
+                  onClick={() => setConfirmDelete(false)}
+                >
+                  Keep
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  className="h-9 rounded-full px-3 text-sm font-semibold"
+                  onClick={removeEditing}
+                  data-testid="button-confirm-delete-insulin-dose"
+                >
+                  Delete
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-9 rounded-full px-2.5 text-sm font-semibold text-destructive hover:text-destructive"
+                onClick={() => setConfirmDelete(true)}
+                data-testid="button-delete-insulin-dose"
+              >
+                <Trash2 className="mr-1.5 h-4 w-4" aria-hidden />
+                Delete
+              </Button>
+              <div className="flex gap-1.5">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-9 rounded-full px-3 text-sm font-semibold"
+                  onClick={() => setEditing(null)}
+                  data-testid="button-cancel-insulin-edit"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  className="h-9 rounded-full px-3 text-sm font-semibold"
+                  onClick={saveEdit}
+                  data-testid="button-save-insulin-edit"
+                >
+                  Save changes
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      {hasDoses && rows.length > 0 && !editing ? (
+        <ul className="mt-1 space-y-1 px-1 pb-1" data-testid="insulin-dose-list">
+          {rows.map((row) => {
+            const left =
+              row.kind === "rapid"
+                ? remainingRapidUnits([{ id: row.id, takenAtIso: row.takenAtIso, units: row.units }], nowMs)
+                : 0;
+            return (
+              <li key={`${row.kind}-${row.id}`}>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left transition-colors hover:bg-muted/50"
+                  onClick={() => startEdit(row)}
+                  data-testid={`button-edit-insulin-dose-${row.id}`}
+                  aria-label={`Edit ${row.kind === "rapid" ? "rapid" : "long-acting"} dose, ${row.units} units, ${formatDoseWhen(row.takenAtIso)}`}
+                >
+                  <span
+                    className={cn(
+                      "flex h-6 w-14 shrink-0 items-center justify-center rounded-full text-[10px] font-bold uppercase tracking-wide",
+                      row.kind === "rapid"
+                        ? "bg-amber-500/15 text-amber-800 dark:text-amber-200"
+                        : "bg-sky-500/15 text-sky-800 dark:text-sky-200",
+                    )}
+                  >
+                    {row.kind === "rapid" ? "Rapid" : "Long"}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold tabular-nums text-foreground">{row.units}u</span>
+                    <span className="block truncate text-[11px] text-muted-foreground">{formatDoseWhen(row.takenAtIso)}</span>
+                  </span>
+                  <span className="shrink-0 text-[11px] font-medium tabular-nums text-muted-foreground">
+                    {row.kind === "rapid" && left > 0.05 ? (
+                      <span className="text-amber-800 dark:text-amber-200">{left.toFixed(1)}u left</span>
+                    ) : (
+                      relativeAgo(row.takenAtIso, nowMs)
+                    )}
+                  </span>
+                  <Pencil className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" aria-hidden />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
       ) : null}
     </div>
   );

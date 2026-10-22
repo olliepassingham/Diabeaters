@@ -1,13 +1,17 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
+  deleteInsulinDose,
   getLongActingDoseHistory,
+  getLongActingDoses,
   getRapidInsulinDoseHistory,
+  getRapidInsulinDoses,
   RAPID_ACTION_HOURS,
   rapidRunsOutAt,
   recordLongActingDose,
   recordRapidInsulinDose,
   remainingRapidUnits,
+  updateInsulinDose,
   type RapidInsulinDose,
 } from "@/lib/insulin-activity";
 
@@ -70,5 +74,51 @@ describe("dose history for patterns", () => {
       JSON.stringify({ rapid: [dose(4, yesterday)], longActing: [] }),
     );
     expect(getRapidInsulinDoseHistory().map((d) => d.units)).toEqual([4]);
+  });
+});
+
+describe("editing and deleting doses", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it("updates units and time in the chart store and history together", () => {
+    const takenAtIso = new Date(Date.now() - 2 * 3_600_000).toISOString();
+    const saved = recordRapidInsulinDose({ units: 6, takenAtIso });
+    expect(saved).not.toBeNull();
+    const newTime = new Date(Date.now() - 90 * 60_000).toISOString();
+    expect(updateInsulinDose("rapid", saved!.id, { units: 4.5, takenAtIso: newTime })).toBe(true);
+
+    expect(getRapidInsulinDoses()).toEqual([{ id: saved!.id, takenAtIso: newTime, units: 4.5 }]);
+    expect(getRapidInsulinDoseHistory().map((d) => [d.units, d.takenAtIso])).toEqual([[4.5, newTime]]);
+  });
+
+  it("updates long-acting doses too", () => {
+    const takenAtIso = new Date(Date.now() - 10 * 3_600_000).toISOString();
+    const newTime = new Date(Date.now() - 9 * 3_600_000).toISOString();
+    const saved = recordLongActingDose({ units: 12, takenAtIso });
+    expect(updateInsulinDose("longActing", saved!.id, { units: 14, takenAtIso: newTime })).toBe(true);
+    expect(getLongActingDoses()[0]?.units).toBe(14);
+    expect(getLongActingDoseHistory()[0]?.units).toBe(14);
+  });
+
+  it("deletes from the chart store and history together", () => {
+    const rapid = recordRapidInsulinDose({ units: 5 });
+    const long = recordLongActingDose({ units: 10 });
+    expect(deleteInsulinDose("rapid", rapid!.id)).toBe(true);
+    expect(deleteInsulinDose("longActing", long!.id)).toBe(true);
+    expect(getRapidInsulinDoses()).toEqual([]);
+    expect(getLongActingDoses()).toEqual([]);
+    expect(getRapidInsulinDoseHistory()).toEqual([]);
+    expect(getLongActingDoseHistory()).toEqual([]);
+  });
+
+  it("rejects invalid edits and unknown ids", () => {
+    const saved = recordRapidInsulinDose({ units: 5 });
+    expect(updateInsulinDose("rapid", saved!.id, { units: 0, takenAtIso: new Date().toISOString() })).toBe(false);
+    expect(updateInsulinDose("rapid", saved!.id, { units: 5, takenAtIso: "not-a-date" })).toBe(false);
+    expect(updateInsulinDose("rapid", "missing-id", { units: 5, takenAtIso: new Date().toISOString() })).toBe(false);
+    expect(deleteInsulinDose("rapid", "missing-id")).toBe(false);
+    expect(getRapidInsulinDoses()).toHaveLength(1);
   });
 });

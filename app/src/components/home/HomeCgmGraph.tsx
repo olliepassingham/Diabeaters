@@ -136,6 +136,7 @@ export function HomeCgmGraph() {
             timelineEvents={timelineEvents}
             insulinSeries={penUser && insulin.visible ? insulin.series : undefined}
             insulinMarks={penUser && insulin.visible ? insulin.marks : undefined}
+            insulinDoseMarks={penUser && insulin.visible ? insulin.doseMarks : undefined}
             xDomain={penUser && insulin.visible ? insulin.xDomain ?? undefined : undefined}
             plotHeight={240}
             className="w-full [&>p]:hidden"

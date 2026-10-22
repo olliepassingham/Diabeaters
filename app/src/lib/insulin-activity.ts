@@ -113,6 +113,87 @@ function appendDoseHistory(kind: "rapid" | "longActing", dose: RapidInsulinDose 
   }
 }
 
+function writeDoseHistory(store: InsulinActivityStore) {
+  try {
+    const cutoff = Date.now() - INSULIN_DOSE_HISTORY_DAYS * 24 * 60 * 60 * 1000;
+    const within = (iso: string) => {
+      const time = new Date(iso).getTime();
+      return Number.isFinite(time) && time >= cutoff;
+    };
+    localStorage.setItem(
+      HISTORY_STORAGE_KEY,
+      JSON.stringify({
+        rapid: store.rapid.filter((d) => within(d.takenAtIso)).slice(-RAPID_HISTORY_CAP),
+        longActing: store.longActing.filter((d) => within(d.takenAtIso)).slice(-LONG_ACTING_HISTORY_CAP),
+      }),
+    );
+  } catch {
+    /* history is best-effort */
+  }
+}
+
+export type InsulinDoseKind = "rapid" | "longActing";
+
+/**
+ * Correct a dose the user logged earlier (wrong units or time). Updates the
+ * live chart store and the 30-day Patterns history together so the two never
+ * disagree. Returns false when the dose no longer exists.
+ */
+export function updateInsulinDose(
+  kind: InsulinDoseKind,
+  id: string,
+  patch: { units: number; takenAtIso: string },
+): boolean {
+  if (!Number.isFinite(patch.units) || patch.units <= 0 || patch.units > 80) return false;
+  const timeMs = new Date(patch.takenAtIso).getTime();
+  if (!Number.isFinite(timeMs)) return false;
+  const units = Math.round(patch.units * 10) / 10;
+  const takenAtIso = new Date(timeMs).toISOString();
+
+  const store = readStore();
+  const inStore =
+    kind === "rapid" ? store.rapid.some((d) => d.id === id) : store.longActing.some((d) => d.id === id);
+  const apply = <T extends { id: string; units: number; takenAtIso: string }>(list: T[]): T[] =>
+    list.map((d) => (d.id === id ? { ...d, units, takenAtIso } : d));
+  writeStore({
+    rapid: kind === "rapid" ? apply(store.rapid) : store.rapid,
+    longActing: kind === "longActing" ? apply(store.longActing) : store.longActing,
+  });
+
+  const history = readDoseHistory();
+  const inHistory =
+    kind === "rapid" ? history.rapid.some((d) => d.id === id) : history.longActing.some((d) => d.id === id);
+  if (inHistory) {
+    writeDoseHistory({
+      rapid: kind === "rapid" ? apply(history.rapid) : history.rapid,
+      longActing: kind === "longActing" ? apply(history.longActing) : history.longActing,
+    });
+  }
+  return inStore || inHistory;
+}
+
+/** Remove a dose entirely — from the chart and from Patterns history. */
+export function deleteInsulinDose(kind: InsulinDoseKind, id: string): boolean {
+  const store = readStore();
+  const inStore =
+    kind === "rapid" ? store.rapid.some((d) => d.id === id) : store.longActing.some((d) => d.id === id);
+  writeStore({
+    rapid: kind === "rapid" ? store.rapid.filter((d) => d.id !== id) : store.rapid,
+    longActing: kind === "longActing" ? store.longActing.filter((d) => d.id !== id) : store.longActing,
+  });
+
+  const history = readDoseHistory();
+  const inHistory =
+    kind === "rapid" ? history.rapid.some((d) => d.id === id) : history.longActing.some((d) => d.id === id);
+  if (inHistory) {
+    writeDoseHistory({
+      rapid: kind === "rapid" ? history.rapid.filter((d) => d.id !== id) : history.rapid,
+      longActing: kind === "longActing" ? history.longActing.filter((d) => d.id !== id) : history.longActing,
+    });
+  }
+  return inStore || inHistory;
+}
+
 function historyWithin<T extends { takenAtIso: string }>(doses: T[], withinDays: number, nowMs: number): T[] {
   const cutoff = nowMs - withinDays * 24 * 60 * 60 * 1000;
   return doses
@@ -305,6 +386,8 @@ export function usualLongActingUnits(unitsPerDay?: number, injectionsPerDay?: nu
   return Math.round((unitsPerDay / doses) * 10) / 10;
 }
 
+export type RapidDoseChartMark = { id: string; timeMs: number; units: number };
+
 export function buildHomeInsulinChart(nowMs = Date.now(), usualTimes: Array<string | undefined> = []) {
   if (!hasConfirmedInsulin() || !isInsulinChartVisible()) {
     return {
@@ -312,6 +395,7 @@ export function buildHomeInsulinChart(nowMs = Date.now(), usualTimes: Array<stri
       hasDoses: hasConfirmedInsulin(),
       series: [] as InsulinActivitySample[],
       marks: [] as LongActingChartMark[],
+      doseMarks: [] as RapidDoseChartMark[],
       xDomain: null as { startMs: number; endMs: number } | null,
       remaining: 0,
       runsOutLabel: null as string | null,
@@ -325,6 +409,9 @@ export function buildHomeInsulinChart(nowMs = Date.now(), usualTimes: Array<stri
     visible: true,
     hasDoses: true,
     series: rapidActivitySamples(rapid, startMs, endMs),
+    doseMarks: rapid
+      .map((dose) => ({ id: dose.id, timeMs: new Date(dose.takenAtIso).getTime(), units: dose.units }))
+      .filter((mark) => Number.isFinite(mark.timeMs) && mark.timeMs >= startMs && mark.timeMs <= endMs),
     marks: longActingChartMarks({
       doses: getLongActingDoses(),
       usualTimes,

@@ -38,6 +38,8 @@ type CgmGlucoseChartProps = {
   /** Rapid-insulin estimate, drawn on its own scale over the glucose plot. */
   insulinSeries?: InsulinChartSample[];
   insulinMarks?: InsulinChartMark[];
+  /** Individual rapid doses, marked on the insulin lane with their units. */
+  insulinDoseMarks?: { id: string; timeMs: number; units: number }[];
   /** Used when the insulin line needs to extend past the last glucose reading. */
   xDomain?: { startMs: number; endMs: number };
   /** Plot frame height in viewBox units. Wider home charts use a taller frame. */
@@ -93,6 +95,7 @@ function scaleXByTime(timeMs: number, startMs: number, endMs: number, width: num
 function InsulinTimeline({
   samples,
   marks,
+  doseMarks = [],
   peak,
   startMs,
   endMs,
@@ -102,6 +105,7 @@ function InsulinTimeline({
 }: {
   samples: InsulinChartSample[];
   marks: InsulinChartMark[];
+  doseMarks?: { id: string; timeMs: number; units: number }[];
   peak: number;
   startMs: number;
   endMs: number;
@@ -175,6 +179,29 @@ function InsulinTimeline({
           </g>
         );
       })}
+      {doseMarks.map((mark) => {
+        const x = scaleXByTime(mark.timeMs, startMs, endMs, width);
+        const timeLabel = new Date(mark.timeMs).toLocaleTimeString(undefined, {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        return (
+          <g key={`dose-${mark.id}`} data-testid={`insulin-dose-mark-${mark.id}`}>
+            <title>{`${mark.units}u rapid at ${timeLabel}`}</title>
+            <circle cx={x} cy={baseline} r={3.5} fill="#d97706" stroke="hsl(var(--background))" strokeWidth={1} />
+            <text
+              x={x}
+              y={baseline + 11}
+              textAnchor="middle"
+              fontSize="7.5"
+              fontWeight={600}
+              fill="#d97706"
+            >
+              {mark.units}u
+            </text>
+          </g>
+        );
+      })}
     </g>
   );
 }
@@ -189,6 +216,7 @@ export function CgmGlucoseChart({
   timelineEvents = [],
   insulinSeries = [],
   insulinMarks = [],
+  insulinDoseMarks = [],
   xDomain,
   plotHeight = HEIGHT,
   className,
@@ -214,7 +242,7 @@ export function CgmGlucoseChart({
   const chartStartMs = xDomain?.startMs ?? points[0]?.timeMs ?? 0;
   const chartEndMs = xDomain?.endMs ?? points[points.length - 1]?.timeMs ?? chartStartMs;
   const insulinPeak = insulinSeries.reduce((max, sample) => Math.max(max, sample.units), 0);
-  const showInsulin = insulinPeak > 0.05 || insulinMarks.length > 0;
+  const showInsulin = insulinPeak > 0.05 || insulinMarks.length > 0 || insulinDoseMarks.length > 0;
   const svgHeight = showInsulin ? frameHeight + INSULIN_LANE_EXTRA : frameHeight;
   const insulinLaneTop = PAD.top + innerHeight + 18;
   const insulinFadeId = `${gradientId}-insulin`;
@@ -640,6 +668,7 @@ export function CgmGlucoseChart({
           <InsulinTimeline
             samples={insulinSeries}
             marks={insulinMarks}
+            doseMarks={insulinDoseMarks}
             peak={insulinPeak}
             startMs={chartStartMs}
             endMs={chartEndMs}
