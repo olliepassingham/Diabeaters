@@ -48,7 +48,7 @@ import {
   normalizeDexcomUsernameInput,
   shouldEmphasizeDexcomAccountIdAssist,
 } from "@/components/cgm-dexcom-login-assist";
-import { isDexcomAccountId } from "@/lib/cgm/dexcom-share-client";
+import { dexcomAccountPortalUrl, isDexcomAccountId } from "@/lib/cgm/dexcom-share-client";
 
 type StatusTone = "muted" | "amber" | "green";
 
@@ -383,18 +383,28 @@ export function SettingsCgmRoute() {
   }
 
   async function handleConnectDexcom() {
+    // A pasted address with no account ID in it (e.g. a Clarity link) can
+    // never log in — explain that here instead of a failed login attempt.
+    const notice = dexcomUsernameInputNotice(dexcomUsername);
+    if (notice) {
+      setDexcomError(notice);
+      setDexcomAssistEmphasize(true);
+      return;
+    }
+    const resolvedUsername = normalizeDexcomUsernameInput(dexcomUsername.trim());
+    if (resolvedUsername !== dexcomUsername) setDexcomUsername(resolvedUsername);
     setDexcomConnecting(true);
     setDexcomError(null);
     try {
       const res = await connectDexcomShareCgm({
-        username: dexcomUsername,
+        username: resolvedUsername,
         password: dexcomPassword,
         server: dexcomServer,
       });
       if (!res.ok) {
         const message = res.error ?? "Could not connect to Dexcom Share.";
         setDexcomError(message);
-        if (shouldEmphasizeDexcomAccountIdAssist(message) && !isDexcomAccountId(dexcomUsername)) {
+        if (shouldEmphasizeDexcomAccountIdAssist(message) && !isDexcomAccountId(resolvedUsername)) {
           setDexcomAssistEmphasize(true);
         }
         toast({ title: "Dexcom Share failed", description: message, variant: "destructive" });
@@ -415,7 +425,7 @@ export function SettingsCgmRoute() {
     } catch (e) {
       const message = e instanceof Error ? e.message : "Dexcom Share connection failed.";
       setDexcomError(message);
-      if (shouldEmphasizeDexcomAccountIdAssist(message) && !isDexcomAccountId(dexcomUsername)) {
+      if (shouldEmphasizeDexcomAccountIdAssist(message) && !isDexcomAccountId(resolvedUsername)) {
         setDexcomAssistEmphasize(true);
       }
       toast({ title: "Dexcom Share failed", description: message, variant: "destructive" });
@@ -653,16 +663,32 @@ export function SettingsCgmRoute() {
                       : dexcomUsername
                   }
                   onChange={(e) => {
-                    const raw = e.target.value;
-                    setDexcomUsername(normalizeDexcomUsernameInput(raw));
-                    setDexcomError(dexcomUsernameInputNotice(raw));
+                    // Keep the field exactly as typed/pasted. Rewriting it
+                    // mid-edit (swapping the address for the account ID)
+                    // fights the caret and makes pasting feel broken — the
+                    // account ID is extracted when Connect is pressed.
+                    setDexcomUsername(e.target.value);
+                    setDexcomError(null);
                   }}
-                  autoComplete="username"
+                  onBlur={() => setDexcomError(dexcomUsernameInputNotice(dexcomUsername))}
+                  type="text"
+                  inputMode="url"
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  enterKeyHint="next"
                   className="h-11"
                   disabled={dexcomConnected}
-                  placeholder="Paste the portal web address"
+                  placeholder="Paste the copied address here"
                   data-testid="input-dexcom-username"
                 />
+                {!dexcomConnected ? (
+                  <p className="text-xs leading-snug text-muted-foreground">
+                    From the top of your browser after signing in — it starts with{" "}
+                    {new URL(dexcomAccountPortalUrl(dexcomServer)).host}.
+                  </p>
+                ) : null}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="dexcom-password" className="text-sm">

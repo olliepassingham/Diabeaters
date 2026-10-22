@@ -61,6 +61,7 @@ export function DexcomLoginAssist({
 }: DexcomLoginAssistProps) {
   const [pasteFlash, setPasteFlash] = useState(false);
   const portalUrl = dexcomAccountPortalUrl(server);
+  const portalHost = new URL(portalUrl).host;
 
   useEffect(() => {
     if (!pasteFlash) return;
@@ -110,9 +111,20 @@ export function DexcomLoginAssist({
         <li>
           In the Dexcom app, turn on <span className="font-medium text-foreground">Share</span>
         </li>
-        <li>Open the account portal and sign in with your Clarity phone or email</li>
-        <li>Copy the web address and paste it below</li>
+        <li>
+          Tap <span className="font-medium text-foreground">Open portal</span> below and sign in
+        </li>
+        <li>
+          Tap the web address at the top of your browser, then <span className="font-medium text-foreground">Copy</span>
+        </li>
+        <li>
+          Come back here and tap <span className="font-medium text-foreground">Paste address</span>
+        </li>
       </ol>
+      <p className="text-xs leading-snug text-muted-foreground">
+        The right address starts with <span className="font-medium text-foreground">{portalHost}</span>. You can also
+        paste it straight into the box below.
+      </p>
       <div className="flex flex-wrap gap-2">
         <Button
           type="button"

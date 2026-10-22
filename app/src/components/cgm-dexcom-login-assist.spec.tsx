@@ -17,6 +17,18 @@ describe("DexcomLoginAssist", () => {
     expect(screen.getByTestId("button-dexcom-open-portal")).toBeTruthy();
     expect(screen.getByTestId("button-dexcom-paste-account-id")).toBeTruthy();
   });
+
+  it("spells out copying from the browser address bar and what the address looks like", () => {
+    render(<DexcomLoginAssist server="eu" onAccountIdPasted={() => undefined} />);
+    expect(screen.getByText(/web address at the top of your browser/i)).toBeTruthy();
+    expect(screen.getByText(/Come back here and tap/i)).toBeTruthy();
+    expect(screen.getByText(/uam2\.dexcom\.com/)).toBeTruthy();
+  });
+
+  it("shows the US portal host for the US server", () => {
+    render(<DexcomLoginAssist server="us" onAccountIdPasted={() => undefined} />);
+    expect(screen.getByText(/uam1\.dexcom\.com/)).toBeTruthy();
+  });
 });
 
 describe("normalizeDexcomUsernameInput", () => {
