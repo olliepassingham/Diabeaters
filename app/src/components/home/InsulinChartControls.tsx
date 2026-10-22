@@ -56,12 +56,15 @@ export function InsulinChartControls({
   remaining,
   runsOutLabel,
   longActingUnits,
+  showDoseList = true,
 }: {
   visible: boolean;
   hasDoses: boolean;
   remaining: number;
   runsOutLabel: string | null;
   longActingUnits?: number;
+  /** The tappable dose list (today's doses, tap to edit). Off on compact surfaces like Home. */
+  showDoseList?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<"rapid" | "long">("rapid");
@@ -71,12 +74,14 @@ export function InsulinChartControls({
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const nowMs = Date.now();
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
   const rows: DoseRow[] = [
     ...getRapidInsulinDoses().map((d) => ({ kind: "rapid" as const, id: d.id, units: d.units, takenAtIso: d.takenAtIso })),
     ...getLongActingDoses().map((d) => ({ kind: "longActing" as const, id: d.id, units: d.units, takenAtIso: d.takenAtIso })),
   ]
-    .sort((a, b) => new Date(b.takenAtIso).getTime() - new Date(a.takenAtIso).getTime())
-    .slice(0, 6);
+    .filter((d) => new Date(d.takenAtIso).getTime() >= todayStart.getTime())
+    .sort((a, b) => new Date(b.takenAtIso).getTime() - new Date(a.takenAtIso).getTime());
 
   const openForm = () => {
     setEditing(null);
@@ -146,7 +151,7 @@ export function InsulinChartControls({
       : "Add a dose to this graph";
 
   const kindToggle = (
-    <div className="grid grid-cols-2 rounded-full bg-muted/70 p-1" role="group" aria-label="Insulin type">
+    <div className="grid grid-cols-2 rounded-full bg-background/70 p-0.5" role="group" aria-label="Insulin type">
       {(
         [
           ["rapid", "Rapid"],
@@ -157,8 +162,8 @@ export function InsulinChartControls({
           key={value}
           type="button"
           className={cn(
-            "h-9 rounded-full text-sm font-medium",
-            kind === value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground",
+            "h-7 rounded-full text-[13px] font-medium",
+            kind === value ? "bg-foreground/[0.06] text-foreground shadow-sm ring-1 ring-border/60" : "text-muted-foreground",
           )}
           aria-pressed={kind === value}
           onClick={() => chooseKind(value)}
@@ -170,26 +175,32 @@ export function InsulinChartControls({
     </div>
   );
 
-  const doseFields = (
-    <div className="grid gap-2">
+  const unitsField = (
+    <div className="relative w-[4.75rem] shrink-0">
       <Input
         inputMode="decimal"
         value={units}
         onChange={(event) => setUnits(event.target.value)}
-        placeholder="Units"
+        placeholder="0"
         aria-label="Units"
-        className="h-12 text-base"
+        className="h-9 rounded-lg border-border/50 bg-background pr-5 text-sm"
         data-testid="input-insulin-units"
       />
-      <Input
-        type="datetime-local"
-        value={takenAt}
-        onChange={(event) => setTakenAt(event.target.value)}
-        aria-label="When"
-        className="h-12 min-w-0 text-base"
-        data-testid="input-insulin-time"
-      />
+      <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
+        u
+      </span>
     </div>
+  );
+
+  const timeField = (
+    <Input
+      type="datetime-local"
+      value={takenAt}
+      onChange={(event) => setTakenAt(event.target.value)}
+      aria-label="When"
+      className="h-9 min-w-0 flex-1 rounded-lg border-border/50 bg-background text-[13px]"
+      data-testid="input-insulin-time"
+    />
   );
 
   return (
@@ -235,31 +246,40 @@ export function InsulinChartControls({
       </div>
 
       {open ? (
-        <div className="mt-3 space-y-3 border-t border-border/50 pt-3">
+        <div className="mx-2 mb-2 space-y-2 rounded-2xl bg-muted/35 p-2">
           {kindToggle}
-          {doseFields}
-          <div className="flex justify-end">
-            <Button type="button" variant="ghost" className="h-9 rounded-full px-3 text-sm font-semibold" onClick={save} data-testid="button-save-insulin-dose">
-              Add to graph
+          <div className="flex items-center gap-1.5">
+            {unitsField}
+            {timeField}
+            <Button
+              type="button"
+              className="h-9 shrink-0 rounded-full px-3.5 text-[13px] font-semibold"
+              onClick={save}
+              data-testid="button-save-insulin-dose"
+            >
+              Add
             </Button>
           </div>
         </div>
       ) : null}
 
       {editing ? (
-        <div className="mt-3 space-y-3 border-t border-border/50 pt-3" data-testid="insulin-dose-edit-form">
-          <p className="text-[13px] font-medium text-foreground">
+        <div className="mx-2 mb-2 space-y-2 rounded-2xl bg-muted/35 p-2" data-testid="insulin-dose-edit-form">
+          <p className="px-1 pt-0.5 text-[13px] font-medium text-foreground">
             Edit {editing.kind === "rapid" ? "rapid" : "long-acting"} dose · {formatDoseWhen(editing.takenAtIso)}
           </p>
-          {doseFields}
+          <div className="flex items-center gap-1.5">
+            {unitsField}
+            {timeField}
+          </div>
           {confirmDelete ? (
-            <div className="flex items-center justify-between gap-2 rounded-xl bg-destructive/[0.06] px-3 py-2">
+            <div className="flex items-center justify-between gap-2 rounded-xl bg-destructive/[0.06] px-2.5 py-1.5">
               <p className="text-[13px] font-medium text-foreground">Delete this dose?</p>
-              <div className="flex shrink-0 gap-1.5">
+              <div className="flex shrink-0 gap-1">
                 <Button
                   type="button"
                   variant="ghost"
-                  className="h-9 rounded-full px-3 text-sm font-semibold"
+                  className="h-8 rounded-full px-2.5 text-[13px] font-semibold"
                   onClick={() => setConfirmDelete(false)}
                 >
                   Keep
@@ -267,7 +287,7 @@ export function InsulinChartControls({
                 <Button
                   type="button"
                   variant="destructive"
-                  className="h-9 rounded-full px-3 text-sm font-semibold"
+                  className="h-8 rounded-full px-2.5 text-[13px] font-semibold"
                   onClick={removeEditing}
                   data-testid="button-confirm-delete-insulin-dose"
                 >
@@ -276,22 +296,22 @@ export function InsulinChartControls({
               </div>
             </div>
           ) : (
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between gap-2 px-0.5">
               <Button
                 type="button"
                 variant="ghost"
-                className="h-9 rounded-full px-2.5 text-sm font-semibold text-destructive hover:text-destructive"
+                className="h-8 rounded-full px-2 text-[13px] font-semibold text-destructive hover:text-destructive"
                 onClick={() => setConfirmDelete(true)}
                 data-testid="button-delete-insulin-dose"
               >
-                <Trash2 className="mr-1.5 h-4 w-4" aria-hidden />
+                <Trash2 className="mr-1 h-3.5 w-3.5" aria-hidden />
                 Delete
               </Button>
-              <div className="flex gap-1.5">
+              <div className="flex gap-1">
                 <Button
                   type="button"
                   variant="ghost"
-                  className="h-9 rounded-full px-3 text-sm font-semibold"
+                  className="h-8 rounded-full px-2.5 text-[13px] font-semibold"
                   onClick={() => setEditing(null)}
                   data-testid="button-cancel-insulin-edit"
                 >
@@ -299,11 +319,11 @@ export function InsulinChartControls({
                 </Button>
                 <Button
                   type="button"
-                  className="h-9 rounded-full px-3 text-sm font-semibold"
+                  className="h-8 rounded-full px-3 text-[13px] font-semibold"
                   onClick={saveEdit}
                   data-testid="button-save-insulin-edit"
                 >
-                  Save changes
+                  Save
                 </Button>
               </div>
             </div>
@@ -311,7 +331,11 @@ export function InsulinChartControls({
         </div>
       ) : null}
 
-      {hasDoses && rows.length > 0 && !editing ? (
+      {showDoseList && rows.length > 0 && !editing ? (
+        <>
+        <p className="px-3 pt-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Today&apos;s doses
+        </p>
         <ul className="mt-1 space-y-1 px-1 pb-1" data-testid="insulin-dose-list">
           {rows.map((row) => {
             const left =
@@ -354,6 +378,7 @@ export function InsulinChartControls({
             );
           })}
         </ul>
+        </>
       ) : null}
     </div>
   );

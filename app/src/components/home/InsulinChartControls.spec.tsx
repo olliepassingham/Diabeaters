@@ -15,6 +15,12 @@ function renderControls() {
   );
 }
 
+function renderControlsWithoutList() {
+  return render(
+    <InsulinChartControls visible hasDoses remaining={0} runsOutLabel={null} showDoseList={false} />,
+  );
+}
+
 describe("InsulinChartControls dose list", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -32,6 +38,28 @@ describe("InsulinChartControls dose list", () => {
     expect(list.textContent).toContain("12u");
     // The rapid dose taken an hour ago still has insulin working.
     expect(list.textContent).toContain("u left");
+  });
+
+  it("only lists today's doses, not yesterday's", () => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    yesterday.setHours(12, 0, 0, 0);
+    recordRapidInsulinDose({ units: 9, takenAtIso: yesterday.toISOString() });
+    recordRapidInsulinDose({ units: 4, takenAtIso: new Date(Date.now() - 30 * 60_000).toISOString() });
+    renderControls();
+
+    const list = screen.getByTestId("insulin-dose-list");
+    expect(list.textContent).toContain("4u");
+    expect(list.textContent).not.toContain("9u");
+    expect(list.textContent).not.toContain("Yesterday");
+  });
+
+  it("hides the dose list when showDoseList is false (Home)", () => {
+    recordRapidInsulinDose({ units: 6, takenAtIso: new Date(Date.now() - 60 * 60_000).toISOString() });
+    renderControlsWithoutList();
+    expect(screen.queryByTestId("insulin-dose-list")).toBeNull();
+    // The slim add-insulin row still shows.
+    expect(screen.getByTestId("button-add-insulin-dose")).toBeTruthy();
   });
 
   it("edits a dose's units and saves to the store and history", () => {

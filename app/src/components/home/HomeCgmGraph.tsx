@@ -187,6 +187,7 @@ export function HomeCgmGraph() {
           hasDoses={insulin.hasDoses}
           remaining={insulin.remaining}
           runsOutLabel={insulin.runsOutLabel}
+          showDoseList={false}
           longActingUnits={usualLongActingUnits(
             storage.getSettings().longActingUnitsPerDay,
             storage.getSettings().longActingInjectionsPerDay,

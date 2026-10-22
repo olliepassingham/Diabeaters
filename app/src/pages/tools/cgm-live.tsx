@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { Activity, Loader2, Minus, Moon, RefreshCw, Settings2, TrendingDown, TrendingUp, Dumbbell } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -30,7 +30,18 @@ import {
   glucoseRangeValueClasses,
 } from "@/lib/live-glucose-range";
 import { resolveUserTargetBgRange } from "@/lib/target-bg-range";
-import { storage } from "@/lib/storage";
+import {
+  storage,
+  DIABEATER_PROFILE_CHANGED_EVENT,
+  DIABEATER_SETTINGS_CHANGED_EVENT,
+} from "@/lib/storage";
+import { isPenDeliveryMethod } from "@/lib/insulin-delivery-method";
+import {
+  buildHomeInsulinChart,
+  INSULIN_ACTIVITY_CHANGED_EVENT,
+  usualLongActingUnits,
+} from "@/lib/insulin-activity";
+import { InsulinChartControls } from "@/components/home/InsulinChartControls";
 import { cn } from "@/lib/utils";
 
 function trendIcon(trend: string | null | undefined) {
@@ -44,6 +55,36 @@ export default function CgmLivePage() {
   const [range, setRange] = useState<CgmHistoryRange>("12h");
   const [highlightSleep, setHighlightSleep] = useState(false);
   const [highlightExercise, setHighlightExercise] = useState(false);
+  const [insulinTick, setInsulinTick] = useState(0);
+  const [penUser, setPenUser] = useState(() =>
+    isPenDeliveryMethod(storage.getProfile()?.insulinDeliveryMethod),
+  );
+
+  useEffect(() => {
+    const refreshInsulin = () => {
+      setPenUser(isPenDeliveryMethod(storage.getProfile()?.insulinDeliveryMethod));
+      setInsulinTick((tick) => tick + 1);
+    };
+    window.addEventListener(INSULIN_ACTIVITY_CHANGED_EVENT, refreshInsulin);
+    window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, refreshInsulin);
+    window.addEventListener(DIABEATER_SETTINGS_CHANGED_EVENT, refreshInsulin);
+    return () => {
+      window.removeEventListener(INSULIN_ACTIVITY_CHANGED_EVENT, refreshInsulin);
+      window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, refreshInsulin);
+      window.removeEventListener(DIABEATER_SETTINGS_CHANGED_EVENT, refreshInsulin);
+    };
+  }, []);
+
+  const insulin = useMemo(() => {
+    const s = storage.getSettings();
+    const times =
+      (s.longActingInjectionsPerDay ?? 0) >= 2
+        ? [s.basalInjectionTime, s.basalInjectionTime2]
+        : [s.basalInjectionTime];
+    return buildHomeInsulinChart(Date.now(), times);
+    // insulinTick refreshes after a dose is saved.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [insulinTick]);
   const { points, units, loading, error, connected, sourceLabel, refresh } = useCgmHistory(range);
   /** Always scan up to 24h for possible low suggestions (independent of chart range). */
   const history24h = useCgmHistory("24h");
@@ -367,6 +408,25 @@ export default function CgmLivePage() {
             </div>
           ) : null}
       </section>
+
+      {penUser ? (
+        <section
+          className="overflow-hidden rounded-[1.35rem] border border-border/50 bg-card/80 py-1 shadow-none"
+          data-testid="cgm-live-insulin"
+          aria-label="Insulin doses"
+        >
+          <InsulinChartControls
+            visible={insulin.visible}
+            hasDoses={insulin.hasDoses}
+            remaining={insulin.remaining}
+            runsOutLabel={insulin.runsOutLabel}
+            longActingUnits={usualLongActingUnits(
+              settings.longActingUnitsPerDay,
+              settings.longActingInjectionsPerDay,
+            )}
+          />
+        </section>
+      ) : null}
 
       <div className="flex items-start gap-2 rounded-xl border border-border/60 bg-muted/20 px-3 py-2.5 text-xs text-muted-foreground">
         <Activity className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
