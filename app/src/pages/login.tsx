@@ -18,6 +18,9 @@ import { FaceLogo } from "@/components/face-logo";
 import {
   authFieldActionClass,
   authMutedNavLinkClass,
+  authPageCenteredBodyClass,
+  authPageColumnClass,
+  authPageScrollClass,
 } from "@/components/auth/auth-link-styles";
 import { AuthCaptcha, useTurnstileCaptcha } from "@/components/auth/Turnstile";
 import { Eye, EyeOff } from "lucide-react";
@@ -153,13 +156,16 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-10 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]">
+    <div className={authPageScrollClass}>
+      <div className={authPageColumnClass}>
+        <div className={authPageCenteredBodyClass}>
         <PageShell variant="narrow" className="w-full max-w-md">
           <div className="mb-8 flex flex-col items-center gap-3 text-center">
             <FaceLogo size={56} />
             <div className="space-y-1">
-              <h1 className="font-display text-3xl font-bold tracking-tight">Log in to Diabeaters</h1>
+              <h1 className="text-balance font-display text-2xl font-bold tracking-tight sm:text-3xl">
+                Log in to Diabeaters
+              </h1>
               <p className="text-sm text-muted-foreground">Welcome back</p>
             </div>
           </div>
@@ -280,6 +286,7 @@ export default function Login() {
             </Link>
           </p>
         </PageShell>
+        </div>
       </div>
     </div>
   );

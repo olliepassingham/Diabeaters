@@ -1,12 +1,19 @@
 import { withTimeout } from "@/lib/cgm/async-timeout";
 
-/** Standard Dexcom Share app id for US + outside-US (EU/UK). */
+/** Standard Dexcom Share app id for US + outside-US (UK/EU/AU/NZ/etc.). */
 export const DEXCOM_SHARE_APPLICATION_ID = "d89443d2-327c-4a6f-89e5-496bbb0317db";
 
-/** Japan / Asia-Pacific only. */
+/** Japan and Dexcom’s Asia-Pacific Share service (not Australia/NZ — those use outside-US). */
 export const DEXCOM_SHARE_APPLICATION_ID_JP = "d8665ade-9673-4e27-9ff6-92db4ce13d13";
 
 export type DexcomShareServer = "eu" | "us" | "jp";
+
+/** User-facing region labels. `eu` is Dexcom’s outside-US Share cluster. */
+export const DEXCOM_SHARE_SERVER_LABELS: Record<DexcomShareServer, string> = {
+  eu: "Outside US (UK, EU, Australia, NZ…)",
+  us: "United States",
+  jp: "Japan / Asia-Pacific",
+};
 
 const DEXCOM_SHARE_TIMEOUT_MS = 12_000;
 const SESSION_TTL_MS = 25 * 60_000;
@@ -205,7 +212,7 @@ async function loginWithKnownAccountId(creds: DexcomShareCredentials, accountId:
       accountId,
       password: creds.password,
     }),
-    "Dexcom Share password failed for this account ID — reset your password at uam2.dexcom.com (UK/EU).",
+    "Dexcom Share password failed for this account ID — reset your password in the Dexcom account portal for your region.",
   );
 }
 
@@ -377,7 +384,7 @@ export async function testDexcomShareConnection(
       return {
         ok: false,
         error:
-          `${message} Check Share is on in the Dexcom app and the region is Europe / UK. Paste the account portal address, not a Clarity website address.`,
+          `${message} Check Share is on in the Dexcom app and the region matches your Dexcom account (Australia and NZ use Outside US, not Japan / Asia-Pacific). Paste the account portal address, not a Clarity website address.`,
       };
     }
     return { ok: false, error: message };

@@ -48,7 +48,11 @@ import {
   normalizeDexcomUsernameInput,
   shouldEmphasizeDexcomAccountIdAssist,
 } from "@/components/cgm-dexcom-login-assist";
-import { dexcomAccountPortalUrl, isDexcomAccountId } from "@/lib/cgm/dexcom-share-client";
+import {
+  DEXCOM_SHARE_SERVER_LABELS,
+  dexcomAccountPortalUrl,
+  isDexcomAccountId,
+} from "@/lib/cgm/dexcom-share-client";
 
 type StatusTone = "muted" | "amber" | "green";
 
@@ -717,11 +721,14 @@ export function SettingsCgmRoute() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="eu">Europe / UK</SelectItem>
-                    <SelectItem value="us">United States</SelectItem>
-                    <SelectItem value="jp">Japan / Asia-Pacific</SelectItem>
+                    <SelectItem value="eu">{DEXCOM_SHARE_SERVER_LABELS.eu}</SelectItem>
+                    <SelectItem value="us">{DEXCOM_SHARE_SERVER_LABELS.us}</SelectItem>
+                    <SelectItem value="jp">{DEXCOM_SHARE_SERVER_LABELS.jp}</SelectItem>
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  Australia and New Zealand use Outside US. Japan / Asia-Pacific is only for Dexcom Japan accounts.
+                </p>
               </div>
               {dexcomError ? (
                 <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
