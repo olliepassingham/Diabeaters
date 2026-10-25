@@ -79,6 +79,12 @@ describe("dexcom-share-client", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     const loginBody = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
     expect(loginBody.accountId).toBe(accountId);
+    const glucoseUrl = String(fetchMock.mock.calls[1][0]);
+    expect(glucoseUrl).toContain("ReadPublisherLatestGlucoseValues");
+    expect(glucoseUrl).toContain("sessionId=session-456");
+    expect(glucoseUrl).toContain("minutes=1440");
+    expect(glucoseUrl).toContain("maxCount=1");
+    expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).toEqual({});
   });
 
   it("fetches latest reading via share api", async () => {
@@ -108,6 +114,9 @@ describe("dexcom-share-client", () => {
     const authBody = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
     expect(authBody.applicationId).toBe("d89443d2-327c-4a6f-89e5-496bbb0317db");
     expect(authBody.accountName).toBe("user@example.com");
+    const glucoseUrl = String(fetchMock.mock.calls[2][0]);
+    expect(glucoseUrl).toContain("sessionId=session-456");
+    expect(glucoseUrl).toContain("maxCount=1");
   });
 
   it("fetches history sorted oldest-first", async () => {

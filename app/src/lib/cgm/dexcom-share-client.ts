@@ -330,12 +330,36 @@ async function fetchDexcomShareRawReadings(
 ): Promise<DexcomRawEntry[]> {
   const sessionId = await getDexcomShareSessionId(creds);
   const base = dexcomShareBaseUrl(creds.server);
-  const rows = await dexcomSharePost<DexcomRawEntry[]>(`${base}/Publisher/ReadPublisherLatestGlucoseValues`, {
-    sessionId,
-    minutes: options.minutes,
-    maxCount: options.maxCount,
+  // Dexcom expects sessionId / minutes / maxCount as query params with an empty JSON
+  // body (same as the official Follow path and pydexcom). Sending them only in the
+  // body can authenticate fine but return [] — which we surface as “no recent glucose”.
+  const url = new URL(`${base}/Publisher/ReadPublisherLatestGlucoseValues`);
+  url.searchParams.set("sessionId", sessionId);
+  url.searchParams.set("minutes", String(options.minutes));
+  url.searchParams.set("maxCount", String(options.maxCount));
+
+  const res = await fetch(url.toString(), {
+    method: "POST",
+    headers: dexcomShareHeaders(),
+    body: JSON.stringify({}),
   });
-  return Array.isArray(rows) ? rows : [];
+
+  const text = await res.text();
+  let data: unknown = text;
+  if (text) {
+    try {
+      data = JSON.parse(text) as unknown;
+    } catch {
+      data = text;
+    }
+  }
+
+  if (!res.ok) {
+    const detail = parseDexcomErrorBody(data);
+    throw new Error(detail ? `Dexcom Share error: ${detail}` : `Dexcom Share request failed (${res.status}).`);
+  }
+
+  return Array.isArray(data) ? (data as DexcomRawEntry[]) : [];
 }
 
 export async function testDexcomShareConnection(
@@ -358,7 +382,8 @@ export async function testDexcomShareConnection(
     if (!reading) {
       return {
         ok: false,
-        error: "Connected but no recent glucose found. Check your sensor is active and Share is on in the Dexcom app.",
+        error:
+          "Connected, but Dexcom has no recent glucose to share. In the Dexcom app: turn Share on, invite at least one follower (a second email works), and confirm the sensor is active with live readings. Then try Connect again.",
       };
     }
     const resolvedAccountId =

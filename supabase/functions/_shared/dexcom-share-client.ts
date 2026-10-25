@@ -255,12 +255,39 @@ export async function fetchLatestDexcomShareReading(
 ): Promise<DexcomShareGlucoseEntry | null> {
   const sessionId = await getDexcomShareSessionId(creds);
   const base = dexcomShareBaseUrl(creds.server);
-  const rows = await dexcomSharePost<DexcomRawEntry[]>(`${base}/Publisher/ReadPublisherLatestGlucoseValues`, {
-    sessionId,
-    minutes: 1440,
-    maxCount: 1,
+  // Query params + empty JSON body (Dexcom / pydexcom). Body-only requests can return [].
+  const url = new URL(`${base}/Publisher/ReadPublisherLatestGlucoseValues`);
+  url.searchParams.set("sessionId", sessionId);
+  url.searchParams.set("minutes", "1440");
+  url.searchParams.set("maxCount", "1");
+
+  const res = await fetch(url.toString(), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "User-Agent": "Dexcom Share/3.0.2.11 CFNetwork/711.2.23 Darwin/14.0.0",
+      "Accept-Encoding": "application/json",
+    },
+    body: JSON.stringify({}),
   });
-  const entry = Array.isArray(rows) ? rows[0] : undefined;
+
+  const text = await res.text();
+  let data: unknown = text;
+  if (text) {
+    try {
+      data = JSON.parse(text) as unknown;
+    } catch {
+      data = text;
+    }
+  }
+  if (!res.ok) {
+    const detail = parseDexcomErrorBody(data);
+    throw new Error(detail ? `Dexcom Share error: ${detail}` : `Dexcom Share request failed (${res.status}).`);
+  }
+
+  const rows = Array.isArray(data) ? (data as DexcomRawEntry[]) : [];
+  const entry = rows[0];
   if (!entry) return null;
   return parseDexcomShareEntry(entry);
 }

@@ -170,7 +170,7 @@ export function AppTopBar({ isCarer, isCommunityMode = false, pathOnly, onBrandC
           </Button>
         </div>
 
-        <div className="pointer-events-none absolute left-1/2 top-[46%] flex max-w-[min(12rem,calc(100vw-8rem))] -translate-x-1/2 -translate-y-1/2 items-center justify-center text-h2 font-semibold text-foreground">
+        <div className="pointer-events-none absolute left-1/2 top-[46%] flex max-w-[min(14rem,calc(100vw-10.5rem))] -translate-x-1/2 -translate-y-1/2 items-center justify-center text-h2 font-semibold text-foreground">
           <button
             type="button"
             onClick={onBrandClick}
@@ -182,7 +182,10 @@ export function AppTopBar({ isCarer, isCommunityMode = false, pathOnly, onBrandC
             data-testid="button-home-brand"
           >
             <FaceLogo size={32} />
-            <span className="truncate leading-none">Diabeaters</span>
+            {/* Shrink before truncating so large Android Display/Font size does not clip to “Diabe…”. */}
+            <span className="min-w-0 truncate leading-none [font-size:clamp(0.95rem,2.8vw+0.55rem,1.25rem)]">
+              Diabeaters
+            </span>
           </button>
         </div>
 
