@@ -878,7 +878,7 @@ export function FeedPostCard({
         bodyClassName="flex min-h-0 flex-col"
         onOpenAutoFocus={(event) => event.preventDefault()}
       >
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-3">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-3" data-vaul-no-drag>
           {loadingComments ? (
             <div className="space-y-1.5" aria-busy="true">
               <Skeleton className="h-11 w-full rounded-lg" />
@@ -938,7 +938,11 @@ export function FeedPostCard({
             </div>
           )}
         </div>
-        <div data-comment-composer="" className="shrink-0 space-y-2 border-t border-border/50 bg-background px-3 pb-2 pt-2">
+        <div
+          data-comment-composer=""
+          data-vaul-no-drag
+          className="shrink-0 space-y-2 border-t border-border/50 bg-background px-3 pb-2 pt-2"
+        >
           {commentImagePreviewUrl ? (
             <div className="flex items-start gap-2 rounded-2xl border border-border/50 bg-muted/30 p-2">
               <img src={commentImagePreviewUrl} alt="" className="max-h-28 rounded-xl object-cover" />
@@ -1002,6 +1006,12 @@ export function FeedPostCard({
                 size="sm"
                 className="mb-0.5 h-10 shrink-0 rounded-full px-4 text-sm font-semibold shadow-none"
                 disabled={!mayEngage || (!commentDraft.trim() && !commentImage)}
+                // Keep focus / fire before keyboard blur so Post isn’t lost on phones.
+                onPointerDown={(e) => {
+                  if (e.button !== 0) return;
+                  if (!mayEngage || (!commentDraft.trim() && !commentImage)) return;
+                  e.preventDefault();
+                }}
                 onClick={onSubmitComment}
               >
                 Post
