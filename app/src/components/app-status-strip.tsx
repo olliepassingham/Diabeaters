@@ -515,10 +515,10 @@ export function AppStatusStrip() {
   if (inSupporterSession) {
     if (!showCgmLiveChip && online) return null;
     return (
-      <div className="relative z-40 -mt-1 mb-0 space-y-1 sm:space-y-1.5" data-testid="app-status-strip">
+      <div className="relative z-40 mb-1 space-y-1 sm:mb-1.5 sm:space-y-1.5" data-testid="app-status-strip">
         {showCgmLiveChip ? (
           <div
-            className="flex items-center gap-2 rounded-2xl border border-border/70 bg-card px-2.5 py-1.5 shadow-none [padding-left:max(0.65rem,env(safe-area-inset-left))] [padding-right:max(0.65rem,env(safe-area-inset-right))] sm:px-3 sm:py-2"
+            className="flex w-full items-center gap-2 border-y border-border/70 bg-card px-3 py-2.5 shadow-none sm:py-2.5"
             data-testid="status-live-bar"
             role="status"
             aria-live="polite"
@@ -558,7 +558,7 @@ export function AppStatusStrip() {
         ) : null}
         {!online ? (
           <div
-            className="flex items-center gap-2 rounded-2xl border border-border/60 bg-card px-3 py-2 text-sm text-muted-foreground"
+            className="flex w-full items-center gap-2 border-y border-border/60 bg-card px-3 py-2 text-sm text-muted-foreground"
             role="status"
             aria-live="polite"
           >
@@ -622,9 +622,9 @@ export function AppStatusStrip() {
   })();
 
   return (
-    <div className="relative z-40 -mt-1 mb-0 space-y-1.5" data-testid="app-status-strip">
+    <div className="relative z-40 mb-1 space-y-1.5 sm:mb-1.5" data-testid="app-status-strip">
       <div
-        className="flex items-center gap-2 rounded-2xl border border-border/70 bg-card px-2.5 py-1.5 shadow-none [padding-left:max(0.65rem,env(safe-area-inset-left))] [padding-right:max(0.65rem,env(safe-area-inset-right))] sm:px-3 sm:py-2"
+        className="flex w-full items-center gap-2 border-y border-border/70 bg-card px-3 py-2.5 shadow-none"
         data-testid="status-live-bar"
         role="status"
         aria-live="polite"
