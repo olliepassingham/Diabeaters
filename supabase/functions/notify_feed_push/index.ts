@@ -6,6 +6,7 @@
  * - like on your comment (community_comment_likes.sql)
  * - mentions on posts (community_posts_poll_event_mentions.sql)
  * - new follower (inapp_notifications_insert_follow_trigger.sql)
+ * - opted-in followed posts (user_follows_notify_posts.sql)
  *
  * The DB triggers can’t directly call APNs, so the client invokes this edge function
  * immediately after the write succeeds (mirrors notify_dm_push pattern).
@@ -29,6 +30,7 @@ type Body =
   | { kind: "feed_comment_like"; post_id: string; comment_id: string }
   | { kind: "feed_post_mention"; post_id: string; mentioned_user_id: string }
   | { kind: "feed_comment_mention"; post_id: string; comment_id: string; mentioned_user_id: string }
+  | { kind: "feed_followed_post"; post_id: string }
   | { kind: "new_follower"; followee_id: string };
 
 function isUuid(s: string): boolean {
@@ -252,6 +254,92 @@ Deno.serve(async (req: Request) => {
         actor_user_id: callerId,
         deep_link: deepLink,
       };
+    } else if (body.kind === "feed_followed_post") {
+      const postId = body.post_id?.trim() ?? "";
+      if (!isUuid(postId)) {
+        return new Response(JSON.stringify({ success: false, error: "invalid_post_id" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const { data: post } = await admin
+        .from("community_posts")
+        .select("author_id, body, image_urls, video_url, mentioned_user_ids")
+        .eq("id", postId)
+        .maybeSingle();
+      const authorId = post ? String((post as any).author_id ?? "") : "";
+      if (!isUuid(authorId) || authorId !== callerId) {
+        return new Response(JSON.stringify({ success: false, error: "not_author" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const rawBody = typeof (post as any)?.body === "string" ? String((post as any).body).trim() : "";
+      let preview = rawBody.slice(0, 120);
+      if (rawBody.length > 120) preview += "…";
+      const imageUrls = Array.isArray((post as any)?.image_urls) ? (post as any).image_urls : [];
+      const hasVideo =
+        typeof (post as any)?.video_url === "string" && String((post as any).video_url).trim().length > 0;
+      const hasMedia = imageUrls.length > 0 || hasVideo;
+      const followedBody =
+        preview.length > 0
+          ? `${actor}: ${preview}`
+          : hasMedia
+            ? `${actor} shared a new post.`
+            : `${actor} posted.`;
+      const followedDeepLink = `/community/post/${postId}`;
+      const followedPayload: Record<string, unknown> = {
+        kind: "feed_followed_post",
+        post_id: postId,
+        actor_user_id: callerId,
+        deep_link: followedDeepLink,
+      };
+
+      const mentioned = Array.isArray((post as any)?.mentioned_user_ids)
+        ? new Set(
+            ((post as any).mentioned_user_ids as unknown[])
+              .map((id) => String(id ?? ""))
+              .filter((id) => isUuid(id)),
+          )
+        : new Set<string>();
+
+      const { data: followRows } = await admin
+        .from("user_follows")
+        .select("follower_id")
+        .eq("followee_id", callerId)
+        .eq("notify_posts", true)
+        .limit(500);
+
+      let deliveredTotal = 0;
+      for (const row of followRows ?? []) {
+        const rid = String((row as any)?.follower_id ?? "");
+        if (!isUuid(rid) || rid === callerId || mentioned.has(rid)) continue;
+
+        const { data: prefRow } = await admin
+          .from("notification_preferences")
+          .select("prefs")
+          .eq("user_id", rid)
+          .maybeSingle();
+        if (!shouldDeliverFeedPush((prefRow as any)?.prefs ?? null)) continue;
+
+        const tokenRows = await fetchLatestPushTokensForUserId(admin, rid);
+        const { delivered } = await deliverPushToTokenRows(tokenRows, "New post", followedBody, followedPayload, {
+          recipientUserId: rid,
+          admin,
+        });
+        deliveredTotal += delivered;
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          delivered_push: deliveredTotal,
+          recipients: (followRows ?? []).length,
+          deep_link: followedDeepLink,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
     if (!recipientId || !isUuid(recipientId)) {

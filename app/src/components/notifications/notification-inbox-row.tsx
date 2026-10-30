@@ -38,6 +38,7 @@ function iconForKind(kind: string): LucideIcon {
   if (kind === "feed_post_like" || kind === "feed_comment_like") return Heart;
   if (kind === "feed_post_comment" || kind === "feed_comment_mention") return MessageCircle;
   if (kind === "feed_post_mention") return AtSign;
+  if (kind === "feed_followed_post") return Bell;
   if (kind === "hypo_logged" || kind === "hypo_logged_self") return Droplet;
   if (kind === "hypo_acknowledged") return ThumbsUp;
   if (kind === "hypo_check_in" || kind === "hypo_check_in_response") return Heart;

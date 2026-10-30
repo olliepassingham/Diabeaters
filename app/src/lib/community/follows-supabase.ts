@@ -44,23 +44,52 @@ export async function unfollowUser(followeeId: string): Promise<{ error: Error |
   return { error: null };
 }
 
-export async function isFollowing(followeeId: string): Promise<{ value: boolean; error: Error | null }> {
+export async function isFollowing(
+  followeeId: string,
+): Promise<{ value: boolean; notifyPosts: boolean; error: Error | null }> {
   const supabase = getSupabase();
-  if (!supabase) return { value: false, error: new Error("Supabase not configured") };
+  if (!supabase) return { value: false, notifyPosts: false, error: new Error("Supabase not configured") };
 
   const { data: sessionData } = await supabase.auth.getSession();
   const uid = sessionData.session?.user?.id;
-  if (!uid) return { value: false, error: null };
+  if (!uid) return { value: false, notifyPosts: false, error: null };
 
   const { data, error } = await supabase
     .from("user_follows")
-    .select("follower_id")
+    .select("follower_id, notify_posts")
     .eq("follower_id", uid)
     .eq("followee_id", followeeId)
     .maybeSingle();
 
-  if (error) return { value: false, error: new Error(error.message) };
-  return { value: !!data, error: null };
+  if (error) return { value: false, notifyPosts: false, error: new Error(error.message) };
+  const notifyPosts = Boolean((data as { notify_posts?: boolean } | null)?.notify_posts);
+  return { value: !!data, notifyPosts, error: null };
+}
+
+/** Opt in/out of “notify me when they post” for an existing follow. */
+export async function setFollowNotifyPosts(
+  followeeId: string,
+  notifyPosts: boolean,
+): Promise<{ error: Error | null }> {
+  const supabase = getSupabase();
+  if (!supabase) return { error: new Error("Supabase not configured") };
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData.session?.user?.id;
+  if (!uid) return { error: new Error("Not signed in") };
+  if (followeeId === uid) return { error: new Error("Cannot notify on your own posts") };
+
+  const { data, error } = await supabase
+    .from("user_follows")
+    .update({ notify_posts: notifyPosts })
+    .eq("follower_id", uid)
+    .eq("followee_id", followeeId)
+    .select("follower_id")
+    .maybeSingle();
+
+  if (error) return { error: new Error(error.message) };
+  if (!data) return { error: new Error("Follow this person first") };
+  return { error: null };
 }
 
 export async function listFolloweeIdsForCurrentUser(): Promise<{ ids: string[]; error: Error | null }> {

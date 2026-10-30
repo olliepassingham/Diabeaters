@@ -31,7 +31,8 @@ function pathFromKind(kind: string, data: Record<string, unknown>, bellDeepLink:
     kind === "feed_post_comment" ||
     kind === "feed_post_mention" ||
     kind === "feed_comment_mention" ||
-    kind === "feed_comment_like"
+    kind === "feed_comment_like" ||
+    kind === "feed_followed_post"
   ) {
     const postId = typeof data.post_id === "string" ? data.post_id : "";
     return postId ? `/community/post/${postId}` : "/community";

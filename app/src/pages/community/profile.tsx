@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { buildCoachHref } from "@/lib/ai-coach/links";
 import { Link, useLocation, useRoute } from "wouter";
-import { MessageCircle, MoreHorizontal, Plus, UserCheck, UserPlus } from "lucide-react";
+import { Bell, BellOff, MessageCircle, MoreHorizontal, Plus, UserCheck, UserPlus } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -64,6 +64,7 @@ import {
   submitContentReport,
   unfollowUser,
   followUser,
+  setFollowNotifyPosts,
   unblockUser,
 } from "@/lib/community";
 import {
@@ -118,7 +119,9 @@ export default function CommunityProfilePage() {
 
   const [counts, setCounts] = useState({ followers: 0, following: 0 });
   const [followingThem, setFollowingThem] = useState(false);
+  const [notifyPosts, setNotifyPosts] = useState(false);
   const [followBusy, setFollowBusy] = useState(false);
+  const [notifyBusy, setNotifyBusy] = useState(false);
   const [blockStatus, setBlockStatus] = useState({ iBlockedThem: false, theyBlockedMe: false });
 
   const [listOpen, setListOpen] = useState(false);
@@ -220,11 +223,16 @@ export default function CommunityProfilePage() {
     if (!userId) return;
     const [{ followers, following, error: cErr }, fol, blk] = await Promise.all([
       getFollowCounts(userId),
-      user?.id && user.id !== userId ? isFollowing(userId) : Promise.resolve({ value: false, error: null }),
+      user?.id && user.id !== userId
+        ? isFollowing(userId)
+        : Promise.resolve({ value: false, notifyPosts: false, error: null }),
       user?.id && user.id !== userId ? getBlockStatus(userId) : Promise.resolve({ status: { iBlockedThem: false, theyBlockedMe: false }, error: null }),
     ]);
     if (!cErr) setCounts({ followers, following });
-    if (fol.error == null) setFollowingThem(fol.value);
+    if (fol.error == null) {
+      setFollowingThem(fol.value);
+      setNotifyPosts(fol.notifyPosts);
+    }
     if (blk.error == null) setBlockStatus(blk.status);
   }, [userId, user?.id]);
 
@@ -298,6 +306,7 @@ export default function CommunityProfilePage() {
         toast({ title: "Unfollow failed", description: error.message, variant: "destructive" });
       } else {
         setFollowingThem(false);
+        setNotifyPosts(false);
         setCounts((c) => ({ ...c, followers: Math.max(0, c.followers - 1) }));
       }
     } else {
@@ -306,10 +315,35 @@ export default function CommunityProfilePage() {
         toast({ title: "Follow failed", description: error.message, variant: "destructive" });
       } else {
         setFollowingThem(true);
+        setNotifyPosts(false);
         setCounts((c) => ({ ...c, followers: c.followers + 1 }));
       }
     }
     setFollowBusy(false);
+  }
+
+  async function toggleNotifyPosts() {
+    if (!userId || !user?.id || isSelf || !followingThem) return;
+    if (blockStatus.iBlockedThem || blockStatus.theyBlockedMe) return;
+    const next = !notifyPosts;
+    setNotifyBusy(true);
+    const { error } = await setFollowNotifyPosts(userId, next);
+    if (error) {
+      toast({
+        title: next ? "Couldn’t turn on post alerts" : "Couldn’t turn off post alerts",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      setNotifyPosts(next);
+      toast({
+        title: next ? "You’ll get notified when they post" : "Post alerts off",
+        description: next
+          ? "We’ll ping you when they share something new (if feed alerts are on)."
+          : "You won’t get alerts for their new posts.",
+      });
+    }
+    setNotifyBusy(false);
   }
 
   async function openMessages() {
@@ -549,6 +583,30 @@ export default function CommunityProfilePage() {
                       )}
                       {followingThem ? "Following" : "Follow"}
                     </Button>
+                    {followingThem ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={notifyPosts ? "secondary" : "outline"}
+                        disabled={
+                          notifyBusy || followBusy || blockStatus.iBlockedThem || blockStatus.theyBlockedMe
+                        }
+                        onClick={() => void toggleNotifyPosts()}
+                        className="h-7 gap-1 rounded-full px-2.5 text-xs"
+                        aria-pressed={notifyPosts}
+                        aria-label={
+                          notifyPosts ? "Turn off notifications when they post" : "Notify me when they post"
+                        }
+                        title={notifyPosts ? "Post alerts on" : "Notify me when they post"}
+                      >
+                        {notifyPosts ? (
+                          <Bell className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        ) : (
+                          <BellOff className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        )}
+                        {notifyPosts ? "Alerts on" : "Notify"}
+                      </Button>
+                    ) : null}
                     <Button
                       type="button"
                       size="sm"

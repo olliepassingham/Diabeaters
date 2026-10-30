@@ -32,7 +32,8 @@ export function profileUserIdForInAppNotification(row: InAppNotificationRow): st
       kind === "feed_post_comment" ||
       kind === "feed_post_mention" ||
       kind === "feed_comment_mention" ||
-      kind === "feed_comment_like") &&
+      kind === "feed_comment_like" ||
+      kind === "feed_followed_post") &&
     typeof d.actor_user_id === "string" &&
     d.actor_user_id.trim()
   ) {

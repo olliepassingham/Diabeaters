@@ -999,6 +999,14 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
     }
   };
 
+  const fireFollowedPostPush = (postId: string) => {
+    void supabase.functions
+      .invoke("notify_feed_push", { body: { kind: "feed_followed_post", post_id: postId } })
+      .then(({ error: fnErr }) => {
+        if (fnErr) logEdgeInvokeFailure("notify_feed_push followed_post", fnErr.message);
+      });
+  };
+
   if (files.length === 0 && !videoFile) {
     const insertRow: Record<string, unknown> = {
       author_id: uid,
@@ -1019,6 +1027,7 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
     if (!data) return { data: null, error: new Error("No row returned") };
     const out = mapPost(data as Record<string, unknown>);
     fireMentionPushes(out.id);
+    fireFollowedPostPush(out.id);
     return { data: await finalizeSinglePostRow(out), error: null };
   }
 
@@ -1080,6 +1089,7 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
     postId = String(data.id);
     const out = mapPost(data);
     fireMentionPushes(out.id);
+    fireFollowedPostPush(out.id);
     return { data: await finalizeSinglePostRow(out), error: null };
   } catch (e) {
     if (postId) {

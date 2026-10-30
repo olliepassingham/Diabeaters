@@ -291,7 +291,8 @@ export function NotificationBell() {
                     kind === "feed_post_comment" ||
                     kind === "feed_post_mention" ||
                     kind === "feed_comment_mention" ||
-                    kind === "feed_comment_like") &&
+                    kind === "feed_comment_like" ||
+                    kind === "feed_followed_post") &&
                   typeof data.actor_user_id === "string"
                     ? data.actor_user_id
                     : "";
