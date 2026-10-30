@@ -932,6 +932,23 @@ export function AccountCommunityProfileFields({
         editFields
       )}
 
+      {editing ? (
+        <div className="rounded-xl border border-border/50 bg-muted/15 px-3 py-3">
+          <p className="text-sm text-foreground">
+            <Link
+              href="/tools/achievements"
+              className="font-medium text-primary underline-offset-4 hover:underline"
+              data-testid="account-edit-manage-achievements"
+            >
+              Manage achievements on profile
+            </Link>
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            Choose which streaks appear on your public profile.
+          </p>
+        </div>
+      ) : null}
+
       <div className={cn(readOnlyPublicSummary || editing || isPublic ? "border-t border-border/40 pt-4 space-y-4" : "pt-1 space-y-4")}>
         {publicToggle}
         {supportedPersonToggle}

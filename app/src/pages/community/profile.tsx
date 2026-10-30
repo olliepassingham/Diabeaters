@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { buildCoachHref } from "@/lib/ai-coach/links";
 import { Link, useLocation, useRoute } from "wouter";
-import { Bell, BellOff, MessageCircle, MoreHorizontal, Plus, UserCheck, UserPlus } from "lucide-react";
+import { Bell, BellOff, MessageCircle, MoreHorizontal, UserCheck, UserPlus } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,7 +42,6 @@ import { FeedPostList } from "@/components/community/feed-post-list";
 import { FollowListDialog, type FollowListPerson } from "@/components/community/follow-list-dialog";
 import { ProfilePostMediaGrid } from "@/components/community/profile-post-media-grid";
 import { StoryAvatarRing } from "@/components/community/story-avatar-ring";
-import { StoryCreateSheet } from "@/components/community/story-create-sheet";
 import { StoryViewerDialog } from "@/components/community/story-viewer-dialog";
 import { ProfileStreakBadges } from "@/components/achievements/achievements-panel";
 import { fetchPublicProfileStreaks, USER_ACHIEVEMENTS_CHANGED_EVENT } from "@/lib/user-achievements";
@@ -136,7 +135,6 @@ export default function CommunityProfilePage() {
   const [blockConfirmOpen, setBlockConfirmOpen] = useState(false);
   const [postsView, setPostsView] = useState<ProfilePostsView>(() => readStoredProfilePostsView());
   const [storyViewerOpen, setStoryViewerOpen] = useState(false);
-  const [storyCreateOpen, setStoryCreateOpen] = useState(false);
 
   const profileStoryAuthorIds = useMemo(() => (userId ? [userId] : []), [userId]);
   const { storiesByAuthor, refresh: refreshStories, ringState: profileRingState } = useCommunityStories(
@@ -549,22 +547,10 @@ export default function CommunityProfilePage() {
 
             <PublicTechChips profile={profile} testId="community-profile-tech-chips" />
 
-            {profile.supported_person || user || !isSelf ? (
+            {profile.supported_person || (user && !isSelf) ? (
               <div className="flex flex-wrap items-center gap-1.5">
                 {profile.supported_person ? (
                   <ProfileSupportedPersonBadge person={profile.supported_person} subtle className="w-fit" />
-                ) : null}
-                {isSelf && user ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-7 w-fit gap-1 rounded-full px-2.5 text-xs"
-                    onClick={() => setStoryCreateOpen(true)}
-                  >
-                    <Plus className="h-3.5 w-3.5" aria-hidden />
-                    Add story
-                  </Button>
                 ) : null}
                 {!isSelf && user ? (
                   <>
@@ -759,11 +745,6 @@ export default function CommunityProfilePage() {
         }
         initialIndex={0}
         onViewed={() => refreshStories()}
-      />
-      <StoryCreateSheet
-        open={storyCreateOpen}
-        onOpenChange={setStoryCreateOpen}
-        onPosted={() => refreshStories()}
       />
     </PageShell>
   );

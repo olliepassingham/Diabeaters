@@ -1,11 +1,10 @@
 import { useMemo, useState } from "react";
-import { Pencil, Plus, Share2 } from "lucide-react";
+import { Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FeedPostList } from "@/components/community/feed-post-list";
 import { ProfilePostMediaGrid } from "@/components/community/profile-post-media-grid";
 import { StoryAvatarRing } from "@/components/community/story-avatar-ring";
-import { StoryCreateSheet } from "@/components/community/story-create-sheet";
 import { StoryViewerDialog } from "@/components/community/story-viewer-dialog";
 import { AccountPublicAchievementsSummary } from "@/components/achievements/achievements-panel";
 import {
@@ -15,7 +14,6 @@ import {
   type ProfilePostsView,
 } from "@/components/profile/profile-posts-view-tabs";
 import {
-  ProfileActionGrid,
   ProfileAvatarTile,
   ProfileBioPreview,
   ProfileDisplayName,
@@ -33,9 +31,7 @@ import { fetchCommunityPostsByAuthorPage } from "@/lib/community";
 import { useCommunityStories } from "@/hooks/use-community-stories";
 import { isType2AppSession } from "@/lib/insulin-clinical-access";
 import { canEngageWithCommunityFeed, useProfile } from "@/lib/profile";
-import { sharePublicProfile } from "@/lib/share-public-profile";
 import { storage } from "@/lib/storage";
-import { useToast } from "@/hooks/use-toast";
 
 export function AccountPublicProfileTab({
   userId,
@@ -71,13 +67,11 @@ export function AccountPublicProfileTab({
   /** When true (Supporter Mode), hide patient habit streaks — they are not earned in this mode. */
   supporterMode?: boolean;
 }) {
-  const { toast } = useToast();
   const { profile: viewerProfile, loading: viewerProfileLoading } = useProfile();
   const canEngageWithFeed = !viewerProfileLoading && canEngageWithCommunityFeed(viewerProfile);
   const publicProfileHref = `/community/profile/${encodeURIComponent(userId)}`;
   const [postsView, setPostsView] = useState<ProfilePostsView>(() => readStoredProfilePostsView());
   const [storyViewerOpen, setStoryViewerOpen] = useState(false);
-  const [storyCreateOpen, setStoryCreateOpen] = useState(false);
   const storyAuthorIds = useMemo(() => [userId], [userId]);
   const { storiesByAuthor, refresh: refreshStories, ringState } = useCommunityStories(userId, storyAuthorIds);
   const authorStories = storiesByAuthor.get(userId) ?? [];
@@ -96,23 +90,6 @@ export function AccountPublicProfileTab({
       testId="link-my-public-profile-avatar"
     />
   );
-
-  async function handleShareProfile() {
-    const result = await sharePublicProfile({
-      userId,
-      displayName,
-      publicHandle,
-    });
-    if (result === "copied") {
-      toast({ title: "Link copied", description: "Paste to share your public profile." });
-    } else if (result === "failed") {
-      toast({
-        title: "Could not share",
-        description: "Try again or copy your profile link from your browser.",
-        variant: "destructive",
-      });
-    }
-  }
 
   return (
     <div className="space-y-4 animate-soft-in">
@@ -160,7 +137,7 @@ export function AccountPublicProfileTab({
                 <ProfileMetaRow>
                   <ProfileHandle handle={publicHandle || null} />
                   {!isPublic ? (
-                    <span className="text-[11px] font-medium text-muted-foreground">Not visible on Feed</span>
+                    <span className="text-xs font-medium text-muted-foreground">Not visible on Feed</span>
                   ) : null}
                 </ProfileMetaRow>
               </div>
@@ -189,36 +166,10 @@ export function AccountPublicProfileTab({
               <AccountPublicAchievementsSummary onsetDate={diabetesOnsetDate} />
             ) : null}
 
-            <ProfileBioPreview compact bio={bioPreview} livingWithLine={livingWithLine} />
+            <ProfileBioPreview bio={bioPreview} livingWithLine={livingWithLine} />
 
             <PublicTechChips profile={viewerProfile} testId="account-public-tech-chips" />
           </ProfileHeroRow>
-
-          <ProfileActionGrid>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className={isPublic ? undefined : "col-span-2"}
-              onClick={() => setStoryCreateOpen(true)}
-              data-testid="button-account-add-story"
-            >
-              <Plus className="h-4 w-4 mr-2 shrink-0" aria-hidden />
-              Add story
-            </Button>
-            {isPublic ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                data-testid="share-public-profile"
-                onClick={() => void handleShareProfile()}
-              >
-                <Share2 className="h-4 w-4 mr-2 shrink-0" aria-hidden />
-                Share profile
-              </Button>
-            ) : null}
-          </ProfileActionGrid>
         </div>
       </ProfileHeroCard>
 
@@ -278,11 +229,6 @@ export function AccountPublicProfileTab({
         }
         initialIndex={0}
         onViewed={() => refreshStories()}
-      />
-      <StoryCreateSheet
-        open={storyCreateOpen}
-        onOpenChange={setStoryCreateOpen}
-        onPosted={() => refreshStories()}
       />
     </div>
   );

@@ -77,13 +77,6 @@ export function AccountPublicAchievementsSummary({
   return (
     <div className={cn("flex flex-wrap items-center gap-2", className)} data-testid="account-public-achievements">
       <ProfileStreakBadges streaks={streaks} size="sm" className="gap-1" />
-      <Link
-        href="/tools/achievements"
-        className="text-[11px] font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-        data-testid="account-achievements-tools-link"
-      >
-        Manage
-      </Link>
     </div>
   );
 }

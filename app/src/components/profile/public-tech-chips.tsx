@@ -20,7 +20,7 @@ export function PublicTechChips({
       {chips.map((chip) => (
         <span
           key={chip}
-          className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-foreground/85 ring-1 ring-primary/15"
+          className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-foreground/85 ring-1 ring-primary/15"
         >
           {chip}
         </span>
