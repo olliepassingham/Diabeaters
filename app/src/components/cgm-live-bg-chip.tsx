@@ -183,7 +183,11 @@ export function CgmLiveBgChip({
       ) : null}
       {embedded ? (
         <span className="text-[9px] tabular-nums text-muted-foreground/80">
-          {formatAgeMinutes(reading.ageMinutes)}
+          {!Number.isFinite(reading.ageMinutes) || reading.ageMinutes < 1
+            ? "now"
+            : reading.ageMinutes < 60
+              ? `${reading.ageMinutes}m`
+              : `${Math.floor(reading.ageMinutes / 60)}h`}
         </span>
       ) : null}
       {resolvedRange && !embedded ? (
