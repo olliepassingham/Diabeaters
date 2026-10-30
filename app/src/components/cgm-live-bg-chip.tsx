@@ -75,13 +75,18 @@ export function CgmLiveBgChip({
   if (loading && !prefill?.fromCgm) {
     return (
       <div
-        className={cn(shell, !embedded && barSurface, "text-xs text-muted-foreground", className)}
+        className={cn(
+          shell,
+          !embedded && barSurface,
+          embedded ? "text-[11px] text-muted-foreground" : "text-xs text-muted-foreground",
+          className,
+        )}
         role="status"
         aria-live="polite"
         data-testid="cgm-live-bg-chip-loading"
       >
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" aria-hidden />
+        <div className="flex min-w-0 flex-1 items-center gap-1.5">
+          <Loader2 className="h-3 w-3 animate-spin shrink-0" aria-hidden />
           Checking BG…
         </div>
         {trailing}
@@ -102,21 +107,26 @@ export function CgmLiveBgChip({
           <button
             type="button"
             onClick={onOpen}
-            className="min-w-0 flex-1 text-left text-xs text-muted-foreground"
+            className={cn(
+              "min-w-0 flex-1 text-left text-muted-foreground",
+              embedded ? "text-[11px]" : "text-xs",
+            )}
             aria-label={openLabel}
             data-testid="button-cgm-live-chip-open"
           >
             {waitingLabel}
           </button>
         ) : (
-          <span className="text-xs text-muted-foreground">{waitingLabel}</span>
+          <span className={cn("text-muted-foreground", embedded ? "text-[11px]" : "text-xs")}>
+            {waitingLabel}
+          </span>
         )}
         {onRefresh ? (
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="h-9 w-9 shrink-0 -my-1"
+            className="h-7 w-7 shrink-0"
             onClick={onRefresh}
             aria-label="Refresh glucose reading"
             data-testid="button-cgm-live-refresh"
@@ -153,13 +163,21 @@ export function CgmLiveBgChip({
 
   const body = (
     <>
-      <span className={cn("text-sm font-semibold tabular-nums tracking-tight", valueTone)}>
-        {prefill.value}{" "}
-        <span className="text-xs font-medium text-muted-foreground">{reading.units}</span>
+      <span
+        className={cn(
+          "tabular-nums tracking-tight",
+          embedded ? "text-[13px] font-semibold leading-none" : "text-sm font-semibold",
+          valueTone,
+        )}
+      >
+        {prefill.value}
+        <span className={cn("ml-1 font-medium text-muted-foreground", embedded ? "text-[10px]" : "text-xs")}>
+          {reading.units}
+        </span>
       </span>
       {TrendIcon && trend ? (
         <span className="inline-flex items-center gap-0.5 text-[11px] capitalize text-muted-foreground">
-          <TrendIcon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          <TrendIcon className={cn("shrink-0", embedded ? "h-3 w-3" : "h-3.5 w-3.5")} aria-hidden />
           {embedded ? null : trend}
         </span>
       ) : null}
@@ -191,14 +209,24 @@ export function CgmLiveBgChip({
         <button
           type="button"
           onClick={onOpen}
-          className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5 text-left"
+          className={cn(
+            "flex min-w-0 flex-1 items-center text-left",
+            embedded ? "gap-x-1.5" : "flex-wrap gap-x-2 gap-y-0.5",
+          )}
           aria-label={openLabel}
           data-testid="button-cgm-live-chip-open"
         >
           {body}
         </button>
       ) : (
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5">{body}</div>
+        <div
+          className={cn(
+            "flex min-w-0 flex-1 items-center",
+            embedded ? "gap-x-1.5" : "flex-wrap gap-x-2 gap-y-0.5",
+          )}
+        >
+          {body}
+        </div>
       )}
       {onRefresh && !embedded ? (
         <Button

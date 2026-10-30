@@ -130,7 +130,7 @@ function prefersReducedMotion(): boolean {
   return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-/** Shared LIVE strip chrome — full-bleed for user and supporter modes. */
+/** Shared LIVE strip chrome — full-bleed, compact instrument bar for user and supporter. */
 function LiveStatusBarShell({
   children,
   className,
@@ -141,7 +141,8 @@ function LiveStatusBarShell({
   return (
     <div
       className={cn(
-        "flex w-full items-center gap-2 border-y border-border/70 bg-card py-2.5 shadow-none",
+        // Hairline under the header only — keeps contrast without a thick “card slab”.
+        "flex w-full items-center gap-1.5 border-b border-border/45 bg-card/95 py-1.5 shadow-none",
         "px-3 [padding-left:max(0.75rem,env(safe-area-inset-left))] [padding-right:max(0.75rem,env(safe-area-inset-right))]",
         className,
       )}
@@ -157,7 +158,7 @@ function LiveStatusBarShell({
 function LiveStatusDot() {
   return (
     <span
-      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-800 dark:text-emerald-200"
+      className="inline-flex shrink-0 items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700/90 dark:text-emerald-300/90"
       data-testid="status-live-indicator"
     >
       <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" aria-hidden />
@@ -551,7 +552,7 @@ export function AppStatusStrip() {
   if (inSupporterSession) {
     if (!showCgmLiveChip && online) return null;
     return (
-      <div className="relative z-40 mb-1 space-y-1 sm:mb-1.5 sm:space-y-1.5" data-testid="app-status-strip">
+      <div className="relative z-40 mb-0.5 space-y-0.5" data-testid="app-status-strip">
         {showCgmLiveChip ? (
           <LiveStatusBarShell>
             <LiveStatusDot />
@@ -572,7 +573,7 @@ export function AppStatusStrip() {
               type="button"
               variant="ghost"
               size="icon"
-              className="h-9 w-9 shrink-0"
+              className="h-7 w-7 shrink-0 text-muted-foreground"
               onClick={refreshSupporterBg}
               aria-label="Refresh glucose reading"
               data-testid="button-cgm-live-refresh"
@@ -582,9 +583,9 @@ export function AppStatusStrip() {
           </LiveStatusBarShell>
         ) : null}
         {!online ? (
-          <LiveStatusBarShell className="border-border/60 text-sm text-muted-foreground">
+          <LiveStatusBarShell className="text-muted-foreground">
             <WifiOff className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            <span className="min-w-0 text-xs leading-snug sm:text-sm" data-testid="offline-banner-message">
+            <span className="min-w-0 text-xs leading-snug" data-testid="offline-banner-message">
               {OFFLINE_BANNER_BASE}
             </span>
           </LiveStatusBarShell>
@@ -603,15 +604,15 @@ export function AppStatusStrip() {
     const Icon = segmentIcon(seg.kind);
     const content = (
       <>
-        <Icon className={cn("h-3.5 w-3.5 shrink-0", segmentTone(seg.kind))} aria-hidden />
+        <Icon className={cn("h-3 w-3 shrink-0", segmentTone(seg.kind))} aria-hidden />
         {seg.label ? (
-          <span className={cn("text-xs font-semibold capitalize", segmentTone(seg.kind))}>{seg.label}</span>
+          <span className={cn("text-[11px] font-medium capitalize", segmentTone(seg.kind))}>{seg.label}</span>
         ) : null}
       </>
     );
     const className = cn(
-      "inline-flex items-center gap-1 whitespace-nowrap rounded-md px-1 py-0.5",
-      seg.promoted ? "bg-background/40" : "opacity-80",
+      "inline-flex items-center gap-1 whitespace-nowrap rounded-md px-0.5 py-0.5",
+      seg.promoted ? "opacity-100" : "opacity-75",
     );
     if (seg.href) {
       return (
@@ -643,7 +644,7 @@ export function AppStatusStrip() {
   })();
 
   return (
-    <div className="relative z-40 mb-1 space-y-1.5 sm:mb-1.5" data-testid="app-status-strip">
+    <div className="relative z-40 mb-0.5 space-y-1" data-testid="app-status-strip">
       <LiveStatusBarShell>
         {showLiveDot ? <LiveStatusDot /> : null}
 
@@ -663,12 +664,12 @@ export function AppStatusStrip() {
         {toolSegments.length > 0 ? (
           <>
             {showCgmLiveChip || showLiveDot ? (
-              <span className="h-4 w-px shrink-0 bg-border/70" aria-hidden />
+              <span className="mx-0.5 h-3 w-px shrink-0 bg-border/50" aria-hidden />
             ) : null}
             <StatusModeMarquee>
               {toolSegments.map((seg, index) => (
                 <span key={seg.kind} className="inline-flex items-center">
-                  {index > 0 ? <span className="mx-1.5 h-3 w-px shrink-0 bg-border/50" aria-hidden /> : null}
+                  {index > 0 ? <span className="mx-1 h-2.5 w-px shrink-0 bg-border/40" aria-hidden /> : null}
                   {renderSegment(seg)}
                 </span>
               ))}
@@ -684,7 +685,7 @@ export function AppStatusStrip() {
               type="button"
               size="sm"
               variant="ghost"
-              className="h-8 w-8 shrink-0 px-0"
+              className="h-7 w-7 shrink-0 px-0 text-muted-foreground"
               aria-label={expanded ? "Collapse status details" : "Expand status details"}
               aria-expanded={expanded}
               data-testid="status-live-expand"
