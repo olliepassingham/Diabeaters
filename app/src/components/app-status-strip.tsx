@@ -17,6 +17,7 @@ import {
   Cookie,
   Maximize2,
   Pause,
+  RefreshCw,
   X,
   Expand,
 } from "lucide-react";
@@ -516,18 +517,48 @@ export function AppStatusStrip() {
     return (
       <div className="relative z-40 -mt-1 mb-0 space-y-1 sm:space-y-1.5" data-testid="app-status-strip">
         {showCgmLiveChip ? (
-          <CgmLiveBgChip
-            prefill={supporterBgPrefill?.fromCgm ? supporterBgPrefill : null}
-            loading={supporterBgLoading}
-            onRefresh={refreshSupporterBg}
-            onOpen={() => setLocation("/carer-view/glucose")}
-            openLabel="Open live glucose"
-            rangeStatus={supporterBgRow?.range_status ?? null}
-          />
+          <div
+            className="flex items-center gap-2 rounded-2xl border border-border/70 bg-card px-2.5 py-1.5 shadow-none [padding-left:max(0.65rem,env(safe-area-inset-left))] [padding-right:max(0.65rem,env(safe-area-inset-right))] sm:px-3 sm:py-2"
+            data-testid="status-live-bar"
+            role="status"
+            aria-live="polite"
+          >
+            <span
+              className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-800 dark:text-emerald-200"
+              data-testid="status-live-indicator"
+            >
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" aria-hidden />
+              Live
+            </span>
+            <div className="min-w-0 flex-1" data-testid="status-segment-bg">
+              <CgmLiveBgChip
+                embedded
+                prefill={supporterBgPrefill?.fromCgm ? supporterBgPrefill : null}
+                loading={supporterBgLoading}
+                onOpen={() => setLocation("/carer-view/glucose")}
+                openLabel="Open live glucose"
+                showWaiting
+                waitingLabel="Waiting for live BG"
+                rangeStatus={supporterBgRow?.range_status ?? null}
+                className="min-w-0"
+              />
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 shrink-0"
+              onClick={refreshSupporterBg}
+              aria-label="Refresh glucose reading"
+              data-testid="button-cgm-live-refresh"
+            >
+              <RefreshCw className={cn("h-3.5 w-3.5", supporterBgLoading && "animate-spin")} aria-hidden />
+            </Button>
+          </div>
         ) : null}
         {!online ? (
           <div
-            className="flex items-center gap-2 rounded-2xl border border-border/60 bg-background/55 px-3 py-2 text-sm text-muted-foreground backdrop-blur"
+            className="flex items-center gap-2 rounded-2xl border border-border/60 bg-card px-3 py-2 text-sm text-muted-foreground"
             role="status"
             aria-live="polite"
           >
@@ -593,7 +624,7 @@ export function AppStatusStrip() {
   return (
     <div className="relative z-40 -mt-1 mb-0 space-y-1.5" data-testid="app-status-strip">
       <div
-        className="flex items-center gap-2 rounded-2xl border border-border/60 bg-background/70 px-2.5 py-1.5 backdrop-blur [padding-left:max(0.65rem,env(safe-area-inset-left))] [padding-right:max(0.65rem,env(safe-area-inset-right))] sm:px-3 sm:py-2"
+        className="flex items-center gap-2 rounded-2xl border border-border/70 bg-card px-2.5 py-1.5 shadow-none [padding-left:max(0.65rem,env(safe-area-inset-left))] [padding-right:max(0.65rem,env(safe-area-inset-right))] sm:px-3 sm:py-2"
         data-testid="status-live-bar"
         role="status"
         aria-live="polite"

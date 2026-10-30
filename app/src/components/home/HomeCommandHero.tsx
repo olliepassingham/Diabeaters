@@ -182,7 +182,7 @@ export function HomeCommandHero({
             </div>
             {hasLiveBg && glucose ? (
               <div className="mt-2 flex items-baseline gap-2" data-testid="home-hero-bg">
-                <span className="font-display text-5xl font-semibold tabular-nums leading-none tracking-[-0.04em] text-foreground">
+                <span className="font-display text-5xl font-semibold tabular-nums leading-[1.12] tracking-[-0.04em] text-foreground">
                   {formatTargetBgInput(glucose.value, normalizeBgUnits(glucose.units))}
                 </span>
                 <span className="text-sm font-medium text-muted-foreground">

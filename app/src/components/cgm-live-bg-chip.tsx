@@ -50,7 +50,10 @@ function trendLabel(trend: ExerciseBgTrend | null | undefined): string | null {
 }
 
 const barBase =
-  "flex items-center justify-between gap-2 rounded-2xl border px-3 py-2 backdrop-blur [padding-left:max(0.75rem,env(safe-area-inset-left))] [padding-right:max(0.75rem,env(safe-area-inset-right))]";
+  "flex items-center justify-between gap-2 rounded-2xl border px-3 py-2 [padding-left:max(0.75rem,env(safe-area-inset-left))] [padding-right:max(0.75rem,env(safe-area-inset-right))]";
+
+/** Solid card fill so the chip reads clearly against the app canvas (esp. supporter mode). */
+const barSurface = "border-border/70 bg-card text-foreground";
 
 const embeddedBase = "flex min-w-0 flex-1 items-center gap-2";
 
@@ -72,7 +75,7 @@ export function CgmLiveBgChip({
   if (loading && !prefill?.fromCgm) {
     return (
       <div
-        className={cn(shell, !embedded && "border-border/60 bg-background/55 text-xs text-muted-foreground", className)}
+        className={cn(shell, !embedded && barSurface, "text-xs text-muted-foreground", className)}
         role="status"
         aria-live="polite"
         data-testid="cgm-live-bg-chip-loading"
@@ -90,7 +93,7 @@ export function CgmLiveBgChip({
     if (!showWaiting) return null;
     return (
       <div
-        className={cn(shell, !embedded && "border-border/60 bg-background/55", className)}
+        className={cn(shell, !embedded && barSurface, className)}
         role="status"
         aria-live="polite"
         data-testid="cgm-live-bg-chip-waiting"
@@ -139,9 +142,18 @@ export function CgmLiveBgChip({
         ? "border-amber-500/30 bg-amber-500/10 dark:border-amber-500/40 dark:bg-amber-950/40"
         : "border-emerald-500/25 bg-emerald-500/10 dark:border-emerald-500/35 dark:bg-emerald-950/30";
 
+  const valueTone =
+    resolvedRange === "low"
+      ? "text-red-700 dark:text-red-300"
+      : resolvedRange === "high"
+        ? "text-orange-700 dark:text-orange-300"
+        : resolvedRange === "in_range"
+          ? "text-emerald-700 dark:text-emerald-300"
+          : "text-foreground";
+
   const body = (
     <>
-      <span className="text-sm font-semibold tabular-nums tracking-tight text-foreground">
+      <span className={cn("text-sm font-semibold tabular-nums tracking-tight", valueTone)}>
         {prefill.value}{" "}
         <span className="text-xs font-medium text-muted-foreground">{reading.units}</span>
       </span>

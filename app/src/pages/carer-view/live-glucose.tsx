@@ -9,8 +9,8 @@ import { useLinkedPatient } from "@/hooks/use-linked-patient";
 import { useSupporterLiveBg } from "@/hooks/use-supporter-live-bg";
 import { formatAgeMinutes } from "@/lib/cgm/staleness";
 import { formatTargetBgInput } from "@/lib/hypo-context";
+import { LiveGlucoseValueCard } from "@/components/live-glucose-value-card";
 import {
-  glucoseRangeCardClasses,
   glucoseRangeStatusLabel,
   glucoseRangeValueClasses,
   type GlucoseRangeStatus,
@@ -67,12 +67,7 @@ export default function CarerLiveGlucosePage() {
         </Card>
       ) : (
         <>
-          <section
-            className={cn(
-              "relative overflow-hidden rounded-[1.35rem] border px-4 py-3 shadow-none",
-              reading ? glucoseRangeCardClasses(rangeStatus) : "border-border/60 bg-card",
-            )}
-          >
+          <LiveGlucoseValueCard rangeStatus={reading ? rangeStatus : null}>
             <div className="flex items-center gap-3">
               <div className="min-w-0 flex-1">
                 {loading && !reading ? (
@@ -84,7 +79,7 @@ export default function CarerLiveGlucosePage() {
                   <div className="flex items-center gap-3">
                     <p
                       className={cn(
-                        "font-display text-4xl font-bold tabular-nums tracking-tight leading-none",
+                        "font-display text-4xl font-bold tabular-nums tracking-tight leading-[1.15]",
                         glucoseRangeValueClasses(rangeStatus),
                       )}
                       data-testid="carer-live-glucose-value"
@@ -110,7 +105,7 @@ export default function CarerLiveGlucosePage() {
                   </p>
                 )}
                 {reading ? (
-                  <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+                  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
                     <Badge
                       variant="secondary"
                       className="rounded-full border-0 bg-background/60 px-2 py-0 text-[11px] font-medium"
@@ -137,7 +132,7 @@ export default function CarerLiveGlucosePage() {
                 <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} aria-hidden />
               </Button>
             </div>
-          </section>
+          </LiveGlucoseValueCard>
 
           <section className="space-y-3 overflow-hidden rounded-[1.35rem] border border-border/50 bg-card/80 p-4 shadow-none">
             {reading ? (

@@ -23,9 +23,9 @@ import { computeGlucoseWindowSummary } from "@/lib/cgm/window-summary";
 import { formatTargetBgInput } from "@/lib/hypo-context";
 import { formatAgeMinutes } from "@/lib/cgm/staleness";
 import { useCgmHistory } from "@/hooks/use-cgm-history";
+import { LiveGlucoseValueCard } from "@/components/live-glucose-value-card";
 import {
   computeGlucoseRangeStatus,
-  glucoseRangeCardClasses,
   glucoseRangeStatusLabel,
   glucoseRangeValueClasses,
 } from "@/lib/live-glucose-range";
@@ -174,12 +174,7 @@ export default function CgmLivePage() {
         <CgmSuggestedHypoCard points={history24h.points} targetLow={targetLow} units={units} />
       ) : null}
 
-      <section
-        className={cn(
-          "relative overflow-hidden rounded-[1.35rem] border px-4 py-3 shadow-none",
-          latestStatus ? glucoseRangeCardClasses(latestStatus) : "border-border/60 bg-card",
-        )}
-      >
+      <LiveGlucoseValueCard rangeStatus={latestStatus}>
         <div className="flex items-center gap-3">
           <div className="min-w-0 flex-1">
             {loading && !latest ? (
@@ -191,7 +186,7 @@ export default function CgmLivePage() {
               <div className="flex items-center gap-3">
                 <p
                   className={cn(
-                    "font-display text-4xl font-bold tabular-nums tracking-tight leading-none",
+                    "font-display text-4xl font-bold tabular-nums tracking-tight leading-[1.15]",
                     latestStatus ? glucoseRangeValueClasses(latestStatus) : undefined,
                   )}
                   data-testid="cgm-live-current-value"
@@ -216,7 +211,7 @@ export default function CgmLivePage() {
               <p className="text-sm text-muted-foreground">No recent reading</p>
             )}
             {latest ? (
-              <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+              <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
                 {latestStatus ? (
                   <Badge
                     variant="secondary"
@@ -245,7 +240,7 @@ export default function CgmLivePage() {
             <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} aria-hidden />
           </Button>
         </div>
-      </section>
+      </LiveGlucoseValueCard>
 
       <section className="space-y-4 overflow-hidden rounded-[1.35rem] border border-border/50 bg-card/80 p-4 shadow-none">
           <div
