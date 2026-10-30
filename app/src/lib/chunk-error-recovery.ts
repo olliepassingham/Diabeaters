@@ -35,3 +35,11 @@ export function markChunkRecoveryAttempted(): void {
     // ignore quota / private mode
   }
 }
+
+export function clearChunkRecoveryAttempted(): void {
+  try {
+    sessionStorage.removeItem(CHUNK_RECOVERY_KEY);
+  } catch {
+    // ignore quota / private mode
+  }
+}

@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { isLazyChunkLoadError, shouldReloadAfterChunkError } from "./chunk-error-recovery";
+import {
+  clearChunkRecoveryAttempted,
+  isLazyChunkLoadError,
+  markChunkRecoveryAttempted,
+  shouldReloadAfterChunkError,
+} from "./chunk-error-recovery";
 import * as offline from "./offline";
 
 describe("chunk error recovery", () => {
@@ -24,7 +29,9 @@ describe("chunk error recovery", () => {
     vi.spyOn(offline, "isOnline").mockReturnValue(true);
     const err = new Error("Failed to fetch dynamically imported module");
     expect(shouldReloadAfterChunkError(err)).toBe(true);
-    sessionStorage.setItem("diabeater-chunk-recovery-attempted", "1");
+    markChunkRecoveryAttempted();
     expect(shouldReloadAfterChunkError(err)).toBe(false);
+    clearChunkRecoveryAttempted();
+    expect(shouldReloadAfterChunkError(err)).toBe(true);
   });
 });
