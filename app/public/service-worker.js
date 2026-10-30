@@ -1,6 +1,6 @@
-const CACHE_NAME = 'diabeaters-v12';
-const STATIC_CACHE = 'diabeaters-static-v12';
-const DYNAMIC_CACHE = 'diabeaters-dynamic-v12';
+const CACHE_NAME = 'diabeaters-v13';
+const STATIC_CACHE = 'diabeaters-static-v13';
+const DYNAMIC_CACHE = 'diabeaters-dynamic-v13';
 
 /** Replaced at build time by scripts/sw-precache.ts — do not edit the marker by hand. */
 const PRECACHE_URLS = __PRECACHE_MANIFEST__;
@@ -79,31 +79,32 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Network-first for HTML so a deploy cannot leave the shell on stale index.html
+  // that references missing /assets/* hashes (white WebView after update).
   if (isNavigationRequest(event.request)) {
-    const cachePromise = caches.open(STATIC_CACHE);
-    const refreshPromise = cachePromise.then(async (cache) => {
-      try {
-        const fetched = await fetch(event.request);
-        if (fetched.ok) {
-          await cache.put('/index.html', fetched.clone());
-          await cache.put('/', fetched.clone());
-        }
-        return fetched;
-      } catch {
-        return null;
-      }
-    });
-    event.waitUntil(refreshPromise.then(() => undefined));
     event.respondWith(
       (async () => {
-        const cache = await cachePromise;
+        const cache = await caches.open(STATIC_CACHE);
+        try {
+          const fetched = await Promise.race([
+            fetch(event.request),
+            new Promise((_, reject) => {
+              setTimeout(() => reject(new Error('navigation timeout')), 2500);
+            }),
+          ]);
+          if (fetched && fetched.ok) {
+            await cache.put('/index.html', fetched.clone());
+            await cache.put('/', fetched.clone());
+            return fetched;
+          }
+        } catch {
+          // Fall through to cache / offline response.
+        }
         const cached =
           (await cache.match(event.request)) ||
           (await cache.match('/index.html')) ||
           (await cache.match('/'));
         if (cached) return cached;
-        const fetched = await refreshPromise;
-        if (fetched) return fetched;
         return new Response('Offline', { status: 503, statusText: 'Offline' });
       })(),
     );

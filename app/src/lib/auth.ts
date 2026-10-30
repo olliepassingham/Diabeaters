@@ -624,6 +624,8 @@ export async function logout(): Promise<AuthResult<{}>> {
   }
 
   try {
+    const { markUserInitiatedSignOut } = await import("@/lib/persisted-auth-session");
+    markUserInitiatedSignOut();
     const { error } = await supabase.auth.signOut();
     return { data: {}, error };
   } catch (e) {

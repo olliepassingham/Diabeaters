@@ -2083,10 +2083,16 @@ export default function App() {
     if (!import.meta.env.PROD || !shouldRegisterServiceWorker()) return;
 
     let reloadedForUpdate = false;
+    let reloadTimer = 0;
     const onControllerChange = () => {
       if (reloadedForUpdate || !isOnline()) return;
-      reloadedForUpdate = true;
-      window.location.reload();
+      // Defer reload so a SW update during cold start does not interrupt auth recovery.
+      window.clearTimeout(reloadTimer);
+      reloadTimer = window.setTimeout(() => {
+        if (reloadedForUpdate || !isOnline()) return;
+        reloadedForUpdate = true;
+        window.location.reload();
+      }, 1800);
     };
 
     navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
@@ -2095,7 +2101,10 @@ export default function App() {
       .then((registration) => registration.update())
       .catch(() => {});
 
-    return () => navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
+    return () => {
+      window.clearTimeout(reloadTimer);
+      navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
+    };
   }, []);
 
   return (

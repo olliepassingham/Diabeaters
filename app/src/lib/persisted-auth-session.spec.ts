@@ -8,7 +8,9 @@ vi.mock("@/lib/supabase", () => ({
 }));
 
 import {
+  clearUserInitiatedSignOut,
   isRetryableAuthNetworkError,
+  markUserInitiatedSignOut,
   readPersistedAuthSession,
   recoverAuthSessionAfterNull,
   supabaseAuthStorageKey,
@@ -17,6 +19,7 @@ import {
 describe("persisted-auth-session", () => {
   afterEach(() => {
     localStorage.clear();
+    clearUserInitiatedSignOut();
   });
 
   it("builds the supabase-js default storage key from the project URL", () => {
@@ -97,5 +100,53 @@ describe("persisted-auth-session", () => {
     const session = await recoverAuthSessionAfterNull(supabase as never);
     expect(session?.user?.id).toBe("user-1");
     expect(session?.refresh_token).toBe("r");
+  });
+
+  it("returns the disk session when refresh hangs past the recovery timeout", async () => {
+    localStorage.setItem(
+      "sb-abcdefg-auth-token",
+      JSON.stringify({
+        access_token: "old",
+        refresh_token: "r",
+        user: { id: "user-1" },
+      }),
+    );
+    const supabase = {
+      auth: {
+        refreshSession: vi.fn(() => new Promise(() => {})),
+        setSession: vi.fn(() => new Promise(() => {})),
+      },
+    };
+    const session = await recoverAuthSessionAfterNull(supabase as never);
+    expect(session?.user?.id).toBe("user-1");
+  }, 10_000);
+
+  it("does not revive a session after an intentional logout", async () => {
+    localStorage.setItem(
+      "sb-abcdefg-auth-token",
+      JSON.stringify({
+        access_token: "old",
+        refresh_token: "r",
+        user: { id: "user-1" },
+      }),
+    );
+    markUserInitiatedSignOut();
+    const supabase = {
+      auth: {
+        refreshSession: vi.fn(async () => ({
+          data: {
+            session: {
+              access_token: "new",
+              refresh_token: "r2",
+              user: { id: "user-1" },
+            },
+          },
+          error: null,
+        })),
+        setSession: vi.fn(),
+      },
+    };
+    expect(await recoverAuthSessionAfterNull(supabase as never)).toBeNull();
+    expect(supabase.auth.refreshSession).not.toHaveBeenCalled();
   });
 });

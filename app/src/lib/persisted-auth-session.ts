@@ -9,6 +9,24 @@
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseUrlAndAnonKey } from "@/lib/supabase";
 
+/** Hard cap so recovery never hangs the startup shell on flaky Wi‑Fi. */
+export const AUTH_RECOVERY_TIMEOUT_MS = 4_000;
+
+let userInitiatedSignOut = false;
+
+/** Call immediately before `supabase.auth.signOut()` so recovery cannot revive the session. */
+export function markUserInitiatedSignOut(): void {
+  userInitiatedSignOut = true;
+}
+
+export function clearUserInitiatedSignOut(): void {
+  userInitiatedSignOut = false;
+}
+
+export function wasUserInitiatedSignOut(): boolean {
+  return userInitiatedSignOut;
+}
+
 export function supabaseAuthStorageKey(): string | null {
   const env = getSupabaseUrlAndAnonKey();
   if (!env) return null;
@@ -73,6 +91,36 @@ export function isRetryableAuthNetworkError(error: { message?: string; status?: 
   );
 }
 
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("auth recovery timed out")), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/**
+ * Timed `getSession()` so a stuck GoTrue refresh lock cannot block the shell forever.
+ * On timeout, falls back to the disk session when present.
+ */
+export async function getSessionWithTimeout(
+  supabase: SupabaseClient,
+  ms = AUTH_RECOVERY_TIMEOUT_MS,
+): Promise<Session | null> {
+  try {
+    const { data } = await withTimeout(supabase.auth.getSession(), ms);
+    return data.session ?? null;
+  } catch {
+    return readPersistedAuthSession();
+  }
+}
+
 /**
  * When `getSession()` / INITIAL_SESSION yields null, try to keep the user signed in
  * from storage. Prefer a live refresh; on retryable network failure fall back to the
@@ -81,30 +129,40 @@ export function isRetryableAuthNetworkError(error: { message?: string; status?: 
 export async function recoverAuthSessionAfterNull(
   supabase: SupabaseClient,
 ): Promise<Session | null> {
+  if (wasUserInitiatedSignOut()) return null;
+
   const persisted = readPersistedAuthSession();
   if (!persisted?.refresh_token) return null;
 
   try {
-    const { data, error } = await supabase.auth.refreshSession({
-      refresh_token: persisted.refresh_token,
-    });
+    const { data, error } = await withTimeout(
+      supabase.auth.refreshSession({ refresh_token: persisted.refresh_token }),
+      AUTH_RECOVERY_TIMEOUT_MS,
+    );
+    if (wasUserInitiatedSignOut()) return null;
     if (data.session?.user?.id) return data.session;
     if (error && !isRetryableAuthNetworkError(error)) return null;
   } catch {
-    // Weak Wi-Fi / storage lock — keep going with persisted tokens.
+    // Timed out / lock / network — paint from disk immediately instead of waiting on setSession too.
+    return wasUserInitiatedSignOut() ? null : persisted;
   }
 
+  if (wasUserInitiatedSignOut()) return null;
   if (!persisted.access_token) return persisted;
 
   try {
-    const { data } = await supabase.auth.setSession({
-      access_token: persisted.access_token,
-      refresh_token: persisted.refresh_token,
-    });
+    const { data } = await withTimeout(
+      supabase.auth.setSession({
+        access_token: persisted.access_token,
+        refresh_token: persisted.refresh_token,
+      }),
+      AUTH_RECOVERY_TIMEOUT_MS,
+    );
+    if (wasUserInitiatedSignOut()) return null;
     if (data.session?.user?.id) return data.session;
   } catch {
     // setSession may also need the network; still return persisted for the React shell.
   }
 
-  return persisted;
+  return wasUserInitiatedSignOut() ? null : persisted;
 }

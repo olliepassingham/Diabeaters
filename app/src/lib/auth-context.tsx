@@ -4,8 +4,11 @@ import { onAuthStateChange } from "@/lib/auth";
 import { clearCarerClientSessionKeys, onboardingAccountPathFromUserMetadata } from "@/lib/carer-session";
 import { restoreAccountSessionFromCloud } from "@/lib/account-session-restore";
 import {
+  clearUserInitiatedSignOut,
+  getSessionWithTimeout,
   readPersistedAuthSession,
   recoverAuthSessionAfterNull,
+  wasUserInitiatedSignOut,
 } from "@/lib/persisted-auth-session";
 import { setActiveUserIdForLocalStorage } from "@/lib/storage";
 import { setSentryUserId } from "@/observability/sentry";
@@ -45,12 +48,24 @@ function getE2EUser(): User | null {
   }
 }
 
+function readBootSession(): Session | null {
+  try {
+    return readPersistedAuthSession();
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const initialE2EUser = getE2EUser();
-  const [user, setUser] = useState<User | null>(initialE2EUser);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(!initialE2EUser);
-  const userIdRef = useRef<string | null>(initialE2EUser?.id ?? null);
+  // Paint from disk on the very first render — before any getSession await — so the
+  // 2.5s safety timer cannot flash the login screen while GoTrue refreshes.
+  const bootSession = initialE2EUser ? null : readBootSession();
+  const [user, setUser] = useState<User | null>(initialE2EUser ?? bootSession?.user ?? null);
+  const [session, setSession] = useState<Session | null>(bootSession);
+  const [loading, setLoading] = useState(!initialE2EUser && !bootSession);
+  const userIdRef = useRef<string | null>(initialE2EUser?.id ?? bootSession?.user?.id ?? null);
+  const authEpochRef = useRef(0);
 
   const syncAuthSession = useCallback((nextSession: Session | null) => {
     setSession(nextSession);
@@ -63,6 +78,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let isMounted = true;
+
+    if (bootSession?.user?.id) {
+      setActiveUserIdForLocalStorage(bootSession.user.id);
+      setSentryUserId(bootSession.user.id);
+    }
 
     (async () => {
       if (initialE2EUser) {
@@ -84,36 +104,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      const epoch = ++authEpochRef.current;
       try {
         // Prefer the cached session. Never call getUser() here — it hits the network and can
         // wipe local auth when Android reports online but the refresh fails.
-        const sessionRes = await supabase.auth.getSession();
-        let next = sessionRes.data.session ?? null;
+        let next = await getSessionWithTimeout(supabase);
+        if (epoch !== authEpochRef.current || !isMounted) return;
         if (!next) {
-          // Paint from disk immediately so a slow/failed refresh cannot flash the login screen.
-          const persisted = readPersistedAuthSession();
-          if (persisted && isMounted) {
-            syncAuthSession(persisted);
-            setLoading(false);
-          }
           next = await recoverAuthSessionAfterNull(supabase);
         }
-        if (!isMounted) return;
+        if (epoch !== authEpochRef.current || !isMounted) return;
         if (next) {
           syncAuthSession(next);
           setLoading(false);
         }
         // If still null, keep loading until INITIAL_SESSION (or the safety timer).
       } catch {
-        if (!isMounted) return;
+        if (epoch !== authEpochRef.current || !isMounted) return;
         try {
-          const persisted = readPersistedAuthSession();
-          if (persisted) {
-            syncAuthSession(persisted);
-            setLoading(false);
-          }
           const recovered = await recoverAuthSessionAfterNull(supabase);
-          if (!isMounted) return;
+          if (epoch !== authEpochRef.current || !isMounted) return;
           if (recovered) {
             syncAuthSession(recovered);
             setLoading(false);
@@ -134,12 +144,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!isMounted) return;
 
       if (event === "SIGNED_OUT") {
+        authEpochRef.current += 1;
+        const intentional = wasUserInitiatedSignOut();
+        clearUserInitiatedSignOut();
         clearCarerClientSessionKeys();
+        if (intentional) {
+          syncAuthSession(null);
+          setLoading(false);
+          return;
+        }
+        // Unexpected SIGNED_OUT (e.g. failed refresh wiped tokens). Prefer disk if anything remains.
+        const persisted = readPersistedAuthSession();
+        if (persisted) {
+          syncAuthSession(persisted);
+          setLoading(false);
+          const supabase = getSupabase();
+          if (supabase) {
+            const epoch = authEpochRef.current;
+            void recoverAuthSessionAfterNull(supabase).then((recovered) => {
+              if (!isMounted || epoch !== authEpochRef.current) return;
+              if (recovered) syncAuthSession(recovered);
+            });
+          }
+          return;
+        }
         syncAuthSession(null);
         setLoading(false);
         return;
       }
 
+      if (event === "SIGNED_IN") {
+        clearUserInitiatedSignOut();
+      }
+
+      const epoch = ++authEpochRef.current;
       void (async () => {
         let sessionToApply = nextSession ?? null;
 
@@ -148,12 +186,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!sessionToApply && (event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED")) {
           const persisted = readPersistedAuthSession();
           if (persisted) {
+            if (epoch !== authEpochRef.current || !isMounted) return;
             syncAuthSession(persisted);
             sessionToApply = persisted;
           }
           const supabase = getSupabase();
           if (supabase) {
             const recovered = await recoverAuthSessionAfterNull(supabase);
+            if (epoch !== authEpochRef.current || !isMounted) return;
             if (recovered) sessionToApply = recovered;
           }
           // If recovery also fails but we already painted a user from bootstrap, keep them.
@@ -163,7 +203,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        if (!isMounted) return;
+        if (epoch !== authEpochRef.current || !isMounted) return;
 
         if (sessionToApply) {
           syncAuthSession(sessionToApply);
@@ -198,6 +238,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       window.clearTimeout(safetyTimer);
       data?.unsubscribe();
     };
+    // bootSession is only used for initial state; do not re-run when identity is stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional cold-start seed
   }, [initialE2EUser, syncAuthSession]);
 
   useEffect(() => {
