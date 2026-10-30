@@ -141,9 +141,9 @@ function LiveStatusBarShell({
   return (
     <div
       className={cn(
-        // Hairline under the header only — keeps contrast without a thick “card slab”.
-        "flex w-full items-center gap-1.5 border-b border-border/45 bg-card/95 py-1.5 shadow-none",
-        "px-3 [padding-left:max(0.75rem,env(safe-area-inset-left))] [padding-right:max(0.75rem,env(safe-area-inset-right))]",
+        // Quiet instrument row: hairline only, no card fill so it doesn’t fight the header.
+        "flex w-full items-center gap-1 border-b border-border/40 bg-background py-1 shadow-none",
+        "px-2.5 [padding-left:max(0.625rem,env(safe-area-inset-left))] [padding-right:max(0.625rem,env(safe-area-inset-right))]",
         className,
       )}
       data-testid="status-live-bar"
@@ -158,7 +158,7 @@ function LiveStatusBarShell({
 function LiveStatusDot() {
   return (
     <span
-      className="inline-flex shrink-0 items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700/90 dark:text-emerald-300/90"
+      className="inline-flex shrink-0 items-center gap-1 text-[9px] font-medium uppercase tracking-[0.12em] text-emerald-700/80 dark:text-emerald-300/80"
       data-testid="status-live-indicator"
     >
       <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" aria-hidden />
@@ -552,7 +552,7 @@ export function AppStatusStrip() {
   if (inSupporterSession) {
     if (!showCgmLiveChip && online) return null;
     return (
-      <div className="relative z-40 mb-0.5 space-y-0.5" data-testid="app-status-strip">
+      <div className="relative z-40 space-y-0" data-testid="app-status-strip">
         {showCgmLiveChip ? (
           <LiveStatusBarShell>
             <LiveStatusDot />
@@ -573,12 +573,12 @@ export function AppStatusStrip() {
               type="button"
               variant="ghost"
               size="icon"
-              className="h-7 w-7 shrink-0 text-muted-foreground"
+              className="h-6 w-6 shrink-0 text-muted-foreground"
               onClick={refreshSupporterBg}
               aria-label="Refresh glucose reading"
               data-testid="button-cgm-live-refresh"
             >
-              <RefreshCw className={cn("h-3.5 w-3.5", supporterBgLoading && "animate-spin")} aria-hidden />
+              <RefreshCw className={cn("h-3 w-3", supporterBgLoading && "animate-spin")} aria-hidden />
             </Button>
           </LiveStatusBarShell>
         ) : null}
@@ -606,13 +606,13 @@ export function AppStatusStrip() {
       <>
         <Icon className={cn("h-3 w-3 shrink-0", segmentTone(seg.kind))} aria-hidden />
         {seg.label ? (
-          <span className={cn("text-[11px] font-medium capitalize", segmentTone(seg.kind))}>{seg.label}</span>
+          <span className={cn("text-[10px] font-medium capitalize", segmentTone(seg.kind))}>{seg.label}</span>
         ) : null}
       </>
     );
     const className = cn(
-      "inline-flex items-center gap-1 whitespace-nowrap rounded-md px-0.5 py-0.5",
-      seg.promoted ? "opacity-100" : "opacity-75",
+      "inline-flex items-center gap-0.5 whitespace-nowrap rounded-sm px-0.5 py-0",
+      seg.promoted ? "opacity-100" : "opacity-70",
     );
     if (seg.href) {
       return (
@@ -644,7 +644,7 @@ export function AppStatusStrip() {
   })();
 
   return (
-    <div className="relative z-40 mb-0.5 space-y-1" data-testid="app-status-strip">
+    <div className="relative z-40 space-y-1" data-testid="app-status-strip">
       <LiveStatusBarShell>
         {showLiveDot ? <LiveStatusDot /> : null}
 
@@ -685,12 +685,12 @@ export function AppStatusStrip() {
               type="button"
               size="sm"
               variant="ghost"
-              className="h-7 w-7 shrink-0 px-0 text-muted-foreground"
+              className="h-6 w-6 shrink-0 px-0 text-muted-foreground"
               aria-label={expanded ? "Collapse status details" : "Expand status details"}
               aria-expanded={expanded}
               data-testid="status-live-expand"
             >
-              <Expand className="h-3.5 w-3.5" aria-hidden />
+              <Expand className="h-3 w-3" aria-hidden />
             </Button>
           </PopoverTrigger>
           <PopoverContent

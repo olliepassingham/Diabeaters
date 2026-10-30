@@ -55,7 +55,7 @@ const barBase =
 /** Solid card fill so the chip reads clearly against the app canvas (esp. supporter mode). */
 const barSurface = "border-border/70 bg-card text-foreground";
 
-const embeddedBase = "flex min-w-0 flex-1 items-center gap-2";
+const embeddedBase = "flex min-w-0 flex-1 items-center gap-1.5";
 
 export function CgmLiveBgChip({
   prefill,
@@ -166,19 +166,24 @@ export function CgmLiveBgChip({
       <span
         className={cn(
           "tabular-nums tracking-tight",
-          embedded ? "text-[13px] font-semibold leading-none" : "text-sm font-semibold",
+          embedded ? "text-xs font-semibold leading-none" : "text-sm font-semibold",
           valueTone,
         )}
       >
         {prefill.value}
-        <span className={cn("ml-1 font-medium text-muted-foreground", embedded ? "text-[10px]" : "text-xs")}>
+        <span className={cn("ml-0.5 font-medium text-muted-foreground", embedded ? "text-[9px]" : "text-xs")}>
           {reading.units}
         </span>
       </span>
       {TrendIcon && trend ? (
-        <span className="inline-flex items-center gap-0.5 text-[11px] capitalize text-muted-foreground">
-          <TrendIcon className={cn("shrink-0", embedded ? "h-3 w-3" : "h-3.5 w-3.5")} aria-hidden />
+        <span className="inline-flex items-center gap-0.5 text-[10px] capitalize text-muted-foreground">
+          <TrendIcon className={cn("shrink-0", embedded ? "h-2.5 w-2.5" : "h-3.5 w-3.5")} aria-hidden />
           {embedded ? null : trend}
+        </span>
+      ) : null}
+      {embedded ? (
+        <span className="text-[9px] tabular-nums text-muted-foreground/80">
+          {formatAgeMinutes(reading.ageMinutes)}
         </span>
       ) : null}
       {resolvedRange && !embedded ? (
