@@ -999,7 +999,7 @@ export default function Bedtime() {
       insulinHours: insulinHoursForIOB,
       bgTrend,
       overnightUsualTrend,
-      exercisedToday,
+      exerciseOvernightCaution,
       hadAlcohol,
       recentHypos,
       sickDayActive: scenarioState.sickDayActive,

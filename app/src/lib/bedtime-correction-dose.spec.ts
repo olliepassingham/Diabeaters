@@ -76,16 +76,16 @@ describe("resolveBedtimeCorrectionAim", () => {
 
 describe("bedtimeExtraCautionMultiplier", () => {
   it("returns a multiplier of 1 and no note when nothing is selected", () => {
-    const result = bedtimeExtraCautionMultiplier({ exercisedToday: false, hadAlcohol: false, recentHypos: false });
+    const result = bedtimeExtraCautionMultiplier({ exerciseOvernightCaution: false, hadAlcohol: false, recentHypos: false });
     expect(result.multiplier).toBe(1);
     expect(result.note).toBe("");
   });
 
   it("reduces the multiplier for each factor and stacks them multiplicatively", () => {
-    const exerciseOnly = bedtimeExtraCautionMultiplier({ exercisedToday: true, hadAlcohol: false, recentHypos: false });
-    const alcoholOnly = bedtimeExtraCautionMultiplier({ exercisedToday: false, hadAlcohol: true, recentHypos: false });
-    const hypoOnly = bedtimeExtraCautionMultiplier({ exercisedToday: false, hadAlcohol: false, recentHypos: true });
-    const all = bedtimeExtraCautionMultiplier({ exercisedToday: true, hadAlcohol: true, recentHypos: true });
+    const exerciseOnly = bedtimeExtraCautionMultiplier({ exerciseOvernightCaution: true, hadAlcohol: false, recentHypos: false });
+    const alcoholOnly = bedtimeExtraCautionMultiplier({ exerciseOvernightCaution: false, hadAlcohol: true, recentHypos: false });
+    const hypoOnly = bedtimeExtraCautionMultiplier({ exerciseOvernightCaution: false, hadAlcohol: false, recentHypos: true });
+    const all = bedtimeExtraCautionMultiplier({ exerciseOvernightCaution: true, hadAlcohol: true, recentHypos: true });
 
     expect(exerciseOnly.multiplier).toBeCloseTo(0.85);
     expect(alcoholOnly.multiplier).toBeCloseTo(0.85);
@@ -95,14 +95,14 @@ describe("bedtimeExtraCautionMultiplier", () => {
   });
 
   it("names every active factor in the note, in a readable list", () => {
-    const one = bedtimeExtraCautionMultiplier({ exercisedToday: true, hadAlcohol: false, recentHypos: false });
-    expect(one.note).toBe("Made more cautious for exercise today.");
+    const one = bedtimeExtraCautionMultiplier({ exerciseOvernightCaution: true, hadAlcohol: false, recentHypos: false });
+    expect(one.note).toBe("Made more cautious for recent or harder exercise.");
 
-    const two = bedtimeExtraCautionMultiplier({ exercisedToday: true, hadAlcohol: true, recentHypos: false });
-    expect(two.note).toBe("Made more cautious for exercise today and alcohol.");
+    const two = bedtimeExtraCautionMultiplier({ exerciseOvernightCaution: true, hadAlcohol: true, recentHypos: false });
+    expect(two.note).toBe("Made more cautious for recent or harder exercise and alcohol.");
 
-    const three = bedtimeExtraCautionMultiplier({ exercisedToday: true, hadAlcohol: true, recentHypos: true });
-    expect(three.note).toBe("Made more cautious for exercise today, alcohol, and a recent hypo.");
+    const three = bedtimeExtraCautionMultiplier({ exerciseOvernightCaution: true, hadAlcohol: true, recentHypos: true });
+    expect(three.note).toBe("Made more cautious for recent or harder exercise, alcohol, and a recent hypo.");
   });
 });
 
@@ -115,7 +115,7 @@ describe("calculateBedtimeCorrectionDose", () => {
     bgUnits: "mmol/L" as const,
     insulinHours: 5,
     overnightUsualTrend: "not_sure" as const,
-    exercisedToday: false,
+    exerciseOvernightCaution: false,
     hadAlcohol: false,
     recentHypos: false,
     sickDayActive: false,
@@ -175,7 +175,7 @@ describe("calculateBedtimeCorrectionDose", () => {
       bgUnits: "mmol/L" as const,
       insulinHours: 6,
       bgTrend: "falling" as const,
-      exercisedToday: false,
+      exerciseOvernightCaution: false,
       hadAlcohol: false,
       recentHypos: false,
       sickDayActive: false,
@@ -225,7 +225,7 @@ describe("calculateBedtimeCorrectionDose", () => {
     it("has no effect on the dose when none of the extras are selected", () => {
       const baseline = calculateBedtimeCorrectionDose({
         ...highBg,
-        exercisedToday: false,
+        exerciseOvernightCaution: false,
         hadAlcohol: false,
         recentHypos: false,
       });
@@ -235,7 +235,7 @@ describe("calculateBedtimeCorrectionDose", () => {
     it("exercise alone lowers the suggested dose", () => {
       const result = calculateBedtimeCorrectionDose({
         ...highBg,
-        exercisedToday: true,
+        exerciseOvernightCaution: true,
         hadAlcohol: false,
         recentHypos: false,
       });
@@ -245,7 +245,7 @@ describe("calculateBedtimeCorrectionDose", () => {
     it("alcohol alone lowers the suggested dose", () => {
       const result = calculateBedtimeCorrectionDose({
         ...highBg,
-        exercisedToday: false,
+        exerciseOvernightCaution: false,
         hadAlcohol: true,
         recentHypos: false,
       });
@@ -255,7 +255,7 @@ describe("calculateBedtimeCorrectionDose", () => {
     it("recent hypos alone lowers the suggested dose (more than exercise or alcohol alone)", () => {
       const result = calculateBedtimeCorrectionDose({
         ...highBg,
-        exercisedToday: false,
+        exerciseOvernightCaution: false,
         hadAlcohol: false,
         recentHypos: true,
       });
@@ -265,7 +265,7 @@ describe("calculateBedtimeCorrectionDose", () => {
     it("stacks all three for an even more cautious dose, while the severity floor still keeps it well above zero", () => {
       const result = calculateBedtimeCorrectionDose({
         ...highBg,
-        exercisedToday: true,
+        exerciseOvernightCaution: true,
         hadAlcohol: true,
         recentHypos: true,
       });
@@ -275,7 +275,7 @@ describe("calculateBedtimeCorrectionDose", () => {
       expect(result.exerciseWarning).toMatch(/exercise/i);
       expect(result.alcoholWarning).toMatch(/alcohol/i);
       expect(result.hypoWarning).toMatch(/hypo/i);
-      expect(result.extraCautionNote).toBe("Made more cautious for exercise today, alcohol, and a recent hypo.");
+      expect(result.extraCautionNote).toBe("Made more cautious for recent or harder exercise, alcohol, and a recent hypo.");
     });
 
     it("mentions the active extras in the dose_too_small note when they push a small dose to zero", () => {
@@ -288,7 +288,7 @@ describe("calculateBedtimeCorrectionDose", () => {
         insulinHours: 6,
         bgTrend: "falling" as const,
         overnightUsualTrend: "not_sure" as const,
-        exercisedToday: false,
+        exerciseOvernightCaution: false,
         sickDayActive: false,
       };
       const withAlcohol = calculateBedtimeCorrectionDose({ ...reported, hadAlcohol: true, recentHypos: false });
@@ -311,7 +311,7 @@ describe("calculateBedtimeCorrectionDose", () => {
       insulinHours: 0.5,
       bgTrend: "steady" as const,
       overnightUsualTrend: "rise" as const,
-      exercisedToday: true,
+      exerciseOvernightCaution: true,
       hadAlcohol: false,
       recentHypos: false,
       sickDayActive: false,
@@ -333,14 +333,14 @@ describe("calculateBedtimeCorrectionDose", () => {
     });
 
     it("a moderately-high reading (not severe) is unaffected by the new floor", () => {
-      // exercisedToday is turned off here since this test is isolating the severity-floor
+      // exerciseOvernightCaution is turned off here since this test is isolating the severity-floor
       // behaviour, not the extra-caution reduction (covered separately above).
       const mild = calculateBedtimeCorrectionDose({
         ...severe,
         bgMmol: 12,
         insulinHours: 5,
         overnightUsualTrend: "not_sure" as const,
-        exercisedToday: false,
+        exerciseOvernightCaution: false,
       });
       expect(mild.status).toBe("dose");
       if (mild.status !== "dose") return;
@@ -383,7 +383,7 @@ describe("calculateBedtimeCorrectionDose", () => {
       insulinHours: 1.5,
       bgTrend: "steady" as const,
       overnightUsualTrend: "rise" as const,
-      exercisedToday: false,
+      exerciseOvernightCaution: false,
       hadAlcohol: true,
       recentHypos: false,
       sickDayActive: false,
@@ -437,5 +437,55 @@ describe("calculateBedtimeCorrectionDose", () => {
     expect(result.status).toBe("dose_too_small");
     if (result.status !== "dose_too_small") return;
     expect(result.note).toMatch(/IOB already covers/i);
+  });
+
+  it("does not shrink the dose for light daily training that is not overnight-caution exercise", () => {
+    const params = {
+      bgMmol: 20,
+      targetLowMmol: 4,
+      targetHighMmol: 8,
+      correctionFactor: 1,
+      bgUnits: "mmol/L" as const,
+      insulinHours: 5,
+      bgTrend: "steady" as const,
+      overnightUsualTrend: "not_sure" as const,
+      hadAlcohol: false,
+      recentHypos: false,
+      sickDayActive: false,
+    };
+    const light = calculateBedtimeCorrectionDose({ ...params, exerciseOvernightCaution: false });
+    const harder = calculateBedtimeCorrectionDose({ ...params, exerciseOvernightCaution: true });
+    expect(light.status).toBe("dose");
+    expect(harder.status).toBe("dose");
+    if (light.status !== "dose" || harder.status !== "dose") return;
+    expect(light.extraCautionMultiplier).toBe(1);
+    expect(harder.extraCautionMultiplier).toBeCloseTo(0.85);
+    expect(harder.suggestedDose).toBeLessThan(light.suggestedDose);
+    expect(light.exerciseWarning).toBe("");
+    expect(light.extraCautionNote).toBe("");
+  });
+
+  it("treats pump suggestions under half a unit as too small instead of recommending a micro-dose", () => {
+    const result = calculateBedtimeCorrectionDose({
+      bgMmol: 9.2,
+      targetLowMmol: 4,
+      targetHighMmol: 8,
+      correctionFactor: 4,
+      bgUnits: "mmol/L",
+      insulinHours: 5,
+      bgTrend: "falling",
+      overnightUsualTrend: "not_sure",
+      exerciseOvernightCaution: false,
+      hadAlcohol: false,
+      recentHypos: false,
+      sickDayActive: false,
+      roundIncrement: 0.05,
+    });
+    expect(result.status).toBe("dose_too_small");
+    if (result.status !== "dose_too_small") return;
+    expect(result.rawDose).toBeGreaterThan(0);
+    expect(result.rawDose).toBeLessThan(0.5);
+    expect(result.note).toMatch(/less than half a unit/i);
+    expect(result.note).toMatch(/recheck/i);
   });
 });

@@ -79,8 +79,27 @@ describe("bedtime-readiness", () => {
       cautionLabels: [],
     });
     expect(copy.headline).toMatch(/recent hypo/i);
+    expect(copy.title).toMatch(/recheck before sleep/i);
     expect(copy.guidance.some((g) => /treatment within reach/i.test(g))).toBe(true);
+    expect(copy.guidance.some((g) => /recheck once more before lights-out/i.test(g))).toBe(true);
     expect(copy.snack).toBeNull();
+  });
+
+  it("soft monitor copy asks for a concrete recheck, not vague watching", () => {
+    const copy = buildBedtimePersonalizedCopy({
+      ...baseCtx,
+      level: "monitor",
+      cautionCount: 2,
+      cautionLabels: ["Food timing", "Time to sleep"],
+      foodSelected: true,
+      foodPhrase: "about 1 hour",
+      foodHours: 1,
+      sleepHours: 2,
+    });
+    expect(copy.title).toMatch(/recheck before sleep/i);
+    expect(copy.headline).toMatch(/plan one more check/i);
+    expect(copy.headline).not.toMatch(/keep an eye|staying aware/i);
+    expect(copy.guidance.some((g) => /recheck/i.test(g))).toBe(true);
   });
 
   it("recent hypo with falling trend suggests snack", () => {

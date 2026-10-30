@@ -71,7 +71,8 @@ export type BedtimeCorrectionSuggestion = {
  *  - `no_correction_needed`: BG is already at/under the (trend-adjusted) aim point.
  *  - `no_isf`: correction factor isn't set, and BG is high enough that one would help.
  *  - `dose_too_small`: BG is high enough to want a correction, ISF is set, but bedtime
- *    caution + IOB reductions bring the dose under half a unit — this is NOT a missing-ISF case.
+ *    caution + IOB reductions bring the dose under {@link BEDTIME_MIN_ACTIONABLE_DOSE_U}
+ *    (half a unit) — this is NOT a missing-ISF case.
  *  - `dose`: a calculated, cautious bedtime correction.
  */
 export type BedtimeCorrectionResult =
@@ -184,7 +185,7 @@ function baseTrendTier(
  * How much smaller a bedtime correction should be when specific overnight risk factors from the
  * "Extras" switches are present. Each one makes a *smaller* correction more appropriate — never a
  * larger one — because they all raise the risk of an overnight low, never a high:
- *  - exercise increases insulin sensitivity for hours afterwards;
+ *  - recent/harder exercise (not every light “trained today”) increases insulin sensitivity overnight;
  *  - alcohol can cause delayed lows;
  *  - a recent hypo raises the chance of another one and can blunt hypo awareness.
  * These stack multiplicatively with the trend/IOB reduction above. The severity floor in
@@ -195,6 +196,9 @@ export const BEDTIME_EXERCISE_CAUTION_MULTIPLIER = 0.85;
 export const BEDTIME_ALCOHOL_CAUTION_MULTIPLIER = 0.85;
 export const BEDTIME_RECENT_HYPO_CAUTION_MULTIPLIER = 0.8;
 
+/** Below this, a bedtime correction is not worth dosing — recheck instead of micro-dosing. */
+export const BEDTIME_MIN_ACTIONABLE_DOSE_U = 0.5;
+
 function joinReasons(reasons: string[]): string {
   if (reasons.length === 0) return "";
   if (reasons.length === 1) return reasons[0]!;
@@ -203,15 +207,19 @@ function joinReasons(reasons: string[]): string {
 }
 
 export function bedtimeExtraCautionMultiplier(ctx: {
-  exercisedToday: boolean;
+  /**
+   * Only when exercise actually raises overnight hypo risk (recent/hard/stacked) —
+   * not every “trained today” tick. See `bedtimeExerciseRaisesOvernightCaution`.
+   */
+  exerciseOvernightCaution: boolean;
   hadAlcohol: boolean;
   recentHypos: boolean;
 }): { multiplier: number; reasons: string[]; note: string } {
   let multiplier = 1;
   const reasons: string[] = [];
-  if (ctx.exercisedToday) {
+  if (ctx.exerciseOvernightCaution) {
     multiplier *= BEDTIME_EXERCISE_CAUTION_MULTIPLIER;
-    reasons.push("exercise today");
+    reasons.push("recent or harder exercise");
   }
   if (ctx.hadAlcohol) {
     multiplier *= BEDTIME_ALCOHOL_CAUTION_MULTIPLIER;
@@ -281,7 +289,8 @@ export function calculateBedtimeCorrectionDose(params: {
   insulinHours: number;
   bgTrend: BedtimeCorrectionTrend;
   overnightUsualTrend: OvernightUsualTrend;
-  exercisedToday: boolean;
+  /** Shrink dose only when exercise raises overnight hypo risk — not every light session. */
+  exerciseOvernightCaution: boolean;
   hadAlcohol: boolean;
   recentHypos: boolean;
   sickDayActive: boolean;
@@ -300,7 +309,7 @@ export function calculateBedtimeCorrectionDose(params: {
     insulinHours,
     bgTrend,
     overnightUsualTrend,
-    exercisedToday,
+    exerciseOvernightCaution,
     hadAlcohol,
     recentHypos,
     sickDayActive,
@@ -359,7 +368,7 @@ export function calculateBedtimeCorrectionDose(params: {
     overnightUsualTrend,
   });
   const { multiplier: extraCautionMultiplier, note: extraCautionNote } = bedtimeExtraCautionMultiplier({
-    exercisedToday,
+    exerciseOvernightCaution,
     hadAlcohol,
     recentHypos,
   });
@@ -376,20 +385,16 @@ export function calculateBedtimeCorrectionDose(params: {
   const suggestedDose = roundInsulinUnits(rawEffective, roundIncrement);
   const pctOfFullDose = fullDose > 0 ? Math.round((rawEffective / fullDose) * 100) : 0;
 
-  if (suggestedDose <= 0) {
+  if (suggestedDose < BEDTIME_MIN_ACTIONABLE_DOSE_U) {
     const extraSuffix = extraCautionNote ? ` ${extraCautionNote}` : "";
     const tooSmallLead =
       usingPumpIob && pumpIob > 0 && remainingFull <= 0
         ? "Pump IOB already covers a standard correction."
-        : roundIncrement >= 1
-          ? "A cautious bedtime correction here works out to less than half a unit."
-          : "A cautious bedtime correction here works out to less than a typical pump increment.";
+        : "A cautious bedtime correction here works out to less than half a unit.";
     const tooSmallTail =
       usingPumpIob && pumpIob > 0 && remainingFull <= 0
         ? `${extraSuffix} Recheck glucose rather than stacking more insulin.`
-        : roundIncrement >= 1
-          ? `${extraSuffix} Many people either round up to 1 unit if that fits their plan, or hold off and recheck glucose within an hour.`
-          : `${extraSuffix} Hold off and recheck glucose, or follow your pump and care team.`;
+        : `${extraSuffix} Recheck in 30–60 minutes rather than dosing a tiny amount — or round up only if that matches your care plan.`;
     return {
       status: "dose_too_small",
       currentBg: toDisplay(bgMmol),
@@ -401,9 +406,9 @@ export function calculateBedtimeCorrectionDose(params: {
   }
 
   let exerciseWarning = "";
-  if (exercisedToday) {
+  if (exerciseOvernightCaution) {
     exerciseWarning =
-      "Exercise increases your sensitivity to insulin, especially overnight, so we've made this suggestion more cautious.";
+      "Recent or harder exercise can raise overnight hypo risk, so we've made this suggestion more cautious.";
   }
 
   let alcoholWarning = "";

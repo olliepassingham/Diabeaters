@@ -241,7 +241,7 @@ function buildHeadline(ctx: BedtimePersonalizedCopyInput): string {
     if (ctx.recentHypos && ctx.concernCount === 1 && ctx.cautionCount === 0) {
       return "A recent hypo warrants caution overnight, even with glucose in range now.";
     }
-    return "Mostly on track — a few factors are worth staying aware of overnight.";
+    return "A couple of overnight factors stand out — plan one more check before you sleep.";
   }
   return "Your inputs look reasonable for sleep tonight.";
 }
@@ -374,9 +374,9 @@ function buildGuidance(ctx: BedtimePersonalizedCopyInput): string[] {
       pushUnique(lines, "Consider setting a phone alarm for an overnight glucose check.");
     }
     if (lines.length === 0) {
-      pushUnique(lines, "Stay mindful overnight and follow your usual plan if you feel unwell.");
+      pushUnique(lines, "Recheck glucose once before lights-out, and keep fast carbs within reach.");
     } else if (!aboveTarget) {
-      pushUnique(lines, "Follow your care plan if you feel low — this is guidance, not dosing advice.");
+      pushUnique(lines, "Recheck once more before lights-out so you’re not guessing overnight.");
     }
     return lines.slice(0, 4);
   }
@@ -499,7 +499,7 @@ export function buildBedtimePersonalizedCopy(ctx: BedtimePersonalizedCopyInput):
       : ctx.level === "monitor"
         ? isBedtimeBgAboveTarget(ctx.bgMmol, ctx.targetHighMmol)
           ? "Above target before bed"
-          : "Worth keeping an eye on"
+          : "Recheck before sleep"
         : "Looking good for sleep";
 
   return {

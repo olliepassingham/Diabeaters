@@ -70,7 +70,7 @@ type Props = {
 
 function verdictLabel(level: ReadinessLevel, aboveTarget?: boolean) {
   if (level === "steady") return "Ready for sleep";
-  if (level === "monitor") return aboveTarget ? "Plan before bed" : "Keep an eye on it";
+  if (level === "monitor") return aboveTarget ? "Plan before bed" : "Recheck before sleep";
   return "Needs attention";
 }
 
