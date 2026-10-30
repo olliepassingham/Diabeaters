@@ -79,6 +79,7 @@ import {
 } from "@/lib/profile";
 import { scheduleDemoRoutePrefetch } from "@/lib/demo-route-prefetch";
 import {
+  APP_GATE_CLOUD_WAIT_MS,
   isPatientOnboardingSatisfied,
   readOnboardingCompleteFromLocalStorage,
   resolveAppGateReady,
@@ -455,6 +456,7 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const [pathname, setLocation] = useLocation();
   const search = useSearch();
   const pathOnly = (pathname || "/").split("?")[0] ?? pathname;
+  const [carerLinkWaitTimedOut, setCarerLinkWaitTimedOut] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -484,7 +486,20 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
     getActiveAppMode() === "carer";
 
   const waitingOnCarerLink =
-    isOnline() && mayNeedCarerLinkGate && linkedPatientLoading && !linkedPatientFetched;
+    isOnline() &&
+    mayNeedCarerLinkGate &&
+    linkedPatientLoading &&
+    !linkedPatientFetched &&
+    !carerLinkWaitTimedOut;
+
+  useEffect(() => {
+    if (loading || !user || !isOnline() || !mayNeedCarerLinkGate || linkedPatientFetched) {
+      setCarerLinkWaitTimedOut(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setCarerLinkWaitTimedOut(true), APP_GATE_CLOUD_WAIT_MS);
+    return () => window.clearTimeout(timer);
+  }, [loading, user, mayNeedCarerLinkGate, linkedPatientFetched]);
 
   if (loading || waitingOnCarerLink) {
     return (
@@ -1819,18 +1834,57 @@ function AppContent() {
     !isSupporterOnlyAccount() &&
     getActiveAppMode() !== "carer";
 
+  const [cloudWaitTimedOut, setCloudWaitTimedOut] = useState(false);
+
   const profileQuery = useQuery({
     queryKey: profileQueryKey(userId),
     queryFn: async () => {
       if (!userId) return null;
-      const { profile } = await getProfile(userId);
-      return profile;
+      let timer: number | undefined;
+      try {
+        const { profile } = await Promise.race([
+          getProfile(userId),
+          new Promise<never>((_, reject) => {
+            timer = window.setTimeout(() => reject(new Error("profile timed out")), 8_000);
+          }),
+        ]);
+        return profile;
+      } catch {
+        return null;
+      } finally {
+        if (timer) window.clearTimeout(timer);
+      }
     },
     // Start as soon as we have a user id (parallel with carer link lookup — gate still waits when needed).
     enabled: Boolean(userId) && !authLoading && !skipProfileForGate,
     staleTime: 30_000,
     retry: false,
   });
+
+  useEffect(() => {
+    const waitingOnCloud =
+      Boolean(userId) &&
+      online &&
+      !authLoading &&
+      ((!skipLinkForGate && !linkQuery.isFetched) ||
+        (!skipProfileForGate &&
+          !readOnboardingCompleteFromLocalStorage() &&
+          !profileQuery.isFetched));
+    if (!waitingOnCloud) {
+      setCloudWaitTimedOut(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setCloudWaitTimedOut(true), APP_GATE_CLOUD_WAIT_MS);
+    return () => window.clearTimeout(timer);
+  }, [
+    userId,
+    online,
+    authLoading,
+    skipLinkForGate,
+    skipProfileForGate,
+    linkQuery.isFetched,
+    profileQuery.isFetched,
+  ]);
 
   const linkedCarer = Boolean(linkQuery.data);
 
@@ -1881,6 +1935,7 @@ function AppContent() {
         skipProfileForGate,
         skipLinkForGate,
         localOnboardingComplete: readOnboardingCompleteFromLocalStorage(),
+        cloudWaitTimedOut,
       }),
     [
       authLoading,
@@ -1890,6 +1945,7 @@ function AppContent() {
       profileQuery.isFetched,
       skipProfileForGate,
       skipLinkForGate,
+      cloudWaitTimedOut,
     ],
   );
 

@@ -128,6 +128,21 @@ describe("resolveAppGateReady", () => {
       }),
     ).toBe(true);
   });
+
+  it("opens after the cloud wait budget even when link/profile are still pending", () => {
+    expect(
+      resolveAppGateReady({
+        authLoading: false,
+        userId: "u1",
+        online: true,
+        linkQueryFetched: false,
+        profileQueryFetched: false,
+        skipProfileForGate: false,
+        skipLinkForGate: false,
+        cloudWaitTimedOut: true,
+      }),
+    ).toBe(true);
+  });
 });
 
 describe("isPatientOnboardingSatisfied", () => {

@@ -15,6 +15,9 @@ export function readOnboardingCompleteFromLocalStorage(): boolean {
  * Whether the authenticated shell may render without waiting for cloud gate queries.
  * When offline with a cached session, local data is authoritative for home/guides/tools.
  */
+/** How long the signed-in shell may wait on cloud gate queries before painting from local data. */
+export const APP_GATE_CLOUD_WAIT_MS = 5_000;
+
 export function resolveAppGateReady(params: {
   authLoading: boolean;
   userId: string | undefined;
@@ -30,10 +33,17 @@ export function resolveAppGateReady(params: {
    * A new signup has this flag cleared, so it still waits for the cloud profile.
    */
   localOnboardingComplete?: boolean;
+  /**
+   * Weak Wi‑Fi often leaves `navigator.onLine` true while fetches hang forever.
+   * After {@link APP_GATE_CLOUD_WAIT_MS}, paint the shell from local data instead of
+   * showing Loading indefinitely.
+   */
+  cloudWaitTimedOut?: boolean;
 }): boolean {
   if (params.authLoading) return false;
   if (!params.userId) return true;
   if (!params.online) return true;
+  if (params.cloudWaitTimedOut) return true;
   if (!params.skipLinkForGate && !params.linkQueryFetched) return false;
   if (params.skipProfileForGate) return true;
   if (params.localOnboardingComplete) return true;

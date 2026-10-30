@@ -19,8 +19,22 @@ export function linkedPatientInfoToWithProfile(info: LinkedPatientInfo): LinkedP
   };
 }
 
+async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 export async function fetchLinkedPatientForUser(): Promise<LinkedPatientInfo | null> {
-  const result = await getLinkedPatientForCarer();
+  const result = await withTimeout(getLinkedPatientForCarer(), 8_000, "carer link");
   return result.data ?? null;
 }
 

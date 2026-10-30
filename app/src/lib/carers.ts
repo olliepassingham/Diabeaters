@@ -247,11 +247,13 @@ function mapLinkRow(row: Record<string, unknown>): CarerLinkRow {
 async function getSessionUserId(): Promise<{ id: string } | { error: Error }> {
   const supabase = getSupabase();
   if (!supabase) return { error: NOT_CONFIGURED };
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data?.user?.id) {
-    return { error: error ?? new Error("Not signed in") };
-  }
-  return { id: data.user.id };
+  // Prefer the cached session. `getUser()` hits the network and can wipe or hang auth
+  // on weak mobile Wi‑Fi — that stalled supporter "Checking session…" forever.
+  const { data, error } = await supabase.auth.getSession();
+  const id = data.session?.user?.id;
+  if (id) return { id };
+  if (error) return { error };
+  return { error: new Error("Not signed in") };
 }
 
 /**
