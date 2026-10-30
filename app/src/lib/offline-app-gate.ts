@@ -1,6 +1,8 @@
 import { isOnline } from "./offline";
 
 const ONBOARDING_COMPLETE_LS_KEY = "diabeater_onboarding_completed";
+/** Binds local onboarding completion to the auth user who finished — avoids cross-account skips. */
+const ONBOARDING_COMPLETE_USER_KEY = "diabeater_onboarding_completed_user_id";
 
 /** Read the device-local onboarding completion flag (survives offline launches). */
 export function readOnboardingCompleteFromLocalStorage(): boolean {
@@ -8,6 +10,37 @@ export function readOnboardingCompleteFromLocalStorage(): boolean {
     return localStorage.getItem(ONBOARDING_COMPLETE_LS_KEY) === "true";
   } catch {
     return false;
+  }
+}
+
+/** Auth user id that last marked onboarding complete on this device (if any). */
+export function readOnboardingCompleteUserIdFromLocalStorage(): string | null {
+  try {
+    const raw = localStorage.getItem(ONBOARDING_COMPLETE_USER_KEY);
+    return raw && raw.trim() ? raw.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Mark clinical/community onboarding complete locally, scoped to the signed-in user when known. */
+export function markOnboardingCompleteLocally(userId?: string | null): void {
+  try {
+    localStorage.setItem(ONBOARDING_COMPLETE_LS_KEY, "true");
+    if (userId && userId.trim()) {
+      localStorage.setItem(ONBOARDING_COMPLETE_USER_KEY, userId.trim());
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+export function clearOnboardingCompleteLocally(): void {
+  try {
+    localStorage.removeItem(ONBOARDING_COMPLETE_LS_KEY);
+    localStorage.removeItem(ONBOARDING_COMPLETE_USER_KEY);
+  } catch {
+    /* ignore */
   }
 }
 
@@ -71,18 +104,31 @@ export function isPatientOnboardingSatisfied(params: {
   online: boolean;
   /** Community Member accounts skip the clinical onboarding wizard. */
   isCommunityMemberAccount?: boolean;
+  /**
+   * User id that marked local onboarding complete. When it matches `userId`, online
+   * mode may trust local completion even if the cloud profile upsert has not landed yet
+   * (avoids / ↔ /onboarding Redirecting loops). A previous account's flag won't match.
+   */
+  onboardingCompleteLocalUserId?: string | null;
 }): boolean {
   if (!params.userId) return true;
   if (params.isCommunityMemberAccount) return true;
   if (params.linkedCarer) return true;
   if (params.carerPendingBlocksOnboarding) return true;
+  if (params.onboardingCompleteFromDb) return true;
+
+  const localForThisUser =
+    params.onboardingCompleteFromLocalStorage &&
+    Boolean(params.onboardingCompleteLocalUserId) &&
+    params.onboardingCompleteLocalUserId === params.userId;
+
   if (!params.online) {
-    return params.onboardingCompleteFromLocalStorage || params.onboardingCompleteFromDb;
+    return params.onboardingCompleteFromLocalStorage || localForThisUser;
   }
   if (!params.profileQueryFetched) return true;
-  // Online: trust the cloud profile only. Stale diabeater_onboarding_completed from a
-  // previous Type 1 account on this device must not skip onboarding for a new signup.
-  return params.onboardingCompleteFromDb;
+  // Online: prefer cloud. Also trust local when bound to this user (finish just wrote local
+  // before/while cloud upsert; stale previous-account flags lack a matching user id).
+  return localForThisUser;
 }
 
 export const OFFLINE_CLOUD_TOOL_IDS = new Set(["ai-coach"]);

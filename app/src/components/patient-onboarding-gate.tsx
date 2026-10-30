@@ -103,9 +103,16 @@ export function PatientOnboardingGate({ onPatientComplete }: PatientOnboardingGa
         return;
       }
 
+      const localComplete =
+        typeof localStorage !== "undefined" &&
+        localStorage.getItem("diabeater_onboarding_completed") === "true";
+      const localUserId =
+        typeof localStorage !== "undefined"
+          ? localStorage.getItem("diabeater_onboarding_completed_user_id")
+          : null;
       const done =
         profile?.onboarding_complete === true ||
-        (typeof localStorage !== "undefined" && localStorage.getItem("diabeater_onboarding_completed") === "true");
+        (localComplete && Boolean(user?.id) && localUserId === user.id);
       if (done) {
         setLocation("/");
         return;

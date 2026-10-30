@@ -127,6 +127,55 @@ describe("account-session-restore", () => {
     expect(getOnboardingAccountPath()).toBe("community");
   });
 
+  it("prefers community signup metadata over bootstrap default account_type=patient", async () => {
+    getProfile.mockResolvedValue({
+      profile: {
+        id: "u1",
+        full_name: null,
+        avatar_url: null,
+        bio: null,
+        public_handle: null,
+        is_public: false,
+        onboarding_complete: false,
+        account_type: "patient",
+        primary_app_role: null,
+      },
+    });
+
+    const { restoreAccountSessionFromCloud } = await import("@/lib/account-session-restore");
+    const { getPrimaryAppRole, getOnboardingAccountPath, getActiveAppMode } = await import(
+      "@/lib/carer-session"
+    );
+
+    await restoreAccountSessionFromCloud("u1", "community");
+    expect(getPrimaryAppRole()).toBe("community");
+    expect(getOnboardingAccountPath()).toBe("community");
+    expect(getActiveAppMode()).toBe("community");
+  });
+
+  it("prefers supporter signup metadata over bootstrap default account_type=patient", async () => {
+    getProfile.mockResolvedValue({
+      profile: {
+        id: "u1",
+        full_name: null,
+        avatar_url: null,
+        bio: null,
+        public_handle: null,
+        is_public: false,
+        onboarding_complete: false,
+        account_type: "patient",
+        primary_app_role: null,
+      },
+    });
+
+    const { restoreAccountSessionFromCloud } = await import("@/lib/account-session-restore");
+    const { getPrimaryAppRole, getOnboardingAccountPath } = await import("@/lib/carer-session");
+
+    await restoreAccountSessionFromCloud("u1", "supporter");
+    expect(getPrimaryAppRole()).toBe("carer");
+    expect(getOnboardingAccountPath()).toBe("supporter");
+  });
+
   it("keeps community metadata when previous Type 1 local data remains and cloud profile is null", async () => {
     const { storage } = await import("@/lib/storage");
     storage.saveProfile({

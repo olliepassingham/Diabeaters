@@ -82,6 +82,7 @@ import {
   APP_GATE_CLOUD_WAIT_MS,
   isPatientOnboardingSatisfied,
   readOnboardingCompleteFromLocalStorage,
+  readOnboardingCompleteUserIdFromLocalStorage,
   resolveAppGateReady,
 } from "@/lib/offline-app-gate";
 import { isOnline } from "@/lib/offline";
@@ -96,6 +97,7 @@ import { isCommunityMemberSession, scheduleCommunityWarmup } from "@/lib/communi
 import { resolvesAsCommunityMemberAccount } from "@/lib/community-member-session";
 import {
   clearCarerClientSessionKeys,
+  canSwitchAppMode,
   getActiveAppMode,
   applyActiveCarerPatientFromNotification,
   getPrimaryAppRole,
@@ -1527,6 +1529,12 @@ function AuthenticatedShell() {
     }
     if (!activeMode) return;
     if (pathOnly === "/carer-view" || pathOnly.startsWith("/carer-view/")) {
+      // Dual-role: supporter deep links / pushes while in User mode should enter Supporter Mode,
+      // not bounce to patient home.
+      if (canSwitchAppMode()) {
+        setActiveAppMode("carer");
+        return;
+      }
       setLocation("/");
     }
   }, [hasCarerLink, activeMode, isCarerMode, pathOnly, setLocation]);
@@ -1910,6 +1918,7 @@ function AppContent() {
         profileQueryFetched: profileQuery.isFetched,
         onboardingCompleteFromDb: profileQuery.data?.onboarding_complete === true,
         onboardingCompleteFromLocalStorage: readOnboardingCompleteFromLocalStorage(),
+        onboardingCompleteLocalUserId: readOnboardingCompleteUserIdFromLocalStorage(),
         online,
         isCommunityMemberAccount: isCommunityMemberForGate,
       }),

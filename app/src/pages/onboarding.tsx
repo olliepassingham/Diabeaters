@@ -76,6 +76,7 @@ import { markBedtimeReminderPromptPending } from "@/lib/bedtime-reminder-prompt"
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { reschedulePumpChangeReminders } from "@/lib/pump-change-reminders";
 import { seedPatientFirstRunDefaultsIfNeeded } from "@/lib/starter-patient-defaults";
+import { markOnboardingCompleteLocally } from "@/lib/offline-app-gate";
 import {
   APP_REGION_OPTIONS,
   applyRegionUnitDefaults,
@@ -633,7 +634,6 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     } catch {
       /* ignore */
     }
-    localStorage.setItem("diabeater_onboarding_completed", "true");
     recordOnboardingFinishedAt();
     markCommunityPushPromptPending();
     if (pathOverride === "/tools") {
@@ -659,17 +659,20 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           description: error.message,
           variant: "destructive",
         });
-      } else {
-        const acctRes = await syncAccountTypeToCloud(user.id);
-        if (acctRes.error) {
-          toast({
-            title: "Profile synced; account type pending",
-            description: acctRes.error.message,
-            variant: "destructive",
-          });
-        }
-        void syncRegionToCloud(user.id);
+        return;
       }
+      const acctRes = await syncAccountTypeToCloud(user.id);
+      if (acctRes.error) {
+        toast({
+          title: "Profile synced; account type pending",
+          description: acctRes.error.message,
+          variant: "destructive",
+        });
+      }
+      void syncRegionToCloud(user.id);
+      markOnboardingCompleteLocally(user.id);
+    } else {
+      markOnboardingCompleteLocally(null);
     }
     toast({
       title: `Welcome${data.name ? `, ${data.name}` : ""}`,
@@ -702,7 +705,6 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       }
       markBedtimeReminderPromptPending();
     }
-    localStorage.setItem("diabeater_onboarding_completed", "true");
     recordOnboardingFinishedAt();
     const previousAccountPath = getOnboardingAccountPath();
     const hadSupporterMarkers =
@@ -742,37 +744,40 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           description: error.message,
           variant: "destructive",
         });
-      } else {
-        const syncRes = await syncClinicalPrefsToCloud(user.id);
-        if (upgradeFlow) {
-          // Ensure cloud Type 2 label flips even if clinical prefs had nothing else to push.
-          await syncDiabetesTypeToCloud(user.id, "type1");
-        }
-        if (syncRes.error) {
-          toast({
-            title: "Profile synced; clinical prefs pending",
-            description: syncRes.error.message,
-            variant: "destructive",
-          });
-        } else {
-          const partial = describePartialClinicalPrefsCloudSync(syncRes);
-          if (partial) {
-            toast({
-              title: "Clinical prefs partially synced",
-              description: partial,
-            });
-          }
-        }
-        const acctRes = await syncAccountTypeToCloud(user.id);
-        if (acctRes.error && !syncRes.error) {
-          toast({
-            title: "Profile synced; account type pending",
-            description: acctRes.error.message,
-            variant: "destructive",
-          });
-        }
-        void syncRegionToCloud(user.id);
+        return;
       }
+      const syncRes = await syncClinicalPrefsToCloud(user.id);
+      if (upgradeFlow) {
+        // Ensure cloud Type 2 label flips even if clinical prefs had nothing else to push.
+        await syncDiabetesTypeToCloud(user.id, "type1");
+      }
+      if (syncRes.error) {
+        toast({
+          title: "Profile synced; clinical prefs pending",
+          description: syncRes.error.message,
+          variant: "destructive",
+        });
+      } else {
+        const partial = describePartialClinicalPrefsCloudSync(syncRes);
+        if (partial) {
+          toast({
+            title: "Clinical prefs partially synced",
+            description: partial,
+          });
+        }
+      }
+      const acctRes = await syncAccountTypeToCloud(user.id);
+      if (acctRes.error && !syncRes.error) {
+        toast({
+          title: "Profile synced; account type pending",
+          description: acctRes.error.message,
+          variant: "destructive",
+        });
+      }
+      void syncRegionToCloud(user.id);
+      markOnboardingCompleteLocally(user.id);
+    } else {
+      markOnboardingCompleteLocally(null);
     }
     const dualRoleUpgrade = upgradeFlow && hadSupporterMarkers;
     toast({

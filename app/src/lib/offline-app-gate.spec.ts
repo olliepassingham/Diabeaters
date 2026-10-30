@@ -186,16 +186,30 @@ describe("isPatientOnboardingSatisfied", () => {
     ).toBe(true);
   });
 
-  it("ignores stale local onboarding completion when online", () => {
+  it("ignores stale local onboarding completion from another account when online", () => {
     expect(
       isPatientOnboardingSatisfied({
         ...base,
         profileQueryFetched: true,
         onboardingCompleteFromDb: false,
         onboardingCompleteFromLocalStorage: true,
+        onboardingCompleteLocalUserId: "other-user",
         online: true,
       }),
     ).toBe(false);
+  });
+
+  it("trusts local completion bound to this user when online (cloud upsert pending)", () => {
+    expect(
+      isPatientOnboardingSatisfied({
+        ...base,
+        profileQueryFetched: true,
+        onboardingCompleteFromDb: false,
+        onboardingCompleteFromLocalStorage: true,
+        onboardingCompleteLocalUserId: "u1",
+        online: true,
+      }),
+    ).toBe(true);
   });
 
   it("uses DB completion when online", () => {

@@ -464,12 +464,17 @@ export function clearActiveCarerPatientId(): void {
 /**
  * From a tapped notification that targets supporter mode: make the alerting patient
  * the active person so carer pages open on the right patient (multi-patient carers).
+ * Dual-role users in User mode also enter Supporter Mode so /carer-view is not bounced to /.
  */
 export function applyActiveCarerPatientFromNotification(
   data: Record<string, unknown> | null | undefined,
   path: string | null,
 ): void {
-  if (!data || !path || !path.startsWith("/carer-view")) return;
+  if (!path || !path.startsWith("/carer-view")) return;
+  if (canSwitchAppMode() && getActiveAppMode() !== "carer") {
+    setActiveAppMode("carer");
+  }
+  if (!data) return;
   const pid = typeof data.patient_user_id === "string" ? data.patient_user_id.trim() : "";
   if (pid) setActiveCarerPatientId(pid);
 }

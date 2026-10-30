@@ -44,6 +44,20 @@ describe("community-path-patient-reconcile", () => {
         account_type: "patient",
       }),
     ).toBe(true);
+    // Bootstrap default alone is not a real patient account.
+    expect(
+      profileIndicatesExistingPatientAccount({
+        id: "u-new",
+        full_name: null,
+        avatar_url: null,
+        bio: null,
+        public_handle: null,
+        is_public: false,
+        onboarding_complete: false,
+        account_type: "patient",
+        primary_app_role: null,
+      }),
+    ).toBe(false);
     expect(
       profileIndicatesExistingPatientAccount({
         id: "u1",

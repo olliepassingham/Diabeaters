@@ -25,17 +25,30 @@ export function isCommunityWelcomePathChosen(): boolean {
   return isCommunityOnlyAccount() || getPrimaryAppRole() === "community";
 }
 
-/** Cloud profile shows a completed patient account (not community/supporter-only). */
+/**
+ * Cloud profile shows a real patient account (not community/supporter-only).
+ *
+ * DB bootstrap rows default `account_type` to `'patient'` with no role/completion —
+ * that alone must NOT count, or supporter/community signup metadata loses after email
+ * verify on a fresh device.
+ */
 export function profileIndicatesExistingPatientAccount(profile: ProfileRow | null | undefined): boolean {
   if (!profile) return false;
   if (profile.account_type === "community") return false;
   if (profile.primary_app_role === "community") return false;
   /** Authoritative supporter-only persona — not a Type 1 user account for routing. */
   if (profile.primary_app_role === "carer") return false;
-  // Require an explicit patient signal — bare onboarding_complete is shared by community finalize
-  // and must not hijack a Community Member into User mode.
-  if (profile.account_type === "patient") return true;
-  if (profile.primary_app_role === "patient" && profile.onboarding_complete === true) return true;
+
+  const diabetesType = profile.diabetes_type;
+  const hasClinicalDiabetesType = diabetesType === "type1" || diabetesType === "type2";
+  const finishedPatientOnboarding = profile.onboarding_complete === true;
+  const cloudPatientRole = profile.primary_app_role === "patient";
+
+  // Bare default account_type=patient (bootstrap) is non-signal until role, completion, or diabetes type.
+  if (profile.account_type === "patient") {
+    return cloudPatientRole || finishedPatientOnboarding || hasClinicalDiabetesType;
+  }
+  if (cloudPatientRole && finishedPatientOnboarding) return true;
   return false;
 }
 
@@ -76,9 +89,9 @@ export function stashExistingPatientOnCommunityPathToast(): void {
  * Uses cloud profile only — leftover Type 1 localStorage from a previous account on this
  * device must not hijack a brand-new Community Member signup.
  *
- * Signup metadata `community` wins unless the cloud row is explicitly `account_type: patient`
- * (a real Type 1 account). That blocks poisoned `primary_app_role: patient` from stealing
- * a fresh Community Member signup.
+ * Signup metadata `community` wins unless the cloud row is a real patient account
+ * ({@link profileIndicatesExistingPatientAccount}). That blocks poisoned incomplete
+ * bootstrap rows from stealing a fresh Community Member signup.
  */
 export async function reconcileCommunityWelcomeWithExistingPatient(
   userId: string,
@@ -89,11 +102,14 @@ export async function reconcileCommunityWelcomeWithExistingPatient(
   }
 
   const { profile } = await getProfile(userId);
+  // Bootstrap defaults account_type=patient; that alone is not enough (see helper).
+  // Fresh community/supporter metadata therefore wins until the cloud row is a real patient.
+  // `metadataAccountPath` is reserved for callers that still pass signup metadata.
   if (!profile || !profileIndicatesExistingPatientAccount(profile)) {
     return { reconciled: false };
   }
-
   if (metadataAccountPath === "community" && profile.account_type !== "patient") {
+    // Explicit community cloud account — never force User mode.
     return { reconciled: false };
   }
 

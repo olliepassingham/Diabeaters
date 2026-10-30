@@ -19,6 +19,8 @@ import {
   onboardingAccountPathFromUserMetadata,
   setOnboardingAccountPath,
   setPrimaryAppRole,
+  setActiveAppMode,
+  getActiveAppMode,
   getOnboardingAccountPath,
 } from "@/lib/carer-session";
 
@@ -251,6 +253,18 @@ describe("applyActiveCarerPatientFromNotification", () => {
       { kind: "live_glucose_check_in", patient_user_id: "patient-b" },
       "/carer-view/glucose",
     );
+    expect(getActiveCarerPatientId()).toBe("patient-b");
+  });
+
+  it("switches dual-role users into carer mode for supporter deep links", () => {
+    setOnboardingAccountPath("both");
+    setPrimaryAppRole("patient");
+    setActiveAppMode("patient");
+    applyActiveCarerPatientFromNotification(
+      { kind: "hypo_logged", patient_user_id: "patient-b" },
+      "/carer-view",
+    );
+    expect(getActiveAppMode()).toBe("carer");
     expect(getActiveCarerPatientId()).toBe("patient-b");
   });
 

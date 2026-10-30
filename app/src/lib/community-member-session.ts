@@ -11,10 +11,10 @@ import { syncAccountTypeToCloud } from "@/lib/clinical-prefs-cloud-sync";
 import { profileIndicatesExistingPatientAccount } from "@/lib/community-path-patient-reconcile";
 import { getProfile, upsertProfile, type ProfileRow } from "@/lib/profile";
 import { applyRegionUnitDefaults } from "@/lib/region";
+import { markOnboardingCompleteLocally } from "@/lib/offline-app-gate";
 import { recordOnboardingFinishedAt, storage, isCommunityAccountProfile } from "@/lib/storage";
 import { restoreCommunitySessionMarkers } from "@/lib/welcome-path-community-reconcile";
 
-const ONBOARDING_LS = "diabeater_onboarding_completed";
 const DEFAULT_COMMUNITY_REGION = "UK";
 
 export type CommunityMemberSessionParams = {
@@ -63,13 +63,13 @@ export function shouldUseCommunityMemberSession(
   return hasCommunityMemberIntent();
 }
 
-export function markCommunityOnboardingCompleteLocally(): void {
+export function markCommunityOnboardingCompleteLocally(userId?: string | null): void {
   try {
-    localStorage.setItem(ONBOARDING_LS, "true");
     localStorage.removeItem("diabeater_onboarding_struggle");
   } catch {
     /* ignore */
   }
+  markOnboardingCompleteLocally(userId ?? null);
   recordOnboardingFinishedAt();
 }
 
@@ -110,7 +110,7 @@ export async function finalizeCommunityMemberSession(
     email: opts?.email,
     name: opts?.fullName?.trim() || undefined,
   });
-  markCommunityOnboardingCompleteLocally();
+  markCommunityOnboardingCompleteLocally(userId);
   setActiveAppMode("community");
 
   const { profile } = await getProfile(userId);
