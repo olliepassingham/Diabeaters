@@ -130,6 +130,42 @@ function prefersReducedMotion(): boolean {
   return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
+/** Shared LIVE strip chrome — full-bleed for user and supporter modes. */
+function LiveStatusBarShell({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex w-full items-center gap-2 border-y border-border/70 bg-card py-2.5 shadow-none",
+        "px-3 [padding-left:max(0.75rem,env(safe-area-inset-left))] [padding-right:max(0.75rem,env(safe-area-inset-right))]",
+        className,
+      )}
+      data-testid="status-live-bar"
+      role="status"
+      aria-live="polite"
+    >
+      {children}
+    </div>
+  );
+}
+
+function LiveStatusDot() {
+  return (
+    <span
+      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-800 dark:text-emerald-200"
+      data-testid="status-live-indicator"
+    >
+      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" aria-hidden />
+      Live
+    </span>
+  );
+}
+
 /** One fixed-width row. When the modes do not fit, they drift slowly so each one is readable. */
 function StatusModeMarquee({ children }: { children: ReactNode }) {
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -517,19 +553,8 @@ export function AppStatusStrip() {
     return (
       <div className="relative z-40 mb-1 space-y-1 sm:mb-1.5 sm:space-y-1.5" data-testid="app-status-strip">
         {showCgmLiveChip ? (
-          <div
-            className="flex w-full items-center gap-2 border-y border-border/70 bg-card px-3 py-2.5 shadow-none sm:py-2.5"
-            data-testid="status-live-bar"
-            role="status"
-            aria-live="polite"
-          >
-            <span
-              className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-800 dark:text-emerald-200"
-              data-testid="status-live-indicator"
-            >
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" aria-hidden />
-              Live
-            </span>
+          <LiveStatusBarShell>
+            <LiveStatusDot />
             <div className="min-w-0 flex-1" data-testid="status-segment-bg">
               <CgmLiveBgChip
                 embedded
@@ -554,19 +579,15 @@ export function AppStatusStrip() {
             >
               <RefreshCw className={cn("h-3.5 w-3.5", supporterBgLoading && "animate-spin")} aria-hidden />
             </Button>
-          </div>
+          </LiveStatusBarShell>
         ) : null}
         {!online ? (
-          <div
-            className="flex w-full items-center gap-2 border-y border-border/60 bg-card px-3 py-2 text-sm text-muted-foreground"
-            role="status"
-            aria-live="polite"
-          >
+          <LiveStatusBarShell className="border-border/60 text-sm text-muted-foreground">
             <WifiOff className="h-3.5 w-3.5 shrink-0" aria-hidden />
             <span className="min-w-0 text-xs leading-snug sm:text-sm" data-testid="offline-banner-message">
               {OFFLINE_BANNER_BASE}
             </span>
-          </div>
+          </LiveStatusBarShell>
         ) : null}
       </div>
     );
@@ -623,24 +644,11 @@ export function AppStatusStrip() {
 
   return (
     <div className="relative z-40 mb-1 space-y-1.5 sm:mb-1.5" data-testid="app-status-strip">
-      <div
-        className="flex w-full items-center gap-2 border-y border-border/70 bg-card px-3 py-2.5 shadow-none"
-        data-testid="status-live-bar"
-        role="status"
-        aria-live="polite"
-      >
-        {showLiveDot ? (
-          <span
-            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-800 dark:text-emerald-200"
-            data-testid="status-live-indicator"
-          >
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" aria-hidden />
-            Live
-          </span>
-        ) : null}
+      <LiveStatusBarShell>
+        {showLiveDot ? <LiveStatusDot /> : null}
 
         {showCgmLiveChip ? (
-          <div className="shrink-0" data-testid="status-segment-bg">
+          <div className="min-w-0 shrink-0" data-testid="status-segment-bg">
             <CgmLiveBgChip
               embedded
               prefill={cgmPrefill}
@@ -879,7 +887,7 @@ export function AppStatusStrip() {
             ) : null}
           </PopoverContent>
         </Popover>
-      </div>
+      </LiveStatusBarShell>
 
       {postExerciseOpen && postExercisePanel && showPostExerciseEducational ? (
         <div

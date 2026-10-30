@@ -157,7 +157,7 @@ export function AppTopBar({ isCarer, isCommunityMode = false, pathOnly, onBrandC
   return (
     <header
       className={cn(
-        "surface-chrome relative sticky top-0 z-50 flex min-h-14 items-center px-4 pb-2 pt-[env(safe-area-inset-top)] [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]",
+        "surface-chrome relative sticky top-0 z-50 flex min-h-14 items-center px-4 pb-3 pt-[env(safe-area-inset-top)] [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]",
       )}
     >
       <div className="relative flex w-full min-w-0 items-center">
