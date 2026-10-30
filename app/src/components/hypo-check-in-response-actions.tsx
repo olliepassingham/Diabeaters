@@ -3,6 +3,7 @@ import { CheckCircle2, Droplet, HeartHandshake } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import {
+  friendlyCreateCheckInError,
   respondHypoCheckIn,
   setPendingHypoCheckInForLog,
   type HypoCheckInResponse,
@@ -55,7 +56,7 @@ export function HypoCheckInResponseActions({
     if (res.error) {
       toast({
         title: "Could not send reply",
-        description: res.error.message,
+        description: friendlyCreateCheckInError(res.error.message),
         variant: "destructive",
       });
       return;

@@ -120,7 +120,7 @@ export function isActivePendingHypoCheckIn(row: { status: string; created_at: st
 export function friendlyCreateCheckInError(message: string): string {
   const m = message.toLowerCase();
   if (m.includes("check_in_expired")) {
-    return `This check-in has timed out after ${HYPO_CHECK_IN_PENDING_MINUTES} minutes.`;
+    return `This check-in timed out after ${HYPO_CHECK_IN_PENDING_MINUTES} minutes. Ask them to send a new one if they still need a reply.`;
   }
   if (m.includes("pending_exists")) {
     return "You already have a check-in waiting for a reply.";

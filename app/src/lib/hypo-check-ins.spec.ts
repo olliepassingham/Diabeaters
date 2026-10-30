@@ -39,6 +39,7 @@ describe("hypo-check-ins", () => {
     expect(friendlyCreateCheckInError("rate_limited")).toContain("15 minutes");
     expect(friendlyCreateCheckInError("pending_exists")).toContain("waiting");
     expect(friendlyCreateCheckInError("check_in_expired")).toContain("30 minutes");
+    expect(friendlyCreateCheckInError("check_in_expired")).toContain("new one");
   });
 
   it("treats pending check-ins older than 30 minutes as inactive", () => {

@@ -10,7 +10,11 @@ import { OsSurfaces, type OsSurfaceStatusPayload } from "@/lib/native-os-surface
 import { getCgmLocalHistory } from "@/lib/cgm/cgm-history-store";
 import { fetchLatestCgmReading } from "@/lib/cgm/registry";
 import { osSurfaceGlucoseFromHistory } from "@/lib/os-surface-glucose";
-import { fetchPendingHypoCheckIns, respondHypoCheckIn } from "@/lib/hypo-check-ins";
+import {
+  fetchPendingHypoCheckIns,
+  friendlyCreateCheckInError,
+  respondHypoCheckIn,
+} from "@/lib/hypo-check-ins";
 import { toast } from "@/hooks/use-toast";
 import type { BgUnits } from "@/lib/cgm/types";
 
@@ -168,7 +172,11 @@ async function handleWatchSortedIt(): Promise<void> {
     }
     const res = await respondHypoCheckIn({ checkInId: latest.id, response: "treating" });
     if (res.error) {
-      toast({ title: "Could not send reply", description: res.error.message, variant: "destructive" });
+      toast({
+        title: "Could not send reply",
+        description: friendlyCreateCheckInError(res.error.message),
+        variant: "destructive",
+      });
       return;
     }
     toast({
