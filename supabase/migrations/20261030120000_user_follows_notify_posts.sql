@@ -79,7 +79,7 @@ BEGIN
     preview := preview || '…';
   END IF;
   has_media :=
-    (NEW.image_urls IS NOT NULL AND coalesce(array_length(NEW.image_urls, 1), 0) > 0)
+    jsonb_array_length(coalesce(NEW.image_urls, '[]'::jsonb)) > 0
     OR (NEW.video_url IS NOT NULL AND length(trim(NEW.video_url)) > 0);
 
   IF preview <> '' THEN

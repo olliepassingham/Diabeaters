@@ -115,7 +115,17 @@ function wrapFeedRpcError(err: { message: string }): Error {
       "Apply migration 20260820120000_community_comment_images.sql, then reload the API schema in Supabase Dashboard → Settings → API.",
     );
   }
-  return new Error(msg);
+  return new Error(friendlyCommunityWriteError(msg));
+}
+
+/** Map known DB write failures to something users (and DEV) can act on. */
+function friendlyCommunityWriteError(msg: string): string {
+  if (msg.includes("array_length(jsonb")) {
+    return import.meta.env.DEV
+      ? `${msg} Apply migration 20261102110000_fix_notify_followers_image_urls_jsonb.sql`
+      : "Couldn't finish posting just now. Please try again in a moment.";
+  }
+  return msg;
 }
 
 function mapPostKind(raw: unknown): CommunityPostKind {
@@ -601,9 +611,9 @@ async function insertCommunityPostReturning(
       delete body.content_note;
       continue;
     }
-    throw new Error(lastMessage);
+    throw new Error(friendlyCommunityWriteError(lastMessage));
   }
-  throw new Error(lastMessage);
+  throw new Error(friendlyCommunityWriteError(lastMessage));
 }
 
 function validateImageFiles(files: File[]): Error | null {
@@ -1022,7 +1032,7 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
     if (params.audience === "followers") insertRow.audience = "followers";
     const { data, error } = await supabase.from("community_posts").insert(insertRow).select("*").single();
 
-    if (error) return { data: null, error: new Error(error.message) };
+    if (error) return { data: null, error: new Error(friendlyCommunityWriteError(error.message)) };
     if (!data) return { data: null, error: new Error("No row returned") };
     const out = mapPost(data as Record<string, unknown>);
     fireMentionPushes(out.id);
