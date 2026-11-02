@@ -453,19 +453,44 @@ function SessionLoadingSkeleton() {
  * `/account` uses `AuthenticatedShell` with a slimmer inner shell (no bottom nav) until verified.
  */
 function ProtectedLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, syncAuthSession } = useAuth();
   const { loading: linkedPatientLoading, isFetched: linkedPatientFetched } = useLinkedPatient();
   const [pathname, setLocation] = useLocation();
   const search = useSearch();
   const pathOnly = (pathname || "/").split("?")[0] ?? pathname;
   const [carerLinkWaitTimedOut, setCarerLinkWaitTimedOut] = useState(false);
+  const [sessionRescueAttempted, setSessionRescueAttempted] = useState(false);
 
   useEffect(() => {
-    if (!loading && !user) {
-      const next = getSafeNext(pathname, search);
-      setLocation(`/login?next=${encodeURIComponent(next)}`);
+    if (loading || user) return;
+    // Weak Wi‑Fi can clear React auth while the refresh token is still on disk.
+    // Rehydrate once before sending anyone to login.
+    if (!sessionRescueAttempted) {
+      setSessionRescueAttempted(true);
+      void (async () => {
+        const { readBestEffortAuthSession, recoverAuthSessionAfterNull } = await import(
+          "@/lib/persisted-auth-session"
+        );
+        const disk = readBestEffortAuthSession();
+        if (disk) {
+          syncAuthSession(disk);
+          const supabase = (await import("@/lib/supabase")).getSupabase();
+          if (supabase) {
+            const recovered = await recoverAuthSessionAfterNull(supabase);
+            if (recovered) syncAuthSession(recovered);
+          }
+          return;
+        }
+        const next = getSafeNext(pathname, search);
+        setLocation(`/login?next=${encodeURIComponent(next)}`);
+      })();
       return;
     }
+    const next = getSafeNext(pathname, search);
+    setLocation(`/login?next=${encodeURIComponent(next)}`);
+  }, [loading, user, pathname, search, setLocation, sessionRescueAttempted, syncAuthSession]);
+
+  useEffect(() => {
     if (!loading && user && !isUserVerified(user)) {
       if (pathOnly === "/account") {
         return;
@@ -504,11 +529,11 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
   }, [loading, user, mayNeedCarerLinkGate, linkedPatientFetched]);
 
   if (loading || waitingOnCarerLink) {
-    return (
+    // Prefer the app shell skeleton over a blank “Checking session…” screen —
+    // weak networks must not look like a hang or a logout.
+    return user ? <SessionLoadingSkeleton /> : (
       <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
-        <div className="animate-pulse text-muted-foreground">
-          Checking session...
-        </div>
+        <div className="animate-pulse text-muted-foreground">Opening Diabeaters…</div>
       </div>
     );
   }
@@ -516,7 +541,9 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
-        <div className="animate-pulse text-muted-foreground">Taking you to sign in…</div>
+        <div className="animate-pulse text-muted-foreground">
+          {sessionRescueAttempted ? "Taking you to sign in…" : "Reconnecting your account…"}
+        </div>
       </div>
     );
   }
@@ -1962,7 +1989,11 @@ function AppContent() {
     if (authLoading) return;
     if (user?.id) return;
     if (pathOnly !== "/" && pathOnly !== "") return;
-    setLocation("/welcome");
+    // Do not send returning users to welcome while a disk session can still be restored.
+    void import("@/lib/persisted-auth-session").then(({ readBestEffortAuthSession }) => {
+      if (readBestEffortAuthSession()) return;
+      setLocation("/welcome");
+    });
   }, [authLoading, user?.id, pathOnly, setLocation]);
 
   useEffect(() => {

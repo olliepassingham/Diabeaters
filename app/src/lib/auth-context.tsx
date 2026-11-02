@@ -6,9 +6,10 @@ import { restoreAccountSessionFromCloud } from "@/lib/account-session-restore";
 import {
   clearUserInitiatedSignOut,
   getSessionWithTimeout,
-  readPersistedAuthSession,
+  readBestEffortAuthSession,
   recoverAuthSessionAfterNull,
   wasUserInitiatedSignOut,
+  writeAuthSessionBackup,
 } from "@/lib/persisted-auth-session";
 import { setActiveUserIdForLocalStorage } from "@/lib/storage";
 import { setSentryUserId } from "@/observability/sentry";
@@ -50,7 +51,7 @@ function getE2EUser(): User | null {
 
 function readBootSession(): Session | null {
   try {
-    return readPersistedAuthSession();
+    return readBestEffortAuthSession();
   } catch {
     return null;
   }
@@ -74,6 +75,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     userIdRef.current = uid;
     setActiveUserIdForLocalStorage(uid);
     setSentryUserId(uid);
+    // Mirror outside GoTrue storage so a failed refresh cannot erase identity.
+    if (nextSession?.user?.id) writeAuthSessionBackup(nextSession);
   }, []);
 
   useEffect(() => {
@@ -153,8 +156,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setLoading(false);
           return;
         }
-        // Unexpected SIGNED_OUT (e.g. failed refresh wiped tokens). Prefer disk if anything remains.
-        const persisted = readPersistedAuthSession();
+        // Unexpected SIGNED_OUT (failed refresh on weak Wi‑Fi). Prefer GoTrue disk,
+        // then our backup — never bounce to login while a refresh token remains.
+        const persisted = readBestEffortAuthSession();
         if (persisted) {
           syncAuthSession(persisted);
           setLoading(false);
@@ -166,6 +170,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               if (recovered) syncAuthSession(recovered);
             });
           }
+          return;
+        }
+        // Keep the in-memory user if we still have one — storage may race behind SIGNED_OUT.
+        if (userIdRef.current) {
+          setLoading(false);
           return;
         }
         syncAuthSession(null);
@@ -184,7 +193,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Failed token refresh / INITIAL_SESSION with null must not look like a logout when
         // the refresh token is still on disk — that is the weak-WiFi "please log in again" bug.
         if (!sessionToApply && (event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED")) {
-          const persisted = readPersistedAuthSession();
+          const persisted = readBestEffortAuthSession();
           if (persisted) {
             if (epoch !== authEpochRef.current || !isMounted) return;
             syncAuthSession(persisted);

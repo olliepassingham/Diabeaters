@@ -114,6 +114,38 @@ export default function Login() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    // Weak Wi‑Fi can land people on /login even though a refresh token is still stored.
+    // Silently restore instead of asking them to type their password again.
+    let cancelled = false;
+    void (async () => {
+      const {
+        isAuthRecoveryBlocked,
+        readBestEffortAuthSession,
+        recoverAuthSessionAfterNull,
+      } = await import("@/lib/persisted-auth-session");
+      if (isAuthRecoveryBlocked()) return;
+      const disk = readBestEffortAuthSession();
+      if (!disk || cancelled) return;
+      syncAuthSession(disk);
+      const supabase = (await import("@/lib/supabase")).getSupabase();
+      if (supabase) {
+        const recovered = await recoverAuthSessionAfterNull(supabase);
+        if (cancelled) return;
+        if (recovered) syncAuthSession(recovered);
+      }
+      if (cancelled) return;
+      const params = new URLSearchParams(window.location.search);
+      const next = params.get("next");
+      const dest =
+        next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
+      setLocation(dest);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [syncAuthSession, setLocation]);
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (captchaRequired && !captchaToken) {

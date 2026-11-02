@@ -2,29 +2,46 @@
  * Read the Supabase auth session still sitting in WebView localStorage.
  *
  * On weak mobile networks GoTrue often returns `session: null` after a failed
- * token refresh while leaving the refresh token in storage. Treating that as a
- * logout forces a login screen — force-closing the app "signs them back in"
- * because storage was never cleared.
+ * token refresh while leaving — or even clearing — the refresh token in its own
+ * storage key. Treating that as a logout forces a login screen; force-closing
+ * the app “signs them back in” because a separate backup (or uncleared storage)
+ * still had the session.
  */
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
+import { isOnline } from "@/lib/offline";
 import { getSupabaseUrlAndAnonKey } from "@/lib/supabase";
 
 /** Hard cap so recovery never hangs the startup shell on flaky Wi‑Fi. */
 export const AUTH_RECOVERY_TIMEOUT_MS = 4_000;
 
+/**
+ * App-owned mirror of the last good session. GoTrue may clear `sb-…-auth-token`
+ * after a failed refresh; this key is only cleared on intentional sign-out.
+ */
+export const AUTH_SESSION_BACKUP_KEY = "diabeater_auth_session_backup";
+
 let userInitiatedSignOut = false;
+/** Blocks auto-restore briefly after logout so /login cannot revive the just-cleared session. */
+let signOutRecoveryBlockedUntil = 0;
 
 /** Call immediately before `supabase.auth.signOut()` so recovery cannot revive the session. */
 export function markUserInitiatedSignOut(): void {
   userInitiatedSignOut = true;
+  signOutRecoveryBlockedUntil = Date.now() + 8_000;
+  clearAuthSessionBackup();
 }
 
 export function clearUserInitiatedSignOut(): void {
   userInitiatedSignOut = false;
+  signOutRecoveryBlockedUntil = 0;
 }
 
 export function wasUserInitiatedSignOut(): boolean {
   return userInitiatedSignOut;
+}
+
+export function isAuthRecoveryBlocked(): boolean {
+  return userInitiatedSignOut || Date.now() < signOutRecoveryBlockedUntil;
 }
 
 export function supabaseAuthStorageKey(): string | null {
@@ -49,13 +66,9 @@ function isSessionShape(value: unknown): value is Session {
   return typeof s.refresh_token === "string" && Boolean(s.refresh_token) && typeof id === "string" && Boolean(id);
 }
 
-/** Best-effort parse of whatever GoTrue last wrote under the auth storage key. */
-export function readPersistedAuthSession(): Session | null {
-  const key = supabaseAuthStorageKey();
-  if (!key || typeof localStorage === "undefined") return null;
+function parseSessionJson(raw: string | null): Session | null {
+  if (!raw) return null;
   try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
     if (isSessionShape(parsed)) return parsed;
     if (parsed && typeof parsed === "object") {
@@ -67,6 +80,54 @@ export function readPersistedAuthSession(): Session | null {
   } catch {
     return null;
   }
+}
+
+/** Best-effort parse of whatever GoTrue last wrote under the auth storage key. */
+export function readPersistedAuthSession(): Session | null {
+  const key = supabaseAuthStorageKey();
+  if (!key || typeof localStorage === "undefined") return null;
+  try {
+    return parseSessionJson(localStorage.getItem(key));
+  } catch {
+    return null;
+  }
+}
+
+/** Last known-good session we mirrored (survives GoTrue wiping its own key). */
+export function readAuthSessionBackup(): Session | null {
+  if (typeof localStorage === "undefined") return null;
+  try {
+    return parseSessionJson(localStorage.getItem(AUTH_SESSION_BACKUP_KEY));
+  } catch {
+    return null;
+  }
+}
+
+export function writeAuthSessionBackup(session: Session | null): void {
+  if (typeof localStorage === "undefined") return;
+  try {
+    if (!session?.refresh_token || !session.user?.id) {
+      localStorage.removeItem(AUTH_SESSION_BACKUP_KEY);
+      return;
+    }
+    localStorage.setItem(AUTH_SESSION_BACKUP_KEY, JSON.stringify(session));
+  } catch {
+    /* quota / private mode */
+  }
+}
+
+export function clearAuthSessionBackup(): void {
+  if (typeof localStorage === "undefined") return;
+  try {
+    localStorage.removeItem(AUTH_SESSION_BACKUP_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** GoTrue key first, then our backup — used before any login redirect. */
+export function readBestEffortAuthSession(): Session | null {
+  return readPersistedAuthSession() ?? readAuthSessionBackup();
 }
 
 export function isRetryableAuthNetworkError(error: { message?: string; status?: number; code?: string } | null | undefined): boolean {
@@ -117,22 +178,32 @@ export async function getSessionWithTimeout(
     const { data } = await withTimeout(supabase.auth.getSession(), ms);
     return data.session ?? null;
   } catch {
-    return readPersistedAuthSession();
+    return readBestEffortAuthSession();
   }
 }
 
 /**
  * When `getSession()` / INITIAL_SESSION yields null, try to keep the user signed in
- * from storage. Prefer a live refresh; on retryable network failure fall back to the
- * persisted session so the shell does not bounce to login.
+ * from storage. Prefer a live refresh when online; on retryable network failure
+ * (or offline) fall back to the persisted / backup session so the shell does not
+ * bounce to login.
+ *
+ * Important: never call `setSession` after a network-failed refresh — that can
+ * clear GoTrue storage and make the false logout stick.
  */
 export async function recoverAuthSessionAfterNull(
   supabase: SupabaseClient,
 ): Promise<Session | null> {
-  if (wasUserInitiatedSignOut()) return null;
+  if (isAuthRecoveryBlocked()) return null;
 
-  const persisted = readPersistedAuthSession();
+  const persisted = readBestEffortAuthSession();
   if (!persisted?.refresh_token) return null;
+
+  // Offline / captive portal: keep the last session for the UI. Do not hit the network.
+  if (!isOnline()) {
+    writeAuthSessionBackup(persisted);
+    return persisted;
+  }
 
   try {
     const { data, error } = await withTimeout(
@@ -140,29 +211,20 @@ export async function recoverAuthSessionAfterNull(
       AUTH_RECOVERY_TIMEOUT_MS,
     );
     if (wasUserInitiatedSignOut()) return null;
-    if (data.session?.user?.id) return data.session;
-    if (error && !isRetryableAuthNetworkError(error)) return null;
+    if (data.session?.user?.id) {
+      writeAuthSessionBackup(data.session);
+      return data.session;
+    }
+    // Real auth rejection (revoked refresh) — clear backup so we do not loop forever.
+    if (error && !isRetryableAuthNetworkError(error)) {
+      clearAuthSessionBackup();
+      return null;
+    }
+    // Network / timeout-ish failure: keep the user signed in from disk.
+    writeAuthSessionBackup(persisted);
+    return persisted;
   } catch {
-    // Timed out / lock / network — paint from disk immediately instead of waiting on setSession too.
+    writeAuthSessionBackup(persisted);
     return wasUserInitiatedSignOut() ? null : persisted;
   }
-
-  if (wasUserInitiatedSignOut()) return null;
-  if (!persisted.access_token) return persisted;
-
-  try {
-    const { data } = await withTimeout(
-      supabase.auth.setSession({
-        access_token: persisted.access_token,
-        refresh_token: persisted.refresh_token,
-      }),
-      AUTH_RECOVERY_TIMEOUT_MS,
-    );
-    if (wasUserInitiatedSignOut()) return null;
-    if (data.session?.user?.id) return data.session;
-  } catch {
-    // setSession may also need the network; still return persisted for the React shell.
-  }
-
-  return wasUserInitiatedSignOut() ? null : persisted;
 }
