@@ -173,8 +173,8 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
       raw.push(f);
     }
     const picked = raw.slice();
-    if (fileInputRef.current) fileInputRef.current.value = "";
     if (picked.length === 0) {
+      if (fileInputRef.current) fileInputRef.current.value = "";
       toast({
         title: "Couldn't add that photo",
         description: "Choose a JPG, PNG, or HEIC image.",
@@ -184,13 +184,16 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
     }
 
     // Keep / reopen the composer so the attach is visible after the OS picker closes.
+    // Do not clear the file input until bytes are copied — clearing early drops
+    // camera-roll handles on iPhone (same class of bug as feed video).
     setSheetOpen(true);
     setComposerFiles((prev) => [...prev, ...picked].slice(0, MAX_POST_IMAGES));
 
     const prepared = await preparePostImageFiles(picked);
+    if (fileInputRef.current) fileInputRef.current.value = "";
     if (prepared.error) {
       toast({
-        title: "Photo too large",
+        title: "Couldn't attach that photo",
         description: prepared.error.message,
         variant: "destructive",
       });

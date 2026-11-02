@@ -227,16 +227,12 @@ export function FeedPostCard({
   const [shareRecentError, setShareRecentError] = useState<string | null>(null);
   const [pendingDeleteCommentId, setPendingDeleteCommentId] = useState<string | null>(null);
   const [commentImagePreviewUrl, setCommentImagePreviewUrl] = useState<string | null>(null);
-  const applyCommentImage = (file: File | null) => {
-    if (file && file.size > MAX_POST_IMAGE_BYTES) {
-      toast({
-        title: "Photo too large",
-        description: "Images must be 5MB or smaller.",
-        variant: "destructive",
-      });
+  const applyCommentImage = async (file: File | null) => {
+    if (!file) {
+      onCommentImageChange(null);
       return;
     }
-    if (file && !isLikelyImageFile(file)) {
+    if (!isLikelyImageFile(file)) {
       toast({
         title: "Photo only",
         description: "You can attach one image to a comment.",
@@ -244,7 +240,18 @@ export function FeedPostCard({
       });
       return;
     }
-    onCommentImageChange(file);
+    // Own/convert bytes before the file input is cleared (iPhone drops live handles).
+    const { preparePostImageFiles } = await import("@/lib/community/prepare-post-image");
+    const prepared = await preparePostImageFiles([file]);
+    if (prepared.error || prepared.files.length === 0) {
+      toast({
+        title: "Couldn't attach that photo",
+        description: prepared.error?.message || "Try choosing the photo again.",
+        variant: "destructive",
+      });
+      return;
+    }
+    onCommentImageChange(prepared.files[0]!);
   };
 
   useEffect(() => {
@@ -976,9 +983,11 @@ export function FeedPostCard({
                   prepareFileInputForPicker(e.currentTarget);
                 }}
                 onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) applyCommentImage(f);
-                  e.target.value = "";
+                  const input = e.currentTarget;
+                  const f = input.files?.[0] ?? null;
+                  void applyCommentImage(f).finally(() => {
+                    input.value = "";
+                  });
                 }}
               />
             </label>

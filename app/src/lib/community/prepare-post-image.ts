@@ -101,9 +101,53 @@ async function jpegFileFromCanvas(canvas: HTMLCanvasElement, baseName: string): 
 function asUploadableJpegAlias(file: File): File {
   const baseName = (file.name.replace(/\.[^.]+$/, "") || "photo").slice(0, 80);
   const type = file.type?.startsWith("image/") ? file.type : "image/jpeg";
-  const name = type === "image/png" ? `${baseName}.png` : type === "image/webp" ? `${baseName}.webp` : type === "image/gif" ? `${baseName}.gif` : `${baseName}.jpg`;
+  const name =
+    type === "image/png"
+      ? `${baseName}.png`
+      : type === "image/webp"
+        ? `${baseName}.webp`
+        : type === "image/gif"
+          ? `${baseName}.gif`
+          : `${baseName}.jpg`;
   if (file.name === name && file.type === type) return file;
   return new File([file], name, { type, lastModified: file.lastModified || Date.now() });
+}
+
+/**
+ * Convert iPhone HEIC/HEIF with heic2any — WKWebView canvas cannot decode HEIC,
+ * which was a common “Couldn’t prepare that photo” failure on Post.
+ */
+export async function jpegFromHeicFile(file: File): Promise<File> {
+  // Dynamic import — heic2any expects Worker and must not load at module init in tests.
+  const { default: heic2any } = await import("heic2any");
+  const converted = (await heic2any({
+    blob: file,
+    toType: "image/jpeg",
+    quality: 0.9,
+  })) as Blob | Blob[];
+  const blob = Array.isArray(converted) ? converted[0] : converted;
+  if (!blob || blob.size <= 0) throw new Error("Could not convert HEIC photo");
+  const base = (file.name.replace(/\.(heic|heif|heics)$/i, "") || "photo").replace(/[^\w.-]+/g, "-").slice(0, 80) || "photo";
+  return new File([blob], `${base}.jpg`, { type: "image/jpeg", lastModified: Date.now() });
+}
+
+async function readOwnedImageBytes(file: File): Promise<ArrayBuffer | null> {
+  const readers = [
+    () => file.arrayBuffer(),
+    () => file.slice(0, file.size || undefined).arrayBuffer(),
+    () => new Response(file).arrayBuffer(),
+  ];
+  for (const read of readers) {
+    try {
+      const bytes = await read();
+      if (bytes.byteLength === 0) continue;
+      if (file.size > 0 && bytes.byteLength !== file.size) continue;
+      return bytes;
+    } catch {
+      /* Try the next reader. */
+    }
+  }
+  return null;
 }
 
 /**
@@ -112,8 +156,8 @@ function asUploadableJpegAlias(file: File): File {
  */
 export async function copyImageFileForUpload(file: File): Promise<File> {
   try {
-    const bytes = await file.arrayBuffer();
-    if (bytes.byteLength > 0) {
+    const bytes = await readOwnedImageBytes(file);
+    if (bytes) {
       return new File([bytes], file.name || "photo.jpg", {
         type: file.type || "image/jpeg",
         lastModified: file.lastModified || Date.now(),
@@ -140,13 +184,13 @@ export function explainImageUploadError(message: string): string {
   if (lower.includes("mime") || lower.includes("content type") || lower.includes("content-type") || lower.includes("not supported")) {
     return "The server rejected that photo format. Try choosing the photo again, or take a new one with Most Compatible camera settings.";
   }
-  if (lower.includes("heic") || lower.includes("heif") || lower.includes("could not read") || lower.includes("could not prepare")) {
+  if (lower.includes("heic") || lower.includes("heif") || lower.includes("could not read") || lower.includes("could not prepare") || lower.includes("could not convert")) {
     return "This iPhone photo could not be converted. Try again, or in Camera settings switch Formats to Most Compatible.";
   }
-  if (lower.includes("load failed") || lower.includes("failed to fetch") || lower.includes("network connection") || lower.includes("networkerror")) {
+  if (lower.includes("load failed") || lower.includes("failed to fetch") || lower.includes("network connection") || lower.includes("networkerror") || lower.includes("timed out")) {
     return "The upload stopped before it finished. Check your connection and post the photo again.";
   }
-  if (lower.includes("jwt") || lower.includes("unauthorized") || lower.includes("invalid compact jws")) {
+  if (lower.includes("jwt") || lower.includes("unauthorized") || lower.includes("invalid compact jws") || lower.includes("not authenticated")) {
     return "You were signed out before the photo finished uploading. Sign in and try again.";
   }
   return raw;
@@ -159,16 +203,27 @@ export function explainImageUploadError(message: string): string {
 export async function preparePostImageFile(file: File): Promise<File> {
   const baseName = (file.name.replace(/\.[^.]+$/, "") || "photo").replace(/[^\w.-]+/g, "-").slice(0, 80) || "photo";
 
-  if (!shouldReencodePostImage(file) && file.size <= MAX_POST_IMAGE_BYTES) {
-    return asUploadableJpegAlias(file);
+  let working = file;
+  if (isHeicLikeImage(file)) {
+    try {
+      working = await jpegFromHeicFile(file);
+    } catch {
+      throw new Error(
+        "This iPhone photo could not be converted. Try again, or in Camera settings switch Formats to Most Compatible.",
+      );
+    }
+  }
+
+  if (!shouldReencodePostImage(working) && working.size <= MAX_POST_IMAGE_BYTES) {
+    return asUploadableJpegAlias(working);
   }
 
   try {
-    const canvas = await drawFileToCanvas(file);
+    const canvas = await drawFileToCanvas(working);
     return await jpegFileFromCanvas(canvas, baseName);
   } catch {
-    if (!isHeicLikeImage(file) && file.size <= MAX_POST_IMAGE_BYTES && (file.type || "").startsWith("image/")) {
-      return asUploadableJpegAlias(file);
+    if (!isHeicLikeImage(working) && working.size <= MAX_POST_IMAGE_BYTES && (working.type || "").startsWith("image/")) {
+      return asUploadableJpegAlias(working);
     }
     throw new Error(
       isHeicLikeImage(file)

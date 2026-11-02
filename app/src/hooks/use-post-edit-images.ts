@@ -124,8 +124,10 @@ export function usePostEditImages() {
   const onPickFromInput = useCallback(
     (files: FileList | null) => {
       const picked = filesFromImageInput(files, totalCount);
-      void appendFiles(picked);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      // Prepare (and own) bytes before clearing — early clear drops iPhone File handles.
+      void appendFiles(picked).finally(() => {
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      });
     },
     [appendFiles, totalCount],
   );

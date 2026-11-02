@@ -30,5 +30,7 @@ describe("prepare-post-image helpers", () => {
       /rejected|compatible|format/,
     );
     expect(explainImageUploadError("Could not read image").toLowerCase()).toMatch(/iphone|compatible|convert/);
+    expect(explainImageUploadError("Load failed").toLowerCase()).toMatch(/stopped before it finished/);
+    expect(explainImageUploadError("Invalid Compact JWS").toLowerCase()).toMatch(/signed out|sign in/);
   });
 });

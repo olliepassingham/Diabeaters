@@ -4,7 +4,7 @@
  * Pagination: RPC fetch_community_posts_page (see supabase migration).
  */
 import { logEdgeInvokeFailure } from "@/lib/dev-log";
-import { getSupabase } from "@/lib/supabase";
+import { getSupabase, getSupabaseUrlAndAnonKey } from "@/lib/supabase";
 import { canEngageWithCommunityFeed, COMMUNITY_FEED_ENGAGE_REQUIRED_MESSAGE, getProfilesByIds } from "@/lib/profile";
 import { listFolloweeIdsForCurrentUser } from "./follows-supabase";
 import {
@@ -32,7 +32,13 @@ import {
   getPostMediaSignedUrl,
   getPostMediaSignedUrls,
 } from "./post-media-signed-urls";
-import { explainVideoUploadError, feedVideoStorageExt, uploadFeedVideoFile } from "./upload-feed-video";
+import {
+  explainVideoUploadError,
+  feedVideoStorageExt,
+  storageObjectUploadUrl,
+  uploadFeedVideoFile,
+  xhrUpload,
+} from "./upload-feed-video";
 import type { CommunityPostAudience } from "./post-audience";
 import type { CommunityPostAuthorPreview, CommunityPostCommentRow, CommunityPostRow } from "./types";
 import {
@@ -51,25 +57,45 @@ export type FeedCursor = { created_at: string; id: string };
 
 const PAGE_LIMIT_CAP = 100;
 
+const FEED_TEMPORARILY_UNAVAILABLE =
+  "The feed is temporarily unavailable. Pull to refresh in a moment.";
+
 /** PostgREST only exposes the new RPC after the topic migration; clearer hint when the DB is behind. */
 function wrapFeedRpcError(err: { message: string }): Error {
   const msg = err.message;
+  const lower = msg.toLowerCase();
+  if (
+    lower.includes("failed to fetch") ||
+    lower.includes("network request failed") ||
+    lower.includes("networkerror") ||
+    lower.includes("load failed") ||
+    lower.includes("timed out")
+  ) {
+    return new Error("Couldn't reach the feed. Check your connection and try again.");
+  }
+  if (lower.includes("jwt") || lower.includes("unauthorized") || lower.includes("not authenticated")) {
+    return new Error("Your session expired. Sign in again, then refresh the feed.");
+  }
+
+  const migrationHint = (detail: string) =>
+    import.meta.env.DEV ? new Error(`${msg} ${detail}`) : new Error(FEED_TEMPORARILY_UNAVAILABLE);
+
   if (
     msg.includes("fetch_community_posts_page") ||
     (msg.includes("schema cache") && msg.includes("function"))
   ) {
-    return new Error(
-      `${msg} Apply migration 20260409120000_community_post_topics (see docs/sql/community_post_topics.sql), then reload the API schema in Supabase Dashboard → Settings → API.`,
+    return migrationHint(
+      "Apply migration 20260409120000_community_post_topics (see docs/sql/community_post_topics.sql), then reload the API schema in Supabase Dashboard → Settings → API.",
     );
   }
   if (msg.includes("search_community_posts")) {
-    return new Error(
-      `${msg} Apply migration 20260507140000_community_feed_search_saves_realtime.sql, then reload the API schema in Supabase Dashboard → Settings → API.`,
+    return migrationHint(
+      "Apply migration 20260507140000_community_feed_search_saves_realtime.sql, then reload the API schema in Supabase Dashboard → Settings → API.",
     );
   }
   if (msg.includes("content_note") || msg.includes("image_alt_texts")) {
-    return new Error(
-      `${msg} Apply migration 20260411120000_community_posts_feed_ux_columns.sql, then reload the API schema in Supabase Dashboard → Settings → API.`,
+    return migrationHint(
+      "Apply migration 20260411120000_community_posts_feed_ux_columns.sql, then reload the API schema in Supabase Dashboard → Settings → API.",
     );
   }
   if (
@@ -77,23 +103,21 @@ function wrapFeedRpcError(err: { message: string }): Error {
     msg.includes("post_extra") ||
     msg.includes("community_poll_votes")
   ) {
-    return new Error(
-      `${msg} Apply migration 20260412120000_community_posts_poll_event_mentions.sql, then reload the API schema in Supabase Dashboard → Settings → API.`,
+    return migrationHint(
+      "Apply migration 20260412120000_community_posts_poll_event_mentions.sql, then reload the API schema in Supabase Dashboard → Settings → API.",
     );
   }
   if (msg.includes("mention_map") || msg.includes("mentioned_user_ids")) {
-    return new Error(
-      `${msg} Apply migrations 20260412120000_community_posts_poll_event_mentions.sql and 20260601120000_community_comment_mentions.sql, then reload the API schema in Supabase Dashboard → Settings → API.`,
+    return migrationHint(
+      "Apply migrations 20260412120000_community_posts_poll_event_mentions.sql and 20260601120000_community_comment_mentions.sql, then reload the API schema in Supabase Dashboard → Settings → API.",
     );
   }
   if (msg.includes("video_url")) {
-    return new Error(
-      `${msg} Apply migration 20260621120000_community_post_video.sql, then reload the API schema in Supabase Dashboard → Settings → API.`,
-    );
+    return migrationHint("Apply migration 20260621120000_community_post_video.sql, then reload the API schema in Supabase Dashboard → Settings → API.");
   }
   if (msg.includes("image_storage_path") && msg.includes("community_post_comments")) {
-    return new Error(
-      `${msg} Apply migration 20260820120000_community_comment_images.sql, then reload the API schema in Supabase Dashboard → Settings → API.`,
+    return migrationHint(
+      "Apply migration 20260820120000_community_comment_images.sql, then reload the API schema in Supabase Dashboard → Settings → API.",
     );
   }
   return new Error(msg);
@@ -562,23 +586,103 @@ function contentTypeForImageUpload(f: File): string {
   return "image/jpeg";
 }
 
-/** Upload one feed image with a single retry — phone networks drop mid-post often. */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function storageUploadErrorText(status: number, text: string): string {
+  try {
+    const body = JSON.parse(text) as { message?: string; error?: string; msg?: string };
+    return body.message || body.error || body.msg || `Upload failed (${status})`;
+  } catch {
+    return text.trim() || `Upload failed (${status})`;
+  }
+}
+
+function isTransientImageUploadFailure(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("load failed") ||
+    lower.includes("failed to fetch") ||
+    lower.includes("network") ||
+    lower.includes("timed out") ||
+    lower.includes("502") ||
+    lower.includes("503") ||
+    lower.includes("504") ||
+    lower.includes("already exists") ||
+    lower.includes("duplicate") ||
+    lower.includes("resource already exists")
+  );
+}
+
+async function resolveFreshAccessToken(supabase: SupabaseNonNull): Promise<string> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  let token = sessionData.session?.access_token ?? "";
+  const expiresAt = sessionData.session?.expires_at;
+  const expiringSoon = typeof expiresAt === "number" && expiresAt * 1000 < Date.now() + 90_000;
+  if (!token || expiringSoon) {
+    const refreshed = await supabase.auth.refreshSession();
+    token = refreshed.data.session?.access_token ?? token;
+  }
+  return token;
+}
+
+/**
+ * Upload one feed image with XHR + retries.
+ * supabase.storage.upload uses fetch(), which iPhone aborts with "Load failed"
+ * for camera-roll Files — same bug we already fixed for feed video.
+ */
 async function uploadFeedImageFile(
   supabase: SupabaseNonNull,
   path: string,
   file: File,
 ): Promise<void> {
   const contentType = contentTypeForImageUpload(file);
+  const env = getSupabaseUrlAndAnonKey();
   let lastMessage = "Upload failed";
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const { error } = await supabase.storage.from(COMMUNITY_POST_IMAGES_BUCKET).upload(path, file, {
-      cacheControl: "604800",
-      upsert: attempt > 0,
-      contentType,
-    });
-    if (!error) return;
-    lastMessage = error.message || lastMessage;
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const upsert = attempt > 0;
+    try {
+      const accessToken = await resolveFreshAccessToken(supabase);
+      if (env && accessToken) {
+        const response = await xhrUpload({
+          url: storageObjectUploadUrl(env.url, path),
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${accessToken}`,
+            apikey: env.anonKey,
+            "x-upsert": String(upsert),
+            "cache-control": "max-age=604800",
+            "content-type": contentType,
+          },
+          body: file,
+        });
+        if (response.status >= 200 && response.status < 300) return;
+        lastMessage = storageUploadErrorText(response.status, response.text);
+      } else {
+        const { error } = await supabase.storage.from(COMMUNITY_POST_IMAGES_BUCKET).upload(path, file, {
+          cacheControl: "604800",
+          upsert,
+          contentType,
+        });
+        if (!error) return;
+        lastMessage = error.message || lastMessage;
+      }
+    } catch (e) {
+      lastMessage = e instanceof Error ? e.message : lastMessage;
+    }
+
+    if (attempt < 2 && isTransientImageUploadFailure(lastMessage)) {
+      await sleep(450 * (attempt + 1));
+      continue;
+    }
+    if (attempt < 2 && (lastMessage.toLowerCase().includes("already exists") || lastMessage.toLowerCase().includes("duplicate"))) {
+      continue;
+    }
+    break;
   }
+
   throw new Error(explainImageUploadError(lastMessage));
 }
 
@@ -1047,14 +1151,12 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
 
       if (videoPosterFile && videoPosterFile.size > 0) {
         directPosterPath = `${uid}/${presetPostId}/poster.jpg`;
-        const { error: posterErr } = await supabase.storage
-          .from(COMMUNITY_POST_IMAGES_BUCKET)
-          .upload(directPosterPath, videoPosterFile, {
-            cacheControl: "604800",
-            upsert: false,
-            contentType: "image/jpeg",
-          });
-        if (posterErr) directPosterPath = null;
+        try {
+          await uploadFeedImageFile(supabase, directPosterPath, videoPosterFile);
+        } catch {
+          // Poster is optional — still publish the clip if the still fails.
+          directPosterPath = null;
+        }
       }
     }
 
