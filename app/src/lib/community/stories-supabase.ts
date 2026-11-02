@@ -6,6 +6,9 @@ import { getSupabase } from "@/lib/supabase";
 import { getProfilesByIds } from "@/lib/profile";
 import { getPostMediaSignedUrl } from "./post-media-signed-urls";
 import { COMMUNITY_POST_IMAGES_BUCKET, MAX_POST_VIDEO_BYTES } from "./posts-supabase";
+import { uploadCommunityImageFile } from "./upload-community-image";
+import { explainImageUploadError } from "./prepare-post-image";
+import { explainVideoUploadError, uploadFeedVideoFile } from "./upload-feed-video";
 
 export const STORY_TTL_MS = 24 * 60 * 60 * 1000;
 export const MAX_STORY_BYTES = MAX_POST_VIDEO_BYTES;
@@ -568,12 +571,19 @@ export async function insertCommunityStory(
   const dest = `${uid}/stories/${storyId}.${ext}`;
   const expiresAt = new Date(Date.now() + STORY_TTL_MS).toISOString();
 
-  const { error: upErr } = await supabase.storage.from(COMMUNITY_POST_IMAGES_BUCKET).upload(dest, file, {
-    cacheControl: "3600",
-    upsert: false,
-    contentType: file.type || undefined,
-  });
-  if (upErr) return { data: null, error: new Error(upErr.message) };
+  try {
+    if (mediaKind === "video") {
+      await uploadFeedVideoFile(supabase, dest, file);
+    } else {
+      await uploadCommunityImageFile(supabase, dest, file);
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Upload failed";
+    return {
+      data: null,
+      error: new Error(mediaKind === "video" ? explainVideoUploadError(msg) : explainImageUploadError(msg)),
+    };
+  }
 
   const baseRow = {
     id: storyId,

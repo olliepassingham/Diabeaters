@@ -9,6 +9,9 @@ import { markDmInAppNotificationsReadForThread } from "@/lib/in-app-notification
 import { getSupabase } from "@/lib/supabase";
 import { getBlockStatus } from "./blocks-supabase";
 import { COMMUNITY_POST_IMAGES_BUCKET } from "./posts-supabase";
+import { explainImageUploadError, preparePostImageFiles } from "./prepare-post-image";
+import { isLikelyImageFile } from "./pick-post-images";
+import { uploadCommunityImageFile } from "./upload-community-image";
 import type { DmMessageRow, DmThreadMemberRow, DmThreadRow } from "./types";
 
 export function dmMessagingBlockedError(): Error {
@@ -39,7 +42,7 @@ function extFromFile(f: File): string {
 
 function validateDmImageFile(f: File): Error | null {
   if (f.size > MAX_DM_IMAGE_BYTES) return new Error("Image must be 5MB or smaller.");
-  if (!f.type.startsWith("image/")) return new Error("Only image files are allowed.");
+  if (!isLikelyImageFile(f)) return new Error("Only image files are allowed.");
   return null;
 }
 
@@ -415,8 +418,16 @@ export async function insertDmMessage(
   if (!uid) return { data: null, error: new Error("Not signed in") };
 
   const trimmed = body.trim();
-  const file = options?.imageFile ?? null;
+  let file = options?.imageFile ?? null;
   if (file) {
+    const prepared = await preparePostImageFiles([file]);
+    if (prepared.error || prepared.files.length === 0) {
+      return {
+        data: null,
+        error: prepared.error ?? new Error("Couldn't prepare that photo. Try choosing it again."),
+      };
+    }
+    file = prepared.files[0]!;
     const v = validateDmImageFile(file);
     if (v) return { data: null, error: v };
   }
@@ -430,13 +441,13 @@ export async function insertDmMessage(
   if (file) {
     const ext = extFromFile(file);
     const path = `${uid}/dm/${threadId}/${crypto.randomUUID()}.${ext}`;
-    const { error: upErr } = await supabase.storage.from(COMMUNITY_POST_IMAGES_BUCKET).upload(path, file, {
-      cacheControl: "3600",
-      upsert: false,
-      contentType: file.type || undefined,
-    });
-    if (upErr) return { data: null, error: new Error(upErr.message) };
-    imagePath = path;
+    try {
+      await uploadCommunityImageFile(supabase, path, file);
+      imagePath = path;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Upload failed";
+      return { data: null, error: new Error(explainImageUploadError(msg)) };
+    }
   }
 
   const insertPayload: Record<string, unknown> = {

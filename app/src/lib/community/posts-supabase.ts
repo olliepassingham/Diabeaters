@@ -4,7 +4,7 @@
  * Pagination: RPC fetch_community_posts_page (see supabase migration).
  */
 import { logEdgeInvokeFailure } from "@/lib/dev-log";
-import { getSupabase, getSupabaseUrlAndAnonKey } from "@/lib/supabase";
+import { getSupabase } from "@/lib/supabase";
 import { canEngageWithCommunityFeed, COMMUNITY_FEED_ENGAGE_REQUIRED_MESSAGE, getProfilesByIds } from "@/lib/profile";
 import { listFolloweeIdsForCurrentUser } from "./follows-supabase";
 import {
@@ -32,13 +32,8 @@ import {
   getPostMediaSignedUrl,
   getPostMediaSignedUrls,
 } from "./post-media-signed-urls";
-import {
-  explainVideoUploadError,
-  feedVideoStorageExt,
-  storageObjectUploadUrl,
-  uploadFeedVideoFile,
-  xhrUpload,
-} from "./upload-feed-video";
+import { explainVideoUploadError, feedVideoStorageExt, uploadFeedVideoFile } from "./upload-feed-video";
+import { uploadCommunityImageFile } from "./upload-community-image";
 import type { CommunityPostAudience } from "./post-audience";
 import type { CommunityPostAuthorPreview, CommunityPostCommentRow, CommunityPostRow } from "./types";
 import {
@@ -578,112 +573,12 @@ function extFromFile(f: File): string {
   return "jpg";
 }
 
-function contentTypeForImageUpload(f: File): string {
-  const ext = extFromFile(f);
-  if (ext === "png") return "image/png";
-  if (ext === "webp") return "image/webp";
-  if (ext === "gif") return "image/gif";
-  return "image/jpeg";
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
-}
-
-function storageUploadErrorText(status: number, text: string): string {
-  try {
-    const body = JSON.parse(text) as { message?: string; error?: string; msg?: string };
-    return body.message || body.error || body.msg || `Upload failed (${status})`;
-  } catch {
-    return text.trim() || `Upload failed (${status})`;
-  }
-}
-
-function isTransientImageUploadFailure(message: string): boolean {
-  const lower = message.toLowerCase();
-  return (
-    lower.includes("load failed") ||
-    lower.includes("failed to fetch") ||
-    lower.includes("network") ||
-    lower.includes("timed out") ||
-    lower.includes("502") ||
-    lower.includes("503") ||
-    lower.includes("504") ||
-    lower.includes("already exists") ||
-    lower.includes("duplicate") ||
-    lower.includes("resource already exists")
-  );
-}
-
-async function resolveFreshAccessToken(supabase: SupabaseNonNull): Promise<string> {
-  const { data: sessionData } = await supabase.auth.getSession();
-  let token = sessionData.session?.access_token ?? "";
-  const expiresAt = sessionData.session?.expires_at;
-  const expiringSoon = typeof expiresAt === "number" && expiresAt * 1000 < Date.now() + 90_000;
-  if (!token || expiringSoon) {
-    const refreshed = await supabase.auth.refreshSession();
-    token = refreshed.data.session?.access_token ?? token;
-  }
-  return token;
-}
-
-/**
- * Upload one feed image with XHR + retries.
- * supabase.storage.upload uses fetch(), which iPhone aborts with "Load failed"
- * for camera-roll Files — same bug we already fixed for feed video.
- */
 async function uploadFeedImageFile(
   supabase: SupabaseNonNull,
   path: string,
   file: File,
 ): Promise<void> {
-  const contentType = contentTypeForImageUpload(file);
-  const env = getSupabaseUrlAndAnonKey();
-  let lastMessage = "Upload failed";
-
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const upsert = attempt > 0;
-    try {
-      const accessToken = await resolveFreshAccessToken(supabase);
-      if (env && accessToken) {
-        const response = await xhrUpload({
-          url: storageObjectUploadUrl(env.url, path),
-          method: "POST",
-          headers: {
-            authorization: `Bearer ${accessToken}`,
-            apikey: env.anonKey,
-            "x-upsert": String(upsert),
-            "cache-control": "max-age=604800",
-            "content-type": contentType,
-          },
-          body: file,
-        });
-        if (response.status >= 200 && response.status < 300) return;
-        lastMessage = storageUploadErrorText(response.status, response.text);
-      } else {
-        const { error } = await supabase.storage.from(COMMUNITY_POST_IMAGES_BUCKET).upload(path, file, {
-          cacheControl: "604800",
-          upsert,
-          contentType,
-        });
-        if (!error) return;
-        lastMessage = error.message || lastMessage;
-      }
-    } catch (e) {
-      lastMessage = e instanceof Error ? e.message : lastMessage;
-    }
-
-    if (attempt < 2 && isTransientImageUploadFailure(lastMessage)) {
-      await sleep(450 * (attempt + 1));
-      continue;
-    }
-    if (attempt < 2 && (lastMessage.toLowerCase().includes("already exists") || lastMessage.toLowerCase().includes("duplicate"))) {
-      continue;
-    }
-    break;
-  }
-
-  throw new Error(explainImageUploadError(lastMessage));
+  await uploadCommunityImageFile(supabase, path, file);
 }
 
 async function insertCommunityPostReturning(
@@ -1220,6 +1115,13 @@ export async function insertFeedPost(
 ): Promise<{ data: CommunityPostRow | null; error: Error | null }> {
   const supabase = getSupabase();
   if (!supabase) return { data: null, error: new Error("Supabase not configured") };
+
+  // Refresh before media uploads so a long compose session does not fail mid-post.
+  try {
+    await supabase.auth.refreshSession();
+  } catch {
+    /* getSession below still applies */
+  }
 
   const { data: sessionData } = await supabase.auth.getSession();
   const uid = sessionData.session?.user?.id;

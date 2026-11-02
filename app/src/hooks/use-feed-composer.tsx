@@ -416,7 +416,7 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
 
   async function handlePost(e: FormEvent) {
     e.preventDefault();
-    if (!user || !composerCanSubmit) return;
+    if (!user || !composerCanSubmit || submitting) return;
     if (!canComposeToFeed) {
       toast({
         title: "Set up your public profile",
@@ -526,7 +526,11 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
           options.onOptimisticFailed?.(pendingId);
           if (options.closeSheetOnPost !== false) setSheetOpen(true);
         }
-        toast({ title: "Post failed", description: res.error.message, variant: "destructive" });
+        toast({
+          title: "Couldn't post just now",
+          description: res.error.message || "Check your connection and try again — your draft is still here.",
+          variant: "destructive",
+        });
         return;
       }
       const postedKind = composerPostKind;
@@ -551,8 +555,8 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
         if (options.closeSheetOnPost !== false) setSheetOpen(true);
       }
       toast({
-        title: "Post failed",
-        description: err instanceof Error ? err.message : "Try again.",
+        title: "Couldn't post just now",
+        description: err instanceof Error ? err.message : "Check your connection and try again — your draft is still here.",
         variant: "destructive",
       });
     } finally {
