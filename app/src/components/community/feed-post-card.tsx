@@ -52,7 +52,6 @@ import { CommunityPeopleSheet } from "@/components/community/community-people-sh
 import { MentionTextarea } from "@/components/community/mention-textarea";
 import { prepareFileInputForPicker } from "@/lib/click-hidden-file-input";
 import { isLikelyImageFile } from "@/lib/community/pick-post-images";
-import { MAX_POST_IMAGE_BYTES } from "@/lib/community/posts-supabase";
 import { renderBodyWithMentions } from "@/components/community/render-body-with-mentions";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
