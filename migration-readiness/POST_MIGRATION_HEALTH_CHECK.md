@@ -2,7 +2,7 @@
 
 **Date:** 9 November 2026
 **Scope:** Full health check after moving the project to a new Cursor account (Cursor-only migration; GitHub, Supabase, Vercel, Apple and Google accounts unchanged).
-**Repo state at check:** `main` at `479b632`, in sync with `origin/main`. Fixes from this check are local and **uncommitted** (see section 13).
+**Repo state at check:** `main` at `479b632`, in sync with `origin/main`. Fixes from this check were committed and pushed with your approval (see section 13).
 **Production URL:** https://diabeaters.vercel.app (unchanged).
 
 ## Overall verdict: AMBER
@@ -12,7 +12,7 @@ The **Cursor migration itself caused no breakage.** The full project is present,
 It is AMBER rather than GREEN because the check found **pre-existing** problems that need your action, and because authenticated flows could not be tested end-to-end safely:
 
 1. **Edge Functions are not deploying** (GitHub secret `SUPABASE_ACCESS_TOKEN` invalid since 13 Oct 2026). The Supporter CGM Share feature is broken in production as a result.
-2. **Two production bugs** were found and fixed locally but are **not yet live** (needs commit + deploy): pump users crash when saving a bedtime check, and new users' chosen @handle is never saved (blocking them from posting/liking/commenting).
+2. **Two production bugs** were found and fixed (pushed; Vercel deploy succeeded) but the fixes have **not been live-tested** while signed in: pump users crashed when saving a bedtime check, and new users' chosen @handle was never saved (blocking them from posting/liking/commenting). Users who signed up since 20 Oct still need to set a handle.
 3. **Authenticated flows are BLOCKED**, not passed — there is no non-production Supabase environment or test account, and testing against production would have meant writing to real user data.
 4. **Vercel dashboard checks are BLOCKED** — the Vercel CLI is not logged in on this machine.
 
@@ -59,7 +59,7 @@ Status key: **PASS** = actually tested and worked. **FAIL** = tested and broken.
 |---|---|---|
 | Repo synced, nothing unpushed | PASS | `main...origin/main`, no divergence before this check. |
 | Migration docs on `main` | PASS | `42207ae`, `479b632`. |
-| CI workflow (`ci.yml`: typecheck + unit) | FAIL (pre-existing) | Red on every push because of the 8 TypeScript errors. Will go green once the local fixes are committed. |
+| CI workflow (`ci.yml`: typecheck + unit) | FAIL → fixed | Was red on every push (8 TypeScript errors, then one env-dependent unit test). Typecheck passes in CI after `1d43021`; the unit test fix is in the follow-up commit. |
 | Edge Functions deploy workflow | FAIL (pre-existing) | Failing since **13 Oct 2026** at "Verify Supabase auth" — the `SUPABASE_ACCESS_TOKEN` repo secret is invalid/expired. No function changes have shipped since. |
 | Vercel deploy workflow | PASS (indirect) | Production is serving the current `main` bundle (bundle points at the correct Supabase project). |
 | Secrets in tracked files | PASS | Scan found no keys/tokens committed. |
@@ -105,7 +105,7 @@ Project: ref `ffgcivxvbtdlmfnttwjm`. **Note:** it is labelled "Diabeaters (stagi
 | Log in / log out / session persistence | BLOCKED | No test credentials; no non-prod environment. |
 | Session restore / auth helper logic | PASS (unit) | `auth.spec`, `auth-post-login.spec`, `account-session-restore.spec` pass. Weak-network behaviour not re-tested live. |
 | Password reset email delivery | BLOCKED | Would send real email from production. |
-| Onboarding saves profile incl. @handle | FAIL → fixed locally | `upsertProfile` silently dropped `public_handle` (bug since 20 Oct 2026). Fixed locally; typecheck and full unit suite pass, but the fix itself is **not live-tested**. |
+| Onboarding saves profile incl. @handle | FAIL → fixed | `upsertProfile` silently dropped `public_handle` (bug since 20 Oct 2026). Fixed and deployed; typecheck and full unit suite pass, but the fix itself is **not live-tested**. |
 
 ## 7. CGM integration test results
 
@@ -124,13 +124,13 @@ Project: ref `ffgcivxvbtdlmfnttwjm`. **Note:** it is labelled "Diabeaters (stagi
 | Feed photo/video preparation and upload helpers | PASS (unit) | `prepare-post-image`, `upload-community-image`, `upload-feed-video`, `post-media-signed-urls`, `community-feed-cache` specs pass. |
 | Create post, upload photo, like, comment (live) | BLOCKED | Would write to production. |
 | Posting requires display name + @handle | NOT TESTED | Confirmed by code review only (`canEngageWithCommunityFeed`) — this gate is why the @handle bug blocked new users. |
-| New users since 20 Oct can post | FAIL → fixed locally | Their onboarding @handle was never saved, so they are blocked until they set one under Account. Fix restores saving; existing affected users still need to set a handle (no backfill possible — the value was never stored). |
+| New users since 20 Oct can post | FAIL → fixed (not live-tested) | Their onboarding @handle was never saved, so they are blocked until they set one under Account. Fix restores saving; existing affected users still need to set a handle (no backfill possible — the value was never stored). |
 
 ## 9. All other feature test results
 
 | Feature | Result | Notes |
 |---|---|---|
-| Bedtime guide — save check (pump users) | FAIL → fixed locally | `ReferenceError: pumpIobUnits is not defined` when a pump user saves. Fixed; not live-tested. |
+| Bedtime guide — save check (pump users) | FAIL → fixed | `ReferenceError: pumpIobUnits is not defined` when a pump user saves. Fixed and deployed; not live-tested. |
 | Bedtime guide — non-pump users | PASS (unit) | Readiness logic unit tests pass. |
 | Exercise, travel, sick day, driving, alcohol, pump failure guides | PASS (unit) | Logic unit tests pass; UI not exercised while signed in. |
 | Supplies / medications | PASS (unit) | Logic tests pass. |
@@ -189,9 +189,9 @@ All problems below are **pre-existing** — none were caused by the Cursor migra
 | 16 | Docs out of date (`FEATURE_INVENTORY.md`); Supabase project naming ("staging" is production) | LOW |
 | 17 | Large JS chunks (> 500 kB) | LOW |
 
-## 13. Problems fixed (local, uncommitted)
+## 13. Problems fixed
 
-All changes are minimal, preserve existing behaviour (other than fixing the bugs), touch no production systems, and are **not committed or pushed**.
+All changes are minimal, preserve existing behaviour (other than fixing the bugs), and touch no production database, settings or secrets.
 
 | File | Change | Why |
 |---|---|---|
@@ -203,14 +203,17 @@ All changes are minimal, preserve existing behaviour (other than fixing the bugs
 | `app/src/lib/cgm/near-future-projection.ts` | Removed an unreachable `method === "arrow"` branch (the blend never returns `"arrow"`). | Type-only; identical runtime result. |
 | `app/src/components/app-status-strip.tsx` | Removed `inert` boolean prop. React 18 never rendered it (it only produced a dev warning), so the DOM is unchanged. | Type-only; see problem 14. |
 | `app/src/test/setup.ts` | Registers jest-dom matchers on the test file's own `expect` and adds a default `window.matchMedia` stub for jsdom. | Fixes problem 6. |
+| `app/src/lib/community/upload-community-image.spec.ts` | Mocks `getSupabaseUrlAndAnonKey` instead of stubbing env vars (which `supabase.ts` reads at import time). | Test only passed locally because of the real `.env`; failed in CI once typecheck stopped blocking the unit step. Reproduced in a clean checkout without `.env`. |
 
-**Verification after fixes:** `npm run check` PASS (0 errors) · `npx vitest run` PASS (269 files, 1,736 tests) · `npm run web:build` PASS.
+**Verification after fixes:** `npm run check` PASS (0 errors) · `npx vitest run` PASS (269 files, 1,736 tests), also in a clean checkout with no `.env` (matches CI) · `npm run web:build` PASS.
+
+**Committed and pushed to `main` with your approval** (`1d43021`, report `c3a1102`, CI test fix in a follow-up commit). "Deploy to Vercel" succeeded on push, so the bedtime and @handle fixes are now live.
 
 ## 14. Outstanding issues (need your approval or action)
 
 These involve production configuration, credentials, database migrations or deployment, so they were **not** done:
 
-1. **Commit and push the local fixes** (section 13). This turns CI green and, once deployed via your normal flow, fixes the bedtime crash and the @handle bug in production.
+1. **Live-test the two bug fixes** while signed in: save a bedtime check as a pump user, and complete onboarding with a new synthetic account and confirm the @handle is saved.
 2. **Rotate `SUPABASE_ACCESS_TOKEN`** in GitHub → Settings → Secrets → Actions (new token from Supabase → Account → Access Tokens), then re-run "Deploy Supabase Edge Functions". This ships the Dexcom fix and `supporter_cgm_share`.
 3. **Apply the two missing migrations** to production (`20261007193000_patient_supporter_cgm_poll`, `20260529140000_profiles_app_region`) — production DB change; review first. Also repair migration history and the duplicate `20260617120000` timestamp.
 4. **Set missing Edge Function secrets** (`SUPPORTER_CGM_SHARE_CRON_SECRET`, `NOTIFY_SUPPORTER_APPT_CRON_SECRET`, `FCM_PROJECT_ID`, `APNS_BUNDLE_ID`).
@@ -222,7 +225,7 @@ These involve production configuration, credentials, database migrations or depl
 
 ## 15. Recommended next steps
 
-1. Review the diff (`git diff`) and approve a commit of the section 13 fixes.
+1. Live-test the bedtime (pump user) and onboarding @handle fixes on production with a synthetic account.
 2. Rotate the Supabase access token secret and re-run the Edge Functions workflow — this is the single biggest integration gap.
 3. Create a real **non-production Supabase project** (or rename the current one to make clear it is production) plus a synthetic test account, so authenticated flows (auth, feed posting, storage, carers, realtime) can be tested safely next time.
 4. Log in to the Vercel CLI and re-run the Vercel checks.

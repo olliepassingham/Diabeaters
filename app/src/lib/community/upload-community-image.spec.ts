@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+// supabase.ts reads env at import time, so stubbing env inside the test is too late (and CI has no .env).
+vi.mock("@/lib/supabase", () => ({
+  getSupabaseUrlAndAnonKey: () => ({ url: "https://example.supabase.co", anonKey: "anon-key" }),
+}));
+
 import {
   isTransientCommunityUploadError,
   uploadCommunityImageFile,
@@ -8,7 +13,6 @@ import {
 describe("uploadCommunityImageFile", () => {
   afterEach(() => {
     vi.restoreAllMocks();
-    vi.unstubAllEnvs();
   });
 
   it("treats Load failed and JWT blips as transient", () => {
@@ -19,9 +23,6 @@ describe("uploadCommunityImageFile", () => {
   });
 
   it("uploads via XHR and retries once after Load failed", async () => {
-    vi.stubEnv("VITE_SUPABASE_URL", "https://example.supabase.co");
-    vi.stubEnv("VITE_SUPABASE_ANON_KEY", "anon-key");
-
     const send = vi
       .fn()
       .mockRejectedValueOnce(new Error("Load failed"))
