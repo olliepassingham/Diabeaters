@@ -189,22 +189,22 @@ If anything fails: sign back into the **old** Cursor account. GitHub / Supabase 
 
 | Area | Status |
 | --- | --- |
-| GitHub `main` clean & synced | Ready (commit this pack first if still untracked) |
+| GitHub `main` clean & synced | Ready — docs on `origin/main` at `42207ae` |
 | Local branches noted | Ready — trust `origin/main`; stale `backup/*` ignorable |
-| Uncommitted app work | None on `main` at last verify |
-| Migration docs | Ready in `migration-readiness/` |
-| Fresh clone possible | Yes once pack is on `origin/main` |
+| Uncommitted app work | None |
+| Migration docs | On GitHub under `migration-readiness/` |
+| Fresh clone possible | Yes |
 | Env inventory | Ready (names documented; values stay private) |
-| Private backup script | Ready — ran to `~/Documents/Diabeaters-private/cursor-backup-*` |
+| Private backup script | Ran to `~/Documents/Diabeaters-private/cursor-backup-20261109-105610` (~74MB) |
 | History archive (~60MB+) | Ready as **reference** archive (not UI restore) |
 | User Rules export | **You must still paste** into `notes/cursor-user-rules-backup.md` |
-| MCP / extensions notes | Light — Remote SSH listed; no `~/.cursor/mcp.json`; note any in-app MCP |
+| MCP / extensions notes | Light — Remote SSH present; no `~/.cursor/mcp.json`; note any in-app MCP |
 | Production untouched | Correct posture for this migration |
 
 ### Verdict: **AMBER**
 
-Safe to proceed with the Cursor account switch **after** you manually copy User Rules into the private backup folder and push this `migration-readiness/` pack to `origin/main`. Production risk is low; residual risk is losing User Rules / chat convenience if you skip the before-sign-out steps.
+Safe to proceed with the Cursor account switch **after** you manually copy User Rules into the private backup folder. Production risk is low; residual risk is losing User Rules if you skip that one step.
 
-**Not GREEN** until: (1) User Rules file exists in the private backup, (2) migration docs are on GitHub `main`, (3) you confirm the private backup folder is non-empty.
+**Not GREEN** until the User Rules backup file exists under `~/Documents/Diabeaters-private/.../notes/`.
 
-**Not RED** — code, env copies, history archive, and guide are in place; nothing blocks preparation.
+**Not RED** — code, env copies, history archive, and guide are on GitHub; nothing else blocks preparation.
