@@ -374,9 +374,8 @@ export function computeNearFutureProjection(
       }
     }
 
-    // Keep a little acceleration only when history alone (or near-agreeing blend) drives the pace —
-    // damp it if we leaned hard on the arrow.
-    const accel = method === "arrow" ? 0 : motion.accelMgDlPerMin2 * (method === "blended" ? 0.65 : 1);
+    // Keep full acceleration when history alone drives the pace — damp it when blended with the arrow.
+    const accel = motion.accelMgDlPerMin2 * (method === "blended" ? 0.65 : 1);
 
     return buildResult(latest.valueMgDl, rate, clampAccel(accel), input.units, method, note);
   }

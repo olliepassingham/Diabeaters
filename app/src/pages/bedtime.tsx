@@ -490,7 +490,7 @@ export default function Bedtime() {
       sickDayActive: scenarioState.sickDayActive,
       travelModeActive: scenarioState.travelModeActive,
       correctionGiven: correctionDose,
-      pumpIobUnits: isPumpUser ? pumpIobUnits : null,
+      pumpIobUnits: isPumpUser ? parseOptionalBolusUnits(pumpIobInput) : null,
       pumpRecentSiteChange: isPumpUser ? pumpRecentSiteChange : undefined,
       pumpDisconnectedRecently: isPumpUser ? pumpDisconnectedRecently : undefined,
       pumpExerciseActivityOn: isPumpUser ? pumpExerciseActivityOn : undefined,

@@ -2,7 +2,10 @@ import { getOnboardingAccountPath } from "@/lib/carer-session";
 import type { UserProfile } from "@/lib/storage";
 
 /** Local profile fields used to decide insulin / Type 1 clinical surfaces. */
-export type InsulinAccessProfile = Pick<UserProfile, "diabetesType" | "usingInsulin" | "accountType"> | null | undefined;
+export type InsulinAccessProfile =
+  | Partial<Pick<UserProfile, "diabetesType" | "usingInsulin" | "accountType">>
+  | null
+  | undefined;
 
 export function isType2Patient(profile: InsulinAccessProfile): boolean {
   return profile?.diabetesType === "type2";

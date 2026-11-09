@@ -287,7 +287,7 @@ export function RoutinesContent() {
       name: exName,
       exerciseType: exType,
       intensity: exIntensity,
-      effortShape: exIntensity === "intense" && exEffortShape === "max" ? "max" : undefined,
+      effortShape: exIntensity === "intense" && exEffortShape === "max" ? ("max" as const) : undefined,
       durationMinutes: parseInt(exDuration),
       notes: exNotes || undefined,
     };

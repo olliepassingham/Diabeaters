@@ -1031,6 +1031,7 @@ export async function upsertProfile(payload: {
   avatar_url?: string | null;
   bio?: string | null;
   is_public?: boolean | null;
+  public_handle?: string | null;
   onboarding_complete?: boolean | null;
   emergency_contact_name?: string | null;
   emergency_contact_phone?: string | null;
@@ -1049,6 +1050,12 @@ export async function upsertProfile(payload: {
       data: null,
       error: new Error("Please sign in again to save your profile."),
     };
+  }
+
+  // Handle goes first so a taken/invalid handle doesn't leave onboarding marked complete.
+  if (payload.public_handle !== undefined) {
+    const handleRes = await updateProfile({ id, public_handle: payload.public_handle });
+    if (handleRes.error) return { data: null, error: handleRes.error };
   }
 
   const {

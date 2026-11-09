@@ -77,7 +77,7 @@ function getInitialTab(): string {
   return "meal";
 }
 
-function getInitialMealTime(): string {
+function getInitialMealTime(): "breakfast" | "lunch" | "dinner" | "snack" {
   const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
   const mt = params.get("mealTime");
   if (mt === "breakfast" || mt === "lunch" || mt === "dinner" || mt === "snack") return mt;

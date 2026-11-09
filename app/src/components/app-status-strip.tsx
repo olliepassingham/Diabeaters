@@ -216,7 +216,7 @@ function StatusModeMarquee({ children }: { children: ReactNode }) {
           {children}
         </div>
         {looping ? (
-          <div className="flex shrink-0 items-center pr-8" aria-hidden inert>
+          <div className="flex shrink-0 items-center pr-8" aria-hidden>
             {children}
           </div>
         ) : null}
