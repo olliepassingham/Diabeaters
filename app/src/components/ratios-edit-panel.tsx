@@ -16,7 +16,13 @@ import {
   parseRatioToGramsPerUnit,
 } from "@/lib/ratio-utils";
 import { useToast } from "@/hooks/use-toast";
-import { targetBgRangeInputValues } from "@/lib/target-bg-range";
+import {
+  resolveUserTargetBgRange,
+  targetBgRangeInputValues,
+  validateBedtimeTargetBgInput,
+} from "@/lib/target-bg-range";
+import { formatTargetBgInput } from "@/lib/hypo-context";
+import { saveDosingSettingsAndSync } from "@/lib/clinical-prefs-cloud-sync";
 
 export type RatiosEditValues = {
   breakfastRatio: string;
@@ -26,6 +32,7 @@ export type RatiosEditValues = {
   correctionFactor: string;
   targetBgLow: string;
   targetBgHigh: string;
+  bedtimeTargetBg: string;
 };
 
 const MEAL_KEYS = [
@@ -54,6 +61,7 @@ export function settingsToEditValues(
     correctionFactor: settings.correctionFactor?.toString() || "",
     targetBgLow: targetInputs.low,
     targetBgHigh: targetInputs.high,
+    bedtimeTargetBg: settings.bedtimeTargetBg?.toString() || "",
   };
 }
 
@@ -77,6 +85,7 @@ export function buildSettingsFromEditValues(
     correctionFactor: editValues.correctionFactor ? parseFloat(editValues.correctionFactor) : undefined,
     targetBgLow: editValues.targetBgLow ? parseFloat(editValues.targetBgLow) : undefined,
     targetBgHigh: editValues.targetBgHigh ? parseFloat(editValues.targetBgHigh) : undefined,
+    bedtimeTargetBg: editValues.bedtimeTargetBg.trim() ? parseFloat(editValues.bedtimeTargetBg) : undefined,
   };
 }
 
@@ -110,7 +119,21 @@ export function RatiosEditPanel({
     setEditValues(settingsToEditValues(settings, ratioFormat, carbPortionSize, bgUnits));
   }, [settings, ratioFormat, carbPortionSize, bgUnits]);
 
+  const bedtimeTargetError = validateBedtimeTargetBgInput(editValues, bgUnits);
+  const editRange = resolveUserTargetBgRange(
+    {
+      targetBgLow: editValues.targetBgLow ? parseFloat(editValues.targetBgLow) : undefined,
+      targetBgHigh: editValues.targetBgHigh ? parseFloat(editValues.targetBgHigh) : undefined,
+    },
+    bgUnits,
+  );
+  const bedtimeTargetPlaceholder = formatTargetBgInput((editRange.low + editRange.high) / 2, bgUnits);
+
   const handleSave = () => {
+    if (bedtimeTargetError) {
+      toast({ title: "Check your bedtime target", description: bedtimeTargetError, variant: "destructive" });
+      return;
+    }
     const oldSettings = storage.getSettings();
     const hadRatios = !!(oldSettings.breakfastRatio || oldSettings.lunchRatio || oldSettings.dinnerRatio || oldSettings.snackRatio);
     const next = buildSettingsFromEditValues(editValues, ratioFormat, carbPortionSize);
@@ -122,7 +145,8 @@ export function RatiosEditPanel({
       oldSettings.snackRatio !== next.snackRatio ||
       oldSettings.correctionFactor !== next.correctionFactor ||
       oldSettings.targetBgLow !== next.targetBgLow ||
-      oldSettings.targetBgHigh !== next.targetBgHigh;
+      oldSettings.targetBgHigh !== next.targetBgHigh ||
+      oldSettings.bedtimeTargetBg !== next.bedtimeTargetBg;
 
     if (!ratiosChanged) {
       onCancel();
@@ -133,9 +157,9 @@ export function RatiosEditPanel({
       storage.snapshotCurrentRatios("Auto-saved before update");
     }
 
-    storage.saveSettings(next);
+    const saved = saveDosingSettingsAndSync(next);
     recordLastInteraction("ratios");
-    onSaved(next);
+    onSaved(saved);
     toast({ title: "Ratios saved", description: "Your meal ratios and targets are updated." });
   };
 
@@ -250,6 +274,37 @@ export function RatiosEditPanel({
               />
             </div>
           </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <Moon className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+            <span className="text-sm font-medium">Bedtime target</span>
+            <InfoTooltip
+              term="Bedtime target"
+              explanation="Where bedtime correction suggestions aim to bring you down to. Leave blank to use the middle of your target range."
+            />
+          </div>
+          <Label htmlFor={`${idPrefix}-bedtime-target`} className="text-xs text-muted-foreground">
+            {bgUnit} (optional)
+          </Label>
+          <Input
+            id={`${idPrefix}-bedtime-target`}
+            type="number"
+            inputMode="decimal"
+            step="0.1"
+            placeholder={bedtimeTargetPlaceholder}
+            value={editValues.bedtimeTargetBg}
+            onChange={(e) => setEditValues((prev) => ({ ...prev, bedtimeTargetBg: e.target.value }))}
+            className="h-11 text-base"
+            aria-invalid={bedtimeTargetError ? true : undefined}
+            data-testid={`${idPrefix}-input-bedtime-target`}
+          />
+          {bedtimeTargetError ? (
+            <p className="text-xs text-destructive" data-testid={`${idPrefix}-bedtime-target-error`}>
+              {bedtimeTargetError}
+            </p>
+          ) : null}
         </div>
       </div>
 

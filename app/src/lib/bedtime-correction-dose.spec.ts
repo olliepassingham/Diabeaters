@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   bedtimeExtraCautionMultiplier,
+  bedtimeMinActionableDose,
   bedtimeTrendReduction,
   calculateBedtimeCorrectionDose,
   classifyBedtimeHighSeverity,
+  defaultBedtimeTargetMmol,
   resolveBedtimeCorrectionAim,
+  resolveBedtimeCorrectionThreshold,
 } from "./bedtime-correction-dose";
 
 describe("classifyBedtimeHighSeverity", () => {
@@ -59,18 +62,53 @@ describe("bedtimeTrendReduction", () => {
   });
 });
 
+describe("resolveBedtimeCorrectionThreshold", () => {
+  it("starts correcting lower in the range when the user usually rises overnight", () => {
+    expect(resolveBedtimeCorrectionThreshold(4, 10, "rise")).toBeCloseTo(5.5);
+  });
+
+  it("waits until above the range top when the user usually falls overnight", () => {
+    expect(resolveBedtimeCorrectionThreshold(4, 10, "fall")).toBeCloseTo(11.5);
+  });
+
+  it("starts correcting at the top of the range when the pattern is unknown or steady", () => {
+    expect(resolveBedtimeCorrectionThreshold(4, 10, "not_sure")).toBe(10);
+    expect(resolveBedtimeCorrectionThreshold(4, 10, "steady")).toBe(10);
+  });
+});
+
 describe("resolveBedtimeCorrectionAim", () => {
-  it("aims lower in the range when the user usually rises overnight", () => {
-    expect(resolveBedtimeCorrectionAim(4, 10, "rise")).toBeCloseTo(5.5);
+  it("aims at the middle of the target range by default", () => {
+    expect(defaultBedtimeTargetMmol(4, 10)).toBe(7);
+    expect(resolveBedtimeCorrectionAim(4, 10, "not_sure")).toBe(7);
+    expect(resolveBedtimeCorrectionAim(4, 10, "steady")).toBe(7);
   });
 
-  it("aims higher than the range top when the user usually falls overnight", () => {
-    expect(resolveBedtimeCorrectionAim(4, 10, "fall")).toBeCloseTo(11.5);
+  it("uses the user's own bedtime target when set", () => {
+    expect(resolveBedtimeCorrectionAim(4, 10, "not_sure", 8)).toBe(8);
   });
 
-  it("aims at the top of the range when the pattern is unknown or steady", () => {
-    expect(resolveBedtimeCorrectionAim(4, 10, "not_sure")).toBe(10);
-    expect(resolveBedtimeCorrectionAim(4, 10, "steady")).toBe(10);
+  it("nudges the aim a little lower when the user usually rises overnight", () => {
+    expect(resolveBedtimeCorrectionAim(4, 10, "rise")).toBeCloseTo(6.5);
+    expect(resolveBedtimeCorrectionAim(4, 10, "rise", 5)).toBe(5);
+  });
+
+  it("nudges the aim a little higher (but never above the range) when the user usually falls overnight", () => {
+    expect(resolveBedtimeCorrectionAim(4, 10, "fall")).toBe(8);
+    expect(resolveBedtimeCorrectionAim(4, 10, "fall", 9.5)).toBe(10);
+  });
+
+  it("keeps a bedtime target inside the target range", () => {
+    expect(resolveBedtimeCorrectionAim(4, 10, "not_sure", 3)).toBe(4);
+    expect(resolveBedtimeCorrectionAim(4, 10, "not_sure", 14)).toBe(10);
+  });
+});
+
+describe("bedtimeMinActionableDose", () => {
+  it("is half a unit for pens and 0.2u for pumps", () => {
+    expect(bedtimeMinActionableDose(1)).toBe(0.5);
+    expect(bedtimeMinActionableDose(0.5)).toBe(0.5);
+    expect(bedtimeMinActionableDose(0.05)).toBe(0.2);
   });
 });
 
@@ -111,7 +149,7 @@ describe("calculateBedtimeCorrectionDose", () => {
     bgMmol: 17,
     targetLowMmol: 4,
     targetHighMmol: 8,
-    correctionFactor: 3,
+    correctionFactor: 1,
     bgUnits: "mmol/L" as const,
     insulinHours: 5,
     overnightUsualTrend: "not_sure" as const,
@@ -153,9 +191,57 @@ describe("calculateBedtimeCorrectionDose", () => {
       ...base,
       bgMmol: 9.4,
       targetHighMmol: 8.5,
+      correctionFactor: 3,
       bgTrend: "falling",
     });
     expect(tooSmall.status).toBe("dose_too_small");
+  });
+
+  it("corrects towards the middle of the range, not the top, once above the threshold", () => {
+    const result = calculateBedtimeCorrectionDose({ ...base, bgTrend: "steady" });
+    expect(result.status).toBe("dose");
+    if (result.status !== "dose") return;
+    expect(result.targetBg).toBe(6);
+    expect(result.fullDose).toBe(11);
+  });
+
+  it("uses the user's bedtime target for the aim but not for when to start correcting", () => {
+    const aimed = calculateBedtimeCorrectionDose({ ...base, bgTrend: "steady", bedtimeTargetMmol: 5 });
+    const defaultAim = calculateBedtimeCorrectionDose({ ...base, bgTrend: "steady" });
+    expect(aimed.status).toBe("dose");
+    if (aimed.status !== "dose" || defaultAim.status !== "dose") return;
+    expect(aimed.targetBg).toBe(5);
+    expect(aimed.suggestedDose).toBeGreaterThan(defaultAim.suggestedDose);
+
+    const inRange = calculateBedtimeCorrectionDose({ ...base, bgMmol: 7.5, bgTrend: "steady", bedtimeTargetMmol: 5 });
+    expect(inRange.status).toBe("no_correction_needed");
+  });
+
+  it("gives the same dose in mg/dL as in mmol/L", () => {
+    const mmol = calculateBedtimeCorrectionDose({ ...base, bgTrend: "steady" });
+    // Correction factor is entered in the user's own units.
+    const mgdl = calculateBedtimeCorrectionDose({ ...base, bgUnits: "mg/dL", correctionFactor: 18, bgTrend: "steady" });
+    expect(mmol.status).toBe("dose");
+    expect(mgdl.status).toBe("dose");
+    if (mmol.status !== "dose" || mgdl.status !== "dose") return;
+    expect(mgdl.suggestedDose).toBe(mmol.suggestedDose);
+    expect(mgdl.targetBg).toBe(108);
+    expect(mgdl.currentBg).toBe(306);
+  });
+
+  it("rounds once, so a pen does not lose a unit to double rounding", () => {
+    // Exact full dose 2.4u × 0.65 share = 1.56u → 2u. Rounding the full dose first (2u × 0.65 = 1.3u) gave 1u.
+    const result = calculateBedtimeCorrectionDose({
+      ...base,
+      bgMmol: 13.2,
+      targetLowMmol: 4,
+      targetHighMmol: 8,
+      correctionFactor: 3,
+      bgTrend: "steady",
+    });
+    expect(result.status).toBe("dose");
+    if (result.status !== "dose") return;
+    expect(result.suggestedDose).toBe(2);
   });
 
   it("says no correction is needed when BG is at or under the target, regardless of ISF", () => {
@@ -181,9 +267,12 @@ describe("calculateBedtimeCorrectionDose", () => {
       sickDayActive: false,
     };
 
-    it("without a known overnight pattern, is honestly reported as too small (not a missing ISF)", () => {
+    it("without a known overnight pattern, gives a small real dose aimed at the middle of the range", () => {
       const result = calculateBedtimeCorrectionDose({ ...reported, overnightUsualTrend: "not_sure" });
-      expect(result.status).toBe("dose_too_small");
+      expect(result.status).toBe("dose");
+      if (result.status !== "dose") return;
+      expect(result.targetBg).toBe(7);
+      expect(result.suggestedDose).toBe(1);
     });
 
     it("when the user says they usually rise overnight, gives a real, non-zero correction dose", () => {
@@ -229,7 +318,7 @@ describe("calculateBedtimeCorrectionDose", () => {
         hadAlcohol: false,
         recentHypos: false,
       });
-      expect(doseOf(baseline)).toBe(8);
+      expect(doseOf(baseline)).toBe(9);
     });
 
     it("exercise alone lowers the suggested dose", () => {
@@ -239,7 +328,7 @@ describe("calculateBedtimeCorrectionDose", () => {
         hadAlcohol: false,
         recentHypos: false,
       });
-      expect(doseOf(result)).toBe(7);
+      expect(doseOf(result)).toBe(8);
     });
 
     it("alcohol alone lowers the suggested dose", () => {
@@ -249,7 +338,7 @@ describe("calculateBedtimeCorrectionDose", () => {
         hadAlcohol: true,
         recentHypos: false,
       });
-      expect(doseOf(result)).toBe(7);
+      expect(doseOf(result)).toBe(8);
     });
 
     it("recent hypos alone lowers the suggested dose (more than exercise or alcohol alone)", () => {
@@ -259,7 +348,7 @@ describe("calculateBedtimeCorrectionDose", () => {
         hadAlcohol: false,
         recentHypos: true,
       });
-      expect(doseOf(result)).toBe(6);
+      expect(doseOf(result)).toBe(7);
     });
 
     it("stacks all three for an even more cautious dose, while the severity floor still keeps it well above zero", () => {
@@ -269,7 +358,7 @@ describe("calculateBedtimeCorrectionDose", () => {
         hadAlcohol: true,
         recentHypos: true,
       });
-      expect(doseOf(result)).toBe(5);
+      expect(doseOf(result)).toBe(6);
       expect(doseOf(result)).toBeGreaterThan(0);
       if (result.status !== "dose") throw new Error("expected a dose");
       expect(result.exerciseWarning).toMatch(/exercise/i);
@@ -287,7 +376,7 @@ describe("calculateBedtimeCorrectionDose", () => {
         bgUnits: "mmol/L" as const,
         insulinHours: 6,
         bgTrend: "falling" as const,
-        overnightUsualTrend: "not_sure" as const,
+        overnightUsualTrend: "fall" as const,
         exerciseOvernightCaution: false,
         sickDayActive: false,
       };
@@ -465,9 +554,31 @@ describe("calculateBedtimeCorrectionDose", () => {
     expect(light.extraCautionNote).toBe("");
   });
 
-  it("treats pump suggestions under half a unit as too small instead of recommending a micro-dose", () => {
+  it("lets pump users take small corrections of 0.2u or more", () => {
     const result = calculateBedtimeCorrectionDose({
       bgMmol: 9.2,
+      targetLowMmol: 4,
+      targetHighMmol: 8,
+      correctionFactor: 4,
+      bgUnits: "mmol/L",
+      insulinHours: 5,
+      bgTrend: "falling",
+      overnightUsualTrend: "not_sure",
+      exerciseOvernightCaution: false,
+      hadAlcohol: false,
+      recentHypos: false,
+      sickDayActive: false,
+      roundIncrement: 0.05,
+    });
+    expect(result.status).toBe("dose");
+    if (result.status !== "dose") return;
+    expect(result.suggestedDose).toBeGreaterThanOrEqual(0.2);
+    expect(result.suggestedDose).toBeLessThan(0.5);
+  });
+
+  it("treats pump suggestions under 0.2u as too small instead of recommending a micro-dose", () => {
+    const result = calculateBedtimeCorrectionDose({
+      bgMmol: 8.2,
       targetLowMmol: 4,
       targetHighMmol: 8,
       correctionFactor: 4,
@@ -484,8 +595,8 @@ describe("calculateBedtimeCorrectionDose", () => {
     expect(result.status).toBe("dose_too_small");
     if (result.status !== "dose_too_small") return;
     expect(result.rawDose).toBeGreaterThan(0);
-    expect(result.rawDose).toBeLessThan(0.5);
-    expect(result.note).toMatch(/less than half a unit/i);
+    expect(result.rawDose).toBeLessThanOrEqual(0.2);
+    expect(result.note).toMatch(/less than 0\.2u/i);
     expect(result.note).toMatch(/recheck/i);
   });
 });

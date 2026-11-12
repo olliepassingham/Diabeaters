@@ -41,7 +41,13 @@ import { shouldReceiveBedtimeCheckReminders } from "@/lib/bedtime-reminder-eligi
 import { reschedulePumpChangeReminders } from "@/lib/pump-change-reminders";
 import { seedPatientFirstRunDefaultsIfNeeded } from "@/lib/starter-patient-defaults";
 import { seedDefaultTargetBgRangeIfNeeded } from "@/lib/starter-target-range";
-import { defaultTargetBgRange, formatTargetBgRangeLabel } from "@/lib/target-bg-range";
+import {
+  defaultTargetBgRange,
+  formatTargetBgRangeLabel,
+  resolveUserTargetBgRange,
+  validateBedtimeTargetBgInput,
+} from "@/lib/target-bg-range";
+import { formatTargetBgInput } from "@/lib/hypo-context";
 import { syncNotificationPreferences } from "@/lib/notification-preferences";
 import { ensureNativePushRegistered, resetNativePushRegistrationState } from "@/lib/push-tokens";
 import { Link, useLocation } from "wouter";
@@ -368,6 +374,7 @@ function ProfileTab({
 function InsulinTab({
   bgUnits, tdd, setTdd, correctionFactor, setCorrectionFactor,
   targetBgLow, setTargetBgLow, targetBgHigh, setTargetBgHigh,
+  bedtimeTargetBg, setBedtimeTargetBg,
   breakfastRatio, setBreakfastRatio, lunchRatio, setLunchRatio,
   dinnerRatio, setDinnerRatio, snackRatio, setSnackRatio,
   ratioFormat, onRatioFormatChange,
@@ -380,6 +387,7 @@ function InsulinTab({
   correctionFactor: string; setCorrectionFactor: (v: string) => void;
   targetBgLow: string; setTargetBgLow: (v: string) => void;
   targetBgHigh: string; setTargetBgHigh: (v: string) => void;
+  bedtimeTargetBg: string; setBedtimeTargetBg: (v: string) => void;
   breakfastRatio: string; setBreakfastRatio: (v: string) => void;
   lunchRatio: string; setLunchRatio: (v: string) => void;
   dinnerRatio: string; setDinnerRatio: (v: string) => void;
@@ -479,6 +487,46 @@ function InsulinTab({
                 Use {formatTargetBgRangeLabel(undefined, bgUnits === "mg/dL" ? "mg/dL" : "mmol/L")}
               </Button>
             ) : null}
+            <div className="space-y-1.5 border-t border-border/50 pt-2.5">
+              <StaticLabelWithInfo
+                ariaLabel="About bedtime target"
+                info={
+                  <p>
+                    Where bedtime correction suggestions aim to bring you down to. Leave blank to use the middle of
+                    your target range.
+                  </p>
+                }
+              >
+                Bedtime target (optional)
+              </StaticLabelWithInfo>
+              <Input
+                id="bedtime-target-bg"
+                type="number"
+                step="0.1"
+                placeholder={(() => {
+                  const units = bgUnits === "mg/dL" ? "mg/dL" : "mmol/L";
+                  const range = resolveUserTargetBgRange(
+                    {
+                      targetBgLow: targetBgLow ? parseFloat(targetBgLow) : undefined,
+                      targetBgHigh: targetBgHigh ? parseFloat(targetBgHigh) : undefined,
+                    },
+                    units,
+                  );
+                  return formatTargetBgInput((range.low + range.high) / 2, units);
+                })()}
+                value={bedtimeTargetBg}
+                onChange={(e) => setBedtimeTargetBg(e.target.value)}
+                data-testid="input-bedtime-target-bg"
+                aria-label={`Bedtime target (${bgUnits})`}
+              />
+              {(() => {
+                const message = validateBedtimeTargetBgInput(
+                  { bedtimeTargetBg, targetBgLow, targetBgHigh },
+                  bgUnits === "mg/dL" ? "mg/dL" : "mmol/L",
+                );
+                return message ? <ClinicalWarningHint warning={{ message, severity: "warning" }} /> : null;
+              })()}
+            </div>
           </div>
         </div>
 
@@ -1069,6 +1117,7 @@ export default function Settings() {
   const [correctionFactor, setCorrectionFactor] = useState("");
   const [targetBgLow, setTargetBgLow] = useState("");
   const [targetBgHigh, setTargetBgHigh] = useState("");
+  const [bedtimeTargetBg, setBedtimeTargetBg] = useState("");
   const [ratioFormat, setRatioFormat] = useState<RatioFormat>("per10g");
   const [carbPortionSize, setCarbPortionSize] = useState("10");
   
@@ -1198,6 +1247,7 @@ export default function Settings() {
       setCorrectionFactor(storedSettings.correctionFactor?.toString() || "");
       setTargetBgLow(storedSettings.targetBgLow != null ? String(storedSettings.targetBgLow) : "");
       setTargetBgHigh(storedSettings.targetBgHigh != null ? String(storedSettings.targetBgHigh) : "");
+      setBedtimeTargetBg(storedSettings.bedtimeTargetBg != null ? String(storedSettings.bedtimeTargetBg) : "");
       setShortActingUnitsPerDay(storedSettings.shortActingUnitsPerDay?.toString() || "");
       setLongActingUnitsPerDay(storedSettings.longActingUnitsPerDay?.toString() || "");
       setInjectionsPerDay(storedSettings.injectionsPerDay?.toString() || "");
@@ -1576,6 +1626,14 @@ export default function Settings() {
       correctionFactor: correctionFactor ? parseFloat(correctionFactor) : undefined,
       targetBgLow: targetBgLow ? parseFloat(targetBgLow) : undefined,
       targetBgHigh: targetBgHigh ? parseFloat(targetBgHigh) : undefined,
+      bedtimeTargetBg: validateBedtimeTargetBgInput(
+        { bedtimeTargetBg, targetBgLow, targetBgHigh },
+        bgUnits === "mg/dL" ? "mg/dL" : "mmol/L",
+      )
+        ? settings.bedtimeTargetBg
+        : bedtimeTargetBg.trim()
+          ? parseFloat(bedtimeTargetBg)
+          : undefined,
       dosingPrefsUpdatedAt: new Date().toISOString(),
     };
     storage.saveSettings(newSettings);
@@ -1598,6 +1656,7 @@ export default function Settings() {
         correctionFactor,
         targetBgLow,
         targetBgHigh,
+        bedtimeTargetBg,
         ratioFormat,
         carbPortionSize,
       }),
@@ -1926,6 +1985,7 @@ export default function Settings() {
       correctionFactor,
       targetBgLow,
       targetBgHigh,
+      bedtimeTargetBg,
       ratioFormat,
       carbPortionSize,
     }),
@@ -1938,6 +1998,7 @@ export default function Settings() {
       correctionFactor,
       targetBgLow,
       targetBgHigh,
+      bedtimeTargetBg,
       ratioFormat,
       carbPortionSize,
     ],
@@ -2146,6 +2207,8 @@ export default function Settings() {
           setTargetBgLow={setTargetBgLow}
           targetBgHigh={targetBgHigh}
           setTargetBgHigh={setTargetBgHigh}
+          bedtimeTargetBg={bedtimeTargetBg}
+          setBedtimeTargetBg={setBedtimeTargetBg}
           breakfastRatio={breakfastRatio}
           setBreakfastRatio={setBreakfastRatio}
           lunchRatio={lunchRatio}

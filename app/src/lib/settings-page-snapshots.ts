@@ -42,6 +42,7 @@ export type RatiosPageSnapshotFields = {
   correctionFactor: string;
   targetBgLow: string;
   targetBgHigh: string;
+  bedtimeTargetBg?: string;
   ratioFormat: RatioFormat;
   carbPortionSize: string;
 };
@@ -94,6 +95,7 @@ export function buildRatiosPageSnapshot(fields: RatiosPageSnapshotFields): strin
     correctionFactor: snapshotText(fields.correctionFactor),
     targetBgLow: snapshotText(fields.targetBgLow),
     targetBgHigh: snapshotText(fields.targetBgHigh),
+    bedtimeTargetBg: snapshotText(fields.bedtimeTargetBg),
     ratioFormat: fields.ratioFormat,
     carbPortionSize: snapshotText(fields.carbPortionSize),
   });

@@ -48,5 +48,18 @@ describe("dosing prefs", () => {
     expect(prefs.dinnerRatio).toBe("10");
     expect(prefs.bodyWeightKg).toBe(70);
     expect(prefs.breakfastRatio).toBeNull();
+    expect(prefs.bedtimeTargetBg).toBeNull();
+    expect(prefs.bedtimeLearningEnabled).toBeNull();
+  });
+
+  it("round-trips the bedtime target and learning switch", () => {
+    const prefs = buildDosingPrefs({
+      settings: { targetBgLow: 4, targetBgHigh: 10, bedtimeTargetBg: 7.5, bedtimeLearningEnabled: true },
+      updatedAt: "2026-10-09T12:00:00.000Z",
+    });
+    const parsed = parseDosingPrefs(JSON.parse(JSON.stringify(prefs)));
+    expect(parsed?.bedtimeTargetBg).toBe(7.5);
+    expect(parsed?.bedtimeLearningEnabled).toBe(true);
+    expect(parseDosingPrefs({ updatedAt: "2026-10-09T12:00:00.000Z", bedtimeLearningEnabled: "yes" })?.bedtimeLearningEnabled).toBeNull();
   });
 });

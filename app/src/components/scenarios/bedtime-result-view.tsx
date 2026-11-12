@@ -217,7 +217,7 @@ export function BedtimeResultView({
           data-testid="card-correction-too-small"
         >
           <p className="font-medium text-foreground">
-            Correction would be under {"\u00BD"}u — likely too small to dose precisely
+            Correction would be under {isPumpUser ? "0.2" : "\u00BD"}u — likely too small to dose precisely
           </p>
           <p className="mt-1 text-muted-foreground">{result.action.note}</p>
         </div>

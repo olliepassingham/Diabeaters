@@ -617,6 +617,10 @@ export interface UserSettings {
   correctionFactor?: number;
   targetBgLow?: number;
   targetBgHigh?: number;
+  /** Where bedtime corrections aim (display units). Unset means the middle of the target range. */
+  bedtimeTargetBg?: number;
+  /** Opt-in: let similar past nights nudge bedtime correction suggestions up or down. */
+  bedtimeLearningEnabled?: boolean;
   shortActingUnitsPerDay?: number;
   longActingUnitsPerDay?: number;
   injectionsPerDay?: number;
@@ -1051,6 +1055,8 @@ export interface BedtimeOutcome {
   morningBg?: number | null;
   morningBgUnits?: "mmol/L" | "mg/dL";
   followedAction?: "yes" | "no" | "partially" | "n_a";
+  /** Correction units actually taken: the suggestion for "yes", user-entered for "partially". */
+  unitsTaken?: number | null;
   note?: string;
 }
 
@@ -1076,6 +1082,14 @@ export interface BedtimeLog {
   sickDayActive: boolean;
   travelModeActive: boolean;
   correctionGiven: number | null;
+  /** Suggested correction before any personal (learning) adjustment, so learning doesn't compound. */
+  correctionBaseDose?: number | null;
+  /** Learning multiplier applied to the suggestion (1 when none). */
+  personalAdjustment?: number | null;
+  /** Bedtime target (mmol/L) the correction aimed for that night. */
+  bedtimeTargetMmol?: number | null;
+  /** True when exercise was recent or hard enough to make the correction more cautious. */
+  exerciseOvernightCaution?: boolean;
   /** Pump IOB entered for this check. Null when blank. */
   pumpIobUnits?: number | null;
   pumpRecentSiteChange?: boolean;
@@ -1099,6 +1113,10 @@ export interface BedtimeOvernightCgmSummary {
   readingCount: number;
   hadLow: boolean;
   hadHigh: boolean;
+  /** Last, lowest and highest readings in the window, in the user's display units. */
+  endValue?: number;
+  min?: number;
+  max?: number;
   computedAt: string;
 }
 

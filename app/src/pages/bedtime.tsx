@@ -60,7 +60,11 @@ import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
 import { BedtimeResultView, type BedtimeAction } from "@/components/scenarios/bedtime-result-view";
 import { BedtimeLastNightCard } from "@/components/scenarios/bedtime-last-night-card";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
-import { calculateBedtimeCorrectionDose, type BedtimeCorrectionResult } from "@/lib/bedtime-correction-dose";
+import {
+  calculateBedtimeCorrectionDose,
+  resolveBedtimeCorrectionAim,
+  type BedtimeCorrectionResult,
+} from "@/lib/bedtime-correction-dose";
 import { CgmPrefillButton } from "@/components/cgm-prefill-button";
 import { useAutoCgmBgField } from "@/hooks/use-auto-cgm-bg-field";
 import { cgmTrendForBedtime } from "@/lib/cgm/apply-cgm-trend";
@@ -95,6 +99,26 @@ interface ReadinessResult {
   /** The single, coherent action for tonight — never both a correction and a snack. */
   action: BedtimeAction;
   bgAboveTarget: boolean;
+}
+
+function bedtimeActionSuggested(action: BedtimeAction): BedtimeActionSuggested {
+  if (action.kind === "correction") return "correction";
+  if (action.kind === "snack") return "snack";
+  if (action.kind === "dose_too_small") return "dose_too_small";
+  if (action.kind === "missing_isf") return "missing_isf";
+  return "none";
+}
+
+/** Fields stored on the bedtime log so later learning compares against the base suggestion. */
+function correctionLogFields(correction: BedtimeCorrectionResult) {
+  if (correction.status !== "dose") {
+    return { correctionGiven: null, correctionBaseDose: null, personalAdjustment: null };
+  }
+  return {
+    correctionGiven: correction.suggestedDose,
+    correctionBaseDose: correction.suggestedDose,
+    personalAdjustment: null,
+  };
 }
 
 /**
@@ -471,7 +495,11 @@ export default function Bedtime() {
     level: ReadinessLevel,
     correctionDose: number | null,
     actionSuggested: BedtimeActionSuggested,
-  ) => {
+    correctionContext: Pick<
+      BedtimeLog,
+      "correctionBaseDose" | "personalAdjustment" | "bedtimeTargetMmol" | "exerciseOvernightCaution"
+    >,
+  ): string => {
     const isFirstBedtimeCheck = storage.getBedtimeLogs().length === 0;
     const log: BedtimeLog = {
       id: crypto.randomUUID(),
@@ -490,6 +518,7 @@ export default function Bedtime() {
       sickDayActive: scenarioState.sickDayActive,
       travelModeActive: scenarioState.travelModeActive,
       correctionGiven: correctionDose,
+      ...correctionContext,
       pumpIobUnits: isPumpUser ? parseOptionalBolusUnits(pumpIobInput) : null,
       pumpRecentSiteChange: isPumpUser ? pumpRecentSiteChange : undefined,
       pumpDisconnectedRecently: isPumpUser ? pumpDisconnectedRecently : undefined,
@@ -507,6 +536,7 @@ export default function Bedtime() {
     if (isFirstBedtimeCheck && user?.id && shouldOfferBedtimeReminderSecondChance(user.id)) {
       setSecondChancePromptOpen(true);
     }
+    return log.id;
   };
 
   const calculateReadiness = () => {
@@ -530,6 +560,13 @@ export default function Bedtime() {
     const targetRange = getTargetRange();
     const targetLowMmol = bgUnits === "mg/dL" ? targetRange.low / 18 : targetRange.low;
     const targetHighMmol = bgUnits === "mg/dL" ? targetRange.high / 18 : targetRange.high;
+    const savedBedtimeTarget = userSettings?.bedtimeTargetBg;
+    const bedtimeTargetMmol =
+      typeof savedBedtimeTarget === "number" && savedBedtimeTarget > 0
+        ? bgUnits === "mg/dL"
+          ? savedBedtimeTarget / 18
+          : savedBedtimeTarget
+        : null;
 
     const factors: ReadinessResult["factors"] = [];
     let concernCount = 0;
@@ -1006,18 +1043,10 @@ export default function Bedtime() {
       pumpIobUnits: isPumpUser ? pumpIobUnits : null,
       requirePumpIob: isPumpUser,
       roundIncrement,
+      bedtimeTargetMmol,
     });
     const action = resolveBedtimeAction(correctionResult, personalized.snack);
-    const actionSuggested: BedtimeActionSuggested =
-      action.kind === "correction"
-        ? "correction"
-        : action.kind === "snack"
-          ? "snack"
-          : action.kind === "dose_too_small"
-            ? "dose_too_small"
-            : action.kind === "missing_isf"
-              ? "missing_isf"
-              : "none";
+    const actionSuggested = bedtimeActionSuggested(action);
 
     // Educational only — reflects the user's own logged outcomes, never changes the dose above.
     const outcomeTip = buildOutcomePatternTip(bedtimeLogs, {
@@ -1053,11 +1082,15 @@ export default function Bedtime() {
     } catch {
       // ignore
     }
-    persistBedtimeCheck(
-      level,
-      correctionResult.status === "dose" ? correctionResult.suggestedDose : null,
-      actionSuggested,
-    );
+    const { correctionGiven, ...correctionFields } = correctionLogFields(correctionResult);
+    persistBedtimeCheck(level, correctionGiven, actionSuggested, {
+      ...correctionFields,
+      bedtimeTargetMmol:
+        Math.round(
+          resolveBedtimeCorrectionAim(targetLowMmol, targetHighMmol, overnightUsualTrend, bedtimeTargetMmol) * 10,
+        ) / 10,
+      exerciseOvernightCaution,
+    });
     setQuickCheckOpen(false);
 
     // Bring the verdict/status card into view after calculating.

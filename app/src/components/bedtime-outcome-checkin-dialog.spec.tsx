@@ -189,6 +189,88 @@ describe("BedtimeOutcomeCheckinDialog", () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
+  it("records the suggested dose as units taken when the correction was followed", () => {
+    render(
+      <BedtimeOutcomeCheckinDialog
+        open
+        onOpenChange={() => {}}
+        log={baseLog({ actionSuggested: "correction", correctionGiven: 2 })}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("button-bedtime-outcome-feel-steady"));
+    fireEvent.click(screen.getByTestId("button-bedtime-outcome-followed-yes"));
+    expect(screen.queryByTestId("input-bedtime-outcome-units-taken")).toBeNull();
+    fireEvent.click(screen.getByTestId("button-bedtime-outcome-save"));
+    expect(mockUpdateBedtimeLog).toHaveBeenCalledWith(
+      "log-1",
+      expect.objectContaining({ outcome: expect.objectContaining({ followedAction: "yes", unitsTaken: 2 }) }),
+    );
+  });
+
+  it("asks how much was taken when the correction was only partly followed", () => {
+    render(
+      <BedtimeOutcomeCheckinDialog
+        open
+        onOpenChange={() => {}}
+        log={baseLog({ actionSuggested: "correction", correctionGiven: 3 })}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("button-bedtime-outcome-feel-went_high"));
+    fireEvent.click(screen.getByTestId("button-bedtime-outcome-followed-partially"));
+    const input = screen.getByTestId("input-bedtime-outcome-units-taken");
+    fireEvent.change(input, { target: { value: "1.5" } });
+    fireEvent.click(screen.getByTestId("button-bedtime-outcome-save"));
+    expect(mockUpdateBedtimeLog).toHaveBeenCalledWith(
+      "log-1",
+      expect.objectContaining({ outcome: expect.objectContaining({ followedAction: "partially", unitsTaken: 1.5 }) }),
+    );
+  });
+
+  it("stores units taken as unknown when a partial dose is left blank, and zero when skipped", () => {
+    const { unmount } = render(
+      <BedtimeOutcomeCheckinDialog
+        open
+        onOpenChange={() => {}}
+        log={baseLog({ actionSuggested: "correction", correctionGiven: 3 })}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("button-bedtime-outcome-feel-steady"));
+    fireEvent.click(screen.getByTestId("button-bedtime-outcome-followed-partially"));
+    fireEvent.click(screen.getByTestId("button-bedtime-outcome-save"));
+    expect(mockUpdateBedtimeLog).toHaveBeenLastCalledWith(
+      "log-1",
+      expect.objectContaining({ outcome: expect.objectContaining({ unitsTaken: null }) }),
+    );
+    unmount();
+
+    render(
+      <BedtimeOutcomeCheckinDialog
+        open
+        onOpenChange={() => {}}
+        log={baseLog({ actionSuggested: "correction", correctionGiven: 3 })}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("button-bedtime-outcome-feel-steady"));
+    fireEvent.click(screen.getByTestId("button-bedtime-outcome-followed-no"));
+    fireEvent.click(screen.getByTestId("button-bedtime-outcome-save"));
+    expect(mockUpdateBedtimeLog).toHaveBeenLastCalledWith(
+      "log-1",
+      expect.objectContaining({ outcome: expect.objectContaining({ unitsTaken: 0 }) }),
+    );
+  });
+
+  it("does not record units taken for a snack suggestion", () => {
+    render(
+      <BedtimeOutcomeCheckinDialog open onOpenChange={() => {}} log={baseLog({ actionSuggested: "snack" })} />,
+    );
+    fireEvent.click(screen.getByTestId("button-bedtime-outcome-feel-steady"));
+    fireEvent.click(screen.getByTestId("button-bedtime-outcome-followed-partially"));
+    expect(screen.queryByTestId("input-bedtime-outcome-units-taken")).toBeNull();
+    fireEvent.click(screen.getByTestId("button-bedtime-outcome-save"));
+    const patch = mockUpdateBedtimeLog.mock.calls.at(-1)?.[1] as { outcome: Record<string, unknown> };
+    expect("unitsTaken" in patch.outcome).toBe(false);
+  });
+
   it("skip dismisses without saving", () => {
     const onOpenChange = vi.fn();
     const onSaved = vi.fn();

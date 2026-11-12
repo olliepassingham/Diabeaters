@@ -11,6 +11,8 @@ export type DosingPrefs = {
   correctionFactor: number | null;
   targetBgLow: number | null;
   targetBgHigh: number | null;
+  bedtimeTargetBg: number | null;
+  bedtimeLearningEnabled: boolean | null;
   bodyWeightKg: number | null;
   weightDisplayUnit: WeightDisplayUnit | null;
   updatedAt: string;
@@ -46,6 +48,8 @@ export function parseDosingPrefs(raw: unknown): DosingPrefs | null {
     correctionFactor: finiteNumber(row.correctionFactor),
     targetBgLow: finiteNumber(row.targetBgLow),
     targetBgHigh: finiteNumber(row.targetBgHigh),
+    bedtimeTargetBg: finiteNumber(row.bedtimeTargetBg),
+    bedtimeLearningEnabled: typeof row.bedtimeLearningEnabled === "boolean" ? row.bedtimeLearningEnabled : null,
     bodyWeightKg: finiteNumber(row.bodyWeightKg),
     weightDisplayUnit: unit,
     updatedAt,
@@ -75,6 +79,12 @@ export function buildDosingPrefs(input: {
       typeof input.settings.targetBgHigh === "number" && Number.isFinite(input.settings.targetBgHigh)
         ? input.settings.targetBgHigh
         : null,
+    bedtimeTargetBg:
+      typeof input.settings.bedtimeTargetBg === "number" && Number.isFinite(input.settings.bedtimeTargetBg)
+        ? input.settings.bedtimeTargetBg
+        : null,
+    bedtimeLearningEnabled:
+      typeof input.settings.bedtimeLearningEnabled === "boolean" ? input.settings.bedtimeLearningEnabled : null,
     bodyWeightKg:
       typeof input.bodyWeightKg === "number" && Number.isFinite(input.bodyWeightKg) && input.bodyWeightKg > 0
         ? input.bodyWeightKg
@@ -93,6 +103,7 @@ export function localDosingHasValues(settings: UserSettings, bodyWeightKg?: numb
       settings.correctionFactor ||
       settings.targetBgLow ||
       settings.targetBgHigh ||
+      settings.bedtimeTargetBg ||
       (typeof bodyWeightKg === "number" && bodyWeightKg > 0),
   );
 }

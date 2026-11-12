@@ -1,7 +1,6 @@
 import { computeSimpleCorrectionDose, type BgUnits } from "@/lib/correction-dose";
 import type { OvernightUsualTrend } from "@/lib/bedtime-readiness";
 import { PEN_INSULIN_INCREMENT, roundInsulinUnits } from "@/lib/insulin-rounding";
-
 export type BedtimeCorrectionTrend = "rising" | "steady" | "falling" | "not_sure";
 
 export type BedtimeHighSeverity = "moderate" | "high" | "very_high";
@@ -198,6 +197,12 @@ export const BEDTIME_RECENT_HYPO_CAUTION_MULTIPLIER = 0.8;
 
 /** Below this, a bedtime correction is not worth dosing — recheck instead of micro-dosing. */
 export const BEDTIME_MIN_ACTIONABLE_DOSE_U = 0.5;
+/** Pumps deliver fine increments, so a smaller bedtime correction is still worth showing. */
+export const BEDTIME_PUMP_MIN_ACTIONABLE_DOSE_U = 0.2;
+
+export function bedtimeMinActionableDose(roundIncrement: number): number {
+  return roundIncrement < 0.5 ? BEDTIME_PUMP_MIN_ACTIONABLE_DOSE_U : BEDTIME_MIN_ACTIONABLE_DOSE_U;
+}
 
 function joinReasons(reasons: string[]): string {
   if (reasons.length === 0) return "";
@@ -260,12 +265,11 @@ function iobWarningForPumpUnits(iobUnits: number): string {
 }
 
 /**
- * Where we aim the correction, given the user's target range and their self-reported usual
- * overnight pattern. This is also the trigger threshold — i.e. someone who usually drops
- * overnight needs a higher bar before we suggest correcting at all, and someone who usually
- * rises needs a lower aim point since levels are expected to climb further unaided.
+ * When a bedtime correction is in play at all, given the user's target range and their
+ * self-reported usual overnight pattern — someone who usually drops overnight needs a higher bar
+ * before we suggest correcting, and someone who usually rises needs a lower one.
  */
-export function resolveBedtimeCorrectionAim(
+export function resolveBedtimeCorrectionThreshold(
   targetLowMmol: number,
   targetHighMmol: number,
   overnightUsualTrend: OvernightUsualTrend,
@@ -278,6 +282,36 @@ export function resolveBedtimeCorrectionAim(
     return targetHighMmol + span * 0.25;
   }
   return targetHighMmol;
+}
+
+/** Default bedtime target when the user hasn't set one: the middle of their target range. */
+export function defaultBedtimeTargetMmol(targetLowMmol: number, targetHighMmol: number): number {
+  return (targetLowMmol + targetHighMmol) / 2;
+}
+
+/**
+ * Where a bedtime correction brings glucose down to: the user's bedtime target (default the
+ * middle of their range), aimed a little lower if they usually rise overnight and a little higher
+ * if they usually fall. Always stays inside the target range.
+ */
+export function resolveBedtimeCorrectionAim(
+  targetLowMmol: number,
+  targetHighMmol: number,
+  overnightUsualTrend: OvernightUsualTrend,
+  bedtimeTargetMmol?: number | null,
+): number {
+  const span = Math.max(targetHighMmol - targetLowMmol, 0.1);
+  const base =
+    bedtimeTargetMmol != null && Number.isFinite(bedtimeTargetMmol) && bedtimeTargetMmol > 0
+      ? bedtimeTargetMmol
+      : defaultBedtimeTargetMmol(targetLowMmol, targetHighMmol);
+  let aim = base;
+  if (overnightUsualTrend === "rise") {
+    aim = Math.max(base - 0.5, Math.min(base, targetLowMmol + span * 0.25));
+  } else if (overnightUsualTrend === "fall") {
+    aim = Math.min(base + 1, targetHighMmol);
+  }
+  return Math.min(Math.max(aim, targetLowMmol), targetHighMmol);
 }
 
 export function calculateBedtimeCorrectionDose(params: {
@@ -299,6 +333,8 @@ export function calculateBedtimeCorrectionDose(params: {
   /** When true, a blank pump IOB withholds the correction instead of treating it as zero. */
   requirePumpIob?: boolean;
   roundIncrement?: number;
+  /** User's bedtime target (mmol/L). Defaults to the middle of the target range. */
+  bedtimeTargetMmol?: number | null;
 }): BedtimeCorrectionResult {
   const {
     bgMmol,
@@ -316,19 +352,21 @@ export function calculateBedtimeCorrectionDose(params: {
     pumpIobUnits,
     requirePumpIob = false,
     roundIncrement = PEN_INSULIN_INCREMENT,
+    bedtimeTargetMmol,
   } = params;
 
-  const aimMmol = resolveBedtimeCorrectionAim(targetLowMmol, targetHighMmol, overnightUsualTrend);
+  const thresholdMmol = resolveBedtimeCorrectionThreshold(targetLowMmol, targetHighMmol, overnightUsualTrend);
+  const aimMmol = resolveBedtimeCorrectionAim(targetLowMmol, targetHighMmol, overnightUsualTrend, bedtimeTargetMmol);
   const toDisplay = (mmol: number) =>
     bgUnits === "mg/dL" ? Math.round(mmol * 18) : Math.round(mmol * 10) / 10;
 
   // Check whether correction is even in play before worrying about a missing ISF — no point
   // sending someone to Settings when their glucose doesn't warrant a correction anyway.
-  if (bgMmol <= aimMmol) {
+  if (bgMmol <= thresholdMmol) {
     return {
       status: "no_correction_needed",
       currentBg: toDisplay(bgMmol),
-      aimBg: toDisplay(aimMmol),
+      aimBg: toDisplay(thresholdMmol),
       bgUnits,
     };
   }
@@ -360,7 +398,8 @@ export function calculateBedtimeCorrectionDose(params: {
   const fullDose = simple.fullDoseRounded;
   const usingPumpIob = pumpIobUnits != null && Number.isFinite(pumpIobUnits);
   const pumpIob = usingPumpIob ? Math.max(0, pumpIobUnits!) : 0;
-  const remainingFull = usingPumpIob ? Math.max(0, fullDose - pumpIob) : fullDose;
+  // Shares apply to the exact dose; rounding happens once at the end so pens don't lose a unit twice.
+  const remainingFull = usingPumpIob ? Math.max(0, simple.exactDose - pumpIob) : simple.exactDose;
   const iobReduction = usingPumpIob ? 0 : iobReductionForHours(insulinHours);
   const severity = classifyBedtimeHighSeverity(bgMmol, targetHighMmol);
   const { multiplier: bedtimeReduction, note: trendNote, overnightNote } = bedtimeTrendReduction(bgTrend, {
@@ -383,14 +422,17 @@ export function calculateBedtimeCorrectionDose(params: {
 
   const rawEffective = remainingFull * effectiveMultiplier;
   const suggestedDose = roundInsulinUnits(rawEffective, roundIncrement);
-  const pctOfFullDose = fullDose > 0 ? Math.round((rawEffective / fullDose) * 100) : 0;
+  const pctOfFullDose = simple.exactDose > 0 ? Math.round((rawEffective / simple.exactDose) * 100) : 0;
+  const minActionable = bedtimeMinActionableDose(roundIncrement);
 
-  if (suggestedDose < BEDTIME_MIN_ACTIONABLE_DOSE_U) {
+  if (suggestedDose < minActionable) {
     const extraSuffix = extraCautionNote ? ` ${extraCautionNote}` : "";
     const tooSmallLead =
       usingPumpIob && pumpIob > 0 && remainingFull <= 0
         ? "Pump IOB already covers a standard correction."
-        : "A cautious bedtime correction here works out to less than half a unit.";
+        : minActionable === BEDTIME_MIN_ACTIONABLE_DOSE_U
+          ? "A cautious bedtime correction here works out to less than half a unit."
+          : `A cautious bedtime correction here works out to less than ${minActionable}u.`;
     const tooSmallTail =
       usingPumpIob && pumpIob > 0 && remainingFull <= 0
         ? `${extraSuffix} Recheck glucose rather than stacking more insulin.`

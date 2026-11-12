@@ -412,15 +412,23 @@ export function resolveOvernightTirCompare(
 }
 
 export function bedtimeOvernightSummaryFromStats(
-  stats: Pick<BedtimeOvernightStats, "inRangePercent" | "readingCount" | "hadLow" | "hadHigh">,
+  stats: Pick<BedtimeOvernightStats, "inRangePercent" | "readingCount" | "hadLow" | "hadHigh"> &
+    Partial<Pick<BedtimeOvernightStats, "endValue" | "min" | "max">>,
   computedAt = new Date().toISOString(),
 ): BedtimeOvernightCgmSummary | null {
   if (stats.readingCount < BEDTIME_TIR_MIN_READINGS) return null;
+  const finite = (n: number | undefined) => (typeof n === "number" && Number.isFinite(n) ? n : undefined);
+  const endValue = finite(stats.endValue);
+  const min = finite(stats.min);
+  const max = finite(stats.max);
   return {
     inRangePercent: stats.inRangePercent,
     readingCount: stats.readingCount,
     hadLow: stats.hadLow,
     hadHigh: stats.hadHigh,
+    ...(endValue != null ? { endValue } : {}),
+    ...(min != null ? { min } : {}),
+    ...(max != null ? { max } : {}),
     computedAt,
   };
 }
@@ -535,6 +543,7 @@ export function overnightSummariesDiffer(
     a.inRangePercent !== b.inRangePercent ||
     a.readingCount !== b.readingCount ||
     a.hadLow !== b.hadLow ||
-    a.hadHigh !== b.hadHigh
+    a.hadHigh !== b.hadHigh ||
+    (a.endValue == null && b.endValue != null)
   );
 }

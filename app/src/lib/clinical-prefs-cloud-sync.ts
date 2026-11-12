@@ -21,7 +21,9 @@ import {
   type PharmacyDayKey,
   type PharmacyHoursDay,
   type UserProfile,
+  type UserSettings,
 } from "@/lib/storage";
+import { getSupabase } from "@/lib/supabase";
 import { isPenDeliveryMethod, isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { normalizeDateOfBirthInput } from "@/lib/user-age";
 import { isEmailLike } from "@/lib/user-display-name";
@@ -296,6 +298,8 @@ function applyDosingPrefsFromCloud(raw: unknown): void {
     correctionFactor: cloud.correctionFactor ?? undefined,
     targetBgLow: cloud.targetBgLow ?? undefined,
     targetBgHigh: cloud.targetBgHigh ?? undefined,
+    bedtimeTargetBg: cloud.bedtimeTargetBg ?? undefined,
+    bedtimeLearningEnabled: cloud.bedtimeLearningEnabled ?? undefined,
     dosingPrefsUpdatedAt: cloud.updatedAt,
   });
 
@@ -602,6 +606,20 @@ export async function syncDosingPrefsToCloud(
     return { error: null, skipped: true };
   }
   return { error };
+}
+
+/** Save dosing settings from screens outside Settings, then push them to the signed-in account if there is one. */
+export function saveDosingSettingsAndSync(next: UserSettings): UserSettings {
+  const stamped: UserSettings = { ...next, dosingPrefsUpdatedAt: new Date().toISOString() };
+  storage.saveSettings(stamped);
+  void (async () => {
+    const supabase = getSupabase();
+    if (!supabase) return;
+    const { data } = await supabase.auth.getSession();
+    const userId = data.session?.user?.id;
+    if (userId) await syncDosingPrefsToCloud(userId);
+  })().catch(() => {});
+  return stamped;
 }
 
 export async function syncCarbSourcePrefsToCloud(

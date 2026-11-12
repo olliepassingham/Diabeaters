@@ -71,6 +71,7 @@ export function BedtimeOutcomeCheckinDialog({ open, onOpenChange, log, logs = []
   const [morningBg, setMorningBg] = useState("");
   const [showMorningBg, setShowMorningBg] = useState(false);
   const [followedAction, setFollowedAction] = useState<BedtimeOutcome["followedAction"] | null>(null);
+  const [unitsTakenInput, setUnitsTakenInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [prefilledFromCgm, setPrefilledFromCgm] = useState(false);
 
@@ -83,6 +84,7 @@ export function BedtimeOutcomeCheckinDialog({ open, onOpenChange, log, logs = []
       setMorningBg("");
       setShowMorningBg(false);
       setFollowedAction(null);
+      setUnitsTakenInput("");
       setPrefilledFromCgm(false);
     }
   }, [open, log?.id]);
@@ -101,7 +103,23 @@ export function BedtimeOutcomeCheckinDialog({ open, onOpenChange, log, logs = []
 
   const recap = describeLastNightCheck(log);
   const askFollowed = actionSuggestedLabel(log) != null;
+  const suggestedCorrection =
+    log.actionSuggested === "correction" && typeof log.correctionGiven === "number" && log.correctionGiven > 0
+      ? log.correctionGiven
+      : null;
+  const askUnitsTaken = suggestedCorrection != null && followedAction === "partially";
   const showCgmChecking = cgmLoading && feel == null;
+
+  const resolveUnitsTaken = (): number | null | undefined => {
+    if (suggestedCorrection == null) return undefined;
+    if (followedAction === "yes") return suggestedCorrection;
+    if (followedAction === "no") return 0;
+    if (followedAction === "partially") {
+      const n = unitsTakenInput.trim() ? parseFloat(unitsTakenInput) : NaN;
+      return Number.isFinite(n) && n >= 0 ? n : null;
+    }
+    return undefined;
+  };
 
   const handleSkip = () => {
     dismissBedtimeOutcomePrompt(log.id);
@@ -120,12 +138,14 @@ export function BedtimeOutcomeCheckinDialog({ open, onOpenChange, log, logs = []
     setBusy(true);
     try {
       const bgValue = morningBg.trim() ? parseFloat(morningBg) : null;
+      const unitsTaken = resolveUnitsTaken();
       const outcome: BedtimeOutcome = {
         reportedAt: new Date().toISOString(),
         overnightFeel: feel,
         morningBg: bgValue != null && Number.isFinite(bgValue) ? bgValue : null,
         morningBgUnits: log.bgUnits === "mg/dL" ? "mg/dL" : "mmol/L",
         followedAction: askFollowed ? followedAction ?? "n_a" : "n_a",
+        ...(unitsTaken !== undefined ? { unitsTaken } : {}),
       };
       const patch: Partial<BedtimeLog> = { outcome };
       if (cgmInsight) {
@@ -247,6 +267,28 @@ export function BedtimeOutcomeCheckinDialog({ open, onOpenChange, log, logs = []
                       </Button>
                     ))}
                   </div>
+                </div>
+              ) : null}
+
+              {askUnitsTaken ? (
+                <div className="flex items-center gap-2">
+                  <label htmlFor="bedtime-outcome-units-taken" className="shrink-0 text-[12px] text-muted-foreground">
+                    How much did you take?
+                  </label>
+                  <Input
+                    id="bedtime-outcome-units-taken"
+                    type="number"
+                    step="0.05"
+                    min="0"
+                    inputMode="decimal"
+                    placeholder={`of ${suggestedCorrection}u`}
+                    value={unitsTakenInput}
+                    onChange={(e) => setUnitsTakenInput(e.target.value)}
+                    disabled={busy}
+                    className="h-9 flex-1 text-base"
+                    data-testid="input-bedtime-outcome-units-taken"
+                  />
+                  <span className="text-sm font-medium text-muted-foreground">u</span>
                 </div>
               ) : null}
 

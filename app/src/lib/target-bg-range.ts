@@ -37,6 +37,28 @@ export function targetBgRangeInputValues(
   };
 }
 
+/** Error message when the bedtime target sits outside the target range, otherwise null. Blank is allowed. */
+export function validateBedtimeTargetBgInput(
+  input: { bedtimeTargetBg: string; targetBgLow: string; targetBgHigh: string },
+  units: BgUnits,
+): string | null {
+  const raw = input.bedtimeTargetBg.trim();
+  if (!raw) return null;
+  const value = parseFloat(raw);
+  if (!Number.isFinite(value) || value <= 0) return "Enter a number for your bedtime target, or leave it blank.";
+  const range = resolveUserTargetBgRange(
+    {
+      targetBgLow: input.targetBgLow ? parseFloat(input.targetBgLow) : undefined,
+      targetBgHigh: input.targetBgHigh ? parseFloat(input.targetBgHigh) : undefined,
+    },
+    units,
+  );
+  if (value < range.low || value > range.high) {
+    return `Bedtime target needs to be within your target range (${range.low}–${range.high} ${units}).`;
+  }
+  return null;
+}
+
 export function formatTargetBgRangeLabel(
   settings: UserSettings | null | undefined,
   units: BgUnits,

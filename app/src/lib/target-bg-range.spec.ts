@@ -1,6 +1,25 @@
 import { describe, expect, it } from "vitest";
-import { resolveUserTargetBgRange, targetBgRangeInputValues } from "./target-bg-range";
+import { resolveUserTargetBgRange, targetBgRangeInputValues, validateBedtimeTargetBgInput } from "./target-bg-range";
 import type { UserSettings } from "@/lib/storage";
+
+describe("validateBedtimeTargetBgInput", () => {
+  it("allows blank and values inside the range", () => {
+    expect(validateBedtimeTargetBgInput({ bedtimeTargetBg: "", targetBgLow: "4", targetBgHigh: "10" }, "mmol/L")).toBeNull();
+    expect(validateBedtimeTargetBgInput({ bedtimeTargetBg: "7.5", targetBgLow: "4", targetBgHigh: "10" }, "mmol/L")).toBeNull();
+  });
+
+  it("rejects values outside the range, using defaults when the range is blank", () => {
+    expect(
+      validateBedtimeTargetBgInput({ bedtimeTargetBg: "11", targetBgLow: "4", targetBgHigh: "10" }, "mmol/L"),
+    ).toMatch(/within your target range/);
+    expect(validateBedtimeTargetBgInput({ bedtimeTargetBg: "200", targetBgLow: "", targetBgHigh: "" }, "mg/dL")).toMatch(
+      /72–180 mg\/dL/,
+    );
+    expect(validateBedtimeTargetBgInput({ bedtimeTargetBg: "abc", targetBgLow: "4", targetBgHigh: "10" }, "mmol/L")).toMatch(
+      /Enter a number/,
+    );
+  });
+});
 
 describe("resolveUserTargetBgRange", () => {
   it("uses settings when both bounds are set", () => {
