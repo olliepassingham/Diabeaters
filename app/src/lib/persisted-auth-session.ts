@@ -8,27 +8,81 @@
  * still had the session.
  */
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
+import { AUTH_SESSION_BACKUP_KEY, mirrorAuthBackupToNative } from "@/lib/native-auth-storage";
+import { getDevicePlatform } from "@/lib/native-platform";
 import { isOnline } from "@/lib/offline";
+import { ACTIVE_USER_ID_KEY, LAST_LOCAL_USER_ID_KEY } from "@/lib/storage";
 import { getSupabaseUrlAndAnonKey } from "@/lib/supabase";
+import { captureAuthSessionLoss, type AuthSessionLossReason } from "@/observability/sentry";
+
+export { AUTH_SESSION_BACKUP_KEY };
 
 /** Hard cap so recovery never hangs the startup shell on flaky Wi‑Fi. */
 export const AUTH_RECOVERY_TIMEOUT_MS = 4_000;
 
-/**
- * App-owned mirror of the last good session. GoTrue may clear `sb-…-auth-token`
- * after a failed refresh; this key is only cleared on intentional sign-out.
- */
-export const AUTH_SESSION_BACKUP_KEY = "diabeater_auth_session_backup";
+/** Set on intentional sign-out and cleared on the next sign-in, so a later login screen isn't reported as a lost session. */
+const SIGNED_OUT_INTENTIONALLY_KEY = "diabeater_signed_out_intentionally";
 
 let userInitiatedSignOut = false;
 /** Blocks auto-restore briefly after logout so /login cannot revive the just-cleared session. */
 let signOutRecoveryBlockedUntil = 0;
+const reportedLossReasons = new Set<AuthSessionLossReason>();
 
 /** Call immediately before `supabase.auth.signOut()` so recovery cannot revive the session. */
 export function markUserInitiatedSignOut(): void {
   userInitiatedSignOut = true;
   signOutRecoveryBlockedUntil = Date.now() + 8_000;
   clearAuthSessionBackup();
+  try {
+    localStorage.setItem(SIGNED_OUT_INTENTIONALLY_KEY, "1");
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Report each reason at most once per app launch. */
+export function reportAuthSessionLoss(
+  reason: AuthSessionLossReason,
+  detail?: { code?: string; status?: number },
+): void {
+  if (reportedLossReasons.has(reason)) return;
+  reportedLossReasons.add(reason);
+  let originHost = "unknown";
+  try {
+    originHost = window.location.hostname || "unknown";
+  } catch {
+    /* ignore */
+  }
+  captureAuthSessionLoss({ reason, platform: getDevicePlatform(), originHost, ...detail });
+}
+
+/** Test hook: allow the same reason to be reported again. */
+export function resetAuthSessionLossReportsForTests(): void {
+  reportedLossReasons.clear();
+}
+
+/**
+ * Called just before redirecting to /login with no session on disk. Reports `storage_missing`
+ * when this device had a signed-in user who never chose to sign out.
+ */
+export function reportIfSessionStorageMissing(): void {
+  try {
+    if (localStorage.getItem(SIGNED_OUT_INTENTIONALLY_KEY) === "1") return;
+    const hadUser = localStorage.getItem(LAST_LOCAL_USER_ID_KEY) || localStorage.getItem(ACTIVE_USER_ID_KEY);
+    if (!hadUser) return;
+  } catch {
+    return;
+  }
+  reportAuthSessionLoss("storage_missing");
+}
+
+function authErrorCode(error: { message?: string; code?: string }): string {
+  if (typeof error.code === "string" && error.code) return error.code;
+  const msg = (error.message ?? "").toLowerCase();
+  if (msg.includes("already used")) return "refresh_token_already_used";
+  if (msg.includes("not found")) return "refresh_token_not_found";
+  if (msg.includes("expired")) return "session_expired";
+  return "unknown";
 }
 
 export function clearUserInitiatedSignOut(): void {
@@ -105,15 +159,18 @@ export function readAuthSessionBackup(): Session | null {
 
 export function writeAuthSessionBackup(session: Session | null): void {
   if (typeof localStorage === "undefined") return;
+  if (!session?.refresh_token || !session.user?.id) {
+    clearAuthSessionBackup();
+    return;
+  }
+  const json = JSON.stringify(session);
   try {
-    if (!session?.refresh_token || !session.user?.id) {
-      localStorage.removeItem(AUTH_SESSION_BACKUP_KEY);
-      return;
-    }
-    localStorage.setItem(AUTH_SESSION_BACKUP_KEY, JSON.stringify(session));
+    localStorage.setItem(AUTH_SESSION_BACKUP_KEY, json);
+    localStorage.removeItem(SIGNED_OUT_INTENTIONALLY_KEY);
   } catch {
     /* quota / private mode */
   }
+  void mirrorAuthBackupToNative(json);
 }
 
 export function clearAuthSessionBackup(): void {
@@ -123,6 +180,7 @@ export function clearAuthSessionBackup(): void {
   } catch {
     /* ignore */
   }
+  void mirrorAuthBackupToNative(null);
 }
 
 /** GoTrue key first, then our backup — used before any login redirect. */
@@ -190,12 +248,24 @@ export async function getSessionWithTimeout(
  *
  * Important: never call `setSession` after a network-failed refresh — that can
  * clear GoTrue storage and make the false logout stick.
+ *
+ * Concurrent callers share one in-flight recovery: sending the same refresh token twice
+ * can trip Supabase's reuse detection and revoke the whole session.
  */
-export async function recoverAuthSessionAfterNull(
-  supabase: SupabaseClient,
-): Promise<Session | null> {
-  if (isAuthRecoveryBlocked()) return null;
+let inflightRecovery: Promise<Session | null> | null = null;
 
+export function recoverAuthSessionAfterNull(supabase: SupabaseClient): Promise<Session | null> {
+  if (isAuthRecoveryBlocked()) return Promise.resolve(null);
+  if (inflightRecovery) return inflightRecovery;
+  const run = runAuthSessionRecovery(supabase).finally(() => {
+    if (inflightRecovery === run) inflightRecovery = null;
+  });
+  inflightRecovery = run;
+  return run;
+}
+
+async function runAuthSessionRecovery(supabase: SupabaseClient): Promise<Session | null> {
+  // Read at call time so a token Supabase rotated a moment ago is the one we send.
   const persisted = readBestEffortAuthSession();
   if (!persisted?.refresh_token) return null;
 
@@ -217,6 +287,10 @@ export async function recoverAuthSessionAfterNull(
     }
     // Real auth rejection (revoked refresh) — clear backup so we do not loop forever.
     if (error && !isRetryableAuthNetworkError(error)) {
+      reportAuthSessionLoss("refresh_rejected", {
+        code: authErrorCode(error),
+        status: typeof error.status === "number" ? error.status : undefined,
+      });
       clearAuthSessionBackup();
       return null;
     }

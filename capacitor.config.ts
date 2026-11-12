@@ -59,6 +59,7 @@ const config: CapacitorConfig = {
       "@capacitor/camera",
       "@capacitor/haptics",
       "@capacitor/local-notifications",
+      "@capacitor/preferences",
       "@capacitor/push-notifications",
       "@capacitor/splash-screen",
       "@capacitor/status-bar",

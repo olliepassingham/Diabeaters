@@ -468,10 +468,10 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
     if (!sessionRescueAttempted) {
       setSessionRescueAttempted(true);
       void (async () => {
-        const { readBestEffortAuthSession, recoverAuthSessionAfterNull } = await import(
-          "@/lib/persisted-auth-session"
-        );
+        const { readBestEffortAuthSession, recoverAuthSessionAfterNull, reportIfSessionStorageMissing } =
+          await import("@/lib/persisted-auth-session");
         const disk = readBestEffortAuthSession();
+        if (!disk) reportIfSessionStorageMissing();
         if (disk) {
           syncAuthSession(disk);
           const supabase = (await import("@/lib/supabase")).getSupabase();
@@ -1990,8 +1990,9 @@ function AppContent() {
     if (user?.id) return;
     if (pathOnly !== "/" && pathOnly !== "") return;
     // Do not send returning users to welcome while a disk session can still be restored.
-    void import("@/lib/persisted-auth-session").then(({ readBestEffortAuthSession }) => {
+    void import("@/lib/persisted-auth-session").then(({ readBestEffortAuthSession, reportIfSessionStorageMissing }) => {
       if (readBestEffortAuthSession()) return;
+      reportIfSessionStorageMissing();
       setLocation("/welcome");
     });
   }, [authLoading, user?.id, pathOnly, setLocation]);

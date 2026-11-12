@@ -95,6 +95,29 @@ export function captureException(err: unknown) {
   Sentry.captureException(err);
 }
 
+export type AuthSessionLossReason = "storage_missing" | "refresh_rejected" | "restored_from_native";
+
+/** Why a signed-in user lost (or nearly lost) their session. Tags only — never tokens or emails. */
+export function captureAuthSessionLoss(input: {
+  reason: AuthSessionLossReason;
+  platform: string;
+  originHost: string;
+  code?: string;
+  status?: number;
+}) {
+  if (!DSN) return;
+  Sentry.withScope((scope) => {
+    scope.setTag("feature", "auth_session");
+    scope.setTag("auth_session.reason", input.reason);
+    scope.setTag("auth_session.platform", input.platform);
+    scope.setTag("auth_session.origin", input.originHost);
+    if (input.code) scope.setTag("auth_session.code", input.code.slice(0, 64));
+    if (input.status != null) scope.setTag("auth_session.http_status", String(input.status));
+    const level = input.reason === "restored_from_native" ? "info" : "warning";
+    Sentry.captureMessage(`auth session lost (${input.reason})`, level);
+  });
+}
+
 /**
  * Lightweight observability for Beatie (`ai_coach`) send failures — no user message text.
  * Uses tags + context; keep `detail` short and non-sensitive.
