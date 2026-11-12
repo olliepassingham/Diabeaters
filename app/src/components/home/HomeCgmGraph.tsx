@@ -10,12 +10,7 @@ import type { BgUnits } from "@/lib/cgm/types";
 import { resolveUserTargetBgRange } from "@/lib/target-bg-range";
 import { storage, DIABEATER_PROFILE_CHANGED_EVENT, DIABEATER_SETTINGS_CHANGED_EVENT } from "@/lib/storage";
 import { isPenDeliveryMethod } from "@/lib/insulin-delivery-method";
-import {
-  buildHomeInsulinChart,
-  INSULIN_ACTIVITY_CHANGED_EVENT,
-  usualLongActingUnits,
-} from "@/lib/insulin-activity";
-import { InsulinChartControls } from "@/components/home/InsulinChartControls";
+import { buildHomeInsulinChart, INSULIN_ACTIVITY_CHANGED_EVENT } from "@/lib/insulin-activity";
 import { useCgmHistory } from "@/hooks/use-cgm-history";
 import {
   getMealTimelineEvents,
@@ -179,20 +174,6 @@ export function HomeCgmGraph() {
             </>
           )}
         </p>
-      ) : null}
-
-      {penUser ? (
-        <InsulinChartControls
-          visible={insulin.visible}
-          hasDoses={insulin.hasDoses}
-          remaining={insulin.remaining}
-          runsOutLabel={insulin.runsOutLabel}
-          showDoseList={false}
-          longActingUnits={usualLongActingUnits(
-            storage.getSettings().longActingUnitsPerDay,
-            storage.getSettings().longActingInjectionsPerDay,
-          )}
-        />
       ) : null}
 
       {history.error && savedPoints.length > 1 ? (
