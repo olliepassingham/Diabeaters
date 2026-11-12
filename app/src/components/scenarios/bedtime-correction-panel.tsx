@@ -1,6 +1,9 @@
-import { Activity, AlertCircle, AlertTriangle, ChevronDown, Clock, Thermometer, Wine } from "lucide-react";
+import { Activity, AlertCircle, AlertTriangle, ChevronDown, Clock, Sparkles, Thermometer, Wine } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import type { BedtimePersonalAdjustment } from "@/lib/bedtime-personal-adjustment";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
 import { ScenarioResultHero, ScenarioResultHeroSuffix } from "@/components/scenarios/scenario-result-hero";
 import { formatInsulinUnits, insulinRoundIncrement } from "@/lib/insulin-rounding";
@@ -23,7 +26,109 @@ export type BedtimeCorrectionData = {
   alcoholWarning: string;
   hypoWarning: string;
   sickDayWarning: string;
+  baseSuggestedDose?: number;
+  personalAdjustment?: number;
+  personalAdjustmentNote?: string;
 };
+
+export type BedtimeLearningState = {
+  suggestion: BedtimePersonalAdjustment;
+  enabled: boolean;
+};
+
+function LearningSwitchRow({
+  enabled,
+  onToggle,
+}: {
+  enabled: boolean;
+  onToggle: (enabled: boolean) => void;
+}) {
+  return (
+    <label className="flex items-center justify-between gap-3 text-sm text-foreground/90">
+      <span>Learn from my nights</span>
+      <Switch
+        checked={enabled}
+        onCheckedChange={onToggle}
+        aria-label="Learn from my nights"
+        data-testid="switch-bedtime-learning"
+      />
+    </label>
+  );
+}
+
+/** Why learning changed tonight's dose, or a one-tap opt-in when it's off but the data points somewhere. */
+function LearningNotice({
+  correction,
+  learning,
+  onToggle,
+  showSwitch,
+}: {
+  correction: BedtimeCorrectionData;
+  learning: BedtimeLearningState;
+  onToggle: (enabled: boolean) => void;
+  showSwitch: boolean;
+}) {
+  const { suggestion, enabled } = learning;
+  if (enabled) {
+    const note =
+      correction.personalAdjustmentNote ||
+      suggestion.reason ||
+      (suggestion.nights < 2
+        ? "Learning is on. It needs at least 2 similar nights with a check-in before it changes anything."
+        : "Learning is on. Similar recent nights went as expected, so no change tonight.");
+    if (!showSwitch && !correction.personalAdjustmentNote && !suggestion.upwardBlockedReason) return null;
+    return (
+      <div
+        className="space-y-2 rounded-xl border border-primary/25 bg-primary/[0.05] px-3 py-2.5 text-sm"
+        data-testid="card-bedtime-learning"
+      >
+        <p className="flex items-start gap-2 leading-snug text-foreground/90">
+          <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
+          <span data-testid="text-bedtime-learning-note">{note}</span>
+        </p>
+        {showSwitch || correction.personalAdjustmentNote ? (
+          <LearningSwitchRow enabled={enabled} onToggle={onToggle} />
+        ) : null}
+      </div>
+    );
+  }
+  if (suggestion.direction === "none") {
+    return showSwitch ? (
+      <div className="rounded-xl border border-border/60 bg-muted/20 px-3 py-2.5" data-testid="card-bedtime-learning">
+        <LearningSwitchRow enabled={false} onToggle={onToggle} />
+        <p className="mt-1 text-xs text-muted-foreground">
+          Off. When on, similar recent nights can nudge suggestions up or down by up to 30%. It never goes above a full
+          correction.
+        </p>
+      </div>
+    ) : null;
+  }
+  const direction = suggestion.direction === "up" ? "a little more" : "a little less";
+  return (
+    <div
+      className="space-y-2 rounded-xl border border-primary/25 bg-primary/[0.05] px-3 py-2.5 text-sm"
+      data-testid="card-bedtime-learning-prompt"
+    >
+      <p className="flex items-start gap-2 leading-snug text-foreground/90">
+        <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
+        <span>
+          Your recent similar nights suggest {direction} insulin. Turn on learning to let them adjust suggestions (up to
+          30%, never above a full correction).
+        </span>
+      </p>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="h-9 w-full rounded-lg"
+        onClick={() => onToggle(true)}
+        data-testid="button-enable-bedtime-learning"
+      >
+        Turn on learning from your nights
+      </Button>
+    </div>
+  );
+}
 
 type WarningItem = {
   id: string;
@@ -118,6 +223,7 @@ function reasonChips(correction: BedtimeCorrectionData): { id: string; label: st
   if (correction.hypoWarning) chips.push({ id: "hypo", label: "Recent hypo" });
   if (/rise overnight/i.test(correction.overnightTrendNote)) chips.push({ id: "rise", label: "Usually rises" });
   else if (/fall overnight/i.test(correction.overnightTrendNote)) chips.push({ id: "fall", label: "Usually falls" });
+  if (correction.personalAdjustmentNote) chips.push({ id: "learning", label: "Your nights" });
   return chips;
 }
 
@@ -191,6 +297,12 @@ function CalculationDetails({
             {correction.extraCautionNote}
           </p>
         ) : null}
+        {correction.personalAdjustmentNote && correction.baseSuggestedDose != null ? (
+          <p className="text-sm leading-relaxed text-foreground/90" data-testid="text-correction-learning-detail">
+            Learning from your nights: {formatInsulinUnits(correction.baseSuggestedDose, insulinRoundIncrement(isPumpUser))}u
+            standard → {formatInsulinUnits(correction.suggestedDose, insulinRoundIncrement(isPumpUser))}u tonight.
+          </p>
+        ) : null}
         {isPumpUser ? (
           <p className="text-sm text-muted-foreground" data-testid="text-pump-correction-tip">
             Check your pump&apos;s IOB — active insulin may already be working on this high. Use the IOB field on this check so the estimate can subtract it.
@@ -208,12 +320,16 @@ export function BedtimeCorrectionPanel({
   hoursUntilSleep,
   variant = "compact",
   closedLoop = false,
+  learning,
+  onToggleLearning,
 }: {
   correction: BedtimeCorrectionData;
   isPumpUser: boolean;
   hoursUntilSleep: string;
   variant?: "compact" | "details";
   closedLoop?: boolean;
+  learning?: BedtimeLearningState;
+  onToggleLearning?: (enabled: boolean) => void;
 }) {
   const warnings = buildWarnings(correction, hoursUntilSleep);
   const topWarning = warnings[0];
@@ -233,11 +349,17 @@ export function BedtimeCorrectionPanel({
     </p>
   ) : null;
 
+  const learningNotice = (showSwitch: boolean) =>
+    learning && onToggleLearning ? (
+      <LearningNotice correction={correction} learning={learning} onToggle={onToggleLearning} showSwitch={showSwitch} />
+    ) : null;
+
   if (variant === "details") {
     return (
       <div className="space-y-3" data-testid="card-correction-suggestion">
         {loopNote}
         <WarningsList warnings={warnings} />
+        {learningNotice(true)}
         <CalculationDetails correction={correction} isPumpUser={isPumpUser} />
       </div>
     );
@@ -292,6 +414,7 @@ export function BedtimeCorrectionPanel({
           <span data-testid={topWarning.testId}>{compactWarningText(topWarning)}</span>
         </div>
       ) : null}
+      {learningNotice(false)}
       {loopNote}
     </div>
   );

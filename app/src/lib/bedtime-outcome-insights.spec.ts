@@ -145,7 +145,18 @@ describe("buildOvernightCheckinTakeaway", () => {
     );
     expect(takeaway.headline).toMatch(/still went low/i);
     expect(takeaway.recommendations.join(" ")).toMatch(/hypo treatment/i);
-    expect(takeaway.nextCheckNote).toMatch(/never changes how a correction dose is calculated/i);
+    expect(takeaway.nextCheckNote).toMatch(/doesn't change how a correction dose is calculated unless you turn on learning/i);
+  });
+
+  it("says similar corrections can be nudged when learning from nights is on", () => {
+    const takeaway = buildOvernightCheckinTakeaway(
+      makeLog({ actionSuggested: "correction" }),
+      { overnightFeel: "went_low", followedAction: "yes" },
+      [],
+      { learningEnabled: true },
+    );
+    expect(takeaway.nextCheckNote).toMatch(/learning from your nights is on/i);
+    expect(takeaway.recommendations.join(" ")).toMatch(/more cautious/i);
   });
 
   it("flags skipping a correction then waking high", () => {

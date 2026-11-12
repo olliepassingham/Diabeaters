@@ -1,9 +1,13 @@
 import type { BedtimeActionSuggested, BedtimeLog } from "@/lib/storage";
 
 /**
- * Educational-only insights derived from a user's own logged bedtime outcomes. These never feed
- * back into the correction-dose calculation — only into copy/tips shown alongside future checks.
+ * Educational insights derived from a user's own logged bedtime outcomes. These don't feed the
+ * correction-dose calculation; opt-in dose learning lives in bedtime-personal-adjustment, and the
+ * copy here only reflects whether it's switched on.
  */
+export type BedtimeInsightOptions = {
+  learningEnabled?: boolean;
+};
 export type BedtimeOutcomeContext = {
   exercisedToday: boolean;
   hadAlcohol: boolean;
@@ -42,7 +46,12 @@ function describeContext(context: BedtimeOutcomeContext): string {
  * Looks for a clear majority outcome among the user's own logged nights that share tonight's key
  * factors, and phrases it as an awareness prompt — never as a reason to change the dose above.
  */
-export function buildOutcomePatternTip(logs: BedtimeLog[], context: BedtimeOutcomeContext): string | null {
+export function buildOutcomePatternTip(
+  logs: BedtimeLog[],
+  context: BedtimeOutcomeContext,
+  options: BedtimeInsightOptions = {},
+): string | null {
+  const learningEnabled = Boolean(options.learningEnabled);
   const cutoffMs = Date.now() - LOOKBACK_DAYS * 24 * 60 * 60 * 1000;
   const matching = logs.filter((log) => new Date(log.date).getTime() >= cutoffMs && matchesContext(log, context));
   if (matching.length < MIN_MATCHING_NIGHTS) return null;
@@ -59,10 +68,14 @@ export function buildOutcomePatternTip(logs: BedtimeLog[], context: BedtimeOutco
 
   const label = describeContext(context);
   if (topFeel === "went_low") {
-    return `On ${label}, you've gone low ${topCount} of ${total} logged nights. Keep hypo treatments nearby, and mention this pattern to your care team — tonight's dose maths stays as calculated.`;
+    return learningEnabled
+      ? `On ${label}, you've gone low ${topCount} of ${total} logged nights. Keep hypo treatments nearby. Learning from your nights is on, so corrections on similar nights can be nudged down — still mention this pattern to your care team.`
+      : `On ${label}, you've gone low ${topCount} of ${total} logged nights. Keep hypo treatments nearby, and mention this pattern to your care team — tonight's dose maths stays as calculated.`;
   }
   if (topFeel === "went_high") {
-    return `On ${label}, you've woken high ${topCount} of ${total} logged nights. Worth a care-team chat about overnight insulin; we still won't change tonight's dose from this.`;
+    return learningEnabled
+      ? `On ${label}, you've woken high ${topCount} of ${total} logged nights. Learning from your nights is on, so corrections on similar nights can be nudged up (by up to 30%). Worth a care-team chat about overnight insulin if it keeps happening.`
+      : `On ${label}, you've woken high ${topCount} of ${total} logged nights. Worth a care-team chat about overnight insulin; tonight's dose isn't changed from this unless you turn on learning from your nights.`;
   }
   if (topFeel === "steady") {
     return `On ${label}, you've stayed steady ${topCount} of ${total} logged nights — we'll keep using that as context for nights like this.`;
@@ -158,26 +171,31 @@ export function describeLastNightCheck(log: BedtimeLog): LastNightCheckRecap {
   return { bgLine, actionLine, contextChips };
 }
 
-function nextCheckNote(log: BedtimeLog): string {
+function nextCheckNote(log: BedtimeLog, learningEnabled: boolean): string {
   const parts: string[] = [];
   if (log.exercisedToday) parts.push("exercise");
   if (log.hadAlcohol) parts.push("alcohol");
   const action = actionPhrase(log.actionSuggested);
   if (action) parts.push(action.replace(/^a /, ""));
+  const doseLine = learningEnabled
+    ? "Learning from your nights is on, so it can also nudge a similar correction up or down (by up to 30%)."
+    : "It doesn't change how a correction dose is calculated unless you turn on learning from your nights.";
   if (parts.length === 0) {
-    return "On your next bedtime check, we'll use this as context in the tips — it never changes how a correction dose is calculated.";
+    return `On your next bedtime check, we'll use this as context in the tips. ${doseLine}`;
   }
-  return `Next time a bedtime check looks like this (${parts.join(" + ")}), we'll surface this as a tip. It never changes how a correction dose is calculated.`;
+  return `Next time a bedtime check looks like this (${parts.join(" + ")}), we'll surface this as a tip. ${doseLine}`;
 }
 
 /**
- * Immediate, educational takeaway from this night's answers. Never feeds the correction-dose maths.
+ * Immediate, educational takeaway from this night's answers. Copy reflects whether dose learning is on.
  */
 export function buildOvernightCheckinTakeaway(
   log: BedtimeLog,
   answers: OvernightCheckinAnswers,
   logs: BedtimeLog[] = [],
+  options: BedtimeInsightOptions = {},
 ): OvernightCheckinTakeaway {
+  const learningEnabled = Boolean(options.learningEnabled);
   const feel = answers.overnightFeel;
   const followed = answers.followedAction ?? "n_a";
   const action = log.actionSuggested ?? "none";
@@ -196,7 +214,11 @@ export function buildOvernightCheckinTakeaway(
     headline = "Correction taken, still went low";
     body = "Taking the suggested correction and still going low is useful to know — it can mean overnight insulin was stronger than usual.";
     recs.push("Keep fast-acting hypo treatment by the bed on similar nights.");
-    recs.push("If this keeps happening, ask your care team about bedtime target or insulin sensitivity — we won't change the dose maths ourselves.");
+    recs.push(
+      learningEnabled
+        ? "Learning from your nights is on, so similar corrections will be made more cautious. If this keeps happening, ask your care team about bedtime target or insulin sensitivity."
+        : "If this keeps happening, ask your care team about bedtime target or insulin sensitivity — the dose maths only changes if you turn on learning from your nights.",
+    );
   } else if (feel === "went_low" && action === "correction" && (followed === "no" || followed === "partially")) {
     headline = "Low overnight, correction not fully taken";
     body = "The low wasn't from taking the full suggested correction, so other overnight factors are more likely.";
@@ -221,7 +243,9 @@ export function buildOvernightCheckinTakeaway(
     recs.push("If skipping and waking high becomes a habit, your care team can help you decide what to change.");
   } else if (feel === "went_high" && action === "correction" && followed === "yes") {
     headline = "Correction taken, still woke high";
-    body = "Following the suggestion and still waking high is worth a care-team chat (sensitivity, duration, or basal) — we won't tweak the dose maths from this.";
+    body = learningEnabled
+      ? "Following the suggestion and still waking high is useful. Learning from your nights is on, so similar corrections can be nudged up (by up to 30%, never above a full correction)."
+      : "Following the suggestion and still waking high is worth a care-team chat (sensitivity, duration, or basal). The dose maths only changes from this if you turn on learning from your nights.";
     recs.push("Mention this pattern at your next review.");
     recs.push("We'll flag similar nights so you can double-check the suggestion rather than stacking extra insulin yourself.");
   } else if (feel === "went_high" && action === "snack" && followed === "yes") {
@@ -259,6 +283,6 @@ export function buildOvernightCheckinTakeaway(
     headline,
     body,
     recommendations: recs.slice(0, 3),
-    nextCheckNote: nextCheckNote(log),
+    nextCheckNote: nextCheckNote(log, learningEnabled),
   };
 }

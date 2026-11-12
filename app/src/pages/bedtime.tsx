@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, type ReactNode } from "react";
+import { useState, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,7 +57,11 @@ import { useToast } from "@/hooks/use-toast";
 import { GuideFrame, PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
-import { BedtimeResultView, type BedtimeAction } from "@/components/scenarios/bedtime-result-view";
+import {
+  BedtimeResultView,
+  type BedtimeAction,
+  type BedtimeLearningState,
+} from "@/components/scenarios/bedtime-result-view";
 import { BedtimeLastNightCard } from "@/components/scenarios/bedtime-last-night-card";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
 import {
@@ -65,6 +69,11 @@ import {
   resolveBedtimeCorrectionAim,
   type BedtimeCorrectionResult,
 } from "@/lib/bedtime-correction-dose";
+import {
+  resolveBedtimePersonalAdjustment,
+  type BedtimePersonalAdjustment,
+} from "@/lib/bedtime-personal-adjustment";
+import { saveDosingSettingsAndSync } from "@/lib/clinical-prefs-cloud-sync";
 import { CgmPrefillButton } from "@/components/cgm-prefill-button";
 import { useAutoCgmBgField } from "@/hooks/use-auto-cgm-bg-field";
 import { cgmTrendForBedtime } from "@/lib/cgm/apply-cgm-trend";
@@ -99,7 +108,10 @@ interface ReadinessResult {
   /** The single, coherent action for tonight — never both a correction and a snack. */
   action: BedtimeAction;
   bgAboveTarget: boolean;
+  learning: BedtimeLearningState;
 }
+
+type CorrectionDoseParams = Parameters<typeof calculateBedtimeCorrectionDose>[0];
 
 function bedtimeActionSuggested(action: BedtimeAction): BedtimeActionSuggested {
   if (action.kind === "correction") return "correction";
@@ -109,6 +121,10 @@ function bedtimeActionSuggested(action: BedtimeAction): BedtimeActionSuggested {
   return "none";
 }
 
+function learningAdjustmentFor(suggestion: BedtimePersonalAdjustment, enabled: boolean) {
+  return enabled && suggestion.direction !== "none" ? suggestion : null;
+}
+
 /** Fields stored on the bedtime log so later learning compares against the base suggestion. */
 function correctionLogFields(correction: BedtimeCorrectionResult) {
   if (correction.status !== "dose") {
@@ -116,8 +132,8 @@ function correctionLogFields(correction: BedtimeCorrectionResult) {
   }
   return {
     correctionGiven: correction.suggestedDose,
-    correctionBaseDose: correction.suggestedDose,
-    personalAdjustment: null,
+    correctionBaseDose: correction.baseSuggestedDose,
+    personalAdjustment: correction.personalAdjustment,
   };
 }
 
@@ -327,6 +343,12 @@ export default function Bedtime() {
   const [hadAlcohol, setHadAlcohol] = useState(false);
   const [recentHypos, setRecentHypos] = useState(false);
   const [result, setResult] = useState<ReadinessResult | null>(null);
+  const lastCorrectionRef = useRef<{
+    params: CorrectionDoseParams;
+    snack: { grams: number; reason: string } | null;
+    learningSuggestion: BedtimePersonalAdjustment;
+    logId: string;
+  } | null>(null);
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
   const [scenarioState, setScenarioState] = useState<ScenarioState>({ travelModeActive: false, sickDayActive: false });
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -537,6 +559,33 @@ export default function Bedtime() {
       setSecondChancePromptOpen(true);
     }
     return log.id;
+  };
+
+  const handleToggleBedtimeLearning = (enabled: boolean) => {
+    const saved = saveDosingSettingsAndSync({ ...storage.getSettings(), bedtimeLearningEnabled: enabled });
+    setUserSettings(saved);
+    const last = lastCorrectionRef.current;
+    if (last) {
+      const correction = calculateBedtimeCorrectionDose({
+        ...last.params,
+        personalAdjustment: learningAdjustmentFor(last.learningSuggestion, enabled),
+      });
+      const action = resolveBedtimeAction(correction, last.snack);
+      setResult((prev) =>
+        prev ? { ...prev, action, learning: { suggestion: last.learningSuggestion, enabled } } : prev,
+      );
+      storage.updateBedtimeLog(last.logId, {
+        ...correctionLogFields(correction),
+        actionSuggested: bedtimeActionSuggested(action),
+      });
+      setBedtimeLogs(storage.getBedtimeLogs());
+    }
+    toast({
+      title: enabled ? "Learning from your nights is on" : "Learning from your nights is off",
+      description: enabled
+        ? "Suggestions can move up or down by up to 30% based on how similar nights went."
+        : "Suggestions go back to the standard bedtime calculation.",
+    });
   };
 
   const calculateReadiness = () => {
@@ -1027,7 +1076,7 @@ export default function Bedtime() {
       tips.push("Consider a temporary basal at 80–90% overnight after exercise if your team uses that approach");
     }
 
-    const correctionResult = calculateBedtimeCorrectionDose({
+    const correctionParams: CorrectionDoseParams = {
       bgMmol,
       targetLowMmol,
       targetHighMmol,
@@ -1044,18 +1093,38 @@ export default function Bedtime() {
       requirePumpIob: isPumpUser,
       roundIncrement,
       bedtimeTargetMmol,
+    };
+    const learningSuggestion = resolveBedtimePersonalAdjustment(
+      mergeCloudNightSummaries(storage.getBedtimeLogs(), cloudNights),
+      {
+        hadAlcohol,
+        exerciseOvernightCaution,
+        bgTrend,
+        recentHypos,
+        sickDayActive: scenarioState.sickDayActive,
+      },
+      { lowMmol: targetLowMmol, highMmol: targetHighMmol, bgUnits },
+    );
+    const learningEnabled = Boolean(userSettings?.bedtimeLearningEnabled);
+    const correctionResult = calculateBedtimeCorrectionDose({
+      ...correctionParams,
+      personalAdjustment: learningAdjustmentFor(learningSuggestion, learningEnabled),
     });
     const action = resolveBedtimeAction(correctionResult, personalized.snack);
     const actionSuggested = bedtimeActionSuggested(action);
 
-    // Educational only — reflects the user's own logged outcomes, never changes the dose above.
-    const outcomeTip = buildOutcomePatternTip(bedtimeLogs, {
-      exercisedToday,
-      hadAlcohol,
-      recentHypos,
-      actionSuggested,
-      bgTrend,
-    });
+    // Tips only; dose changes from past nights come from opt-in learning above.
+    const outcomeTip = buildOutcomePatternTip(
+      bedtimeLogs,
+      {
+        exercisedToday,
+        hadAlcohol,
+        recentHypos,
+        actionSuggested,
+        bgTrend,
+      },
+      { learningEnabled },
+    );
     if (outcomeTip) {
       tips.push(outcomeTip);
     }
@@ -1076,6 +1145,7 @@ export default function Bedtime() {
       factors,
       action,
       bgAboveTarget,
+      learning: { suggestion: learningSuggestion, enabled: learningEnabled },
     });
     try {
       localStorage.setItem(BEDTIME_OVERNIGHT_TREND_STORAGE_KEY, overnightUsualTrend);
@@ -1083,7 +1153,7 @@ export default function Bedtime() {
       // ignore
     }
     const { correctionGiven, ...correctionFields } = correctionLogFields(correctionResult);
-    persistBedtimeCheck(level, correctionGiven, actionSuggested, {
+    const logId = persistBedtimeCheck(level, correctionGiven, actionSuggested, {
       ...correctionFields,
       bedtimeTargetMmol:
         Math.round(
@@ -1091,6 +1161,12 @@ export default function Bedtime() {
         ) / 10,
       exerciseOvernightCaution,
     });
+    lastCorrectionRef.current = {
+      params: correctionParams,
+      snack: personalized.snack,
+      learningSuggestion,
+      logId,
+    };
     setQuickCheckOpen(false);
 
     // Bring the verdict/status card into view after calculating.
@@ -1278,6 +1354,7 @@ export default function Bedtime() {
           exercisedToday={exercisedToday}
           hadAlcohol={hadAlcohol}
           lastExerciseLabel={lastExerciseLabel}
+          onToggleBedtimeLearning={handleToggleBedtimeLearning}
         />
       ) : null}
 

@@ -554,6 +554,73 @@ describe("calculateBedtimeCorrectionDose", () => {
     expect(light.extraCautionNote).toBe("");
   });
 
+  describe("personal adjustment from similar nights", () => {
+    const steady = { ...base, bgTrend: "steady" as const };
+
+    it("scales the cautious dose and keeps the base dose for logging", () => {
+      const plain = calculateBedtimeCorrectionDose(steady);
+      const up = calculateBedtimeCorrectionDose({
+        ...steady,
+        personalAdjustment: { multiplier: 1.2, reason: "Adjusted up 20%: on 2 similar nights you ended above 8." },
+      });
+      expect(plain.status).toBe("dose");
+      expect(up.status).toBe("dose");
+      if (plain.status !== "dose" || up.status !== "dose") return;
+      expect(up.baseSuggestedDose).toBe(plain.suggestedDose);
+      expect(up.suggestedDose).toBeGreaterThan(plain.suggestedDose);
+      expect(up.personalAdjustment).toBeCloseTo(1.2);
+      expect(up.personalAdjustmentNote).toMatch(/Adjusted up 20%/);
+      expect(plain.personalAdjustment).toBe(1);
+      expect(plain.personalAdjustmentNote).toBe("");
+    });
+
+    it("never goes above a full correction to the bedtime target", () => {
+      // Rising + very high: the caution share is already 90%, so +30% would overshoot.
+      const result = calculateBedtimeCorrectionDose({
+        ...base,
+        bgTrend: "rising",
+        personalAdjustment: { multiplier: 1.3, reason: "Adjusted up 30%." },
+      });
+      expect(result.status).toBe("dose");
+      if (result.status !== "dose") return;
+      expect(result.suggestedDose).toBeLessThanOrEqual(result.fullDose);
+      expect(result.personalAdjustment).toBeLessThan(1.3);
+      expect(result.personalAdjustmentNote).toMatch(/Capped at a full correction/);
+    });
+
+    it("never goes above the full correction after pump IOB", () => {
+      const result = calculateBedtimeCorrectionDose({
+        ...base,
+        bgTrend: "rising",
+        pumpIobUnits: 4,
+        roundIncrement: 0.05,
+        personalAdjustment: { multiplier: 1.3, reason: "Adjusted up 30%." },
+      });
+      expect(result.status).toBe("dose");
+      if (result.status !== "dose") return;
+      expect(result.suggestedDose).toBeLessThanOrEqual(11 - 4);
+    });
+
+    it("clamps out-of-range multipliers to 0.7–1.3", () => {
+      const huge = calculateBedtimeCorrectionDose({ ...steady, personalAdjustment: { multiplier: 5, reason: "x" } });
+      const tiny = calculateBedtimeCorrectionDose({ ...steady, personalAdjustment: { multiplier: 0.1, reason: "x" } });
+      if (huge.status !== "dose" || tiny.status !== "dose") throw new Error("expected doses");
+      expect(huge.personalAdjustment).toBeLessThanOrEqual(1.3);
+      expect(tiny.personalAdjustment).toBeCloseTo(0.7);
+    });
+
+    it("is ignored on sick days", () => {
+      const result = calculateBedtimeCorrectionDose({
+        ...steady,
+        sickDayActive: true,
+        personalAdjustment: { multiplier: 1.3, reason: "Adjusted up 30%." },
+      });
+      if (result.status !== "dose") throw new Error("expected a dose");
+      expect(result.personalAdjustment).toBe(1);
+      expect(result.suggestedDose).toBe(result.baseSuggestedDose);
+    });
+  });
+
   it("lets pump users take small corrections of 0.2u or more", () => {
     const result = calculateBedtimeCorrectionDose({
       bgMmol: 9.2,

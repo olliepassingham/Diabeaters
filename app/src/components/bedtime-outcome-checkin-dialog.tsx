@@ -163,6 +163,7 @@ export function BedtimeOutcomeCheckinDialog({ open, onOpenChange, log, logs = []
           morningBg: outcome.morningBg,
         },
         logs,
+        { learningEnabled: Boolean(storage.getSettings().bedtimeLearningEnabled) },
       );
       toast({
         title: result.headline,

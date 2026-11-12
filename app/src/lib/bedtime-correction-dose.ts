@@ -1,6 +1,8 @@
 import { computeSimpleCorrectionDose, type BgUnits } from "@/lib/correction-dose";
 import type { OvernightUsualTrend } from "@/lib/bedtime-readiness";
 import { PEN_INSULIN_INCREMENT, roundInsulinUnits } from "@/lib/insulin-rounding";
+import { BEDTIME_LEARNING_MAX_MULTIPLIER, BEDTIME_LEARNING_MIN_MULTIPLIER } from "@/lib/bedtime-personal-adjustment";
+
 export type BedtimeCorrectionTrend = "rising" | "steady" | "falling" | "not_sure";
 
 export type BedtimeHighSeverity = "moderate" | "high" | "very_high";
@@ -41,6 +43,12 @@ function correctionSeverityFloor(
 export type BedtimeCorrectionSuggestion = {
   fullDose: number;
   suggestedDose: number;
+  /** Suggestion before any personal (learning) adjustment. */
+  baseSuggestedDose: number;
+  /** Learning multiplier actually applied after the full-correction cap (1 = none). */
+  personalAdjustment: number;
+  /** Why learning changed the dose; empty when it didn't. */
+  personalAdjustmentNote: string;
   /** Pre-round share of full dose (for display; avoids 100% badge when rounding). */
   pctOfFullDose: number;
   bedtimeReduction: number;
@@ -335,6 +343,8 @@ export function calculateBedtimeCorrectionDose(params: {
   roundIncrement?: number;
   /** User's bedtime target (mmol/L). Defaults to the middle of the target range. */
   bedtimeTargetMmol?: number | null;
+  /** Opt-in learning from similar nights. Ignored on sick days. */
+  personalAdjustment?: { multiplier: number; reason: string } | null;
 }): BedtimeCorrectionResult {
   const {
     bgMmol,
@@ -353,6 +363,7 @@ export function calculateBedtimeCorrectionDose(params: {
     requirePumpIob = false,
     roundIncrement = PEN_INSULIN_INCREMENT,
     bedtimeTargetMmol,
+    personalAdjustment,
   } = params;
 
   const thresholdMmol = resolveBedtimeCorrectionThreshold(targetLowMmol, targetHighMmol, overnightUsualTrend);
@@ -420,13 +431,27 @@ export function calculateBedtimeCorrectionDose(params: {
     ? rawMultiplier
     : Math.max(rawMultiplier, correctionSeverityFloor(severity, overnightUsualTrend));
 
-  const rawEffective = remainingFull * effectiveMultiplier;
+  const baseRaw = remainingFull * effectiveMultiplier;
+  const requestedAdjustment =
+    personalAdjustment && !sickDayActive && Number.isFinite(personalAdjustment.multiplier)
+      ? Math.min(BEDTIME_LEARNING_MAX_MULTIPLIER, Math.max(BEDTIME_LEARNING_MIN_MULTIPLIER, personalAdjustment.multiplier))
+      : 1;
+  // Learning can never push past a full correction to the bedtime target (after pump IOB).
+  const rawEffective = requestedAdjustment === 1 ? baseRaw : Math.min(remainingFull, baseRaw * requestedAdjustment);
+  const appliedAdjustment = baseRaw > 0 ? Math.round((rawEffective / baseRaw) * 100) / 100 : 1;
+  const personalAdjustmentNote =
+    requestedAdjustment === 1 || !personalAdjustment
+      ? ""
+      : appliedAdjustment < requestedAdjustment
+        ? `${personalAdjustment.reason} Capped at a full correction to your bedtime target.`
+        : personalAdjustment.reason;
+  const baseSuggestedDose = roundInsulinUnits(baseRaw, roundIncrement);
   const suggestedDose = roundInsulinUnits(rawEffective, roundIncrement);
   const pctOfFullDose = simple.exactDose > 0 ? Math.round((rawEffective / simple.exactDose) * 100) : 0;
   const minActionable = bedtimeMinActionableDose(roundIncrement);
 
   if (suggestedDose < minActionable) {
-    const extraSuffix = extraCautionNote ? ` ${extraCautionNote}` : "";
+    const extraSuffix = [extraCautionNote, personalAdjustmentNote].filter(Boolean).map((s) => ` ${s}`).join("");
     const tooSmallLead =
       usingPumpIob && pumpIob > 0 && remainingFull <= 0
         ? "Pump IOB already covers a standard correction."
@@ -475,6 +500,9 @@ export function calculateBedtimeCorrectionDose(params: {
     status: "dose",
     fullDose,
     suggestedDose,
+    baseSuggestedDose,
+    personalAdjustment: appliedAdjustment,
+    personalAdjustmentNote,
     pctOfFullDose,
     bedtimeReduction,
     iobReduction,

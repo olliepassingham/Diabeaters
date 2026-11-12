@@ -15,7 +15,13 @@ import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { BedtimeCorrectionPanel, type BedtimeCorrectionData } from "@/components/scenarios/bedtime-correction-panel";
+import {
+  BedtimeCorrectionPanel,
+  type BedtimeCorrectionData,
+  type BedtimeLearningState,
+} from "@/components/scenarios/bedtime-correction-panel";
+
+export type { BedtimeLearningState };
 import { closedLoopSafetyNote } from "@/lib/closed-loop";
 import { storage } from "@/lib/storage";
 import {
@@ -56,6 +62,7 @@ export type BedtimeResultViewData = {
   factors: Factor[];
   action: BedtimeAction;
   bgAboveTarget: boolean;
+  learning?: BedtimeLearningState;
 };
 
 type Props = {
@@ -66,6 +73,7 @@ type Props = {
   exercisedToday: boolean;
   hadAlcohol: boolean;
   lastExerciseLabel: string | null;
+  onToggleBedtimeLearning?: (enabled: boolean) => void;
 };
 
 function verdictLabel(level: ReadinessLevel, aboveTarget?: boolean) {
@@ -119,6 +127,7 @@ export function BedtimeResultView({
   exercisedToday,
   hadAlcohol,
   lastExerciseLabel,
+  onToggleBedtimeLearning,
 }: Props) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const tone = levelTone(result.level);
@@ -179,6 +188,8 @@ export function BedtimeResultView({
           hoursUntilSleep={hoursUntilSleep}
           variant="compact"
           closedLoop={loopOn}
+          learning={result.learning}
+          onToggleLearning={onToggleBedtimeLearning}
         />
       ) : null}
 
@@ -295,6 +306,8 @@ export function BedtimeResultView({
                   hoursUntilSleep={hoursUntilSleep}
                   variant="details"
                   closedLoop={loopOn}
+                  learning={result.learning}
+                  onToggleLearning={onToggleBedtimeLearning}
                 />
               </section>
             ) : null}
