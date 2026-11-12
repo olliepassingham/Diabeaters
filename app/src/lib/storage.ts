@@ -1484,6 +1484,18 @@ export type ExerciseBgTrend = "rising" | "flat" | "falling" | "not_sure";
 /** Quick bar: any rapid-acting meal or correction dose in the last ~2 hours. */
 export type PreRapidInsulin2h = "yes" | "no" | "not_sure";
 
+/** What the person plans to eat before exercise (pre-workout fuel plan). */
+export type ExercisePreFuelIntent = "meal" | "top_up" | "none";
+
+/** Pre-workout fuel choice captured on "Plan a workout" and carried into the session. */
+export type ExercisePrePlan = {
+  intent: ExercisePreFuelIntent;
+  /** Meal carbs (meal intent only). */
+  carbsGrams?: number;
+  mealType?: string;
+  minutesUntilStart: number;
+};
+
 /** Environment selected on the deeper coach. */
 export type ExerciseEnvironmentChoice =
   | "indoor"
@@ -1581,6 +1593,8 @@ export interface ActiveExerciseSession {
   preBetaBlockerToday?: boolean;
   /** Pre: known IOB units (pump or mental tally). */
   preIobUnits?: number;
+  /** Pre: fuel plan chosen before starting (meal / top-up / not eating). */
+  prePlan?: ExercisePrePlan;
 
   /** Active: carbs the user has actually consumed during the session. */
   midCarbsGramsSoFar?: number;

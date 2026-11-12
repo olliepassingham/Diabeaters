@@ -82,4 +82,51 @@ describe("startGuidedExerciseSession", () => {
     expect(storage.getExerciseOutcomes()).toHaveLength(0);
     expect(storage.didExerciseRecently(24)).toBe(false);
   });
+
+  it("writes Plan a workout answers onto the new session", () => {
+    const result = startGuidedExerciseSession({
+      exerciseType: "cardio",
+      intensity: "moderate",
+      durationMinutes: 45,
+      prefill: {
+        preBg: 8.2,
+        preTrend: "flat",
+        preRapidInsulin2h: "yes",
+        preIobUnits: 1.5,
+        preFasted: false,
+        prefuelMinutesAgo: 90,
+        prefuelGrams: 30,
+        prePlan: { intent: "meal", carbsGrams: 50, mealType: "lunch", minutesUntilStart: 30 },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const stored = storage.getActiveExercise();
+    for (const session of [result.session, stored]) {
+      expect(session?.preBg).toBe(8.2);
+      expect(session?.preBgAt).toBeTruthy();
+      expect(session?.preTrend).toBe("flat");
+      expect(session?.preRapidInsulin2h).toBe("yes");
+      expect(session?.preIobUnits).toBe(1.5);
+      expect(session?.preFasted).toBe(false);
+      expect(session?.prefuelMinutesAgo).toBe(90);
+      expect(session?.prefuelGrams).toBe(30);
+      expect(session?.prePlan).toEqual({ intent: "meal", carbsGrams: 50, mealType: "lunch", minutesUntilStart: 30 });
+    }
+  });
+
+  it("leaves pre fields empty when no prefill is given", () => {
+    const result = startGuidedExerciseSession({
+      exerciseType: "cardio",
+      intensity: "moderate",
+      durationMinutes: 45,
+      prefill: { preBg: undefined, prePlan: undefined },
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.session.preBg).toBeUndefined();
+    expect(result.session.preBgAt).toBeUndefined();
+    expect(result.session.prePlan).toBeUndefined();
+  });
 });

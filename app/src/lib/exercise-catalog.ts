@@ -1,4 +1,4 @@
-import type { ExerciseEffortShape, ExerciseIntensity, ExerciseType } from "@/lib/storage";
+import type { ExerciseEffortShape, ExerciseIntensity, ExercisePreFuelIntent, ExerciseType } from "@/lib/storage";
 
 export const EXERCISE_TYPE_OPTIONS: Array<{ value: ExerciseType; label: string }> = [
   { value: "cardio", label: "Cardio" },
@@ -38,3 +38,13 @@ export const EXERCISE_MEAL_TYPE_OPTIONS = [
   { value: "lunch", label: "Lunch" },
   { value: "dinner", label: "Dinner" },
 ] as const;
+
+export const EXERCISE_PRE_FUEL_INTENT_OPTIONS: Array<{
+  value: ExercisePreFuelIntent;
+  label: string;
+  hint: string;
+}> = [
+  { value: "meal", label: "Eating a meal first", hint: "Enter the carbs — we'll reduce your meal insulin for exercise" },
+  { value: "top_up", label: "Small snack to top up", hint: "No insulin — we'll size it to get you into the start range" },
+  { value: "none", label: "Not eating", hint: "Just tell me what to carry" },
+];

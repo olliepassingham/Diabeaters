@@ -107,6 +107,8 @@ import {
   type ExerciseEffortShape,
   type ExerciseIntensity,
   type ExercisePhase,
+  type ExercisePrePlan,
+  type ExercisePreFuelIntent,
   type ExerciseRoutine,
   type ExerciseSymptomFlag,
   type ExerciseType,
@@ -142,7 +144,21 @@ import { useExerciseCgmBg } from "@/hooks/use-exercise-cgm-bg";
 import type { BgPrefillResult } from "@/lib/cgm/prefill";
 // Shared with the exercise routines page and elsewhere so every exercise type has exactly one
 // label app-wide (e.g. always "Yoga / Pilates", never just "Yoga" on one screen and not another).
-import { EXERCISE_TYPE_OPTIONS } from "@/lib/exercise-catalog";
+import { EXERCISE_START_IN_OPTIONS, EXERCISE_TYPE_OPTIONS, exerciseStartInLabel } from "@/lib/exercise-catalog";
+import {
+  computeExerciseFuelPlan,
+  exerciseFuelInputFromSession,
+  type ExerciseFuelCalculatorResult,
+} from "@/lib/exercise-fuel-calculator";
+import {
+  PreFuelIntentPicker,
+  PreFuelMealFields,
+  PreFuelMoreContext,
+  PreFuelPlanSummary,
+  type PreFuelContextValues,
+} from "@/components/scenarios/exercise-pre-fuel-plan";
+import { getRapidInsulinDoses, rapidDoseWithinHours } from "@/lib/insulin-activity";
+import { parseOptionalBolusUnits } from "@/lib/meal-dose";
 
 /** Per-activity icon so the session header reads at a glance instead of always showing the same dumbbell. */
 const EXERCISE_TYPE_ICONS: Record<ExerciseType, typeof Dumbbell> = {
@@ -179,6 +195,17 @@ function sessionMetaLine(session: ActiveExerciseSession): string {
 }
 
 const INTENSITY_OPTIONS: ExerciseIntensity[] = ["light", "moderate", "intense"];
+
+function defaultMealTypeForHour(hour: number): string {
+  if (hour < 11) return "breakfast";
+  if (hour < 16) return "lunch";
+  return "dinner";
+}
+
+function parseWholeNumber(raw: string): number | undefined {
+  const n = parseInt(raw.trim(), 10);
+  return Number.isFinite(n) && n >= 0 ? n : undefined;
+}
 
 const ENVIRONMENT_OPTIONS: Array<{ value: ExerciseEnvironmentChoice; label: string; icon: typeof Sun }> = [
   { value: "indoor", label: "Indoor", icon: Activity },
@@ -402,6 +429,20 @@ export function ExerciseGuidedCoach() {
   const [startIntensity, setStartIntensity] = useState<ExerciseIntensity>("moderate");
   const [startEffortShape, setStartEffortShape] = useState<ExerciseEffortShape>("steady");
   const [startDuration, setStartDuration] = useState<string>("45");
+  const [startInMinutes, setStartInMinutes] = useState<number>(30);
+  const [startInCustom, setStartInCustom] = useState("");
+  const [planTrend, setPlanTrend] = useState<ExerciseBgTrend | null>(null);
+  const [planIntent, setPlanIntent] = useState<ExercisePreFuelIntent | null>(null);
+  const [planMealCarbs, setPlanMealCarbs] = useState("");
+  const [planMealType, setPlanMealType] = useState<string>(() => defaultMealTypeForHour(new Date().getHours()));
+  const [planContext, setPlanContext] = useState<PreFuelContextValues>(() => ({
+    rapidInsulin2h: false,
+    pumpIob: "",
+    fasted: false,
+    lastMealMins: "",
+    lastMealCarbs: "",
+  }));
+  const planToolUseRecorded = useRef(false);
 
   // Pre / active / recovery local input state (mirrors active session for snappy controls)
   const [bgInput, setBgInput] = useState<string>("");
@@ -475,7 +516,8 @@ export function ExerciseGuidedCoach() {
   // Sync the BG input when the phase changes so the visible field reflects the right reading.
   useEffect(() => {
     if (!activeSession) {
-      setBgInput("");
+      // Only clear when a session just ended — the Plan a workout card also uses this field.
+      if (lastSyncedSessionId.current) setBgInput("");
       lastSyncedSessionId.current = "";
       return;
     }
@@ -745,13 +787,16 @@ export function ExerciseGuidedCoach() {
   };
 
   const onTrendChange = (t: ExerciseBgTrend) => {
-    if (!activeSession) return;
+    if (!activeSession) {
+      setPlanTrend(t);
+      return;
+    }
     if (activeSession.phase === "pre") update({ preTrend: t });
     else if (activeSession.phase === "active") update({ midTrend: t });
     else update({ recoveryTrend: t });
   };
 
-  const cgmAutoApplyKey = activeSession ? `${activeSession.id}-${activeSession.phase}` : undefined;
+  const cgmAutoApplyKey = activeSession ? `${activeSession.id}-${activeSession.phase}` : "plan-workout";
   const {
     prefill: cgmPrefill,
     loading: cgmLoading,
@@ -772,6 +817,90 @@ export function ExerciseGuidedCoach() {
     cgmEmptyHint,
     onCgmRefresh: refreshCgm,
     onBgFieldChange,
+  };
+
+  useEffect(() => {
+    if (isPump) return;
+    if (rapidDoseWithinHours(getRapidInsulinDoses(), 2, Date.now())) {
+      setPlanContext((c) => ({ ...c, rapidInsulin2h: true }));
+    }
+  }, [isPump]);
+
+  const planBg = parseFloatOrNull(bgInput);
+  const planMealCarbsNum = parseWholeNumber(planMealCarbs);
+
+  const planFuelResult = useMemo((): ExerciseFuelCalculatorResult | null => {
+    if (activeSession || !planIntent) return null;
+    const durationMinutes = parseInt(startDuration, 10);
+    if (!Number.isFinite(durationMinutes) || durationMinutes < 1) return null;
+    return computeExerciseFuelPlan({
+      preFuelIntent: planIntent,
+      exerciseType: startType,
+      intensity: startIntensity,
+      effortShape: startIntensity === "intense" ? startEffortShape : undefined,
+      durationMinutes,
+      minutesUntilStart: startInMinutes,
+      fasted: planContext.fasted,
+      bgUnits,
+      settings,
+      isPump,
+      mealCarbsGrams: planIntent === "meal" ? planMealCarbsNum : undefined,
+      mealType: planIntent === "meal" ? planMealType : "snack",
+      currentBg: planBg ?? undefined,
+      bgTrend: planTrend && planTrend !== "not_sure" ? planTrend : null,
+      rapidInsulinLast2h: planContext.rapidInsulin2h,
+      pumpIobUnits: isPump ? parseOptionalBolusUnits(planContext.pumpIob) : null,
+      lastMealMinutesAgo: planContext.fasted ? undefined : parseWholeNumber(planContext.lastMealMins),
+      lastMealCarbsGrams: planContext.fasted ? undefined : parseWholeNumber(planContext.lastMealCarbs),
+      profile,
+    });
+  }, [
+    activeSession,
+    bgUnits,
+    isPump,
+    planBg,
+    planContext,
+    planIntent,
+    planMealCarbsNum,
+    planMealType,
+    planTrend,
+    profile,
+    settings,
+    startDuration,
+    startEffortShape,
+    startInMinutes,
+    startIntensity,
+    startType,
+  ]);
+
+  const onPlanIntentChange = (intent: ExercisePreFuelIntent) => {
+    setPlanIntent(intent);
+    if (!planToolUseRecorded.current) {
+      planToolUseRecorded.current = true;
+      storage.recordExerciseToolUse("calculate");
+    }
+  };
+
+  const buildPlanPrefill = (): GuidedExerciseStartParams["prefill"] => {
+    const prePlan: ExercisePrePlan | undefined = planIntent
+      ? {
+          intent: planIntent,
+          carbsGrams: planIntent === "meal" ? planMealCarbsNum : undefined,
+          mealType: planIntent === "meal" ? planMealType : undefined,
+          minutesUntilStart: startInMinutes,
+        }
+      : undefined;
+    const iob = isPump ? parseOptionalBolusUnits(planContext.pumpIob) : null;
+    return {
+      preBg: planBg ?? undefined,
+      preTrend: planTrend ?? undefined,
+      preRapidInsulin2h: planContext.rapidInsulin2h ? "yes" : undefined,
+      preIobUnits: iob != null && iob >= 0 ? iob : undefined,
+      preFasted: planContext.fasted ? true : planIntent === "meal" || planIntent === "top_up" ? false : undefined,
+      prefuelMinutesAgo: planContext.fasted ? undefined : parseWholeNumber(planContext.lastMealMins),
+      prefuelGrams: planContext.fasted ? undefined : parseWholeNumber(planContext.lastMealCarbs),
+      prePlan,
+    };
   };
 
   const beginGuidedSession = (
@@ -849,6 +978,7 @@ export function ExerciseGuidedCoach() {
       intensity: startIntensity,
       effortShape: startIntensity === "intense" ? startEffortShape : undefined,
       durationMinutes: dur,
+      prefill: buildPlanPrefill(),
     });
   };
 
@@ -950,7 +1080,7 @@ export function ExerciseGuidedCoach() {
                   </span>
                   <div className="min-w-0">
                     <p className="text-lg font-semibold tracking-tight text-foreground">Plan a workout</p>
-                    <p className="text-xs text-muted-foreground">Type, intensity, and duration — then start guided</p>
+                    <p className="text-xs text-muted-foreground">Your session and what to eat, inject and carry</p>
                   </div>
                 </div>
                 <ChevronDown
@@ -1063,6 +1193,95 @@ export function ExerciseGuidedCoach() {
                       </span>
                     </div>
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium text-muted-foreground">Starting in</Label>
+                  <div
+                    className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                    role="group"
+                    aria-label="Minutes until exercise starts"
+                  >
+                    {EXERCISE_START_IN_OPTIONS.map((m) => (
+                      <Button
+                        key={m}
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className={cn(
+                          "h-10 min-w-[3.25rem] shrink-0 rounded-xl px-2.5 text-xs font-medium tabular-nums",
+                          startInMinutes === m && !startInCustom
+                            ? "bg-background text-foreground shadow-sm ring-1 ring-border/60"
+                            : "bg-muted/30 text-muted-foreground hover:text-foreground",
+                        )}
+                        onClick={() => {
+                          setStartInMinutes(m);
+                          setStartInCustom("");
+                        }}
+                        data-testid={`button-start-in-${m}`}
+                      >
+                        {exerciseStartInLabel(m)}
+                      </Button>
+                    ))}
+                    <Input
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      autoComplete="off"
+                      value={startInCustom}
+                      placeholder="Custom"
+                      onChange={(e) => {
+                        const digits = e.target.value.replace(/\D/g, "").slice(0, 3);
+                        setStartInCustom(digits);
+                        const n = parseInt(digits, 10);
+                        if (Number.isFinite(n)) setStartInMinutes(n);
+                      }}
+                      className="h-10 w-[4.75rem] shrink-0 rounded-xl border-border/60 bg-muted/20 px-2 text-center text-xs font-medium tabular-nums shadow-none"
+                      data-testid="input-start-in-custom"
+                      aria-label="Custom minutes until start"
+                    />
+                  </div>
+                </div>
+
+                <ExerciseCgmBgField
+                  bgUnits={bgUnits}
+                  bgValue={bgInput}
+                  trend={planTrend}
+                  onBgChange={onBgFieldChange}
+                  onTrendChange={onTrendChange}
+                  prefill={cgmPrefill}
+                  loading={cgmLoading}
+                  onRefresh={refreshCgm}
+                  emptyHint={cgmEmptyHint}
+                  inputTestId="input-plan-bg"
+                  trendTestIdPrefix="button-plan-trend"
+                  className="space-y-3"
+                />
+
+                <div className="space-y-3 border-t border-border/40 pt-4">
+                  <PreFuelIntentPicker value={planIntent} onChange={onPlanIntentChange} />
+                  {planIntent === "meal" ? (
+                    <PreFuelMealFields
+                      carbs={planMealCarbs}
+                      onCarbsChange={setPlanMealCarbs}
+                      mealType={planMealType}
+                      onMealTypeChange={setPlanMealType}
+                    />
+                  ) : null}
+                  <PreFuelMoreContext
+                    values={planContext}
+                    onChange={(next) => setPlanContext((c) => ({ ...c, ...next }))}
+                    isPump={isPump}
+                  />
+                  {planFuelResult ? (
+                    <div className="rounded-2xl border border-border/50 bg-muted/10 p-3.5">
+                      <PreFuelPlanSummary
+                        result={planFuelResult}
+                        bgUnits={bgUnits}
+                        settings={settings}
+                        profile={profile}
+                      />
+                    </div>
+                  ) : null}
                 </div>
 
                 {/* Keep selects for tests that still query them; synced with pill UI above. */}
@@ -1575,6 +1794,17 @@ export function ExerciseGuidedCoach() {
             <div className="space-y-4 border-t border-border/40 pt-4">
               <Tabs value={phase} className="w-full">
                 <TabsContent value="pre" className="mt-0 space-y-4" data-testid="coach-input-panel-pre">
+                  <PrePlanSessionCard
+                    session={activeSession}
+                    bgInput={bgInput}
+                    bgUnits={bgUnits}
+                    settings={settings}
+                    profile={profile}
+                    isPump={isPump}
+                    nowMs={now}
+                    update={update}
+                    hasHypoSuggestion={hypoCoachSuggestion != null}
+                  />
                   <PreQuestions
                     session={activeSession}
                     bgUnits={bgUnits}
@@ -1625,6 +1855,147 @@ export function ExerciseGuidedCoach() {
 }
 
 // ----- Sub-components -----
+
+/**
+ * Before step: the pre-workout food plan chosen on "Plan a workout", recomputed from the
+ * live reading. Carry is left to the coach's own fuel lines so there is one carry number.
+ */
+function PrePlanSessionCard({
+  session,
+  bgInput,
+  bgUnits,
+  settings,
+  profile,
+  isPump,
+  nowMs,
+  update,
+  hasHypoSuggestion,
+}: {
+  session: ActiveExerciseSession;
+  bgInput: string;
+  bgUnits: "mmol/L" | "mg/dL";
+  settings: UserSettings;
+  profile: Partial<UserProfile>;
+  isPump: boolean;
+  nowMs: number;
+  update: (updates: Parameters<typeof storage.updateActiveExercise>[0]) => void;
+  hasHypoSuggestion: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const plan = session.prePlan;
+  const [draftIntent, setDraftIntent] = useState<ExercisePreFuelIntent | null>(plan?.intent ?? null);
+  const [draftCarbs, setDraftCarbs] = useState(plan?.carbsGrams != null ? String(plan.carbsGrams) : "");
+  const [draftMealType, setDraftMealType] = useState(plan?.mealType ?? defaultMealTypeForHour(new Date().getHours()));
+
+  const result = useMemo(() => {
+    const input = exerciseFuelInputFromSession(session, {
+      bgUnits,
+      settings,
+      isPump,
+      currentBg: parseFloatOrNull(bgInput),
+      profile,
+      nowMs,
+    });
+    return input ? computeExerciseFuelPlan(input) : null;
+  }, [bgInput, bgUnits, isPump, nowMs, profile, session, settings]);
+
+  const openEditor = () => {
+    setDraftIntent(plan?.intent ?? null);
+    setDraftCarbs(plan?.carbsGrams != null ? String(plan.carbsGrams) : "");
+    setDraftMealType(plan?.mealType ?? defaultMealTypeForHour(new Date().getHours()));
+    setEditing(true);
+  };
+
+  const saveDraft = () => {
+    if (!draftIntent) return;
+    const startedMs = new Date(session.startedAt).getTime();
+    const elapsedMin = Number.isFinite(startedMs) ? Math.max(0, Math.floor((nowMs - startedMs) / 60_000)) : 0;
+    update({
+      prePlan: {
+        intent: draftIntent,
+        carbsGrams: draftIntent === "meal" ? parseWholeNumber(draftCarbs) : undefined,
+        mealType: draftIntent === "meal" ? draftMealType : undefined,
+        // Counted from session start; a plan added mid-step means "starting now".
+        minutesUntilStart: plan ? plan.minutesUntilStart : elapsedMin,
+      },
+    });
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <div className="space-y-3 rounded-2xl border border-border/50 bg-muted/10 p-3.5" data-testid="coach-preplan-editor">
+        <PreFuelIntentPicker value={draftIntent} onChange={setDraftIntent} testIdPrefix="button-coach-prefuel-intent" />
+        {draftIntent === "meal" ? (
+          <PreFuelMealFields
+            carbs={draftCarbs}
+            onCarbsChange={setDraftCarbs}
+            mealType={draftMealType}
+            onMealTypeChange={setDraftMealType}
+            testIdPrefix="coach-prefuel"
+          />
+        ) : null}
+        <div className="flex gap-2">
+          <Button type="button" variant="ghost" className="h-10 flex-1 rounded-xl" onClick={() => setEditing(false)}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            className="h-10 flex-1 rounded-xl"
+            disabled={!draftIntent}
+            onClick={saveDraft}
+            data-testid="button-coach-preplan-save"
+          >
+            Update plan
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!plan || !result) {
+    return (
+      <button
+        type="button"
+        onClick={openEditor}
+        className="flex w-full items-center justify-between gap-3 rounded-2xl border border-dashed border-border/60 bg-muted/10 px-3.5 py-3 text-left text-sm transition-colors hover:bg-muted/25"
+        data-testid="button-coach-preplan-add"
+      >
+        <span>
+          <span className="block font-medium text-foreground">Eating before you start?</span>
+          <span className="block text-xs text-muted-foreground">Get what to eat and any insulin for it</span>
+        </span>
+        <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+      </button>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border border-border/50 bg-muted/10 p-3.5">
+      <PreFuelPlanSummary
+        result={result}
+        bgUnits={bgUnits}
+        settings={settings}
+        profile={profile}
+        compact
+        deferTreatFirst={hasHypoSuggestion}
+        testId="coach-preplan-summary"
+        headerAction={
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 rounded-lg px-2.5 text-xs"
+            onClick={openEditor}
+            data-testid="button-coach-preplan-change"
+          >
+            Change
+          </Button>
+        }
+      />
+    </div>
+  );
+}
 
 type PhaseProps = {
   session: ActiveExerciseSession;

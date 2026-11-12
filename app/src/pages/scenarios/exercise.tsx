@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ScenarioToolDisclaimer } from "@/components/disclaimer";
-import { ExerciseFuelCalculator } from "@/components/scenarios/ExerciseFuelCalculator";
 import { ExerciseGuidedCoach } from "@/components/scenarios/ExerciseGuidedCoach";
 import { GuideFrame, PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
@@ -77,7 +76,6 @@ export default function ScenarioExercisePage() {
       <GuideFrame bare>
         {/* The guided coach below already shows the active session's name, phase, and
             progress in its own header — a second summary card here duplicated that. */}
-        {!active ? <ExerciseFuelCalculator /> : null}
         <ExerciseGuidedCoach />
         <ScenarioToolDisclaimer className="mt-2" />
       </GuideFrame>

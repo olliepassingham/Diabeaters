@@ -4,6 +4,21 @@ import { isStaleActiveExerciseSession, plannedWorkoutEndMs } from "@/lib/exercis
 import type { ActiveExerciseSession, ExerciseEffortShape, ExerciseIntensity, ExerciseType } from "@/lib/storage";
 import { storage } from "@/lib/storage";
 
+/** Answers from "Plan a workout" written onto the new session so the Before step isn't asked twice. */
+export type GuidedExerciseStartPrefill = Partial<
+  Pick<
+    ActiveExerciseSession,
+    | "preBg"
+    | "preTrend"
+    | "preRapidInsulin2h"
+    | "preIobUnits"
+    | "preFasted"
+    | "prefuelMinutesAgo"
+    | "prefuelGrams"
+    | "prePlan"
+  >
+>;
+
 export type GuidedExerciseStartParams = {
   exerciseType: ExerciseType;
   intensity: ExerciseIntensity;
@@ -11,7 +26,19 @@ export type GuidedExerciseStartParams = {
   durationMinutes: number;
   exerciseName?: string;
   routineId?: string;
+  prefill?: GuidedExerciseStartPrefill;
 };
+
+function applyStartPrefill(session: ActiveExerciseSession, prefill?: GuidedExerciseStartPrefill): ActiveExerciseSession {
+  if (!prefill) return session;
+  const updates: Partial<ActiveExerciseSession> = {};
+  for (const [key, value] of Object.entries(prefill) as Array<[keyof GuidedExerciseStartPrefill, unknown]>) {
+    if (value !== undefined) (updates as Record<string, unknown>)[key] = value;
+  }
+  if (updates.preBg != null) updates.preBgAt = new Date().toISOString();
+  if (Object.keys(updates).length === 0) return session;
+  return storage.updateActiveExercise(updates) ?? session;
+}
 
 export type GuidedExerciseStartBlockReason = "active_session" | "severe_sick_day" | "invalid_duration";
 
@@ -126,6 +153,7 @@ export function startGuidedExerciseSession(params: GuidedExerciseStartParams): G
     effortShape: params.effortShape,
     durationMinutes,
   });
-  const withDefaults = applyCoachDefaultsFromLastExercise(session);
+  const withPrefill = applyStartPrefill(session, params.prefill);
+  const withDefaults = applyCoachDefaultsFromLastExercise(withPrefill);
   return { ok: true, session: withDefaults };
 }

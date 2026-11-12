@@ -30,16 +30,18 @@ import { computeActiveWorkoutFuelCarry } from "@/lib/exercise-readiness";
 import { parseRatioToGramsPerUnit } from "@/lib/ratio-utils";
 import {
   isShortMaxEffort,
+  type ActiveExerciseSession,
   type ExerciseBgTrend,
   type ExerciseEffortShape,
   type ExerciseIntensity,
+  type ExercisePreFuelIntent,
   type ExerciseType,
   type UserProfile,
   type UserSettings,
 } from "@/lib/storage";
 import { getEffectiveTdd } from "@/lib/tdd";
 
-export type { PreExerciseInsulinSuppressedReason, PreExerciseMealCarbsSkipReason };
+export type { ExercisePreFuelIntent, PreExerciseInsulinSuppressedReason, PreExerciseMealCarbsSkipReason };
 
 export type ExerciseFuelCalculationBreakdown = {
   intensityLabel: string;
@@ -59,6 +61,12 @@ export type ExerciseFuelCalculationBreakdown = {
 };
 
 export type ExerciseFuelCalculatorInput = {
+  /**
+   * meal: known carbs, reduced meal insulin. top_up: snack sized by us, never bolused.
+   * none: carry plan only (low-BG safety carbs still apply).
+   * Omit for legacy behaviour: entered carbs mean meal, otherwise a suggested top-up.
+   */
+  preFuelIntent?: ExercisePreFuelIntent;
   exerciseType: ExerciseType;
   intensity: ExerciseIntensity;
   /** Only applies when intensity is intense. */
@@ -132,6 +140,13 @@ export type ExerciseFuelProjection = {
 };
 
 export type ExerciseFuelCalculatorResult = {
+  preFuelIntent: ExercisePreFuelIntent;
+  /** BG is below the hypo threshold or the exercise-start comfort line — carbs come before anything else. */
+  treatFirst: boolean;
+  treatFirstReason: "hypo" | "low" | null;
+  /** Fast carbs to take now when `treatFirst` (0 otherwise). */
+  treatFirstGrams: number;
+  currentBg: number | null;
   /** Short headline for the result card. */
   headline: string;
   targetBg: string;
@@ -167,6 +182,11 @@ export type ExerciseFuelCalculatorResult = {
   breakdown: ExerciseFuelCalculationBreakdown;
 };
 
+export function resolvePreFuelIntent(input: Pick<ExerciseFuelCalculatorInput, "preFuelIntent" | "mealCarbsGrams">): ExercisePreFuelIntent {
+  if (input.preFuelIntent) return input.preFuelIntent;
+  return input.mealCarbsGrams != null && input.mealCarbsGrams > 0 ? "meal" : "top_up";
+}
+
 function buildPlanContext(input: ExerciseFuelCalculatorInput): ExercisePlanContext {
   const ctx: ExercisePlanContext = {
     exerciseType: input.exerciseType,
@@ -194,7 +214,7 @@ function buildPlanContext(input: ExerciseFuelCalculatorInput): ExercisePlanConte
     }
   }
 
-  const mealCarbs = input.mealCarbsGrams ?? 0;
+  const mealCarbs = resolvePreFuelIntent(input) === "meal" ? (input.mealCarbsGrams ?? 0) : 0;
   if (mealCarbs > 0) {
     ctx.nutritionContext = "about_to_eat";
     ctx.approximateCarbsGrams = mealCarbs;
@@ -705,6 +725,9 @@ function computeLowBgCarbTopUp(
   return Math.min(35, Math.ceil(grams / 5) * 5);
 }
 
+/** Usual fast-acting hypo treatment amount — floor for "treat first" carbs. */
+const MIN_TREAT_FIRST_GRAMS = 15;
+
 function planTargetBand(bgUnits: string): string {
   const units = bgUnits === "mg/dL" ? "mg/dL" : "mmol/L";
   return `${preExerciseIdealLowBg(units)}–${preExerciseIdealHighBg(units)} ${units}`;
@@ -893,8 +916,11 @@ function computeSessionFuel(
 export function computeExerciseFuelPlan(input: ExerciseFuelCalculatorInput): ExerciseFuelCalculatorResult {
   const plan = calculateExercisePlan(buildPlanContext(input), input.settings);
 
-  const userMealCarbs = input.mealCarbsGrams != null && input.mealCarbsGrams > 0 ? input.mealCarbsGrams : 0;
-  const mealCarbsIsSuggested = userMealCarbs <= 0;
+  const intent = resolvePreFuelIntent(input);
+  const explicitIntent = input.preFuelIntent != null;
+  const userMealCarbs =
+    intent === "meal" && input.mealCarbsGrams != null && input.mealCarbsGrams > 0 ? input.mealCarbsGrams : 0;
+  const mealCarbsIsSuggested = intent !== "meal";
   const preBufferGrams = plan.pre.carbsIfLow;
   const userEnteredMealCarbs = userMealCarbs > 0;
   const sessionFuel = computeSessionFuel(input, plan, userEnteredMealCarbs);
@@ -905,8 +931,21 @@ export function computeExerciseFuelPlan(input: ExerciseFuelCalculatorInput): Exe
   let mealCarbsSkipReason: PreExerciseMealCarbsSkipReason | null = null;
   let lowBgCarbTopUpGrams = 0;
   const bgUnitsNormalized = input.bgUnits === "mg/dL" ? "mg/dL" : "mmol/L";
+  const hasBg = input.currentBg != null && Number.isFinite(input.currentBg);
+  const bgIsHypo = hasBg && isBgBelowHypoThreshold(input.currentBg!, input.settings, bgUnitsNormalized);
+  const bgIsStartLow = hasBg && isExerciseStartLow(input.currentBg!, bgUnitsNormalized);
+  // A planned meal already lifts BG, so only a hypo forces "treat first" there; otherwise any low reading does.
+  const treatFirst = intent === "meal" ? bgIsHypo : bgIsHypo || bgIsStartLow;
 
-  if (mealCarbsIsSuggested) {
+  const lowBgTopUpAtThisReading = hasBg
+    ? computeLowBgCarbTopUp(input.currentBg!, bgUnitsNormalized, input.profile, input.intensity, input.effortShape)
+    : 0;
+  const suggestedCarbsAtThisReading = (): number => {
+    lowBgCarbTopUpGrams = lowBgTopUpAtThisReading;
+    return preBufferGrams + lowBgTopUpAtThisReading;
+  };
+
+  if (intent === "top_up" || intent === "none") {
     const carbsDecision = shouldSuggestPreExerciseMealCarbs({
       currentBg: input.currentBg,
       bgTrend: input.bgTrend,
@@ -915,22 +954,23 @@ export function computeExerciseFuelPlan(input: ExerciseFuelCalculatorInput): Exe
       bufferGrams: preBufferGrams,
       settings: input.settings,
     });
-    if (carbsDecision.suggest) {
-      if (input.currentBg != null && Number.isFinite(input.currentBg)) {
-        lowBgCarbTopUpGrams = computeLowBgCarbTopUp(
-          input.currentBg,
-          bgUnitsNormalized,
-          input.profile,
-          input.intensity,
-          input.effortShape,
-        );
-      }
-      mealCarbs = preBufferGrams + lowBgCarbTopUpGrams;
-    } else if (carbsDecision.skipReason) {
+    if (carbsDecision.suggest && (intent === "top_up" || treatFirst)) {
+      mealCarbs = suggestedCarbsAtThisReading();
+    } else if (intent === "top_up" && carbsDecision.skipReason) {
       mealCarbsSkipReason = carbsDecision.skipReason;
+    }
+    if (explicitIntent && treatFirst && mealCarbs <= 0) {
+      mealCarbs = Math.max(suggestedCarbsAtThisReading(), MIN_TREAT_FIRST_GRAMS);
     }
   } else {
     mealCarbs = userMealCarbs;
+  }
+
+  /** Carbs to take before anything else when the reading is low (shown as "Treat first"). */
+  let treatFirstGrams = 0;
+  if (treatFirst) {
+    treatFirstGrams =
+      intent === "meal" ? Math.max(preBufferGrams + lowBgTopUpAtThisReading, MIN_TREAT_FIRST_GRAMS) : mealCarbs;
   }
 
   let insulin: ExerciseFuelInsulinResult | null = null;
@@ -948,7 +988,7 @@ export function computeExerciseFuelPlan(input: ExerciseFuelCalculatorInput): Exe
       insulinSuppressedReason = known.suppressedReason;
       projection = known.projection;
       exerciseEffectNote = known.exerciseEffectNote;
-    } else {
+    } else if (!explicitIntent) {
       const attempt = tryMealInsulinForBg(input, mealCarbs, mealCarbsIsSuggested);
       insulin = attempt.insulin;
       insulinNoRatios = attempt.insulinNoRatios;
@@ -991,6 +1031,11 @@ export function computeExerciseFuelPlan(input: ExerciseFuelCalculatorInput): Exe
   };
 
   return {
+    preFuelIntent: intent,
+    treatFirst,
+    treatFirstReason: treatFirst ? (bgIsHypo ? "hypo" : "low") : null,
+    treatFirstGrams,
+    currentBg: hasBg ? input.currentBg! : null,
     headline,
     targetBg: plan.pre.targetBg,
     mealCarbs,
@@ -1021,5 +1066,211 @@ export function computeExerciseFuelPlan(input: ExerciseFuelCalculatorInput): Exe
     projection,
     exerciseEffectNote,
     breakdown,
+  };
+}
+
+export type ExerciseFuelSummaryEat = {
+  grams: number;
+  kind: "meal" | "top_up" | "treat_first";
+};
+
+export type ExerciseFuelSummaryInsulin = {
+  units: number;
+  kind: "meal_bolus" | "correction" | "none";
+  reason: string;
+};
+
+export type ExerciseFuelSummary = {
+  intent: ExercisePreFuelIntent;
+  /** Null when there is nothing to eat before starting — see `eatNote`. */
+  eat: ExerciseFuelSummaryEat | null;
+  eatNote: string | null;
+  insulin: ExerciseFuelSummaryInsulin;
+  carry: { grams: number; doseGrams?: number; everyMinutes?: number };
+  /** One plain sentence explaining the main number. */
+  why: string;
+};
+
+function summaryEatNote(result: ExerciseFuelCalculatorResult, bgUnits: string): string | null {
+  const band = planTargetBand(bgUnits);
+  if (result.preFuelIntent === "meal") return "Enter the carbs in your meal to see your plan.";
+  if (result.preFuelIntent === "none") {
+    return result.currentBg == null
+      ? "Add your BG to check it's safe to start without eating."
+      : "Nothing to eat before you start at this reading.";
+  }
+  switch (result.mealCarbsSkipReason) {
+    case "bg_missing":
+      return "Add your BG so we can size a top-up.";
+    case "in_range_fed":
+      return `No top-up needed — you're already in the start range (${band}).`;
+    case "elevated_bg":
+    case "high_bg":
+      return `No top-up needed — your BG is above the start range (${band}).`;
+    default:
+      return "No top-up needed for this session.";
+  }
+}
+
+function summaryInsulin(result: ExerciseFuelCalculatorResult, bgUnits: string, settings?: UserSettings): ExerciseFuelSummaryInsulin {
+  const band = planTargetBand(bgUnits);
+  if (result.treatFirst) {
+    return {
+      units: 0,
+      kind: "none",
+      reason:
+        result.preFuelIntent === "meal"
+          ? "Treat the low first and recheck — then work out your meal insulin."
+          : "No insulin — treat first and recheck before you start.",
+    };
+  }
+
+  const insulin = result.insulin;
+  if (insulin && insulin.totalUnits > 0) {
+    const parts = [`${insulin.reductionPercent}% less than your usual ${insulin.standardUnits}u for ${insulin.carbsGrams}g`];
+    if (insulin.correctionUnits > 0) parts.push(`includes ${insulin.correctionUnits}u correction`);
+    if (result.insulinSuppressedReason === "falling") parts.push("reduced further because BG is falling");
+    return { units: insulin.totalUnits, kind: "meal_bolus", reason: `${parts.join(", ")}.` };
+  }
+
+  const pre = result.preCorrection;
+  if (pre && pre.units > 0) {
+    return {
+      units: pre.units,
+      kind: "correction",
+      reason:
+        pre.severity === "very_high"
+          ? `BG is very high — check ketones and fluids first. If your team agrees, a reduced correction toward ${band} (${pre.reductionPercent}% less than full).`
+          : `Reduced correction toward ${band} (${pre.reductionPercent}% less than a full correction).`,
+    };
+  }
+
+  if (result.preFuelIntent === "meal") {
+    if (!result.userEnteredMealCarbs) return { units: 0, kind: "none", reason: "Enter your carbs to see a dose." };
+    if (result.insulinNoRatios) {
+      return { units: 0, kind: "none", reason: "Add your meal ratios in Settings to see a dose." };
+    }
+    if (result.insulinSuppressedReason === "bg_missing") {
+      return { units: 0, kind: "none", reason: "Add your BG to see a dose — we won't suggest insulin without a reading." };
+    }
+    if (result.insulinSuppressedReason) {
+      return {
+        units: 0,
+        kind: "none",
+        reason: preExerciseInsulinSuppressedMessage(result.insulinSuppressedReason, bgUnits, settings),
+      };
+    }
+    return { units: 0, kind: "none", reason: "No meal insulin needed at this reading." };
+  }
+
+  if (result.preFuelIntent === "top_up") {
+    return { units: 0, kind: "none", reason: "No insulin for a top-up — it's there to raise your levels." };
+  }
+  return { units: 0, kind: "none", reason: "No insulin needed before you start." };
+}
+
+function summaryWhy(result: ExerciseFuelCalculatorResult, bgUnits: string): string {
+  const units = bgUnits === "mg/dL" ? "mg/dL" : "mmol/L";
+  const band = planTargetBand(units);
+
+  if (result.treatFirst) {
+    return result.treatFirstReason === "hypo"
+      ? "Your BG is in your hypo range — treat it, wait 15 minutes and recheck before you start."
+      : `Your BG is below a safe starting level — eat this, then recheck. Aim for ${band} before you start.`;
+  }
+  if (result.preFuelIntent === "meal" && result.projection?.projectedBgAtStart != null) {
+    const correction = result.insulin?.correctionUnits ?? 0;
+    return correction > 0
+      ? `Your meal alone would take you to about ${result.projection.projectedBgAtStart} ${units} when you start, so ${correction}u correction is included to bring you toward ${band}.`
+      : `Should bring you to about ${result.projection.projectedBgAtStart} ${units} when you start (aim ${band}).`;
+  }
+  if (result.preFuelIntent === "top_up" && result.mealCarbs > 0) {
+    return result.breakdown.lowBgCarbTopUpGrams
+      ? `Sized to lift you into the start range (${band}), with a little extra because you're below it.`
+      : `A small buffer so you start in range (${band}) and don't drop early in the session.`;
+  }
+  if (result.preCorrection) {
+    return "Exercise lowers glucose too, so this is less than a normal correction. Recheck before you start.";
+  }
+  if (result.currentBg == null) {
+    return "Add your BG and trend — they change whether you need to eat before you start.";
+  }
+  return result.exerciseEffectNote ?? "Carry fast carbs in case BG drops during exercise.";
+}
+
+/**
+ * Fuel-plan input for a guided session that has a `prePlan`. Start time counts down
+ * from when the plan was made; live BG (if given) wins over the logged pre reading.
+ */
+export function exerciseFuelInputFromSession(
+  session: ActiveExerciseSession,
+  opts: {
+    bgUnits: string;
+    settings: UserSettings;
+    isPump: boolean;
+    currentBg?: number | null;
+    profile?: Partial<UserProfile>;
+    nowMs?: number;
+  },
+): ExerciseFuelCalculatorInput | null {
+  const plan = session.prePlan;
+  if (!plan) return null;
+  const startedMs = new Date(session.startedAt).getTime();
+  const elapsedMin = Number.isFinite(startedMs)
+    ? Math.max(0, Math.floor(((opts.nowMs ?? Date.now()) - startedMs) / 60_000))
+    : 0;
+  const bg = opts.currentBg ?? session.preBg;
+  return {
+    preFuelIntent: plan.intent,
+    exerciseType: session.exerciseType,
+    intensity: session.intensity,
+    effortShape: session.intensity === "intense" ? session.effortShape : undefined,
+    durationMinutes: session.durationMinutes,
+    minutesUntilStart: Math.max(0, plan.minutesUntilStart - elapsedMin),
+    fasted: !!session.preFasted,
+    bgUnits: opts.bgUnits,
+    settings: opts.settings,
+    isPump: opts.isPump,
+    mealCarbsGrams: plan.intent === "meal" ? plan.carbsGrams : undefined,
+    mealType: plan.mealType ?? "snack",
+    currentBg: bg != null && Number.isFinite(bg) ? bg : undefined,
+    bgTrend: session.preTrend ?? null,
+    rapidInsulinLast2h: session.preRapidInsulin2h === "yes",
+    pumpIobUnits: opts.isPump ? (session.preIobUnits ?? null) : null,
+    lastMealMinutesAgo: session.preFasted ? undefined : session.prefuelMinutesAgo,
+    lastMealCarbsGrams: session.preFasted ? undefined : session.prefuelGrams,
+    profile: opts.profile,
+  };
+}
+
+/**
+ * Three plain answers for the plan card — what to eat, what insulin, what to carry —
+ * plus one reason. Built from the full result so the numbers always agree.
+ */
+export function buildExerciseFuelSummary(
+  result: ExerciseFuelCalculatorResult,
+  bgUnits: string,
+  settings?: UserSettings,
+): ExerciseFuelSummary {
+  let eat: ExerciseFuelSummaryEat | null = null;
+  if (result.treatFirst && result.treatFirstGrams > 0) {
+    eat = { grams: result.treatFirstGrams, kind: "treat_first" };
+  } else if (result.preFuelIntent === "meal" && result.userEnteredMealCarbs) {
+    eat = { grams: result.mealCarbs, kind: "meal" };
+  } else if (result.preFuelIntent === "top_up" && result.mealCarbs > 0) {
+    eat = { grams: result.mealCarbs, kind: "top_up" };
+  }
+
+  return {
+    intent: result.preFuelIntent,
+    eat,
+    eatNote: eat ? null : summaryEatNote(result, bgUnits),
+    insulin: summaryInsulin(result, bgUnits, settings),
+    carry: {
+      grams: result.sessionFuel.carryGrams,
+      doseGrams: result.sessionFuel.doseGrams,
+      everyMinutes: result.sessionFuel.intervalMinutes,
+    },
+    why: summaryWhy(result, bgUnits),
   };
 }

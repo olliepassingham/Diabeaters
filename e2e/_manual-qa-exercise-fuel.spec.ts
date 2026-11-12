@@ -16,7 +16,9 @@ async function seedPatientSession(
   await page.evaluate(
     ({ settings }) => {
       localStorage.setItem("diabeater_onboarding_completed", "true");
-      localStorage.setItem("diabeater_profile", JSON.stringify({ bgUnits: "mmol/L" }));
+      localStorage.setItem("diabeater_onboarding_completed_user_id", "e2e-exercise-qa");
+      localStorage.setItem("diabeater_profile", JSON.stringify({ bgUnits: "mmol/L", name: "Jake", dateOfBirth: "1995-01-01" }));
+      localStorage.removeItem("diabeater_active_exercise");
       localStorage.setItem("diabeater_settings", JSON.stringify(settings));
     },
     { settings },
@@ -24,103 +26,41 @@ async function seedPatientSession(
   await page.reload();
 }
 
-test.describe("Exercise fuel & insulin manual QA", () => {
-  test("redesigned form + result flow", async ({ page }) => {
+test.describe("Exercise pre-workout fuel plan manual QA", () => {
+  test("pick what you're eating, see Eat / Insulin / Carry, carry into the coach", async ({ page }) => {
     page.on("pageerror", (err) => console.log(`[pageerror] ${err.message}\n${err.stack}`));
     await seedPatientSession(page, { snackRatio: "1:10g", lunchRatio: "1:10g", correctionFactor: 3 });
     await page.goto("/scenarios/exercise");
-    await expect(page.getByTestId("efc-collapsible-trigger")).toBeVisible({ timeout: 10000 });
-    await page.getByTestId("efc-collapsible-trigger").click();
-    await expect(page.getByTestId("efc-meal-carbs")).toBeVisible();
-    await page.screenshot({ path: "test-results/efc-1-form-open.png", fullPage: true });
+    await expect(page.getByTestId("exercise-guided-coach-start")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId("button-prefuel-intent-meal")).toBeVisible();
+    await page.getByTestId("input-plan-bg").fill("8");
+    await page.screenshot({ path: "test-results/prefuel-1-plan-card.png", fullPage: true });
 
-    // activity dropdown + intensity pills
-    await page.getByTestId("efc-activity").click();
-    await page.getByTestId("efc-type-hiit").click();
-    await page.getByTestId("efc-intensity-intense").click();
-    await page.getByTestId("efc-bg").fill("7");
-    await page.screenshot({ path: "test-results/efc-2-pills-selected.png", fullPage: true });
+    // Top-up when in range: nothing to eat, no insulin.
+    await page.getByTestId("button-prefuel-intent-top_up").click();
+    await expect(page.getByTestId("prefuel-plan-summary")).toBeVisible();
+    await expect(page.getByTestId("prefuel-row-eat")).toContainText(/No top-up needed/);
+    await expect(page.getByTestId("prefuel-row-insulin")).toContainText("None");
+    await page.screenshot({ path: "test-results/prefuel-2-topup-in-range.png", fullPage: true });
 
-    // extras collapsible
-    await page.getByTestId("efc-extras-toggle").click();
-    await expect(page.getByTestId("efc-fasted")).toBeVisible();
-    await page.screenshot({ path: "test-results/efc-3-extras-open.png", fullPage: true });
-    await page.getByTestId("efc-extras-toggle").click();
+    // Top-up when low: carbs, still no insulin.
+    await page.getByTestId("input-plan-bg").fill("4.8");
+    await expect(page.getByTestId("prefuel-row-eat")).toContainText(/~\d+g/);
+    await expect(page.getByTestId("prefuel-row-insulin")).toContainText("None");
+    await page.screenshot({ path: "test-results/prefuel-3-topup-low.png", fullPage: true });
 
-    await expect(page.getByTestId("efc-calculate")).toBeEnabled();
-    await page.getByTestId("efc-calculate").click();
-    await expect(page.getByTestId("efc-result")).toBeVisible({ timeout: 5000 });
-    await page.screenshot({ path: "test-results/efc-4-result-suggested.png", fullPage: true });
+    // Meal: reduced bolus.
+    await page.getByTestId("input-plan-bg").fill("8");
+    await page.getByTestId("button-prefuel-intent-meal").click();
+    await page.getByTestId("input-prefuel-meal-carbs").fill("50");
+    await expect(page.getByTestId("prefuel-row-insulin")).toContainText(/\d+(\.\d+)?u/);
+    await expect(page.getByTestId("prefuel-row-carry")).toBeVisible();
+    await page.screenshot({ path: "test-results/prefuel-4-meal.png", fullPage: true });
 
-    await page.getByTestId("efc-details-toggle").click();
-    await page.screenshot({ path: "test-results/efc-5-result-details-open.png", fullPage: true });
-
-    // Now switch to "known carbs" by editing the field directly
-    await page.getByTestId("efc-clear").click();
-    await page.getByTestId("efc-meal-carbs").fill("50");
-    await expect(page.getByTestId("efc-meal-carbs-reset")).toBeVisible();
-    await page.screenshot({ path: "test-results/efc-6-form-known-carbs.png", fullPage: true });
-    await page.getByTestId("efc-calculate").click();
-    await expect(page.getByTestId("efc-result")).toBeVisible({ timeout: 5000 });
-    await expect(page.getByTestId("text-efc-dose")).toBeVisible();
-    await page.screenshot({ path: "test-results/efc-7-result-known-carbs.png", fullPage: true });
-  });
-
-  test("suggested carbs respond to BG without the user touching the field", async ({ page }) => {
-    await seedPatientSession(page, { snackRatio: "1:10g", correctionFactor: 3 });
-    await page.goto("/scenarios/exercise");
-    await page.getByTestId("efc-collapsible-trigger").click();
-    await page.getByTestId("efc-activity").click();
-    await page.getByTestId("efc-type-cardio").click();
-    await page.getByTestId("efc-intensity-moderate").click();
-
-    // In-range BG, not fasted -> engine intentionally suggests 0 extra pre-meal carbs.
-    await page.getByTestId("efc-bg").fill("8");
-    await page.waitForTimeout(200);
-    const inRangeValue = await page.getByTestId("efc-meal-carbs").inputValue();
-    console.log("carbs suggested at BG 8 (in-range):", JSON.stringify(inRangeValue));
-
-    // Low BG -> engine should suggest carbs to bring BG up before exercise.
-    await page.getByTestId("efc-bg").fill("3.8");
-    await page.waitForTimeout(200);
-    const lowBgValue = await page.getByTestId("efc-meal-carbs").inputValue();
-    console.log("carbs suggested at BG 3.8 (low):", JSON.stringify(lowBgValue));
-    await page.screenshot({ path: "test-results/efc-8-suggestion-low-bg.png", fullPage: true });
-
-    // High BG -> engine should suggest 0 (don't add more carbs on top of high BG).
-    await page.getByTestId("efc-bg").fill("16");
-    await page.waitForTimeout(200);
-    const highBgValue = await page.getByTestId("efc-meal-carbs").inputValue();
-    console.log("carbs suggested at BG 16 (high):", JSON.stringify(highBgValue));
-
-    // Elevated-but-not-"very high" BG (the reported bug: 13 mmol/L was wrongly
-    // suggesting 20g of carbs) -> engine should suggest 0.
-    await page.getByTestId("efc-bg").fill("13");
-    await page.waitForTimeout(200);
-    const elevatedBgValue = await page.getByTestId("efc-meal-carbs").inputValue();
-    console.log("carbs suggested at BG 13 (elevated):", JSON.stringify(elevatedBgValue));
-
-    expect(Number(lowBgValue || "0")).toBeGreaterThan(0);
-    expect(Number(inRangeValue || "0")).toBe(0);
-    expect(Number(highBgValue || "0")).toBe(0);
-    expect(Number(elevatedBgValue || "0")).toBe(0);
-  });
-
-  test("low-BG top-up is visible in the result and its explanation", async ({ page }) => {
-    await seedPatientSession(page, { snackRatio: "1:10g", correctionFactor: 3 });
-    await page.goto("/scenarios/exercise");
-    await page.getByTestId("efc-collapsible-trigger").click();
-    await page.getByTestId("efc-activity").click();
-    await page.getByTestId("efc-type-cardio").click();
-    await page.getByTestId("efc-intensity-moderate").click();
-    await page.getByTestId("efc-bg").fill("4.8");
-    await page.waitForTimeout(200);
-    await page.screenshot({ path: "test-results/efc-9-low-bg-form.png", fullPage: true });
-    await page.getByTestId("efc-calculate").click();
-    await expect(page.getByTestId("efc-result")).toBeVisible({ timeout: 5000 });
-    await page.screenshot({ path: "test-results/efc-10-low-bg-result.png", fullPage: true });
-    await page.getByTestId("efc-details-toggle").click();
-    await expect(page.getByText(/Added ~\d+g on top of your usual buffer/)).toBeVisible();
-    await page.screenshot({ path: "test-results/efc-11-low-bg-result-details.png", fullPage: true });
+    // Start the guided session: the Before step shows the same plan without asking again.
+    await page.getByTestId("button-start-coach").click();
+    await expect(page.getByTestId("coach-preplan-summary")).toBeVisible({ timeout: 5000 });
+    await expect(page.getByTestId("input-coach-bg")).toHaveValue("8");
+    await page.screenshot({ path: "test-results/prefuel-5-coach-before-step.png", fullPage: true });
   });
 });

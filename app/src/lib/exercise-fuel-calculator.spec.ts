@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { computeExerciseFuelPlan } from "./exercise-fuel-calculator";
+import {
+  buildExerciseFuelSummary,
+  computeExerciseFuelPlan,
+  exerciseFuelInputFromSession,
+} from "./exercise-fuel-calculator";
 import type { UserSettings } from "./storage";
 
 const settings: UserSettings = {
@@ -511,5 +515,171 @@ describe("computeExerciseFuelPlan", () => {
     expect(r.sessionFuel.doseGrams).toBe(20);
     expect(r.sessionFuel.intervalMinutes).toBe(30);
     expect(r.sessionFuel.carryGrams).toBeGreaterThanOrEqual(40);
+  });
+});
+
+describe("computeExerciseFuelPlan with a pre-fuel intent", () => {
+  const base = {
+    exerciseType: "cardio" as const,
+    intensity: "moderate" as const,
+    durationMinutes: 45,
+    minutesUntilStart: 30,
+    fasted: false,
+    mealType: "snack",
+    bgTrend: "flat" as const,
+    bgUnits: "mmol/L",
+    settings,
+    isPump: false,
+  };
+
+  it("top_up never returns insulin, even when fasted with a large buffer", () => {
+    for (const currentBg of [4.8, 6.5, 8, 12]) {
+      const r = computeExerciseFuelPlan({ ...base, preFuelIntent: "top_up", fasted: true, currentBg, mealCarbsGrams: 60 });
+      expect(r.insulin).toBeNull();
+      expect(r.userEnteredMealCarbs).toBe(false);
+    }
+  });
+
+  it("top_up sizes carbs when below the start range", () => {
+    const r = computeExerciseFuelPlan({ ...base, preFuelIntent: "top_up", currentBg: 6.2 });
+    expect(r.mealCarbs).toBeGreaterThan(0);
+    expect(r.treatFirst).toBe(false);
+    const s = buildExerciseFuelSummary(r, "mmol/L", settings);
+    expect(s.eat).toEqual({ grams: r.mealCarbs, kind: "top_up" });
+    expect(s.insulin.kind).toBe("none");
+    expect(s.insulin.reason).toMatch(/no insulin for a top-up/i);
+  });
+
+  it("top_up in range returns 0g with a reason", () => {
+    const r = computeExerciseFuelPlan({ ...base, preFuelIntent: "top_up", currentBg: 8 });
+    expect(r.mealCarbs).toBe(0);
+    expect(r.mealCarbsSkipReason).toBe("in_range_fed");
+    const s = buildExerciseFuelSummary(r, "mmol/L", settings);
+    expect(s.eat).toBeNull();
+    expect(s.eatNote).toMatch(/already in the start range/i);
+    expect(s.carry.grams).toBeGreaterThan(0);
+  });
+
+  it("meal returns a reduced bolus", () => {
+    const r = computeExerciseFuelPlan({ ...base, preFuelIntent: "meal", mealCarbsGrams: 50, currentBg: 8.5 });
+    expect(r.insulin).not.toBeNull();
+    expect(r.insulin!.totalUnits).toBeGreaterThan(0);
+    expect(r.insulin!.adjustedUnits).toBeLessThan(r.insulin!.standardUnits);
+    const s = buildExerciseFuelSummary(r, "mmol/L", settings);
+    expect(s.eat).toEqual({ grams: 50, kind: "meal" });
+    expect(s.insulin.kind).toBe("meal_bolus");
+    expect(s.insulin.units).toBe(r.insulin!.totalUnits);
+    expect(s.insulin.reason).toMatch(/% less than your usual/);
+    expect(s.why).toMatch(/when you start/);
+  });
+
+  it("meal at a hypo reading gives treat first and no insulin", () => {
+    const r = computeExerciseFuelPlan({ ...base, preFuelIntent: "meal", mealCarbsGrams: 50, currentBg: 3.5 });
+    expect(r.insulin).toBeNull();
+    expect(r.treatFirst).toBe(true);
+    expect(r.treatFirstReason).toBe("hypo");
+    expect(r.treatFirstGrams).toBeGreaterThanOrEqual(15);
+    const s = buildExerciseFuelSummary(r, "mmol/L", settings);
+    expect(s.eat?.kind).toBe("treat_first");
+    expect(s.insulin.kind).toBe("none");
+    expect(s.why).toMatch(/hypo range/);
+  });
+
+  it("meal at a low-but-not-hypo reading keeps today's reduced dose", () => {
+    const r = computeExerciseFuelPlan({ ...base, preFuelIntent: "meal", mealCarbsGrams: 48, currentBg: 5.5 });
+    expect(r.treatFirst).toBe(false);
+    expect(r.insulin).not.toBeNull();
+  });
+
+  it("none with high BG gives a correction only", () => {
+    const r = computeExerciseFuelPlan({ ...base, preFuelIntent: "none", currentBg: 12.8 });
+    expect(r.mealCarbs).toBe(0);
+    expect(r.insulin).toBeNull();
+    expect(r.preCorrection).not.toBeNull();
+    const s = buildExerciseFuelSummary(r, "mmol/L", settings);
+    expect(s.eat).toBeNull();
+    expect(s.insulin.kind).toBe("correction");
+    expect(s.insulin.units).toBe(r.preCorrection!.units);
+  });
+
+  it("none in range: nothing to eat, carry only", () => {
+    const r = computeExerciseFuelPlan({ ...base, preFuelIntent: "none", currentBg: 8, fasted: true });
+    expect(r.mealCarbs).toBe(0);
+    const s = buildExerciseFuelSummary(r, "mmol/L", settings);
+    expect(s.eat).toBeNull();
+    expect(s.eatNote).toMatch(/Nothing to eat/);
+    expect(s.insulin.units).toBe(0);
+  });
+
+  it("none still says treat first when BG is low", () => {
+    const r = computeExerciseFuelPlan({ ...base, preFuelIntent: "none", currentBg: 4.9 });
+    expect(r.treatFirst).toBe(true);
+    expect(r.mealCarbs).toBeGreaterThan(0);
+    const s = buildExerciseFuelSummary(r, "mmol/L", settings);
+    expect(s.eat?.kind).toBe("treat_first");
+    expect(s.insulin.units).toBe(0);
+  });
+
+  it("ignores entered carbs unless the intent is meal", () => {
+    const r = computeExerciseFuelPlan({ ...base, preFuelIntent: "none", mealCarbsGrams: 60, currentBg: 8 });
+    expect(r.mealCarbs).toBe(0);
+    expect(r.insulin).toBeNull();
+  });
+
+  it("legacy calls without an intent behave as before", () => {
+    const meal = computeExerciseFuelPlan({ ...base, mealCarbsGrams: 50, currentBg: 8.5 });
+    expect(meal.preFuelIntent).toBe("meal");
+    expect(meal.userEnteredMealCarbs).toBe(true);
+    const suggested = computeExerciseFuelPlan({ ...base, fasted: true, currentBg: 8 });
+    expect(suggested.preFuelIntent).toBe("top_up");
+    expect(suggested.mealCarbsIsSuggested).toBe(true);
+  });
+
+  it("asks for BG when it is missing", () => {
+    const r = computeExerciseFuelPlan({ ...base, preFuelIntent: "meal", mealCarbsGrams: 50 });
+    const s = buildExerciseFuelSummary(r, "mmol/L", settings);
+    expect(s.insulin.reason).toMatch(/Add your BG/);
+    const none = buildExerciseFuelSummary(computeExerciseFuelPlan({ ...base, preFuelIntent: "none" }), "mmol/L", settings);
+    expect(none.eatNote).toMatch(/Add your BG/);
+  });
+});
+
+describe("exerciseFuelInputFromSession", () => {
+  const session = {
+    id: "s1",
+    exerciseName: "Run",
+    exerciseType: "cardio" as const,
+    intensity: "moderate" as const,
+    durationMinutes: 45,
+    phase: "pre" as const,
+    startedAt: new Date(Date.now() - 10 * 60_000).toISOString(),
+    recoveryMinutes: 120,
+    midCheckDone: false,
+    preChecklist: { bgChecked: false, carbsConsidered: false, basalAdjusted: false },
+    preBg: 7.4,
+    preTrend: "flat" as const,
+    preRapidInsulin2h: "yes" as const,
+    prePlan: { intent: "meal" as const, carbsGrams: 40, mealType: "lunch", minutesUntilStart: 30 },
+  };
+
+  it("counts down the start time and prefers the live BG", () => {
+    const input = exerciseFuelInputFromSession(session, {
+      bgUnits: "mmol/L",
+      settings,
+      isPump: false,
+      currentBg: 9.1,
+    });
+    expect(input).not.toBeNull();
+    expect(input!.minutesUntilStart).toBe(20);
+    expect(input!.currentBg).toBe(9.1);
+    expect(input!.preFuelIntent).toBe("meal");
+    expect(input!.mealCarbsGrams).toBe(40);
+    expect(input!.rapidInsulinLast2h).toBe(true);
+  });
+
+  it("returns null without a plan", () => {
+    expect(
+      exerciseFuelInputFromSession({ ...session, prePlan: undefined }, { bgUnits: "mmol/L", settings, isPump: false }),
+    ).toBeNull();
   });
 });
