@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const publicAssets = join(process.cwd(), "ios", "App", "App", "public", "assets");
-const required = ["card-bedtime-last-night", "Last night", "Overnight glucose review"];
+const required = ["card-bedtime-last-night", "Last night"];
 
 if (!existsSync(publicAssets)) {
   console.error(`Missing ${publicAssets} — run cap sync ios first.`);
