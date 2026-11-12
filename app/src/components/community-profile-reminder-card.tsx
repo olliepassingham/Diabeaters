@@ -6,9 +6,11 @@ import { Card, CardContent } from "@/components/ui/card";
 
 type Props = {
   onDismiss: () => void;
+  /** Name and public visibility are already set; only the @handle is missing. */
+  onlyHandleMissing?: boolean;
 };
 
-export function CommunityProfileReminderCard({ onDismiss }: Props) {
+export function CommunityProfileReminderCard({ onDismiss, onlyHandleMissing = false }: Props) {
   return (
     <Card
       className="border-primary/20 bg-gradient-to-br from-primary/[0.06] to-muted/20 shadow-sm"
@@ -25,7 +27,7 @@ export function CommunityProfileReminderCard({ onDismiss }: Props) {
           <div className="min-w-0 flex-1 space-y-2">
             <div className="flex items-start justify-between gap-2">
               <p className="text-sm font-semibold leading-snug text-foreground">
-                Finish your public profile for the Feed
+                {onlyHandleMissing ? "Pick your @handle to post and comment" : "Finish your public profile for the Feed"}
               </p>
               <Button
                 type="button"
@@ -39,8 +41,9 @@ export function CommunityProfileReminderCard({ onDismiss }: Props) {
               </Button>
             </div>
             <p className="text-sm leading-relaxed text-muted-foreground">
-              You can browse the Feed without this. To post, follow, or message, add a display name, choose a
-              public @handle, and turn your profile public.
+              {onlyHandleMissing
+                ? "Your profile doesn't have a public @handle yet. Choose one to post, comment, follow, and message."
+                : "You can browse the Feed without this. To post, follow, or message, add a display name, choose a public @handle, and turn your profile public."}
             </p>
             <ul className="space-y-1 text-xs leading-relaxed text-muted-foreground">
               <li>· Post, comment, and follow others in the community</li>
@@ -48,7 +51,7 @@ export function CommunityProfileReminderCard({ onDismiss }: Props) {
             </ul>
             <Button asChild size="sm" className="mt-1 rounded-xl">
               <Link href="/community/setup">
-                Set up profile
+                {onlyHandleMissing ? "Choose @handle" : "Set up profile"}
                 <ArrowRight className="ml-1.5 h-4 w-4" aria-hidden />
               </Link>
             </Button>

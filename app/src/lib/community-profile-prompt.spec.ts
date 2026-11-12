@@ -45,4 +45,10 @@ describe("community-profile-prompt", () => {
       false,
     );
   });
+
+  it("re-shows the feed reminder to members who dismissed the original version", () => {
+    localStorage.setItem(`diabeater_community_feed_profile_reminder_dismissed_u_${USER_ID}`, "true");
+    const noHandle = { full_name: "A", public_handle: null, is_public: true };
+    expect(shouldShowCommunityFeedProfileReminder(USER_ID, noHandle)).toBe(true);
+  });
 });

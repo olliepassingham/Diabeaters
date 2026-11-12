@@ -782,6 +782,7 @@ export default function CommunityHomePage() {
 
       {showProfileReminder && user?.id ? (
         <CommunityProfileReminderCard
+          onlyHandleMissing={Boolean(profile?.is_public && profile?.full_name?.trim())}
           onDismiss={() => {
             dismissCommunityFeedProfileReminder(user.id);
             setShowProfileReminder(false);

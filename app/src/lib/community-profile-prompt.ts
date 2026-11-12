@@ -2,7 +2,8 @@ import { needsCommunityProfileSetup, type ProfileRow } from "@/lib/profile";
 
 const SKIPPED_PROFILE_KEY = "diabeater_community_skipped_profile_setup";
 const TOOLS_DISMISSED_PREFIX = "diabeater_community_tools_profile_reminder_dismissed_u_";
-const FEED_DISMISSED_PREFIX = "diabeater_community_feed_profile_reminder_dismissed_u_";
+// v2: re-show once to members whose onboarding @handle was never saved (Oct–Nov 2026).
+const FEED_DISMISSED_PREFIX = "diabeater_community_feed_profile_reminder_dismissed_v2_u_";
 
 /** Set when community onboarding finishes via “Browse tools” instead of profile setup. */
 export function markCommunitySkippedProfileSetup(): void {
