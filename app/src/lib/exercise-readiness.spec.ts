@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { calculateExercisePlan } from "./exercise-plan";
-import { getExerciseCarbPlanHintLine, getExerciseFuelPlanLines, getExerciseReadinessVerdict, getRecoveryReadinessVerdict } from "./exercise-readiness";
+import { computeActiveWorkoutFuelCarry, getExerciseCarbPlanHintLine, getExerciseFuelPlanLines, getExerciseReadinessVerdict, getRecoveryReadinessVerdict } from "./exercise-readiness";
 
 const plan = calculateExercisePlan({
   exerciseType: "cardio",
@@ -503,8 +503,51 @@ describe("getExerciseFuelPlanLines", () => {
       exerciseType: "strength",
     });
     expect(lines.some((l) => l.id === "on_hand")).toBe(true);
-    expect(lines.find((l) => l.id === "on_hand")?.label).toBe("Have ready");
+    expect(lines.find((l) => l.id === "on_hand")?.label).toBe("Carry with you");
     expect(lines.some((l) => l.id === "post")).toBe(false);
+  });
+
+  it("pre-phase carry matches the during-session carry total and interval", () => {
+    const cardioPlan = calculateExercisePlan({
+      exerciseType: "cardio",
+      durationMinutes: 45,
+      intensity: "moderate",
+      minutesUntilStart: 0,
+      bgUnits: "mmol/L",
+      currentBg: 8.4,
+    });
+    const carry = computeActiveWorkoutFuelCarry({ plan: cardioPlan, exerciseType: "cardio", intensity: "moderate" });
+    const pre = getExerciseFuelPlanLines(cardioPlan, "ready", null, {
+      phase: "pre",
+      exerciseType: "cardio",
+      currentBg: 8.4,
+      bgUnits: "mmol/L",
+      intensity: "moderate",
+    });
+    expect(pre[0]?.label).toBe("Carry with you");
+    expect(pre[0]?.text).toContain(`${carry!.carryGrams}g`);
+    expect(pre[1]?.label).toBe("Every 30 min");
+    expect(pre[1]?.text).toContain(`${carry!.doseGrams}g`);
+  });
+
+  it("pre-phase take now keeps the eat-now amount and adds the session carry", () => {
+    const cardioPlan = calculateExercisePlan({
+      exerciseType: "cardio",
+      durationMinutes: 30,
+      intensity: "intense",
+      minutesUntilStart: 0,
+      bgUnits: "mmol/L",
+      currentBg: 5.6,
+    });
+    const lines = getExerciseFuelPlanLines(cardioPlan, "caution", null, {
+      phase: "pre",
+      exerciseType: "cardio",
+      currentBg: 5.6,
+      bgUnits: "mmol/L",
+      intensity: "intense",
+    });
+    expect(lines[0]?.label).toBe("Take now");
+    expect(lines[1]?.label).toBe("Then carry");
   });
 
   it("uses carb favourites when configured", () => {

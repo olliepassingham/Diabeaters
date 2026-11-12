@@ -26,7 +26,7 @@ import {
   type MealExerciseMeta,
 } from "@/lib/meal-dose";
 import type { ExercisePlanResult } from "@/lib/exercise-plan";
-import { computeActiveWorkoutFuelCarry } from "@/lib/exercise-readiness";
+import { computeActiveWorkoutFuelCarry, showsWorkoutFuelInterval } from "@/lib/exercise-readiness";
 import { parseRatioToGramsPerUnit } from "@/lib/ratio-utils";
 import {
   isShortMaxEffort,
@@ -890,11 +890,15 @@ function computeSessionFuel(
   const carbFrequency = plan.during.carbFrequency;
 
   if (carry) {
+    const showInterval = showsWorkoutFuelInterval({
+      exerciseType: input.exerciseType,
+      intensity: input.intensity,
+      durationMinutes: plan.duration,
+    });
     return {
       carryGrams: carry.carryGrams,
       duringTotalGrams: Math.max(duringFromPlan, carry.carryGrams),
-      doseGrams: carry.doseGrams,
-      intervalMinutes: carry.intervalMinutes,
+      ...(showInterval ? { doseGrams: carry.doseGrams, intervalMinutes: carry.intervalMinutes } : {}),
       carbFrequency,
     };
   }

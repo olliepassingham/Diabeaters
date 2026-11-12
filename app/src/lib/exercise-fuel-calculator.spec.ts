@@ -516,6 +516,24 @@ describe("computeExerciseFuelPlan", () => {
     expect(r.sessionFuel.intervalMinutes).toBe(30);
     expect(r.sessionFuel.carryGrams).toBeGreaterThanOrEqual(40);
   });
+
+  it("leaves out interval dosing for strength, matching the coach", () => {
+    const r = computeExerciseFuelPlan({
+      exerciseType: "strength",
+      intensity: "moderate",
+      durationMinutes: 45,
+      minutesUntilStart: 30,
+      fasted: false,
+      currentBg: 8.5,
+      bgTrend: "flat",
+      bgUnits: "mmol/L",
+      settings,
+      isPump: false,
+      preFuelIntent: "none",
+    });
+    expect(r.sessionFuel.doseGrams).toBeUndefined();
+    expect(buildExerciseFuelSummary(r, "mmol/L", settings).carry.everyMinutes).toBeUndefined();
+  });
 });
 
 describe("computeExerciseFuelPlan with a pre-fuel intent", () => {

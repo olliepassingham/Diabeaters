@@ -727,6 +727,19 @@ function resolveTreatFirstFuelGrams(
   return null;
 }
 
+/** Whether to show the "~Xg every 30 min" dose alongside the carry total. */
+export function showsWorkoutFuelInterval(input: {
+  exerciseType: string;
+  intensity?: ExerciseIntensity;
+  durationMinutes: number;
+}): boolean {
+  return (
+    isCardioLikeExerciseType(input.exerciseType) &&
+    (input.intensity === "moderate" || input.intensity === "intense") &&
+    input.durationMinutes > 30
+  );
+}
+
 /** During-workout carry + interval dose for the active strip (cardio: ~30g per 30 min). */
 export function computeActiveWorkoutFuelCarry(input: {
   plan: ExercisePlanResult;
@@ -817,13 +830,54 @@ export function getExerciseFuelPlanLines(
     return lines;
   }
 
+  const carry = computeActiveWorkoutFuelCarry({
+    plan,
+    exerciseType: options?.exerciseType ?? "",
+    intensity: options?.intensity ?? "moderate",
+  });
+  const showInterval =
+    carry != null &&
+    showsWorkoutFuelInterval({
+      exerciseType: options?.exerciseType ?? "",
+      intensity: options?.intensity,
+      durationMinutes: plan.duration,
+    });
+  const intervalLine = (): ExerciseFuelPlanLine | null => {
+    if (!carry || !showInterval) return null;
+    const doseDetail = formatCarbsForScenario(carry.doseGrams, profile, "exercise_during");
+    return {
+      id: "on_hand",
+      label: `Every ${carry.intervalMinutes} min`,
+      text: doseDetail ? `~${Math.round(carry.doseGrams)}g · ${doseDetail}` : `~${Math.round(carry.doseGrams)}g`,
+    };
+  };
+
   if (phase === "pre") {
+    // Same carry total as the planning card and the During step, so the number doesn't change between screens.
+    if (carry && !takeNow) {
+      lines.push({
+        id: "on_hand",
+        label: "Carry with you",
+        text: formatFastCarbsForScenario(carry.carryGrams, profile, "exercise_on_hand"),
+      });
+      const interval = intervalLine();
+      if (interval) lines.push({ ...interval, id: "during" });
+      return lines;
+    }
     if (pre > 0) {
       lines.push({
         id: "on_hand",
         label: takeNow ? "Take now" : "Have ready",
         text: formatFastCarbsForScenario(pre, profile, "exercise_on_hand"),
       });
+    }
+    if (takeNow && carry) {
+      lines.push({
+        id: "during",
+        label: "Then carry",
+        text: `~${Math.round(carry.carryGrams)}g fast carbs`,
+      });
+      return lines;
     }
     if (during > 0) {
       const duringDetail = formatCarbsForScenario(during, profile, "exercise_during");
@@ -846,11 +900,6 @@ export function getExerciseFuelPlanLines(
         },
       ];
     }
-    const carry = computeActiveWorkoutFuelCarry({
-      plan,
-      exerciseType: options?.exerciseType ?? "",
-      intensity: options?.intensity ?? "moderate",
-    });
     if (carry) {
       const carryDetail = formatCarbsForScenario(carry.carryGrams, profile, "exercise_during");
       lines.push({
@@ -860,20 +909,8 @@ export function getExerciseFuelPlanLines(
           ? `~${Math.round(carry.carryGrams)}g fast carbs · ${carryDetail}`
           : `~${Math.round(carry.carryGrams)}g fast carbs`,
       });
-      const showInterval =
-        isCardioLikeExerciseType(options?.exerciseType ?? "") &&
-        (options?.intensity === "moderate" || options?.intensity === "intense") &&
-        plan.duration > 30;
-      if (showInterval) {
-        const doseDetail = formatCarbsForScenario(carry.doseGrams, profile, "exercise_during");
-        lines.push({
-          id: "on_hand",
-          label: `Every ${carry.intervalMinutes} min`,
-          text: doseDetail
-            ? `~${Math.round(carry.doseGrams)}g · ${doseDetail}`
-            : `~${Math.round(carry.doseGrams)}g`,
-        });
-      }
+      const interval = intervalLine();
+      if (interval) lines.push(interval);
     }
     return lines;
   }
