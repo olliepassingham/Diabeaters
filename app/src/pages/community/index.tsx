@@ -3,7 +3,6 @@ import { Link, useLocation, useSearch } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { Bookmark, Play, Search as SearchIcon, SlidersHorizontal, X } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
-import { FeedFollowSuggestionsStrip } from "@/components/community/feed-follow-suggestions-strip";
 import { FeedWatchLearnPlayer } from "@/components/community/feed-watch-learn-player";
 import { FeedStoriesComposerHeader } from "@/components/community/feed-stories-composer-header";
 import { FeedPostList } from "@/components/community/feed-post-list";
@@ -49,10 +48,6 @@ import {
   dismissCommunityFeedProfileReminder,
   shouldShowCommunityFeedProfileReminder,
 } from "@/lib/community-profile-prompt";
-import {
-  dismissFeedSuggestions,
-  isFeedSuggestionsDismissed,
-} from "@/lib/community/feed-suggestions-dismiss";
 import {
   buildMainFeedScopeKey,
   COMMUNITY_FEED_QUERY_ROOT,
@@ -143,7 +138,7 @@ export default function CommunityHomePage() {
   const [suggestedLoading, setSuggestedLoading] = useState(false);
   const [suggestionsFetched, setSuggestionsFetched] = useState(false);
   const [followBusyIds, setFollowBusyIds] = useState<Record<string, boolean>>({});
-  /** Current user’s followees — loaded on feed mount for suggestion strip + Find people. */
+  /** Current user’s followees — loaded on feed mount for Find people + follow buttons. */
   const [followeeIds, setFolloweeIds] = useState<Set<string>>(() => new Set());
   const [followeesLoading, setFolloweesLoading] = useState(false);
   const [savedOnly, setSavedOnly] = useState(false);
@@ -152,7 +147,6 @@ export default function CommunityHomePage() {
   const [searchMatchedAuthorIds, setSearchMatchedAuthorIds] = useState<string[] | null>(null);
   const [scrollByTab, setScrollByTab] = useState<Record<FeedTab, number>>({ everyone: 0, following: 0 });
   const [showProfileReminder, setShowProfileReminder] = useState(false);
-  const [suggestionsDismissed, setSuggestionsDismissed] = useState(false);
   const [watchLearnPosts, setWatchLearnPosts] = useState<CommunityPostRow[]>([]);
   const [watchLearnLoading, setWatchLearnLoading] = useState(false);
   const [watchLearnOpen, setWatchLearnOpen] = useState(false);
@@ -188,14 +182,6 @@ export default function CommunityHomePage() {
     }
     setShowProfileReminder(shouldShowCommunityFeedProfileReminder(user.id, profile));
   }, [user?.id, profile, profileLoading, isCommunityMode]);
-
-  useEffect(() => {
-    if (!user?.id) {
-      setSuggestionsDismissed(false);
-      return;
-    }
-    setSuggestionsDismissed(isFeedSuggestionsDismissed(user.id));
-  }, [user?.id]);
 
   useEffect(() => {
     if (profileLoading) return;
@@ -541,7 +527,7 @@ export default function CommunityHomePage() {
     void loadSuggestedPeople();
   }, [user?.id, suggestedLoading, suggestionsFetched, loadSuggestedPeople]);
 
-  // Discovery — deferred until idle; fetch once so the strip does not flash repeatedly.
+  // Discovery for Find people — deferred until idle; fetch once.
   useEffect(() => {
     if (!user?.id || suggestionsFetched) return;
     if (savedOnly || feedSearch.trim()) return;
@@ -750,7 +736,7 @@ export default function CommunityHomePage() {
   );
 
   return (
-    <PageShell variant="full" density="compact" className="space-y-2 pb-2 pt-0">
+    <PageShell variant="full" density="compact" className="space-y-1.5 pb-2 pt-0">
       <PageHeader title="Community" screenReaderOnly />
 
       {user && !savedOnly && !feedSearch.trim() ? (
@@ -782,6 +768,7 @@ export default function CommunityHomePage() {
 
       {showProfileReminder && user?.id ? (
         <CommunityProfileReminderCard
+          compact
           onlyHandleMissing={Boolean(profile?.is_public && profile?.full_name?.trim())}
           onDismiss={() => {
             dismissCommunityFeedProfileReminder(user.id);
@@ -834,7 +821,7 @@ export default function CommunityHomePage() {
         extras={feedComposer.composerExtras}
       />
 
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         <div className="flex items-center gap-2">
           <Tabs
             value={watchLearnOpen ? "watch" : feedTab}
@@ -953,22 +940,6 @@ export default function CommunityHomePage() {
           </div>
         ) : null}
       </div>
-
-      {user && !savedOnly && !feedSearch.trim() && !suggestionsDismissed && (suggestedLoading || suggested.length > 0) ? (
-        <FeedFollowSuggestionsStrip
-          suggestions={suggested}
-          loading={suggestedLoading && suggested.length === 0}
-          followeeIds={followeeIds}
-          followBusyIds={followBusyIds}
-          onFollow={(id) => void handleFollow(id)}
-          onFindPeople={() => setPeopleOpen(true)}
-          onDismiss={() => {
-            if (!user?.id) return;
-            dismissFeedSuggestions(user.id);
-            setSuggestionsDismissed(true);
-          }}
-        />
-      ) : null}
 
       <div className="min-w-0">
       <FeedPostList

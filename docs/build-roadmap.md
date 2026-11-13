@@ -12,6 +12,7 @@ Last seeded: 2026-11-13 (phone audit + recent exercise / stay-signed-in work).
 - [x] Product brief + living roadmap + AGENTS.md propose-and-wait loop
 - [x] **Web viewport lock** — `app/index.html`: `maximum-scale=1, user-scalable=no` (matches native zoom lock)
 - [x] **Feed: saved-posts false empty** — `fetchCommunitySavedPostsPage` loads bookmarks from `community_post_saves` (not client-filter of the normal feed)
+- [x] **Thinner Feed first viewport** — compact profile reminder; suggestions strip removed from above posts (still in Find people)
 
 ## P0
 
@@ -19,11 +20,10 @@ Last seeded: 2026-11-13 (phone audit + recent exercise / stay-signed-in work).
 
 ## P1 — Feed polish
 
-- [ ] **Thinner first viewport** — cut chrome above the first post in `app/src/pages/community/index.tsx` (profile reminder / suggestions / filter clutter); first post should land on-screen on a typical phone.
 - [ ] **Composer as a real control** — strengthen the “Write a post…” row in `feed-stories-composer-header.tsx` (clear field chrome / CTA, not bare muted text).
 - [ ] **Drop soft-in on recycled feed cards** — stop re-animating every page of infinite scroll in `feed-post-card.tsx`; gate like/heart bursts for reduced motion.
 - [ ] **Watch placement** — Watch should not feel like a third feed tab that leaves the list mounted underneath; clearer entry (header or filter) without modal-as-tab confusion.
-- [ ] **Suggestions strip** — soften or defer `feed-follow-suggestions-strip.tsx` (less nested card chrome, no tiny 10px handles mid-feed).
+- [x] **Suggestions strip** — deferred off the main Feed chrome; discovery remains in Find people
 - [ ] **Following empty state** — use the quieter parent copy; don’t override with dense onboarding chips when Following is empty.
 
 ## P1 — Product polish
