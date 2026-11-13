@@ -126,7 +126,11 @@ export function getCommunityFeedNextPageParam(
   if (!lastPage?.length || lastPage.length < pageSize) return undefined;
   const last = lastPage[lastPage.length - 1];
   if (!last) return undefined;
-  return { created_at: last.created_at, id: last.id };
+  // Saved feed pages are ordered by bookmark time (`save_created_at`), not post time.
+  return {
+    created_at: last.save_created_at ?? last.created_at,
+    id: last.id,
+  };
 }
 
 /** Community-only session (feed landing, not patient/carer with a link). */

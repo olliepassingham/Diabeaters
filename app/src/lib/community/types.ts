@@ -44,6 +44,11 @@ export type CommunityPostRow = {
   /** Whether the current user saved/bookmarked this post (community_post_saves). */
   saved_by_me: boolean;
   created_at: string;
+  /**
+   * Bookmark time when the row came from the saved-posts feed.
+   * Used as the pagination cursor (`created_at` + `id`) instead of post time.
+   */
+  save_created_at?: string;
   /** Set by feed fetchers together with `liked_by_me` so avatars/names load with the post payload. */
   author_preview?: CommunityPostAuthorPreview;
 };

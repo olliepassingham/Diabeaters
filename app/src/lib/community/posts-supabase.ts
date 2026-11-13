@@ -817,6 +817,96 @@ async function collectCommunityPostPage(
   return { data: await finalizePostRowsForFeed(page), error: null };
 }
 
+/**
+ * Posts the viewer has bookmarked (`community_post_saves`), newest save first.
+ * Cursor is (save.created_at, post_id) — see `save_created_at` on returned rows.
+ */
+export async function fetchCommunitySavedPostsPage(
+  limit: number,
+  cursor: FeedCursor | null,
+  topicFilter?: CommunityTopicId | null,
+): Promise<{
+  data: CommunityPostRow[] | null;
+  error: Error | null;
+}> {
+  const supabase = getSupabase();
+  if (!supabase) return { data: null, error: new Error("Supabase not configured") };
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData.session?.user?.id;
+  if (!uid) return { data: null, error: new Error("Not signed in") };
+
+  const lim = Math.min(Math.max(limit, 1), PAGE_LIMIT_CAP);
+  const collected: CommunityPostRow[] = [];
+  let pageCursor = cursor;
+
+  for (let pass = 0; pass < 6 && collected.length < lim; pass += 1) {
+    let savesQuery = supabase
+      .from("community_post_saves")
+      .select("post_id, created_at")
+      .eq("user_id", uid)
+      .order("created_at", { ascending: false })
+      .order("post_id", { ascending: false })
+      .limit(lim);
+
+    if (pageCursor?.created_at && pageCursor.id) {
+      // Quote timestamptz so PostgREST does not split on `:` / `+`.
+      const ts = `"${pageCursor.created_at.replace(/"/g, "")}"`;
+      const id = pageCursor.id;
+      savesQuery = savesQuery.or(`created_at.lt.${ts},and(created_at.eq.${ts},post_id.lt.${id})`);
+    }
+
+    const { data: saveRows, error: saveErr } = await savesQuery;
+    if (saveErr) return { data: null, error: new Error(saveErr.message) };
+
+    const saves = (saveRows ?? []) as { post_id: string; created_at: string }[];
+    if (saves.length === 0) break;
+
+    const saveAtByPostId = new Map(saves.map((s) => [String(s.post_id), String(s.created_at)]));
+    const postIds = saves.map((s) => String(s.post_id));
+
+    const { data: postRows, error: postErr } = await supabase
+      .from("community_posts")
+      .select("*")
+      .in("id", postIds);
+
+    if (postErr) return { data: null, error: wrapFeedRpcError(postErr) };
+
+    const byId = new Map(
+      ((postRows ?? []) as Record<string, unknown>[]).map((row) => [String(row.id), mapPost(row)]),
+    );
+
+    // Preserve save order; skip posts RLS hid or that fail the optional topic filter.
+    const pagePosts: CommunityPostRow[] = [];
+    for (const sid of postIds) {
+      const post = byId.get(sid);
+      if (!post) continue;
+      if (topicFilter && post.topic !== topicFilter) continue;
+      pagePosts.push({
+        ...post,
+        saved_by_me: true,
+        save_created_at: saveAtByPostId.get(sid) ?? post.created_at,
+      });
+    }
+
+    const finalized = await finalizePostRowsForFeed(pagePosts);
+    // finalize re-reads saves; keep bookmark time + guaranteed saved_by_me for this lane.
+    for (const p of finalized) {
+      collected.push({
+        ...p,
+        saved_by_me: true,
+        save_created_at: saveAtByPostId.get(p.id) ?? p.save_created_at ?? p.created_at,
+      });
+    }
+
+    const lastSave = saves[saves.length - 1]!;
+    pageCursor = { created_at: String(lastSave.created_at), id: String(lastSave.post_id) };
+    if (saves.length < lim) break;
+  }
+
+  return { data: collected.slice(0, lim), error: null };
+}
+
 export async function togglePostSave(
   postId: string,
   currentlySaved: boolean,

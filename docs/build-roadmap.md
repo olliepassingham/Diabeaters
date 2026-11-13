@@ -11,10 +11,11 @@ Last seeded: 2026-11-13 (phone audit + recent exercise / stay-signed-in work).
 - [x] Phone audit report (viewport, shell, Feed, native-fit)
 - [x] Product brief + living roadmap + AGENTS.md propose-and-wait loop
 - [x] **Web viewport lock** — `app/index.html`: `maximum-scale=1, user-scalable=no` (matches native zoom lock)
+- [x] **Feed: saved-posts false empty** — `fetchCommunitySavedPostsPage` loads bookmarks from `community_post_saves` (not client-filter of the normal feed)
 
 ## P0
 
-- [ ] **Feed: fix saved-posts false empty** — `savedOnly` client-filters the normal feed in `app/src/components/community/feed-post-list.tsx`. Need a real saved query (or don’t show empty until pages are exhausted) so “No saved posts yet” is truthful.
+- *(none open)*
 
 ## P1 — Feed polish
 

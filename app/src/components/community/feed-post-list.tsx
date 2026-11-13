@@ -48,6 +48,7 @@ import {
   insertCommunityComment,
   isCommunityTopicId,
   listBlockRelatedUserIdsForCurrentUser,
+  fetchCommunitySavedPostsPage,
   searchCommunityPostsPage,
   submitContentReport,
   togglePostLike,
@@ -127,7 +128,7 @@ export function FeedPostList(props: {
   /** Author ids matched from name/handle search (used for server search). */
   searchMatchedAuthorIds?: string[] | null;
   onOpenFindPeople?: () => void;
-  /** Show only posts saved by the viewer (client filter). */
+  /** Show only posts saved by the viewer (server saved-posts query). */
   savedOnly?: boolean;
   /** Bump when parent remount key changes (realtime channel id). */
   feedListRevision?: number;
@@ -254,6 +255,13 @@ export function FeedPostList(props: {
       return !(pages?.[0]?.length);
     },
     queryFn: async ({ pageParam }) => {
+      // Saved lane loads bookmarks directly — never client-filter the normal feed
+      // (that falsely empties when the first page has no saves).
+      if (props.savedOnly) {
+        const res = await fetchCommunitySavedPostsPage(pageSize, pageParam, topicFilter);
+        if (res.error) throw new Error(res.error.message);
+        return res.data ?? [];
+      }
       if (useServerSearch) {
         const res = await searchCommunityPostsPage(
           pageSize,
@@ -462,20 +470,18 @@ export function FeedPostList(props: {
 
   const displayPosts = useMemo(() => {
     let list = posts;
-    if (props.savedOnly) {
-      list = list.filter((p) => p.saved_by_me);
-    }
-    if (!useServerSearch) {
-      const q = (props.searchQuery ?? "").trim().toLowerCase();
-      if (q) {
-        list = list.filter((p) => {
-          if (p.body.toLowerCase().includes(q)) return true;
-          const m = authorMeta[p.author_id];
-          const name = (m?.name ?? "").toLowerCase();
-          const handle = (m?.public_handle ?? "").toLowerCase();
-          return name.includes(q) || handle.includes(q);
-        });
-      }
+    // Saved lane already loads bookmarks from the server. Still allow a light
+    // client search within that set (server search is skipped while savedOnly).
+    const q =
+      props.savedOnly || !useServerSearch ? (props.searchQuery ?? "").trim().toLowerCase() : "";
+    if (q) {
+      list = list.filter((p) => {
+        if (p.body.toLowerCase().includes(q)) return true;
+        const m = authorMeta[p.author_id];
+        const name = (m?.name ?? "").toLowerCase();
+        const handle = (m?.public_handle ?? "").toLowerCase();
+        return name.includes(q) || handle.includes(q);
+      });
     }
     const known = new Set(list.map((p) => p.id));
     const pending = (props.pendingPosts ?? []).filter((p) => {
@@ -668,12 +674,21 @@ export function FeedPostList(props: {
     }
     const cur = postsRef.current.find((p) => p.id === postId);
     if (!cur) return;
+    const wasSaved = cur.saved_by_me;
     // Optimistic update; togglePostSave is idempotent (duplicate PK treated as success).
-    patchPostsInCache((p) => (p.id === postId ? { ...p, saved_by_me: !p.saved_by_me } : p));
-    const res = await togglePostSave(postId, cur.saved_by_me);
+    if (props.savedOnly && wasSaved) {
+      removePostFromCache(postId);
+    } else {
+      patchPostsInCache((p) => (p.id === postId ? { ...p, saved_by_me: !p.saved_by_me } : p));
+    }
+    const res = await togglePostSave(postId, wasSaved);
     if (res.error) {
       // Revert on failure.
-      patchPostsInCache((p) => (p.id === postId ? { ...p, saved_by_me: cur.saved_by_me } : p));
+      if (props.savedOnly && wasSaved) {
+        await feedQuery.refetch();
+      } else {
+        patchPostsInCache((p) => (p.id === postId ? { ...p, saved_by_me: wasSaved } : p));
+      }
       toast({ title: "Could not update bookmark", description: res.error.message, variant: "destructive" });
     }
   }
@@ -774,15 +789,23 @@ export function FeedPostList(props: {
     toast({ title: "Updated", description: "Your post was updated." });
   }
 
-  const searchLabelRaw = useServerSearch ? debouncedSearch.trim() : (props.searchQuery ?? "").trim();
+  const searchLabelRaw =
+    props.savedOnly || useServerSearch
+      ? debouncedSearch.trim() || (props.searchQuery ?? "").trim()
+      : (props.searchQuery ?? "").trim();
   const searchNoResults =
     Boolean(searchLabelRaw) &&
     displayPosts.length === 0 &&
     !loadingPosts &&
-    (useServerSearch ? posts.length === 0 : posts.length > 0);
+    (props.savedOnly || (useServerSearch ? posts.length === 0 : posts.length > 0));
 
+  // Truthful empty: saved query returned no rows (not “first feed page had no saves”).
   const savedFilterEmpty =
-    Boolean(props.savedOnly) && !loadingPosts && posts.length > 0 && displayPosts.length === 0;
+    Boolean(props.savedOnly) &&
+    !loadingPosts &&
+    !searchLabelRaw &&
+    posts.length === 0 &&
+    displayPosts.length === 0;
 
   const followingOnboardingEmpty =
     props.feedTab === "following" &&
