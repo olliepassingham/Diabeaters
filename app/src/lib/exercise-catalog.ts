@@ -42,9 +42,8 @@ export const EXERCISE_MEAL_TYPE_OPTIONS = [
 export const EXERCISE_PRE_FUEL_INTENT_OPTIONS: Array<{
   value: ExercisePreFuelIntent;
   label: string;
-  hint: string;
 }> = [
-  { value: "meal", label: "Eating a meal first", hint: "Enter the carbs — we'll reduce your meal insulin for exercise" },
-  { value: "top_up", label: "Small snack to top up", hint: "No insulin — we'll size it to get you into the start range" },
-  { value: "none", label: "Not eating", hint: "Just tell me what to carry" },
+  { value: "meal", label: "Meal" },
+  { value: "top_up", label: "Snack" },
+  { value: "none", label: "Not eating" },
 ];

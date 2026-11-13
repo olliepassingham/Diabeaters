@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildExerciseFuelActionLines,
   buildExerciseFuelSummary,
   computeExerciseFuelPlan,
   exerciseFuelInputFromSession,
@@ -659,6 +660,73 @@ describe("computeExerciseFuelPlan with a pre-fuel intent", () => {
     expect(s.insulin.reason).toMatch(/Add your BG/);
     const none = buildExerciseFuelSummary(computeExerciseFuelPlan({ ...base, preFuelIntent: "none" }), "mmol/L", settings);
     expect(none.eatNote).toMatch(/Add your BG/);
+  });
+});
+
+describe("buildExerciseFuelActionLines", () => {
+  const base = {
+    exerciseType: "cardio" as const,
+    intensity: "moderate" as const,
+    durationMinutes: 45,
+    minutesUntilStart: 30,
+    fasted: false,
+    bgUnits: "mmol/L",
+    settings,
+    isPump: false,
+    bgTrend: "flat" as const,
+  };
+
+  it("gives meal eat + insulin, at most two lines", () => {
+    const lines = buildExerciseFuelActionLines(
+      computeExerciseFuelPlan({ ...base, preFuelIntent: "meal", mealCarbsGrams: 50, currentBg: 8.5 }),
+      "mmol/L",
+      settings,
+    );
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toMatchObject({ label: "Eat", value: "50g" });
+    expect(lines[1]?.label).toBe("Take");
+    expect(lines[1]?.value).toMatch(/u$/);
+  });
+
+  it("gives snack size for a low top-up", () => {
+    const lines = buildExerciseFuelActionLines(
+      computeExerciseFuelPlan({ ...base, preFuelIntent: "top_up", currentBg: 6.2 }),
+      "mmol/L",
+      settings,
+    );
+    expect(lines[0]?.label).toBe("Snack");
+    expect(lines[0]?.value).toMatch(/g$/);
+    expect(lines.length).toBeLessThanOrEqual(2);
+  });
+
+  it("gives treat first when BG is hypo", () => {
+    const lines = buildExerciseFuelActionLines(
+      computeExerciseFuelPlan({ ...base, preFuelIntent: "top_up", currentBg: 3.8 }),
+      "mmol/L",
+      settings,
+    );
+    expect(lines[0]?.label).toBe("Treat first");
+  });
+
+  it("gives carry for not eating when in range", () => {
+    const lines = buildExerciseFuelActionLines(
+      computeExerciseFuelPlan({ ...base, preFuelIntent: "none", currentBg: 8.4 }),
+      "mmol/L",
+      settings,
+    );
+    expect(lines[0]).toMatchObject({ label: "Carry" });
+    expect(lines).toHaveLength(1);
+  });
+
+  it("omits carry when compact (Before step)", () => {
+    const lines = buildExerciseFuelActionLines(
+      computeExerciseFuelPlan({ ...base, preFuelIntent: "meal", mealCarbsGrams: 50, currentBg: 8.5 }),
+      "mmol/L",
+      settings,
+      { includeCarry: false },
+    );
+    expect(lines.every((l) => l.label !== "Carry")).toBe(true);
+    expect(lines.length).toBeLessThanOrEqual(2);
   });
 });
 

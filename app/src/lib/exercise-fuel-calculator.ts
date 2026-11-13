@@ -1248,8 +1248,8 @@ export function exerciseFuelInputFromSession(
 }
 
 /**
- * Three plain answers for the plan card — what to eat, what insulin, what to carry —
- * plus one reason. Built from the full result so the numbers always agree.
+ * Full summary (used for tests and any longer UI). Prefer {@link buildExerciseFuelActionLines}
+ * for the Plan a workout answer.
  */
 export function buildExerciseFuelSummary(
   result: ExerciseFuelCalculatorResult,
@@ -1277,4 +1277,70 @@ export function buildExerciseFuelSummary(
     },
     why: summaryWhy(result, bgUnits),
   };
+}
+
+export type ExerciseFuelActionLine = {
+  /** Short label, e.g. Eat / Take / Carry. */
+  label: string;
+  /** The number the user needs, e.g. "50g" / "4u". */
+  value: string;
+  tone?: "default" | "caution" | "insulin";
+};
+
+/**
+ * At most two action lines — the useful numbers only, no explanations.
+ * Meal → eat + insulin; snack → snack size (+ carry if needed); not eating → carry (+ correction).
+ */
+export function buildExerciseFuelActionLines(
+  result: ExerciseFuelCalculatorResult,
+  bgUnits: string,
+  settings?: UserSettings,
+  opts?: { deferTreatFirst?: boolean; includeCarry?: boolean },
+): ExerciseFuelActionLine[] {
+  const summary = buildExerciseFuelSummary(result, bgUnits, settings);
+  const includeCarry = opts?.includeCarry !== false;
+  const lines: ExerciseFuelActionLine[] = [];
+
+  const push = (line: ExerciseFuelActionLine) => {
+    if (lines.length < 2) lines.push(line);
+  };
+
+  if (summary.eat?.kind === "treat_first") {
+    push({
+      label: "Treat first",
+      value: opts?.deferTreatFirst ? "Now" : `~${summary.eat.grams}g`,
+      tone: "caution",
+    });
+  } else if (summary.eat?.kind === "meal") {
+    push({ label: "Eat", value: `${summary.eat.grams}g` });
+  } else if (summary.eat?.kind === "top_up") {
+    push({ label: "Snack", value: `~${summary.eat.grams}g` });
+  }
+
+  if (summary.insulin.units > 0) {
+    push({
+      label: summary.insulin.kind === "correction" ? "Correction" : "Take",
+      value: `${summary.insulin.kind === "correction" ? "~" : ""}${summary.insulin.units}u`,
+      tone: "insulin",
+    });
+  }
+
+  if (includeCarry && summary.carry.grams > 0 && lines.length < 2) {
+    // Prefer carry when there was nothing to eat or inject (not eating / in-range snack).
+    if (!summary.eat || summary.intent === "none" || (summary.intent === "top_up" && summary.insulin.units <= 0)) {
+      push({ label: "Carry", value: `~${summary.carry.grams}g` });
+    }
+  }
+
+  if (lines.length === 0) {
+    if (summary.intent === "meal" && !summary.eat) {
+      push({ label: "Meal", value: "Add carbs" });
+    } else if (summary.intent === "top_up") {
+      push({ label: "Snack", value: result.currentBg == null ? "Add BG" : "None" });
+    } else if (summary.intent === "none") {
+      push({ label: "Before", value: result.currentBg == null ? "Add BG" : "Ready" });
+    }
+  }
+
+  return lines;
 }

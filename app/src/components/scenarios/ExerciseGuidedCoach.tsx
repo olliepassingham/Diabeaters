@@ -153,12 +153,9 @@ import {
 import {
   PreFuelIntentPicker,
   PreFuelMealFields,
-  PreFuelMoreContext,
   PreFuelPlanSummary,
-  type PreFuelContextValues,
 } from "@/components/scenarios/exercise-pre-fuel-plan";
 import { getRapidInsulinDoses, rapidDoseWithinHours } from "@/lib/insulin-activity";
-import { parseOptionalBolusUnits } from "@/lib/meal-dose";
 
 /** Per-activity icon so the session header reads at a glance instead of always showing the same dumbbell. */
 const EXERCISE_TYPE_ICONS: Record<ExerciseType, typeof Dumbbell> = {
@@ -435,13 +432,6 @@ export function ExerciseGuidedCoach() {
   const [planIntent, setPlanIntent] = useState<ExercisePreFuelIntent | null>(null);
   const [planMealCarbs, setPlanMealCarbs] = useState("");
   const [planMealType, setPlanMealType] = useState<string>(() => defaultMealTypeForHour(new Date().getHours()));
-  const [planContext, setPlanContext] = useState<PreFuelContextValues>(() => ({
-    rapidInsulin2h: false,
-    pumpIob: "",
-    fasted: false,
-    lastMealMins: "",
-    lastMealCarbs: "",
-  }));
   const planToolUseRecorded = useRef(false);
 
   // Pre / active / recovery local input state (mirrors active session for snappy controls)
@@ -819,15 +809,9 @@ export function ExerciseGuidedCoach() {
     onBgFieldChange,
   };
 
-  useEffect(() => {
-    if (isPump) return;
-    if (rapidDoseWithinHours(getRapidInsulinDoses(), 2, Date.now())) {
-      setPlanContext((c) => ({ ...c, rapidInsulin2h: true }));
-    }
-  }, [isPump]);
-
   const planBg = parseFloatOrNull(bgInput);
   const planMealCarbsNum = parseWholeNumber(planMealCarbs);
+  const planRapidInsulin2h = !isPump && rapidDoseWithinHours(getRapidInsulinDoses(), 2, Date.now());
 
   const planFuelResult = useMemo((): ExerciseFuelCalculatorResult | null => {
     if (activeSession || !planIntent) return null;
@@ -840,7 +824,7 @@ export function ExerciseGuidedCoach() {
       effortShape: startIntensity === "intense" ? startEffortShape : undefined,
       durationMinutes,
       minutesUntilStart: startInMinutes,
-      fasted: planContext.fasted,
+      fasted: false,
       bgUnits,
       settings,
       isPump,
@@ -848,10 +832,7 @@ export function ExerciseGuidedCoach() {
       mealType: planIntent === "meal" ? planMealType : "snack",
       currentBg: planBg ?? undefined,
       bgTrend: planTrend && planTrend !== "not_sure" ? planTrend : null,
-      rapidInsulinLast2h: planContext.rapidInsulin2h,
-      pumpIobUnits: isPump ? parseOptionalBolusUnits(planContext.pumpIob) : null,
-      lastMealMinutesAgo: planContext.fasted ? undefined : parseWholeNumber(planContext.lastMealMins),
-      lastMealCarbsGrams: planContext.fasted ? undefined : parseWholeNumber(planContext.lastMealCarbs),
+      rapidInsulinLast2h: planRapidInsulin2h,
       profile,
     });
   }, [
@@ -859,10 +840,10 @@ export function ExerciseGuidedCoach() {
     bgUnits,
     isPump,
     planBg,
-    planContext,
     planIntent,
     planMealCarbsNum,
     planMealType,
+    planRapidInsulin2h,
     planTrend,
     profile,
     settings,
@@ -890,15 +871,11 @@ export function ExerciseGuidedCoach() {
           minutesUntilStart: startInMinutes,
         }
       : undefined;
-    const iob = isPump ? parseOptionalBolusUnits(planContext.pumpIob) : null;
     return {
       preBg: planBg ?? undefined,
       preTrend: planTrend ?? undefined,
-      preRapidInsulin2h: planContext.rapidInsulin2h ? "yes" : undefined,
-      preIobUnits: iob != null && iob >= 0 ? iob : undefined,
-      preFasted: planContext.fasted ? true : planIntent === "meal" || planIntent === "top_up" ? false : undefined,
-      prefuelMinutesAgo: planContext.fasted ? undefined : parseWholeNumber(planContext.lastMealMins),
-      prefuelGrams: planContext.fasted ? undefined : parseWholeNumber(planContext.lastMealCarbs),
+      preRapidInsulin2h: planRapidInsulin2h ? "yes" : undefined,
+      preFasted: planIntent === "meal" || planIntent === "top_up" ? false : undefined,
       prePlan,
     };
   };
@@ -1080,7 +1057,7 @@ export function ExerciseGuidedCoach() {
                   </span>
                   <div className="min-w-0">
                     <p className="text-lg font-semibold tracking-tight text-foreground">Plan a workout</p>
-                    <p className="text-xs text-muted-foreground">Your session and what to eat, inject and carry</p>
+                    <p className="text-xs text-muted-foreground">Quick setup, then what to do</p>
                   </div>
                 </div>
                 <ChevronDown
@@ -1267,20 +1244,12 @@ export function ExerciseGuidedCoach() {
                       onMealTypeChange={setPlanMealType}
                     />
                   ) : null}
-                  <PreFuelMoreContext
-                    values={planContext}
-                    onChange={(next) => setPlanContext((c) => ({ ...c, ...next }))}
-                    isPump={isPump}
-                  />
                   {planFuelResult ? (
-                    <div className="rounded-2xl border border-border/50 bg-muted/10 p-3.5">
-                      <PreFuelPlanSummary
-                        result={planFuelResult}
-                        bgUnits={bgUnits}
-                        settings={settings}
-                        profile={profile}
-                      />
-                    </div>
+                    <PreFuelPlanSummary
+                      result={planFuelResult}
+                      bgUnits={bgUnits}
+                      settings={settings}
+                    />
                   ) : null}
                 </div>
 
@@ -1857,8 +1826,8 @@ export function ExerciseGuidedCoach() {
 // ----- Sub-components -----
 
 /**
- * Before step: the pre-workout food plan chosen on "Plan a workout", recomputed from the
- * live reading. Carry is left to the coach's own fuel lines so there is one carry number.
+ * Before step: short action lines from "Plan a workout", recomputed from the live reading.
+ * Carry stays on the coach fuel strip so there is one carry number.
  */
 function PrePlanSessionCard({
   session,
@@ -1946,7 +1915,7 @@ function PrePlanSessionCard({
             onClick={saveDraft}
             data-testid="button-coach-preplan-save"
           >
-            Update plan
+            Save
           </Button>
         </div>
       </div>
@@ -1961,10 +1930,7 @@ function PrePlanSessionCard({
         className="flex w-full items-center justify-between gap-3 rounded-2xl border border-dashed border-border/60 bg-muted/10 px-3.5 py-3 text-left text-sm transition-colors hover:bg-muted/25"
         data-testid="button-coach-preplan-add"
       >
-        <span>
-          <span className="block font-medium text-foreground">Eating before you start?</span>
-          <span className="block text-xs text-muted-foreground">Get what to eat and any insulin for it</span>
-        </span>
+        <span className="font-medium text-foreground">Eating before?</span>
         <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
       </button>
     );
